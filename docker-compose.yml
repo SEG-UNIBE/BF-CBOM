@@ -1,0 +1,138 @@
+version: '3.8'
+
+services:
+  # Main BF-CBOM API service
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://bf_cbom:bf_cbom_pass@db:5432/bf_cbom_db
+      - REDIS_URL=redis://redis:6379/0
+      - ENV=production
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - bf-cbom-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Worker service for background tasks
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    command: ["python", "-m", "bf_cbom.worker"]
+    environment:
+      - DATABASE_URL=postgresql://bf_cbom:bf_cbom_pass@db:5432/bf_cbom_db
+      - REDIS_URL=redis://redis:6379/0
+      - ENV=production
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    networks:
+      - bf-cbom-network
+    restart: unless-stopped
+
+  # PostgreSQL database
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=bf_cbom_db
+      - POSTGRES_USER=bf_cbom
+      - POSTGRES_PASSWORD=bf_cbom_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - bf-cbom-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bf_cbom -d bf_cbom_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for caching and task queue
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --requirepass redis_pass
+    volumes:
+      - redis_data:/data
+    networks:
+      - bf-cbom-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis_pass", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - api
+    networks:
+      - bf-cbom-network
+    restart: unless-stopped
+
+  # Monitoring with Prometheus (optional)
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    networks:
+      - bf-cbom-network
+    restart: unless-stopped
+
+  # Grafana for visualization (optional)
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - bf-cbom-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  bf-cbom-network:
+    driver: bridge

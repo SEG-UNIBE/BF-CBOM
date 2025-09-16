@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      target: base
+    volumes:
+      - ./src:/app/src
+      - ./logs:/app/logs
+    environment:
+      - ENV=development
+      - DEBUG=true
+    command: ["uv", "run", "uvicorn", "bf_cbom.server:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    
+  worker:
+    build:
+      target: base
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+      - ./logs:/app/logs
+    environment:
+      - ENV=development
+      - DEBUG=true
