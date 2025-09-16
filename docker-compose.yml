@@ -1,12 +1,9 @@
-version: '3.8'
-
 services:
   # Main BF-CBOM API service
   api:
     build:
       context: .
       dockerfile: Dockerfile
-      target: production
     ports:
       - "8000:8000"
     environment:
@@ -32,7 +29,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: production
     command: ["python", "-m", "bf_cbom.worker"]
     environment:
       - DATABASE_URL=postgresql://bf_cbom:bf_cbom_pass@db:5432/bf_cbom_db

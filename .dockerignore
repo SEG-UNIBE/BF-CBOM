@@ -32,6 +32,7 @@ MANIFEST
 
 # Virtual environments
 .env
+.env.*
 .venv
 env/
 venv/
@@ -86,7 +87,6 @@ docker-compose*.yml
 .circleci/
 
 # Development
-README.md
 LICENSE
 CHANGELOG.md
 .editorconfig
@@ -96,3 +96,9 @@ CHANGELOG.md
 node_modules/
 package-lock.json
 yarn.lock
+
+# Scripts and utilities
+scripts/
+backups/
+logs/
+data/

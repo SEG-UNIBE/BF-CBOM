@@ -1,6 +1,6 @@
 """FastAPI server for BF-CBOM web interface."""
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List, Dict, Any
 import uvicorn
