@@ -85,9 +85,7 @@ def _asset_type_label(comp: dict) -> str:
     return label
 
 
-def analyze_cbom_json(
-    raw_json: str, _tool: str
-) -> tuple[int, Counter, Counter, Counter]:
+def analyze_cbom_json(raw_json: str, _tool: str) -> tuple[int, Counter, Counter, Counter]:
     """
     Parse a CBOM JSON string and return
     ``(total_components, type_counter, combo_counter, detail_counter)``.
@@ -113,7 +111,8 @@ def analyze_cbom_json(
         if isinstance(c, dict):
             name_val = c.get("name")
             if isinstance(name_val, str) and name_val.strip():
-                comp_name = name_val
+                before, sep, _ = name_val.partition("@")
+                comp_name = before if sep else name_val
             elif name_val is not None:
                 comp_name = str(name_val)
         detail_counter[(comp_type, asset_label, comp_name)] += 1
