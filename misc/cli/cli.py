@@ -1,8 +1,12 @@
+import io
 import json
 import os
 import sys
 import time
+import zipfile
+from pathlib import Path
 
+import click
 import redis
 import typer
 
@@ -15,6 +19,7 @@ from coordinator.redis_io import (
     get_bench_workers,
     list_benchmarks,
     now_iso,
+    pair_key,
     start_benchmark,
 )
 
@@ -22,7 +27,15 @@ app = typer.Typer(
     add_completion=False,
     help="BF-CBOM CLI: create and run benchmarks",
     no_args_is_help=True,
+    context_settings={"help_option_names": ["-h", "--help"]},
 )
+
+export_app = typer.Typer(
+    help="Export benchmark artifacts",
+    add_completion=False,
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
+app.add_typer(export_app, name="export")
 
 
 _STATUS_COLORS = {
@@ -85,6 +98,29 @@ def _summarize_bench(r: redis.Redis, bench_id: str) -> dict:
     }
 
 
+def _resolve_bench_id(r: redis.Redis, bench_id: str) -> str:
+    """Allow prefix matching for benchmark identifiers when unique."""
+
+    if not bench_id:
+        raise ValueError("Benchmark ID is required")
+
+    if r.exists(f"bench:{bench_id}"):
+        return bench_id
+
+    benches = r.smembers("benches") or []
+    matches = [bid for bid in benches if bid.startswith(bench_id)]
+
+    if not matches:
+        raise ValueError(f"No benchmark found matching '{bench_id}'")
+    if len(matches) > 1:
+        sample = ", ".join(sorted(matches)[:5])
+        raise ValueError(
+            f"Benchmark prefix '{bench_id}' is ambiguous ({len(matches)} matches: {sample}{'…' if len(matches) > 5 else ''})"
+        )
+
+    return matches[0]
+
+
 def _clear_screen() -> None:
     # ANSI clear + home
     sys.stdout.write("\x1b[2J\x1b[H")
@@ -107,6 +143,48 @@ def _render_lines(lines: list[str]) -> None:
     sys.stdout.write(output)
     sys.stdout.write("\n")
     sys.stdout.flush()
+
+
+def _build_cboms_zip_bytes(r: redis.Redis, bench_id: str) -> tuple[bytes, int]:
+    """Collect successful CBOM payloads for a benchmark and package them into a ZIP."""
+
+    repos = get_bench_repos(r, bench_id) or []
+    workers = get_bench_workers(r, bench_id) or []
+
+    mem = io.BytesIO()
+    written = 0
+    with zipfile.ZipFile(mem, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for repo in repos:
+            full = repo.get("full_name")
+            safe_repo = (full or "").replace("/", "_")
+            for worker in workers:
+                job_key = pair_key(full or "", worker)
+                job_id = r.hget(f"bench:{bench_id}:job_index", job_key)
+                if not job_id:
+                    continue
+                raw = r.hget(f"bench:{bench_id}:job:{job_id}", "result_json")
+                if not raw:
+                    continue
+                try:
+                    payload = json.loads(raw)
+                except Exception:
+                    continue
+                if payload.get("status") != "ok":
+                    continue
+                content = payload.get("json") or "{}"
+                try:
+                    parsed = json.loads(content)
+                    if isinstance(parsed, dict) and isinstance(parsed.get("bom"), dict):
+                        parsed = parsed["bom"]
+                    content = json.dumps(parsed, indent=2, ensure_ascii=False, sort_keys=True)
+                except Exception:
+                    # Keep original content if it is not valid JSON
+                    pass
+                archive_path = f"{bench_id}/{worker}/{safe_repo}_{worker}.json"
+                zf.writestr(archive_path, content)
+                written += 1
+    mem.seek(0)
+    return mem.read(), written
 
 
 @app.command()
@@ -282,41 +360,163 @@ def status(
         )
 
 
-@app.command()
-def export(
-    bench_id: str = typer.Argument(..., help="Benchmark ID"),
-    out: str | None = typer.Option(None, "--out", "-o", help="Output file; default stdout"),
+@export_app.callback(invoke_without_command=True)
+def export_default(
+    ctx: typer.Context,
+    out: str | None = typer.Option(
+        None,
+        "--out",
+        "-o",
+        help="Output file when exporting configs; defaults to stdout",
+    ),
     redis_host: str = typer.Option("localhost", envvar="REDIS_HOST", help="Redis host"),
     redis_port: int = typer.Option(6379, envvar="REDIS_PORT", help="Redis port"),
-):
-    """Export a minimal config for a benchmark (for reruns)."""
+) -> None:
+    """Backward-compatible entry point: `cli export` defaults to config export."""
+
+    if ctx.invoked_subcommand is not None:
+        return
+
+    remaining = list(ctx.args)
+    subcommands = set(ctx.command.commands.keys())
+
+    if not remaining:
+        typer.echo(ctx.get_help())
+        raise typer.Exit(1)
+
+    candidate = remaining.pop(0)
+
+    if candidate in subcommands:
+        if remaining and remaining[0] in ("-h", "--help"):
+            remaining.pop(0)
+            cmd = ctx.command.commands[candidate]
+            with click.Context(cmd, info_name=candidate, parent=ctx) as sub_ctx:
+                typer.echo(cmd.get_help(sub_ctx))
+            raise typer.Exit()
+
+        typer.echo(
+            f"Missing BENCH_ID argument for `cli export {candidate}`.\n"
+            f"Usage: uv run misc/cli/cli.py export {candidate} <BENCH_ID> [options]",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    bench_id = candidate
+
+    if remaining:
+        typer.echo(
+            "Unexpected extra arguments: " + " ".join(remaining),
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    ctx.invoke(
+        export_config,
+        bench_id=bench_id,
+        out=out,
+        redis_host=redis_host,
+        redis_port=redis_port,
+    )
+
+
+@export_app.command("config")
+def export_config(
+    bench_id: str = typer.Argument(..., help="Benchmark ID"),
+    out: str | None = typer.Option(
+        None,
+        "--out",
+        "-o",
+        help="Write JSON to this file instead of stdout",
+    ),
+    redis_host: str = typer.Option("localhost", envvar="REDIS_HOST", help="Redis host"),
+    redis_port: int = typer.Option(6379, envvar="REDIS_PORT", help="Redis port"),
+) -> None:
+    """Export a minimal config snapshot for a benchmark."""
+
     r = _connect_redis(redis_host, redis_port)
-    meta = get_bench_meta(r, bench_id)
+    try:
+        resolved_id = _resolve_bench_id(r, bench_id)
+    except ValueError as err:
+        typer.echo(str(err), err=True)
+        raise typer.Exit(1)
+
+    if resolved_id != bench_id:
+        typer.echo(f"Resolved benchmark ID '{bench_id}' -> '{resolved_id}'", err=True)
+
+    meta = get_bench_meta(r, resolved_id)
     if not meta:
         typer.echo(f"No such benchmark: {bench_id}", err=True)
         raise typer.Exit(1)
-    workers = get_bench_workers(r, bench_id)
-    repos = get_bench_repos(r, bench_id)
-    # Build dataclass config for nice JSON
-    repo_refs = []
-    for d in repos:
-        full = d.get("full_name")
-        git_url = d.get("clone_url") or d.get("git_url") or (f"https://github.com/{full}.git" if full else "")
-        branch = d.get("default_branch") or d.get("branch")
+
+    workers = get_bench_workers(r, resolved_id)
+    repos = get_bench_repos(r, resolved_id)
+
+    repo_refs: list[RepoRef] = []
+    for data in repos:
+        full = data.get("full_name")
+        git_url = data.get("clone_url") or data.get("git_url") or (f"https://github.com/{full}.git" if full else "")
+        branch = data.get("default_branch") or data.get("branch")
         repo_refs.append(RepoRef(full_name=full or "", git_url=git_url or "", branch=branch))
 
     cfg_obj = BenchmarkConfig(
         schema_version="1",
-        name=meta.get("name", bench_id) or "",
+        name=meta.get("name", resolved_id) or "",
         workers=workers,
         repos=repo_refs,
     )
     text = cfg_obj.to_json(indent=2)
+
     if out:
-        with open(out, "w", encoding="utf-8") as f:
-            f.write(text)
+        path = Path(out)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+        typer.echo(str(path))
     else:
         typer.echo(text)
+
+
+@export_app.command("cboms")
+def export_cboms(
+    bench_id: str = typer.Argument(..., help="Benchmark ID"),
+    dest: Path = typer.Option(..., "--dest", "-d", help="Directory to write the ZIP"),
+    filename: str | None = typer.Option(
+        None,
+        "--filename",
+        "-f",
+        help="Optional ZIP filename (defaults to cboms_<bench>.zip)",
+    ),
+    redis_host: str = typer.Option("localhost", envvar="REDIS_HOST", help="Redis host"),
+    redis_port: int = typer.Option(6379, envvar="REDIS_PORT", help="Redis port"),
+) -> None:
+    """Export a ZIP containing successful CBOMs for a benchmark."""
+
+    r = _connect_redis(redis_host, redis_port)
+    try:
+        resolved_id = _resolve_bench_id(r, bench_id)
+    except ValueError as err:
+        typer.echo(str(err), err=True)
+        raise typer.Exit(1)
+
+    if resolved_id != bench_id:
+        typer.echo(f"Resolved benchmark ID '{bench_id}' -> '{resolved_id}'", err=True)
+
+    meta = get_bench_meta(r, resolved_id)
+    if not meta:
+        typer.echo(f"No such benchmark: {bench_id}", err=True)
+        raise typer.Exit(1)
+
+    dest = dest.expanduser()
+    dest.mkdir(parents=True, exist_ok=True)
+    zip_name = filename or f"cboms_{resolved_id[:8]}.zip"
+    out_path = dest / zip_name
+
+    data, count = _build_cboms_zip_bytes(r, resolved_id)
+    out_path.write_bytes(data)
+
+    if count == 0:
+        typer.echo(f"Created empty archive (no successful CBOMs) at {out_path}", err=True)
+    else:
+        typer.echo(f"Wrote {count} CBOM(s) for {resolved_id[:8]} to {out_path}")
 
 
 @app.command()
@@ -385,7 +585,10 @@ def banner(
     typer.echo("  uv run misc/cli/cli.py run -c bench.json --wait")
     typer.echo("")
     typer.echo(typer.style("  # Export a config for an existing benchmark", fg=typer.colors.CYAN))
-    typer.echo("  uv run misc/cli/cli.py export <BENCH_ID> -o bench.json")
+    typer.echo("  uv run misc/cli/cli.py export config <BENCH_ID> -o bench.json")
+    typer.echo("")
+    typer.echo(typer.style("  # Download all CBOMs", fg=typer.colors.CYAN))
+    typer.echo("  uv run misc/cli/cli.py export cboms <BENCH_ID> --dest ./downloads")
     typer.echo("")
     typer.echo(typer.style("  # Check status", fg=typer.colors.CYAN))
     typer.echo("  uv run misc/cli/cli.py status <BENCH_ID> --json")
