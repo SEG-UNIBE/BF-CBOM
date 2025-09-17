@@ -1,0 +1,709 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:32c96bba-9d5c-4b8a-b1cb-3affb73da5cb",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2025-09-17T10:43:37Z",
+    "tools": {
+      "components": [],
+      "services": [
+        {
+          "provider": {
+            "name": "PQCA"
+          },
+          "name": "CBOMkit"
+        }
+      ]
+    },
+    "properties": [
+      {
+        "name": "gitUrl",
+        "value": "https://github.com/AutoGPTQ/AutoGPTQ"
+      },
+      {
+        "name": "revision",
+        "value": "Revision[value=main]"
+      },
+      {
+        "name": "commit",
+        "value": "9f7d370"
+      }
+    ]
+  },
+  "components": [
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "94689979-976d-49c4-8ff6-b5f16a760f2f",
+      "name": "private-key@94689979-976d-49c4-8ff6-b5f16a760f2f",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "examples/quantization/basic_usage.py",
+            "line": 57,
+            "offset": 27,
+            "additionalContext": "generate"
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "2b433489-97fb-4db8-bafc-2818a1e0214e",
+      "name": "Ed448",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "auto_gptq/modeling/_base.py",
+            "line": 418,
+            "offset": 19,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "auto_gptq/eval_tasks/text_summarization_task.py",
+            "line": 35,
+            "offset": 21,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "auto_gptq/eval_tasks/sequence_classification_task.py",
+            "line": 63,
+            "offset": 21,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "examples/quantization/basic_usage_gpt_xl.py",
+            "line": 83,
+            "offset": 27,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "examples/quantization/basic_usage.py",
+            "line": 57,
+            "offset": 27,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "examples/benchmark/generation_speed.py",
+            "line": 197,
+            "offset": 22,
+            "additionalContext": "generate"
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "signature",
+          "curve": "Edwards448",
+          "cryptoFunctions": [
+            "keygen"
+          ]
+        },
+        "oid": "1.3.101.113"
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "7ac57cbe-0ed8-4841-8167-b35ca48b8d36",
+      "name": "SHAKE256",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "auto_gptq/modeling/_base.py",
+            "line": 418,
+            "offset": 19,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "auto_gptq/eval_tasks/text_summarization_task.py",
+            "line": 35,
+            "offset": 21,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "auto_gptq/eval_tasks/sequence_classification_task.py",
+            "line": 63,
+            "offset": 21,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "examples/quantization/basic_usage_gpt_xl.py",
+            "line": 83,
+            "offset": 27,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "examples/quantization/basic_usage.py",
+            "line": 57,
+            "offset": 27,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "examples/benchmark/generation_speed.py",
+            "line": 197,
+            "offset": 22,
+            "additionalContext": "generate"
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "xof",
+          "parameterSetIdentifier": "256",
+          "cryptoFunctions": [
+            "digest"
+          ]
+        }
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "fa48816c-d0b1-47ce-a2f4-43981daf55ea",
+      "name": "private-key@fa48816c-d0b1-47ce-a2f4-43981daf55ea",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "auto_gptq/modeling/_base.py",
+            "line": 418,
+            "offset": 19,
+            "additionalContext": "generate"
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "525891ec-dff3-4d91-9b1c-6a0950aa60c1",
+      "name": "private-key@525891ec-dff3-4d91-9b1c-6a0950aa60c1",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "examples/benchmark/generation_speed.py",
+            "line": 197,
+            "offset": 22,
+            "additionalContext": "generate"
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "006328b4-e7e0-412d-bd69-63e7a9f4fbed",
+      "name": "private-key@006328b4-e7e0-412d-bd69-63e7a9f4fbed",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "auto_gptq/eval_tasks/text_summarization_task.py",
+            "line": 35,
+            "offset": 21,
+            "additionalContext": "generate"
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "60e8208a-dac4-4d39-a61d-294239e1cc6d",
+      "name": "private-key@60e8208a-dac4-4d39-a61d-294239e1cc6d",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "examples/quantization/basic_usage_gpt_xl.py",
+            "line": 83,
+            "offset": 27,
+            "additionalContext": "generate"
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "9f4c18e7-657a-4b8d-83f9-2fcfe6df3807",
+      "name": "private-key@9f4c18e7-657a-4b8d-83f9-2fcfe6df3807",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "auto_gptq/eval_tasks/text_summarization_task.py",
+            "line": 35,
+            "offset": 21,
+            "additionalContext": "generate"
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "46477a86-9a3e-4471-bc3f-e5d166d40d8b",
+      "name": "x448",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "auto_gptq/modeling/_base.py",
+            "line": 418,
+            "offset": 19,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "auto_gptq/eval_tasks/text_summarization_task.py",
+            "line": 35,
+            "offset": 21,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "auto_gptq/eval_tasks/sequence_classification_task.py",
+            "line": 63,
+            "offset": 21,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "examples/quantization/basic_usage_gpt_xl.py",
+            "line": 83,
+            "offset": 27,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "examples/quantization/basic_usage.py",
+            "line": 57,
+            "offset": 27,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "examples/benchmark/generation_speed.py",
+            "line": 197,
+            "offset": 22,
+            "additionalContext": "generate"
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "key-agree",
+          "curve": "Curve448",
+          "cryptoFunctions": [
+            "keygen"
+          ]
+        },
+        "oid": "1.3.101.111"
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "af7c98c1-381f-485a-9555-e4f17dbb2bfc",
+      "name": "Ed25519",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "auto_gptq/modeling/_base.py",
+            "line": 418,
+            "offset": 19,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "auto_gptq/eval_tasks/text_summarization_task.py",
+            "line": 35,
+            "offset": 21,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "auto_gptq/eval_tasks/sequence_classification_task.py",
+            "line": 63,
+            "offset": 21,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "examples/quantization/basic_usage_gpt_xl.py",
+            "line": 83,
+            "offset": 27,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "examples/quantization/basic_usage.py",
+            "line": 57,
+            "offset": 27,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "examples/benchmark/generation_speed.py",
+            "line": 197,
+            "offset": 22,
+            "additionalContext": "generate"
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "signature",
+          "curve": "Edwards25519",
+          "cryptoFunctions": [
+            "keygen"
+          ]
+        },
+        "oid": "1.3.101.112"
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "fccc9e7c-dbef-4dde-9796-f69026b004e2",
+      "name": "private-key@fccc9e7c-dbef-4dde-9796-f69026b004e2",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "auto_gptq/eval_tasks/sequence_classification_task.py",
+            "line": 63,
+            "offset": 21,
+            "additionalContext": "generate"
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "325bf47d-a4a5-4543-b6f2-c123d05dbfec",
+      "name": "private-key@325bf47d-a4a5-4543-b6f2-c123d05dbfec",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "examples/quantization/basic_usage_gpt_xl.py",
+            "line": 83,
+            "offset": 27,
+            "additionalContext": "generate"
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "4185b468-d149-4c3d-aa3f-3b4c873ad662",
+      "name": "private-key@4185b468-d149-4c3d-aa3f-3b4c873ad662",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "examples/benchmark/generation_speed.py",
+            "line": 197,
+            "offset": 22,
+            "additionalContext": "generate"
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "14fe3d56-511e-4bf8-ab97-6be57c1aa4e8",
+      "name": "private-key@14fe3d56-511e-4bf8-ab97-6be57c1aa4e8",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "auto_gptq/modeling/_base.py",
+            "line": 418,
+            "offset": 19,
+            "additionalContext": "generate"
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "f4129d19-a111-4460-b0d2-15576301a61e",
+      "name": "private-key@f4129d19-a111-4460-b0d2-15576301a61e",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "auto_gptq/eval_tasks/sequence_classification_task.py",
+            "line": 63,
+            "offset": 21,
+            "additionalContext": "generate"
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "5c7fd045-e5f2-455b-a7ca-a6510b99c7f4",
+      "name": "x25519",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "auto_gptq/modeling/_base.py",
+            "line": 418,
+            "offset": 19,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "auto_gptq/eval_tasks/text_summarization_task.py",
+            "line": 35,
+            "offset": 21,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "auto_gptq/eval_tasks/sequence_classification_task.py",
+            "line": 63,
+            "offset": 21,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "examples/quantization/basic_usage_gpt_xl.py",
+            "line": 83,
+            "offset": 27,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "examples/quantization/basic_usage.py",
+            "line": 57,
+            "offset": 27,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "examples/benchmark/generation_speed.py",
+            "line": 197,
+            "offset": 22,
+            "additionalContext": "generate"
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "key-agree",
+          "curve": "Curve25519",
+          "cryptoFunctions": [
+            "keygen"
+          ]
+        },
+        "oid": "1.3.101.110"
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "9022e1db-53aa-44b4-9ea1-4b9e30728c42",
+      "name": "SHA512",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "auto_gptq/modeling/_base.py",
+            "line": 418,
+            "offset": 19,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "auto_gptq/eval_tasks/text_summarization_task.py",
+            "line": 35,
+            "offset": 21,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "auto_gptq/eval_tasks/sequence_classification_task.py",
+            "line": 63,
+            "offset": 21,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "examples/quantization/basic_usage_gpt_xl.py",
+            "line": 83,
+            "offset": 27,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "examples/quantization/basic_usage.py",
+            "line": 57,
+            "offset": 27,
+            "additionalContext": "generate"
+          },
+          {
+            "location": "examples/benchmark/generation_speed.py",
+            "line": 197,
+            "offset": 22,
+            "additionalContext": "generate"
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "hash",
+          "parameterSetIdentifier": "512",
+          "cryptoFunctions": [
+            "digest"
+          ]
+        },
+        "oid": "2.16.840.1.101.3.4.2.3"
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "ce3d3647-2b51-429d-90d9-e538c689ca2b",
+      "name": "private-key@ce3d3647-2b51-429d-90d9-e538c689ca2b",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "examples/quantization/basic_usage.py",
+            "line": 57,
+            "offset": 27,
+            "additionalContext": "generate"
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      }
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "fa48816c-d0b1-47ce-a2f4-43981daf55ea",
+      "dependsOn": [
+        "2b433489-97fb-4db8-bafc-2818a1e0214e"
+      ]
+    },
+    {
+      "ref": "fccc9e7c-dbef-4dde-9796-f69026b004e2",
+      "dependsOn": [
+        "af7c98c1-381f-485a-9555-e4f17dbb2bfc"
+      ]
+    },
+    {
+      "ref": "325bf47d-a4a5-4543-b6f2-c123d05dbfec",
+      "dependsOn": [
+        "2b433489-97fb-4db8-bafc-2818a1e0214e"
+      ]
+    },
+    {
+      "ref": "9f4c18e7-657a-4b8d-83f9-2fcfe6df3807",
+      "dependsOn": [
+        "af7c98c1-381f-485a-9555-e4f17dbb2bfc"
+      ]
+    },
+    {
+      "ref": "60e8208a-dac4-4d39-a61d-294239e1cc6d",
+      "dependsOn": [
+        "af7c98c1-381f-485a-9555-e4f17dbb2bfc"
+      ]
+    },
+    {
+      "ref": "ce3d3647-2b51-429d-90d9-e538c689ca2b",
+      "dependsOn": [
+        "af7c98c1-381f-485a-9555-e4f17dbb2bfc"
+      ]
+    },
+    {
+      "ref": "f4129d19-a111-4460-b0d2-15576301a61e",
+      "dependsOn": [
+        "2b433489-97fb-4db8-bafc-2818a1e0214e"
+      ]
+    },
+    {
+      "ref": "14fe3d56-511e-4bf8-ab97-6be57c1aa4e8",
+      "dependsOn": [
+        "af7c98c1-381f-485a-9555-e4f17dbb2bfc"
+      ]
+    },
+    {
+      "ref": "4185b468-d149-4c3d-aa3f-3b4c873ad662",
+      "dependsOn": [
+        "af7c98c1-381f-485a-9555-e4f17dbb2bfc"
+      ]
+    },
+    {
+      "ref": "af7c98c1-381f-485a-9555-e4f17dbb2bfc",
+      "dependsOn": [
+        "9022e1db-53aa-44b4-9ea1-4b9e30728c42"
+      ]
+    },
+    {
+      "ref": "94689979-976d-49c4-8ff6-b5f16a760f2f",
+      "dependsOn": [
+        "2b433489-97fb-4db8-bafc-2818a1e0214e"
+      ]
+    },
+    {
+      "ref": "006328b4-e7e0-412d-bd69-63e7a9f4fbed",
+      "dependsOn": [
+        "2b433489-97fb-4db8-bafc-2818a1e0214e"
+      ]
+    },
+    {
+      "ref": "2b433489-97fb-4db8-bafc-2818a1e0214e",
+      "dependsOn": [
+        "7ac57cbe-0ed8-4841-8167-b35ca48b8d36"
+      ]
+    },
+    {
+      "ref": "525891ec-dff3-4d91-9b1c-6a0950aa60c1",
+      "dependsOn": [
+        "2b433489-97fb-4db8-bafc-2818a1e0214e"
+      ]
+    }
+  ]
+}
