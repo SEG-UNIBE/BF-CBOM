@@ -91,4 +91,4 @@ done
 
 echo "[cbomkit] Starting Python worker..."
 export CBOMKIT_BASE_URL="http://127.0.0.1:${CBOMKIT_PORT}"
-exec uv run workers/cbomkit/main.py
+exec uv run --no-dev workers/cbomkit/main.py

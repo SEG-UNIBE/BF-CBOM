@@ -18,4 +18,4 @@ RUN pip install --no-cache-dir --upgrade pip \
 COPY --chown=appuser:appuser workers/testing/ ./workers/testing/
 
 # Proper PID 1 and clean shutdown
-ENTRYPOINT ["tini","-g","--","uv","run","workers/testing/main.py"]
+ENTRYPOINT ["tini","-g","--","uv","run","--no-dev","workers/testing/main.py"]

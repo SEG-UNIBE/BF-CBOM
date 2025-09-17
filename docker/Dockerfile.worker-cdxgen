@@ -22,4 +22,4 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip uv \
 # Worker code last
 COPY workers/cdxgen/ ./workers/cdxgen/
 
-ENTRYPOINT ["uv","run","workers/cdxgen/main.py"]
+ENTRYPOINT ["uv", "run", "--no-dev", "workers/cdxgen/main.py"]
