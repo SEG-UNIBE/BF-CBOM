@@ -5,7 +5,7 @@ In short, your **b**est **f**riend for generating and analyzing CBOMs.*
 
 <div align="center">
   <!-- Replace the src below with your actual logo path if/when available -->
-  <img width="50%" src="logo.png" alt="CBOMB logo" />
+  <img width="50%" src="logo.png" alt="BF-CBOM logo" />
 </div>
 
 </br>
