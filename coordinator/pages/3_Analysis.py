@@ -4,7 +4,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from common.cbom_analysis import analyze_cbom_json
+from common.cbom_analysis import analyze_cbom_json, summarize_component_types
 from common.utils import get_status_emoji, get_status_keys_order, status_text
 from coordinator.redis_io import (
     get_bench_meta,
@@ -353,55 +353,13 @@ if comp_rows:
     )
 
     st.subheader("Component Types")
-    type_summary: dict[str, dict[tuple[str, str, str], dict[str, int]]] = {}
-    for row in comp_rows:
-        repo_name = row.get("repo")
-        worker_name = row.get("worker")
-        combo_counts = row.get("type_asset_counts") or {}
-        detail_counts = row.get("type_asset_name_counts") or {}
-        type_counts = row.get("types") or {}
-        if not repo_name or not worker_name:
-            continue
-        repo_map = type_summary.setdefault(repo_name, {})
-        if detail_counts:
-            source_iter = detail_counts.items()
-        elif combo_counts:
-            source_iter = [
-                ((str(comp_type) or "(unknown)", str(asset_label or ""), ""), count)
-                for (comp_type, asset_label), count in combo_counts.items()
-            ]
-        else:
-            source_iter = [((str(comp_type) or "(unknown)", "", ""), count) for comp_type, count in type_counts.items()]
-        for key, count in source_iter:
-            if isinstance(key, tuple) and len(key) == 3:
-                base_type, asset_label, name = key
-            elif isinstance(key, tuple) and len(key) == 2:
-                base_type, asset_label = key
-                name = ""
-            else:
-                base_type, asset_label, name = key, "", ""
-            base_type_str = str(base_type or "(unknown)")
-            asset_label_str = str(asset_label or "")
-            name_str = str(name or "")
-            type_map = repo_map.setdefault((base_type_str, asset_label_str, name_str), {})
-            type_map[worker_name] = safe_int(count)
-
-    if not type_summary:
+    component_tables = summarize_component_types(comp_rows, workers)
+    if not component_tables:
         st.caption("No component type information available yet.")
     else:
-        for repo_name in sorted(type_summary.keys()):
+        for repo_name in sorted(component_tables.keys()):
             with st.expander(f"{repo_name}"):
-                type_map = type_summary[repo_name]
-                rows = []
-                for (comp_type, asset_type, name), counts in sorted(type_map.items()):
-                    entry = {
-                        "component.type": comp_type,
-                        "asset.type": asset_type,
-                        "name": name,
-                    }
-                    for w in workers:
-                        entry[w] = safe_int(counts.get(w, 0))
-                    rows.append(entry)
+                rows = component_tables.get(repo_name) or []
                 if not rows:
                     st.caption("No component type information available yet.")
                     continue
