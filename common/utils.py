@@ -32,9 +32,7 @@ def _date_days_ago(days):
     return dt.strftime("%Y-%m-%d")
 
 
-def github_search(
-    language, stars_min, stars_max, days_since_commit, sample_size=10, github_token=None
-):
+def github_search(language, stars_min, stars_max, days_since_commit, sample_size=10, github_token=None):
     # Build query
     query = f"language:{language} stars:{stars_min}..{stars_max} pushed:>={_date_days_ago(days_since_commit)}"
     url = f"https://api.github.com/search/repositories?q={query}&sort=stars&order=desc&per_page={sample_size}"
@@ -88,9 +86,7 @@ def check_git_installed():
                 git_dir = os.path.dirname(abs_git)
                 cur = os.environ.get("PATH", "")
                 if git_dir not in cur.split(os.pathsep):
-                    os.environ["PATH"] = (
-                        f"{git_dir}{os.pathsep}{cur}" if cur else git_dir
-                    )
+                    os.environ["PATH"] = f"{git_dir}{os.pathsep}{cur}" if cur else git_dir
                 if shutil.which("git") is not None:
                     return True
     except Exception:
@@ -129,9 +125,7 @@ def clone_repo(github_url, branch="main", target_dir="repo"):
         return None
 
     # Avoid leaking tokens if present in URL.
-    display_url = re.sub(
-        r"https://[^@]+@github.com/", "https://github.com/", str(github_url)
-    )
+    display_url = re.sub(r"https://[^@]+@github.com/", "https://github.com/", str(github_url))
     print(f"Starting clone: {display_url} (branch: {branch})")
     try:
         # Clean up the target directory before cloning
@@ -258,9 +252,7 @@ def clone_repo(github_url, branch="main", target_dir="repo"):
                 reason = "network error"
             print(f"Error: Git clone failed (rc=128): {reason}", file=sys.stderr)
             if tail:
-                safe_tail = re.sub(
-                    r"https://[^@]+@github.com/", "https://github.com/", tail
-                )
+                safe_tail = re.sub(r"https://[^@]+@github.com/", "https://github.com/", tail)
                 print(safe_tail, file=sys.stderr)
             return None
 

@@ -152,11 +152,7 @@ def github_search_multi_language(
             seen.add(lang)
 
     # Compute pushed date cutoff
-    pushed_date = (
-        (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=int(days_since)))
-        .date()
-        .isoformat()
-    )
+    pushed_date = (dt.datetime.now(dt.UTC) - dt.timedelta(days=int(days_since))).date().isoformat()
 
     base_parts = [
         f"stars:{int(stars_min)}..{int(stars_max)}",
@@ -208,9 +204,7 @@ def format_duration_and_size(duration_sec, size_bytes) -> str:
         size_txt = f"{kb:.1f} KB"
     else:
         size_txt = ""
-    return " ".join(
-        [t for t in [dur_txt, "·" if dur_txt and size_txt else "", size_txt] if t]
-    ).strip()
+    return " ".join([t for t in [dur_txt, "·" if dur_txt and size_txt else "", size_txt] if t]).strip()
 
 
 # ----- Coordinator helpers (moved out of pages) -----
@@ -407,13 +401,9 @@ def enrich_repos_with_github(repos: list[dict], token: str | None = None) -> lis
         # Merge key fields
         merged = dict(r)
         merged["language"] = data.get("language", merged.get("language"))
-        merged["stargazers_count"] = data.get(
-            "stargazers_count", merged.get("stargazers_count")
-        )
+        merged["stargazers_count"] = data.get("stargazers_count", merged.get("stargazers_count"))
         merged["size"] = data.get("size", merged.get("size"))  # KB
-        merged["default_branch"] = data.get(
-            "default_branch", merged.get("default_branch")
-        )
+        merged["default_branch"] = data.get("default_branch", merged.get("default_branch"))
         merged["html_url"] = data.get("html_url", merged.get("html_url"))
         merged["clone_url"] = data.get("clone_url", merged.get("clone_url"))
         merged["ssh_url"] = data.get("ssh_url", merged.get("ssh_url"))
@@ -470,9 +460,7 @@ def build_cboms_zip(r, bench_id: str) -> bytes:
                     parsed = json.loads(content)
                     if isinstance(parsed, dict) and isinstance(parsed.get("bom"), dict):
                         parsed = parsed["bom"]
-                    content = json.dumps(
-                        parsed, indent=2, ensure_ascii=False, sort_keys=True
-                    )
+                    content = json.dumps(parsed, indent=2, ensure_ascii=False, sort_keys=True)
                 except Exception:
                     pass
                 safe_repo = (full or "").replace("/", "_")
@@ -491,9 +479,7 @@ def build_cboms_zip(r, bench_id: str) -> bytes:
 
 def _repo_minimal(d: dict) -> dict:
     full = d.get("full_name")
-    git_url = d.get("clone_url") or d.get("git_url") or (
-        f"https://github.com/{full}.git" if full else ""
-    )
+    git_url = d.get("clone_url") or d.get("git_url") or (f"https://github.com/{full}.git" if full else "")
     out_d: dict = {"full_name": full, "git_url": git_url}
     branch = d.get("default_branch") or d.get("branch")
     if branch:
@@ -501,9 +487,7 @@ def _repo_minimal(d: dict) -> dict:
     return out_d
 
 
-def build_minimal_config_dict(
-    *, name: str, workers: list[str], repos: list[dict]
-) -> dict:
+def build_minimal_config_dict(*, name: str, workers: list[str], repos: list[dict]) -> dict:
     """Return minimal benchmark config dict used by CLI/CI downloads.
 
     Includes only:

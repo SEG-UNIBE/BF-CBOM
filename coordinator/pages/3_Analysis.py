@@ -37,10 +37,7 @@ if not benches:
     st.info("No benchmarks found. Please create one first.")
     st.stop()
 
-labels = [
-    f"{m.get('name', '(unnamed)')} · {bid[:8]} · {m.get('status', '?')}"
-    for bid, m in benches
-]
+labels = [f"{m.get('name', '(unnamed)')} · {bid[:8]} · {m.get('status', '?')}" for bid, m in benches]
 default_idx = 0
 if bench_id_hint:
     try:
@@ -64,15 +61,11 @@ repos = get_bench_repos(r, bench_id)
 created = meta.get("created_at") or meta.get("started_at") or "?"
 expected = meta.get("expected_jobs") or "?"
 
-st.markdown(
-    format_benchmark_header(name, bench_id, created, expected), unsafe_allow_html=True
-)
+st.markdown(format_benchmark_header(name, bench_id, created, expected), unsafe_allow_html=True)
 
 job_idx = r.hgetall(f"bench:{bench_id}:job_index") or {}
 order_keys = get_status_keys_order()
-worker_status_counts = {
-    w: {status_text(k, "label"): 0 for k in order_keys} for w in workers
-}
+worker_status_counts = {w: {status_text(k, "label"): 0 for k in order_keys} for w in workers}
 comp_rows = []  # rows: repo, worker, total_components, types (Counter)
 repo_worker_status: dict[str, dict[str, str]] = {}
 
@@ -153,7 +146,8 @@ for repo in repos:
                         if not size_val:
                             repo_info = payload.get("repo_info") or {}
                             size_val = safe_int(
-                                repo_info.get("size") or repo_info.get("size_kb"), default=0
+                                repo_info.get("size") or repo_info.get("size_kb"),
+                                default=0,
                             )
                         scatter_rows.append(
                             {
@@ -183,10 +177,7 @@ if chart_data:
     domain = order
     # Map from label to color via key order
     key_order = get_status_keys_order()
-    label_to_color = {
-        status_text(k, "label"): status_meta[k].get("color", "#999999")
-        for k in key_order
-    }
+    label_to_color = {status_text(k, "label"): status_meta[k].get("color", "#999999") for k in key_order}
     colors = [label_to_color.get(lbl, "#999999") for lbl in domain]
 
     chart = (
@@ -232,9 +223,7 @@ if scatter_rows:
         y_title = "Reported components"
         y_scale = alt.Scale(zero=True)
 
-    filtered = df_scatter[
-        df_scatter["worker"].isin(selected_workers)
-    ]
+    filtered = df_scatter[df_scatter["worker"].isin(selected_workers)]
 
     if filtered.empty:
         st.info("No data points for the selected filters.")
@@ -335,9 +324,7 @@ if comp_rows:
     comp_df = pd.DataFrame(comp_rows)
     # Pivot: rows=repo, cols=workers, values=total_components
     pivot = (
-        comp_df.pivot_table(
-            index="repo", columns="worker", values="total_components", aggfunc="max"
-        )
+        comp_df.pivot_table(index="repo", columns="worker", values="total_components", aggfunc="max")
         .fillna(0)
         .astype(int)
     )

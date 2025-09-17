@@ -10,8 +10,7 @@ from common.utils import (
     get_status_emoji,
 )
 from coordinator.redis_io import delete_benchmark, get_redis, list_benchmarks
-from coordinator.utils import build_minimal_config_json
-from coordinator.utils import human_duration, set_query_bench_id
+from coordinator.utils import build_minimal_config_json, human_duration, set_query_bench_id
 
 
 def _init_logging():
@@ -25,9 +24,7 @@ def _init_logging():
 
 logger = _init_logging()
 print("[coordinator] Starting Streamlit app…")
-logger.info(
-    "Coordinator: starting Streamlit app (version=%s)", getattr(st, "__version__", "?")
-)
+logger.info("Coordinator: starting Streamlit app (version=%s)", getattr(st, "__version__", "?"))
 
 st.set_page_config(
     page_title="Start",
@@ -63,7 +60,7 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
-st.caption("Benchmarking Framework for Cryptographic Bill of Materials")
+st.caption("Benchmarking Framework for Cryptographic Bill of Material (CBOM) Generator Tools")
 
 # Top action: create new benchmark
 if st.button("➕ Create New Benchmark", type="primary"):
@@ -126,16 +123,11 @@ with left:
                             workers = st.session_state.get("_tmp_workers", None)  # unused guard
                             # Defer to utility to keep shape consistent
                             repos_key = f"bench:{bid}:repos"
-                            repos = [
-                                __import__("json").loads(x)
-                                for x in r.lrange(repos_key, 0, -1) or []
-                            ]
+                            repos = [__import__("json").loads(x) for x in r.lrange(repos_key, 0, -1) or []]
                             name_txt = meta.get("name", bid)
                             # Workers list is stored in bench meta as JSON
                             try:
-                                workers_list = __import__("json").loads(
-                                    meta.get("workers_json", "[]")
-                                )
+                                workers_list = __import__("json").loads(meta.get("workers_json", "[]"))
                             except Exception:
                                 workers_list = []
                             cfg_text = build_minimal_config_json(
@@ -151,13 +143,9 @@ with left:
                         except Exception:
                             pass
                     with d2:
-                        if st.button(
-                            "🗑️", key=f"del_{bid}", help="Delete benchmark"
-                        ):
+                        if st.button("🗑️", key=f"del_{bid}", help="Delete benchmark"):
                             deleted = delete_benchmark(r, bid)
-                            st.toast(
-                                f"Deleted benchmark {bid[:8]} (jobs removed: {deleted})"
-                            )
+                            st.toast(f"Deleted benchmark {bid[:8]} (jobs removed: {deleted})")
                             st.rerun()
 
 with mid:
@@ -180,9 +168,7 @@ with right:
     total_benches = len(benches)
 
     # Global job stats across all benches
-    status_counts = {
-        k: 0 for k in ("completed", "failed", "cancelled", "pending", "timeout")
-    }
+    status_counts = {k: 0 for k in ("completed", "failed", "cancelled", "pending", "timeout")}
     total_duration = 0.0
     duration_count = 0
     try:

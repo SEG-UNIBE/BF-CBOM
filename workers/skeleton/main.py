@@ -18,9 +18,7 @@ class SkeletonClient:
     def __init__(self):
         pass
 
-    def generate_cbom(
-        self, git_url: str, branch: str = "main", trace: Trace | None = None
-    ) -> str:
+    def generate_cbom(self, git_url: str, branch: str = "main", trace: Trace | None = None) -> str:
         """
         Implement your CBOM generation here.
         Return a JSON string (valid or empty '{}').

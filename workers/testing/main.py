@@ -82,9 +82,7 @@ class TestingClient:
         # First build with empty notes to estimate base size
         for i in range(base_comp_count):
             # Deterministic per-component asset type selection
-            atype = COMMON_CRYPTO_ASSET_TYPES[
-                (h + i * 31) % len(COMMON_CRYPTO_ASSET_TYPES)
-            ]
+            atype = COMMON_CRYPTO_ASSET_TYPES[(h + i * 31) % len(COMMON_CRYPTO_ASSET_TYPES)]
             comp = {
                 "type": "crypto-asset",
                 "name": f"component-{i}",
@@ -152,13 +150,9 @@ class TestingClient:
         final_json = json.dumps(cbom, ensure_ascii=False)
         cur_bytes = len(final_json.encode("utf-8"))
         if cur_bytes < target_bytes:
-            pad = "x" * min(
-                target_bytes - cur_bytes, 32 * 1024
-            )  # cap extra pad to 32KB
+            pad = "x" * min(target_bytes - cur_bytes, 32 * 1024)  # cap extra pad to 32KB
             cbom["metadata"]["testing"]["padding"] = len(pad)
-            cbom["metadata"]["testing"]["actual_kb_before_pad"] = round(
-                cur_bytes / 1024, 1
-            )
+            cbom["metadata"]["testing"]["actual_kb_before_pad"] = round(cur_bytes / 1024, 1)
             cbom["metadata"]["testing"]["target_bytes"] = target_bytes
             cbom["metadata"]["testing"]["repo_kb"] = repo_kb
             cbom["metadata"]["testing"]["ratio"] = round(ratio, 3)

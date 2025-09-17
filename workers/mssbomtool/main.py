@@ -28,9 +28,7 @@ def _which(prog: str) -> str | None:
         return None
 
 
-def _run(
-    cmd: list[str], cwd: Path | None = None, timeout: int | None = None
-) -> subprocess.CompletedProcess:
+def _run(cmd: list[str], cwd: Path | None = None, timeout: int | None = None) -> subprocess.CompletedProcess:
     """
     Run a command and return the CompletedProcess. Raises on non-zero returncode.
     """
@@ -84,41 +82,25 @@ class MsSbomToolClient:
             produced_paths: list[Path] = []
             try:
                 if self.cli_path:
-                    produced_paths = self._run_sbom_cli(
-                        repo_dir, pkg_name, pkg_version, pkg_supplier
-                    )
+                    produced_paths = self._run_sbom_cli(repo_dir, pkg_name, pkg_version, pkg_supplier)
                 elif self.docker_path:
-                    produced_paths = self._run_sbom_docker(
-                        repo_dir, pkg_name, pkg_version, pkg_supplier
-                    )
+                    produced_paths = self._run_sbom_docker(repo_dir, pkg_name, pkg_version, pkg_supplier)
                 else:
-                    raise RuntimeError(
-                        "neither `sbom-tool` nor `docker` is available in PATH"
-                    )
+                    raise RuntimeError("neither `sbom-tool` nor `docker` is available in PATH")
             except subprocess.TimeoutExpired as te:
-                raise RuntimeError(
-                    f"sbom-tool timed out after {CMD_TIMEOUT_SEC}s"
-                ) from te
+                raise RuntimeError(f"sbom-tool timed out after {CMD_TIMEOUT_SEC}s") from te
             except subprocess.CalledProcessError as cpe:
-                raise RuntimeError(
-                    f"sbom-tool failed: {cpe.stderr.strip() or cpe.stdout.strip()}"
-                ) from cpe
+                raise RuntimeError(f"sbom-tool failed: {cpe.stderr.strip() or cpe.stdout.strip()}") from cpe
 
             # 4) pick the most likely JSON file
             json_path = self._find_best_json(repo_dir)
             if not json_path and produced_paths:
                 # fallback: inspect produced paths for json
-                json_candidates = [
-                    p
-                    for p in produced_paths
-                    if p.suffix.lower() == ".json" and p.is_file()
-                ]
+                json_candidates = [p for p in produced_paths if p.suffix.lower() == ".json" and p.is_file()]
                 json_path = json_candidates[0] if json_candidates else None
 
             if not json_path:
-                logger.warning(
-                    "[%s] sbom-tool produced no JSON output we could find", NAME
-                )
+                logger.warning("[%s] sbom-tool produced no JSON output we could find", NAME)
                 return "{}"
 
             try:
@@ -126,9 +108,7 @@ class MsSbomToolClient:
                 # Normalize by dumping again to ensure we return valid JSON text
                 return json.dumps(data, ensure_ascii=False)
             except Exception as e:
-                logger.warning(
-                    "[%s] failed to parse JSON at %s: %s", NAME, json_path, e
-                )
+                logger.warning("[%s] failed to parse JSON at %s: %s", NAME, json_path, e)
                 # Return raw bytes if it's at least text-ish
                 try:
                     return json_path.read_text(encoding="utf-8", errors="replace")
@@ -160,9 +140,7 @@ class MsSbomToolClient:
         except Exception:
             return None
 
-    def _run_sbom_cli(
-        self, repo_dir: Path, pkg_name: str, pkg_version: str, pkg_supplier: str
-    ) -> list[Path]:
+    def _run_sbom_cli(self, repo_dir: Path, pkg_name: str, pkg_version: str, pkg_supplier: str) -> list[Path]:
         """
         Invoke local `sbom-tool` CLI.
         The tool typically writes under `<repo>/_manifest/...`.

@@ -2,11 +2,11 @@ import json
 import os
 import sys
 import time
-from typing import Optional
 
 import redis
 import typer
 
+from common.models import BenchmarkConfig, RepoRef
 from coordinator.redis_io import (
     collect_results_once,
     create_benchmark,
@@ -17,8 +17,6 @@ from coordinator.redis_io import (
     now_iso,
     start_benchmark,
 )
-from common.models import BenchmarkConfig, RepoRef
-
 
 app = typer.Typer(
     add_completion=False,
@@ -61,7 +59,7 @@ def _connect_redis(host: str, port: int) -> redis.Redis:
 def _read_config_text(path: str) -> str:
     if path == "-":
         return sys.stdin.read()
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         return f.read()
 
 
@@ -113,9 +111,7 @@ def _render_lines(lines: list[str]) -> None:
 
 @app.command()
 def watch(
-    bench_id: Optional[str] = typer.Option(
-        None, "--bench-id", "-b", help="Follow a specific benchmark"
-    ),
+    bench_id: str | None = typer.Option(None, "--bench-id", "-b", help="Follow a specific benchmark"),
     redis_host: str = typer.Option("localhost", envvar="REDIS_HOST"),
     redis_port: int = typer.Option(6379, envvar="REDIS_PORT"),
     interval: float = typer.Option(2.0, help="Refresh interval seconds"),
@@ -192,21 +188,13 @@ def watch(
 
 @app.command()
 def run(
-    config: str = typer.Option(
-        ..., "--config", "-c", help="Path to config JSON or '-' for stdin"
-    ),
-    name: Optional[str] = typer.Option(
-        None, "--name", "-n", help="Override benchmark name from config"
-    ),
-    redis_host: str = typer.Option(
-        "localhost", envvar="REDIS_HOST", help="Redis host"
-    ),
+    config: str = typer.Option(..., "--config", "-c", help="Path to config JSON or '-' for stdin"),
+    name: str | None = typer.Option(None, "--name", "-n", help="Override benchmark name from config"),
+    redis_host: str = typer.Option("localhost", envvar="REDIS_HOST", help="Redis host"),
     redis_port: int = typer.Option(6379, envvar="REDIS_PORT", help="Redis port"),
     wait: bool = typer.Option(False, "--wait", help="Wait for completion"),
     poll_interval: float = typer.Option(2.0, help="Polling interval when waiting (sec)"),
-    timeout: Optional[int] = typer.Option(
-        None, help="Max seconds to wait before exiting"
-    ),
+    timeout: int | None = typer.Option(None, help="Max seconds to wait before exiting"),
 ):
     """Create a benchmark from config, start it, and optionally wait."""
 
@@ -231,12 +219,14 @@ def run(
 
     r = _connect_redis(redis_host, redis_port)
     repos_payload = [
-        {"full_name": rr.full_name, "git_url": rr.git_url, **({"branch": rr.branch} if rr.branch else {})}
+        {
+            "full_name": rr.full_name,
+            "git_url": rr.git_url,
+            **({"branch": rr.branch} if rr.branch else {}),
+        }
         for rr in repos_refs
     ]
-    bench_id = create_benchmark(
-        r, name=bench_name, params=params, repos=repos_payload, workers=workers
-    )
+    bench_id = create_benchmark(r, name=bench_name, params=params, repos=repos_payload, workers=workers)
     typer.echo(bench_id)
     issued = start_benchmark(r, bench_id)
     typer.secho(f"Issued jobs: {issued}", fg=typer.colors.BLUE, err=True)
@@ -274,9 +264,7 @@ def run(
 @app.command()
 def status(
     bench_id: str = typer.Argument(..., help="Benchmark ID"),
-    redis_host: str = typer.Option(
-        "localhost", envvar="REDIS_HOST", help="Redis host"
-    ),
+    redis_host: str = typer.Option("localhost", envvar="REDIS_HOST", help="Redis host"),
     redis_port: int = typer.Option(6379, envvar="REDIS_PORT", help="Redis port"),
     json_out: bool = typer.Option(False, "--json", help="Emit JSON summary"),
 ):
@@ -299,10 +287,8 @@ def status(
 @app.command()
 def export(
     bench_id: str = typer.Argument(..., help="Benchmark ID"),
-    out: Optional[str] = typer.Option(None, "--out", "-o", help="Output file; default stdout"),
-    redis_host: str = typer.Option(
-        "localhost", envvar="REDIS_HOST", help="Redis host"
-    ),
+    out: str | None = typer.Option(None, "--out", "-o", help="Output file; default stdout"),
+    redis_host: str = typer.Option("localhost", envvar="REDIS_HOST", help="Redis host"),
     redis_port: int = typer.Option(6379, envvar="REDIS_PORT", help="Redis port"),
 ):
     """Export a minimal config for a benchmark (for reruns)."""
@@ -317,9 +303,7 @@ def export(
     repo_refs = []
     for d in repos:
         full = d.get("full_name")
-        git_url = d.get("clone_url") or d.get("git_url") or (
-            f"https://github.com/{full}.git" if full else ""
-        )
+        git_url = d.get("clone_url") or d.get("git_url") or (f"https://github.com/{full}.git" if full else "")
         branch = d.get("default_branch") or d.get("branch")
         repo_refs.append(RepoRef(full_name=full or "", git_url=git_url or "", branch=branch))
 
@@ -353,12 +337,17 @@ def banner(
 
     status = "ok" if ok else "unreachable"
     try:
-        with open("logo.txt", "r", encoding="utf-8") as art_file:
+        with open("logo.txt", encoding="utf-8") as art_file:
             art_lines = [line.rstrip("\n") for line in art_file.readlines()]
     except OSError:
         art_lines = []
 
-    palette = [typer.colors.CYAN, typer.colors.BRIGHT_BLUE, typer.colors.MAGENTA, typer.colors.BRIGHT_MAGENTA]
+    palette = [
+        typer.colors.CYAN,
+        typer.colors.BRIGHT_BLUE,
+        typer.colors.MAGENTA,
+        typer.colors.BRIGHT_MAGENTA,
+    ]
     for idx, line in enumerate(art_lines):
         if line.strip():
             fg = palette[idx % len(palette)]
@@ -369,7 +358,10 @@ def banner(
     typer.echo("")
     typer.secho("BF-CBOM CLI", fg=typer.colors.BRIGHT_CYAN, bold=True)
     typer.echo(
-        typer.style("Create benchmarks, orchestrate workers, and monitor progress.", fg=typer.colors.WHITE)
+        typer.style(
+            "Create benchmarks, orchestrate workers, and monitor progress.",
+            fg=typer.colors.WHITE,
+        )
     )
 
     status_color = typer.colors.GREEN if ok else typer.colors.RED
@@ -399,7 +391,6 @@ def banner(
     typer.echo("")
     typer.echo(typer.style("  # Check status", fg=typer.colors.CYAN))
     typer.echo("  uv run cli.py status <BENCH_ID> --json")
-
 
 
 if __name__ == "__main__":

@@ -250,9 +250,7 @@ def _render_job_results(
                     cbom_txt = payload.get("json") or "{}"
                     try:
                         obj = json.loads(cbom_txt)
-                        pretty = json.dumps(
-                            obj, indent=2, ensure_ascii=False, sort_keys=False
-                        )
+                        pretty = json.dumps(obj, indent=2, ensure_ascii=False, sort_keys=False)
                         st.code(pretty, language="json")
                     except Exception:
                         st.text_area(
@@ -288,7 +286,8 @@ bench_id = st.selectbox(
     "Select benchmark",
     options=bench_order,
     index=bench_order.index(initial_id),
-    format_func=lambda bid: f"{bench_map.get(bid, {}).get('name', '(unnamed)')} · {bid[:8]} · {bench_map.get(bid, {}).get('status', '?')}",
+    format_func=lambda bid: f"{bench_map.get(bid, {}).get('name', '(unnamed)')} · "
+                            f"{bid[:8]} · {bench_map.get(bid, {}).get('status', '?')}",
 )
 set_query_bench_id(bench_id)
 
@@ -301,9 +300,7 @@ repos = get_bench_repos(r, bench_id)
 workers = get_bench_workers(r, bench_id)
 job_idx = r.hgetall(f"bench:{bench_id}:job_index") or {}
 
-st.markdown(
-    format_benchmark_header(name, bench_id, created, expected), unsafe_allow_html=True
-)
+st.markdown(format_benchmark_header(name, bench_id, created, expected), unsafe_allow_html=True)
 st.caption(f"Status: {status}")
 
 zip_bytes = build_cboms_zip(r, bench_id)

@@ -42,10 +42,7 @@ if not benches:
     st.info("No benchmarks found. Please create one first.")
     st.stop()
 
-labels = [
-    f"{m.get('name', '(unnamed)')} · {bid[:8]} · {m.get('status', '?')}"
-    for bid, m in benches
-]
+labels = [f"{m.get('name', '(unnamed)')} · {bid[:8]} · {m.get('status', '?')}" for bid, m in benches]
 default_idx = 0
 if bench_id_hint:
     try:
@@ -71,10 +68,11 @@ with left:
 
     created = meta.get("created_at") or meta.get("started_at") or "?"
     expected = meta.get("expected_jobs") or "?"
-    st.markdown(format_benchmark_header(name, bench_id, created, expected), unsafe_allow_html=True)
-    st.caption(
-        f"Workers: {', '.join(workers) if workers else '(none)'} · Status: {status}"
+    st.markdown(
+        format_benchmark_header(name, bench_id, created, expected),
+        unsafe_allow_html=True,
     )
+    st.caption(f"Workers: {', '.join(workers) if workers else '(none)'} · Status: {status}")
 
     # Action controls
     if status == "running":
@@ -182,9 +180,7 @@ elif status == "created":
 
 col_a, col_b, _ = st.columns([1, 1, 5])
 with col_a:
-    if st.button(
-        "Show analysis", type="primary", disabled=analysis_disabled, help=analysis_help
-    ):
+    if st.button("Show analysis", type="primary", disabled=analysis_disabled, help=analysis_help):
         set_query_bench_id(bench_id)
         st.switch_page("pages/3_Analysis.py")
 with col_b:

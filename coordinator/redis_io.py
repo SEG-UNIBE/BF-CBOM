@@ -80,9 +80,7 @@ def fetch_repo_meta(r: redis.Redis, fullname: str, token: str | None) -> dict | 
     return None
 
 
-def fetch_default_branch(
-    r: redis.Redis, fullname: str, token: str | None
-) -> str | None:
+def fetch_default_branch(r: redis.Redis, fullname: str, token: str | None) -> str | None:
     meta = fetch_repo_meta(r, fullname, token)
     if isinstance(meta, dict):
         return meta.get("default_branch")
@@ -193,9 +191,7 @@ def pair_key(repo_full_name: str, worker: str) -> str:
     return f"{repo_full_name}|{worker}"
 
 
-def create_benchmark(
-    r: redis.Redis, name: str, params: dict, repos: list[dict], workers: list[str]
-) -> str:
+def create_benchmark(r: redis.Redis, name: str, params: dict, repos: list[dict], workers: list[str]) -> str:
     """Create a benchmark record with a snapshot of repos and selected workers."""
     bench_id = str(uuid.uuid4())
 
@@ -392,9 +388,7 @@ def cancel_benchmark(r: redis.Redis, bench_id: str) -> int:
             f"bench:{bench_id}:job:{job_id}",
             mapping={"status": "cancelled", "cancelled_at": now_iso()},
         )
-    pipe.hset(
-        f"bench:{bench_id}", mapping={"status": "cancelled", "cancelled_at": now_iso()}
-    )
+    pipe.hset(f"bench:{bench_id}", mapping={"status": "cancelled", "cancelled_at": now_iso()})
     pipe.execute()
     return len(pending)
 
@@ -441,11 +435,7 @@ def retry_non_completed_benchmark(r: redis.Redis, bench_id: str) -> int:
     for idx, repo in enumerate(repos):
         repo = dict(repo)
         fullname = repo.get("full_name")
-        git_url = (
-            repo.get("clone_url")
-            or repo.get("git_url")
-            or f"https://github.com/{fullname}.git"
-        )
+        git_url = repo.get("clone_url") or repo.get("git_url") or f"https://github.com/{fullname}.git"
         branch = repo.get("default_branch") or repo.get("branch")
         if not branch:
             resolved = fetch_default_branch(r, fullname, gh_token)
