@@ -29,7 +29,7 @@ target-version = "py312"
 select = ["E", "F", "I", "UP", "B"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["common", "coordinator", "workers"]
+known-first-party = ["common", "coordinator", "workers", "misc"]
 combine-as-imports = true
 
 [tool.ruff.format]
@@ -45,16 +45,13 @@ dev-dependencies = [
     "watchdog>=6.0.0",
 ]
 
-[tool.setuptools]
-py-modules = ["cli"]
-
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["common*", "coordinator*", "workers*"]
+include = ["common*", "coordinator*", "workers*", "misc*"]
 exclude = ["docker*", "tests*", "scripts*"]
 
 [project.scripts]
-bf-cbom = "cli:app"
+bf-cbom = "misc.cli:app"
 
 [build-system]
 requires = ["setuptools>=77", "wheel"]

@@ -154,10 +154,7 @@ def summarize_component_types(
                 for (comp_type, asset_label), count in combo_counts.items()
             ]
         else:
-            source_iter = [
-                ((str(comp_type) or "(unknown)", "", ""), count)
-                for comp_type, count in type_counts.items()
-            ]
+            source_iter = [((str(comp_type) or "(unknown)", "", ""), count) for comp_type, count in type_counts.items()]
 
         for key, count in source_iter:
             if isinstance(key, tuple) and len(key) == 3:
