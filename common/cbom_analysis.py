@@ -51,30 +51,70 @@ def _extract_components(obj: Any) -> list[dict]:
     return []
 
 
-def _component_type(comp: dict, tool: str) -> str:
-    """
-    Infer a component "type" field, prioritizing cbomkit's cryptoProperties.assetType
-    when present; otherwise use generic `type`.
-    """
+def _component_type(comp: dict) -> str:
+    """Return the component's declared type, defaulting to ``"unknown"``."""
     if not isinstance(comp, dict):
         return "unknown"
-    if tool.lower() in ("cbomkit", "testing"):
-        crypto = comp.get("cryptoProperties")
-        if isinstance(crypto, dict) and crypto.get("assetType"):
-            return str(crypto.get("assetType"))
-    return str(comp.get("type", "unknown"))
+    ctype = comp.get("type")
+    if isinstance(ctype, str) and ctype.strip():
+        return ctype
+    return str(ctype or "unknown")
 
 
-def analyze_cbom_json(raw_json: str, tool: str) -> tuple[int, Counter]:
+def _asset_type_label(comp: dict) -> str:
+    """Return a formatted crypto asset type (optionally suffixed with primitive)."""
+    if not isinstance(comp, dict):
+        return ""
+    crypto = comp.get("cryptoProperties")
+    if not isinstance(crypto, dict):
+        return ""
+    asset_type = crypto.get("assetType")
+    if isinstance(asset_type, str) and asset_type.strip():
+        label = asset_type
+    elif asset_type is not None:
+        label = str(asset_type)
+    else:
+        label = ""
+    if not label:
+        return ""
+    algo_props = crypto.get("algorithmProperties")
+    if isinstance(algo_props, dict):
+        primitive = algo_props.get("primitive")
+        if isinstance(primitive, str) and primitive.strip():
+            return f"{label} ({primitive})"
+    return label
+
+
+def analyze_cbom_json(
+    raw_json: str, _tool: str
+) -> tuple[int, Counter, Counter, Counter]:
     """
-    Parse a CBOM JSON string and return (total_components, component_type_counter).
+    Parse a CBOM JSON string and return
+    ``(total_components, type_counter, combo_counter, detail_counter)``.
+    ``type_counter`` aggregates by component ``type``. ``combo_counter`` aggregates
+    by ``(component type, asset type with optional primitive)``. ``detail_counter``
+    aggregates by ``(component type, asset label, component name)`` to enable name-level
+    tabulations in the UI.
     This function is non-throwing; invalid input yields (0, empty Counter).
     """
     obj = _safe_json_loads(raw_json or "")
     if obj is None:
-        return 0, Counter()
+        return 0, Counter(), Counter(), Counter()
     comps = _extract_components(obj)
-    counter: Counter = Counter()
+    type_counter: Counter = Counter()
+    combo_counter: Counter = Counter()
+    detail_counter: Counter = Counter()
     for c in comps:
-        counter[_component_type(c, tool)] += 1
-    return len(comps), counter
+        comp_type = _component_type(c)
+        type_counter[comp_type] += 1
+        asset_label = _asset_type_label(c)
+        combo_counter[(comp_type, asset_label)] += 1
+        comp_name = ""
+        if isinstance(c, dict):
+            name_val = c.get("name")
+            if isinstance(name_val, str) and name_val.strip():
+                comp_name = name_val
+            elif name_val is not None:
+                comp_name = str(name_val)
+        detail_counter[(comp_type, asset_label, comp_name)] += 1
+    return len(comps), type_counter, combo_counter, detail_counter

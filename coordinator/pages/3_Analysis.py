@@ -126,13 +126,15 @@ for repo in repos:
                 try:
                     payload = json.loads(raw)
                     cbom_text = payload.get("json", "{}")
-                    total, types = analyze_cbom_json(cbom_text, w)
+                    total, types, type_assets, type_asset_names = analyze_cbom_json(cbom_text, w)
                     comp_rows.append(
                         {
                             "repo": full,
                             "worker": w,
                             "total_components": total,
                             "types": dict(types),
+                            "type_asset_counts": dict(type_assets),
+                            "type_asset_name_counts": dict(type_asset_names),
                         }
                     )
                     duration = payload.get("duration_sec")
@@ -355,16 +357,40 @@ if comp_rows:
     )
 
     st.subheader("Component Types")
-    type_summary: dict[str, dict[str, dict[str, int]]] = {}
+    type_summary: dict[str, dict[tuple[str, str, str], dict[str, int]]] = {}
     for row in comp_rows:
         repo_name = row.get("repo")
         worker_name = row.get("worker")
+        combo_counts = row.get("type_asset_counts") or {}
+        detail_counts = row.get("type_asset_name_counts") or {}
         type_counts = row.get("types") or {}
         if not repo_name or not worker_name:
             continue
         repo_map = type_summary.setdefault(repo_name, {})
-        for comp_type, count in type_counts.items():
-            type_map = repo_map.setdefault(str(comp_type) or "(unknown)", {})
+        if detail_counts:
+            source_iter = detail_counts.items()
+        elif combo_counts:
+            source_iter = [
+                ((str(comp_type) or "(unknown)", str(asset_label or ""), ""), count)
+                for (comp_type, asset_label), count in combo_counts.items()
+            ]
+        else:
+            source_iter = [
+                ((str(comp_type) or "(unknown)", "", ""), count)
+                for comp_type, count in type_counts.items()
+            ]
+        for key, count in source_iter:
+            if isinstance(key, tuple) and len(key) == 3:
+                base_type, asset_label, name = key
+            elif isinstance(key, tuple) and len(key) == 2:
+                base_type, asset_label = key
+                name = ""
+            else:
+                base_type, asset_label, name = key, "", ""
+            base_type_str = str(base_type or "(unknown)")
+            asset_label_str = str(asset_label or "")
+            name_str = str(name or "")
+            type_map = repo_map.setdefault((base_type_str, asset_label_str, name_str), {})
             type_map[worker_name] = safe_int(count)
 
     if not type_summary:
@@ -373,27 +399,34 @@ if comp_rows:
         for repo_name in sorted(type_summary.keys()):
             with st.expander(f"{repo_name}"):
                 type_map = type_summary[repo_name]
-                df_counts = pd.DataFrame.from_dict(type_map, orient="index")
-                df_counts.index.name = "component.type"
-                for w in workers:
-                    if w not in df_counts.columns:
-                        df_counts[w] = 0
-                df_counts = df_counts.fillna(0).astype(int)
-                ordered_cols = []
-                rename_map = {}
+                rows = []
+                for (comp_type, asset_type, name), counts in sorted(type_map.items()):
+                    entry = {
+                        "component.type": comp_type,
+                        "asset.type": asset_type,
+                        "name": name,
+                    }
+                    for w in workers:
+                        entry[w] = safe_int(counts.get(w, 0))
+                    rows.append(entry)
+                if not rows:
+                    st.caption("No component type information available yet.")
+                    continue
+                df_counts = pd.DataFrame(rows)
                 status_map = repo_worker_status.get(repo_name, {})
+                rename_map = {
+                    "component.type": "Component type",
+                    "name": "Name",
+                    "asset.type": "Asset type",
+                }
+                ordered_cols = ["component.type", "name", "asset.type"]
                 for w in workers:
-                    if w in df_counts.columns:
-                        ordered_cols.append(w)
                     status_key = status_map.get(w, "pending")
                     emoji = get_status_emoji(status_key)
                     rename_map[w] = f"{emoji} {w}" if emoji else w
-                for col in df_counts.columns:
-                    if col not in ordered_cols:
-                        ordered_cols.append(col)
-                        rename_map.setdefault(col, col)
+                    ordered_cols.append(w)
                 df_counts = df_counts[ordered_cols]
-                view_types = df_counts.reset_index().rename(columns=rename_map)
+                view_types = df_counts.rename(columns=rename_map)
                 st.dataframe(
                     view_types,
                     hide_index=True,
