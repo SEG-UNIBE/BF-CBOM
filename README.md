@@ -24,6 +24,10 @@
 
 </br>
 
+
+https://github.com/user-attachments/assets/9926c193-6b1f-4e1e-9556-95ebcc3e0401
+
+
 ## Introduction
 
 BF-CBOM is a research-grade harness for comparing heterogeneous CBOM generators side-by-side.
