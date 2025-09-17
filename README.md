@@ -36,14 +36,14 @@ BF-CBOM is a research-grade harness for comparing heterogeneous CBOM generators 
 
 ## Setup
 
-BF-CBOM is a multi-container environment: Redis, the coordinator UI, and one container per CBOM worker. Every install starts the same way—clone the repo and choose one of two setup paths.
+BF-CBOM is a multi-container environment: Redis, the coordinator UI, and one container per CBOM worker. Every install starts the same way—clone the repo and choose one of two setup options.
 
 ```bash
 git clone https://github.com/SEG-UNIBE/BF-CBOM.git
 cd BF-CBOM
 ```
 
-### Path 1 – Disposable Builder Container
+### Option 1 – Disposable Builder Container
 
 Use this when you want to keep tooling off your host. Docker must already be installed.
 
@@ -59,7 +59,7 @@ Use this when you want to keep tooling off your host. Docker must already be ins
       -v "$(pwd)/docker/env":/workspace/secrets/env:ro \
       --name bf-cbom-builder \
       bf-cbom/builder -lc "\
-        git clone --branch dev --single-branch https://github.com/SEG-UNIBE/BF-CBOM.git repo && \
+        git clone --branch main https://github.com/SEG-UNIBE/BF-CBOM.git repo && \
         cp -vf /workspace/secrets/env/*.env repo/docker/env/ && \
         cd repo && \
         make up-prod \
@@ -78,12 +78,12 @@ docker run --rm -it `
   -v /var/run/docker.sock:/var/run/docker.sock `
   -v "$pwdPath/docker/env:/workspace/secrets/env:ro" `
   --name bf-cbom-builder `
-  bf-cbom/builder -lc "git clone --branch dev --single-branch https://github.com/SEG-UNIBE/BF-CBOM.git repo && cp -vf /workspace/secrets/env/*.env repo/docker/env/ && cd repo && make up-prod"
+  bf-cbom/builder -lc "git clone --branch main https://github.com/SEG-UNIBE/BF-CBOM.git repo && cp -vf /workspace/secrets/env/*.env repo/docker/env/ && cd repo && make up-prod"
 ```
 
 </details>
 
-### Path 2 – Direct Make-Based Setup
+### Option 2 – Direct Make-Based Setup
 
 Bring the stack up on your host using GNU Make and Docker Compose.
 
