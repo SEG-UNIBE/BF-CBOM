@@ -70,8 +70,8 @@ If you want to avoid installing Git, Make, and Python tooling locally, you can r
    docker run --rm -it \
      -v /var/run/docker.sock:/var/run/docker.sock \
      --name bf-cbom-builder \
-     bf-cbom/builder -lc "\
-       git clone https://github.com/SEG-UNIBE/BF-CBOM.git repo && \
+    bf-cbom/builder -lc "\
+      git clone --branch dev --single-branch https://github.com/SEG-UNIBE/BF-CBOM.git repo && \
        cd repo && \
        make up-dev \
      "
