@@ -19,6 +19,8 @@
   <strong>🚀 <a href="#add-additional-workers">Add Workers</a> | 🛠️ <a href="#developer-notes">Developer Notes</a> | 🔍 <a href="#tool-under-scrutinize">Tools</a></strong>
 </div>
 
+</br>
+
 ---
 
 - **BF-CBOM**: Benchmarking Framework for Cryptographic Bill of Materials *(your **b**est **f**riend for CBOMs)*
