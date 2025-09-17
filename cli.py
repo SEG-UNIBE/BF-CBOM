@@ -52,7 +52,7 @@ def _connect_redis(host: str, port: int) -> redis.Redis:
         r.ping()
     except redis.exceptions.RedisError as e:
         typer.echo(f"Error: cannot connect to Redis at {host}:{port}: {e}", err=True)
-        raise typer.Exit(2)
+        raise typer.Exit(2) from e
     return r
 
 
@@ -203,7 +203,7 @@ def run(
         cfg = BenchmarkConfig.from_json(cfg_text)
     except Exception as e:
         typer.echo(f"Error: invalid CLI config: {e}", err=True)
-        raise typer.Exit(2)
+        raise typer.Exit(2) from e
 
     workers = list(cfg.workers or [])
     repos_refs = list(cfg.repos or [])
