@@ -374,21 +374,21 @@ def banner(
 
     typer.echo("")
     typer.secho("Usage Highlights", fg=typer.colors.YELLOW, bold=True)
-    typer.echo(typer.style("  uv run cli.py [COMMAND] [OPTIONS]", fg=typer.colors.WHITE))
+    typer.echo(typer.style("  uv run misc/cli/cli.py [COMMAND] [OPTIONS]", fg=typer.colors.WHITE))
     typer.echo("")
 
     typer.secho("Examples", fg=typer.colors.YELLOW, bold=True)
     typer.echo(typer.style("  # Run with stdin (fire-and-forget with wait)", fg=typer.colors.CYAN))
-    typer.echo("  cat bench.json | uv run cli.py run -c - --wait")
+    typer.echo("  cat bench.json | uv run misc/cli/cli.py run -c - --wait")
     typer.echo("")
     typer.echo(typer.style("  # Run with local config file", fg=typer.colors.CYAN))
-    typer.echo("  uv run cli.py run -c bench.json --wait")
+    typer.echo("  uv run misc/cli/cli.py run -c bench.json --wait")
     typer.echo("")
     typer.echo(typer.style("  # Export a config for an existing benchmark", fg=typer.colors.CYAN))
-    typer.echo("  uv run cli.py export <BENCH_ID> -o bench.json")
+    typer.echo("  uv run misc/cli/cli.py export <BENCH_ID> -o bench.json")
     typer.echo("")
     typer.echo(typer.style("  # Check status", fg=typer.colors.CYAN))
-    typer.echo("  uv run cli.py status <BENCH_ID> --json")
+    typer.echo("  uv run misc/cli/cli.py status <BENCH_ID> --json")
 
 
 if __name__ == "__main__":

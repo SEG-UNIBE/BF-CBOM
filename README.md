@@ -107,4 +107,4 @@ Follow these steps to integrate a new CBOM worker efficiently:
   
 - CLI usage (runs outside Docker once Redis is up):
   - `uv sync --frozen --no-dev`
-  - `uv run cli.py --help`
+  - `uv run misc/cli/cli.py --help`
