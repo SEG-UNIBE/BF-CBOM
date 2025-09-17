@@ -31,17 +31,17 @@ It orchestrates full container stacks, captures worker outputs, normalizes resul
 
 ### Key Features
 
-**Coordinator-first control plane:** a Streamlit UI backed by Redis schedules benchmarks, tracks job state, and surfaces results for reviewers.
-**Containerised worker plugins:** every CBOM generator runs in its own Docker image but speaks the same Redis-driven instruction protocol.
-**Scriptable CLI:** a Typer-based interface can launch benchmarks, export configs, or bundle CBOM artefacts for offline analysis.
-**Reproducible runs:** checked-in `.env` templates, Dockerfiles, and `uv`-managed Python dependencies keep environments consistent across machines.
+- **Coordinator-first control plane:** a Streamlit UI backed by Redis schedules benchmarks, tracks job state, and surfaces results for reviewers.
+- **Containerised worker plugins:** every CBOM generator runs in its own Docker image but speaks the same Redis-driven instruction protocol.
+- **Scriptable CLI:** a Typer-based interface can launch benchmarks, export configs, or bundle CBOM artefacts for offline analysis.
+- **Reproducible runs:** checked-in `.env` templates, Dockerfiles, and `uv`-managed Python dependencies keep environments consistent across machines.
 
 ### Tools Under Scrutinize
 
-[`CBOMKit`](https://github.com/PQCA/cbomkit): PQCA's reference backend that normalises requests, aggregates worker responses, and produces scored CBOM comparisons.
-[`cdxgen`](https://github.com/CycloneDX/cdxgen): Open-source CycloneDX generator maintained by the OWASP CycloneDX project (OWASP Foundation); supports Node.js, Python, Java, Go, container images, and more.
-[`DeepSeek`](https://www.deepseek.com/): Research prototype from DeepSeek Inc. (China) exploring large language models to infer cryptographic usage from documentation and source code.
-[`sbom-tool`](https://github.com/microsoft/sbom-tool): Microsoft's official SPDX 2.2 generator designed for CI/CD pipelines and Azure DevOps release processes.
+- [`CBOMKit`](https://github.com/PQCA/cbomkit): PQCA's reference backend that normalises requests, aggregates worker responses, and produces scored CBOM comparisons.
+- [`cdxgen`](https://github.com/CycloneDX/cdxgen): Open-source CycloneDX generator maintained by the OWASP CycloneDX project (OWASP Foundation); supports Node.js, Python, Java, Go, container images, and more.
+- [`DeepSeek`](https://www.deepseek.com/): Research prototype from DeepSeek Inc. (China) exploring large language models to infer cryptographic usage from documentation and source code.
+- [`sbom-tool`](https://github.com/microsoft/sbom-tool): Microsoft's official SPDX 2.2 generator designed for CI/CD pipelines and Azure DevOps release processes.
 
 ## Setup
 
@@ -77,7 +77,7 @@ Prepare the environment files under `docker/env/`. Each service ships with a `*.
 │       ├── coordinator.env.template
 │       ├── worker-cbomkit.env
 │       ├── worker-cbomkit.env.template
-│       └── …
+│       └── ...  (and so on)
 ```
 
 > [!NOTE]
