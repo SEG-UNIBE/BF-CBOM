@@ -142,8 +142,7 @@ def watch(
                 cancelled = _style_count(c["cancelled"], typer.colors.YELLOW)
                 pending = _style_count(c["pending"], typer.colors.BLUE)
                 lines.append(
-                    f"done {done}/{total} · completed={completed} "
-                    f"failed={failed} cancelled={cancelled} pending={pending}"
+                    f"done {done}/{total} · completed={completed} failed={failed} cancelled={cancelled} pending={pending}"
                 )
             else:
                 benches = list_benchmarks(r)
@@ -152,8 +151,7 @@ def watch(
                 bench_count = typer.style(str(len(benches)), fg=typer.colors.BRIGHT_CYAN, bold=True)
                 lines.append(f"{title} · {timestamp} · {bench_count} benchmarks")
                 header_text = (
-                    "id       name                          status    "
-                    "done/total   completed  failed  cancelled"
+                    "id       name                          status    done/total   completed  failed  cancelled"
                 )
                 lines.append(typer.style(header_text, fg=typer.colors.WHITE, bold=True))
                 lines.append(typer.style("-" * 90, fg=typer.colors.BRIGHT_BLACK))

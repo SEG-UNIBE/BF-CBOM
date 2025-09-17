@@ -22,9 +22,7 @@ def create_job_instruction(repo: dict, worker: str, job_id: str):
     full = repo.get("full_name")
     repo_info = RepoInfo(
         full_name=full,
-        git_url=repo.get("clone_url")
-        or repo.get("git_url")
-        or (f"https://github.com/{full}.git" if full else ""),
+        git_url=repo.get("clone_url") or repo.get("git_url") or (f"https://github.com/{full}.git" if full else ""),
         branch=repo.get("default_branch") or repo.get("branch") or "main",
         size_kb=int(repo.get("size", 0) or 0),
         main_language=repo.get("language"),
@@ -435,7 +433,6 @@ def retry_non_completed_benchmark(r: redis.Redis, bench_id: str) -> int:
     for idx, repo in enumerate(repos):
         repo = dict(repo)
         fullname = repo.get("full_name")
-        git_url = repo.get("clone_url") or repo.get("git_url") or f"https://github.com/{fullname}.git"
         branch = repo.get("default_branch") or repo.get("branch")
         if not branch:
             resolved = fetch_default_branch(r, fullname, gh_token)

@@ -338,12 +338,8 @@ if comp_rows:
     # Add split columns: info (lang/stars/size) and URL link
     pivot_reset = pivot.reset_index()
     info_url_map = build_repo_info_url_map(repos)
-    pivot_reset["info"] = pivot_reset["repo"].apply(
-        lambda name: (info_url_map.get(name, {}) or {}).get("info", "")
-    )
-    pivot_reset["url"] = pivot_reset["repo"].apply(
-        lambda name: (info_url_map.get(name, {}) or {}).get("url", "")
-    )
+    pivot_reset["info"] = pivot_reset["repo"].apply(lambda name: (info_url_map.get(name, {}) or {}).get("info", ""))
+    pivot_reset["url"] = pivot_reset["repo"].apply(lambda name: (info_url_map.get(name, {}) or {}).get("url", ""))
     # Order columns: repo/info/url then worker counts
     ordered = ["repo", "info", "url"] + [w for w in workers]
     view_df = pivot_reset[ordered]
@@ -375,10 +371,7 @@ if comp_rows:
                 for (comp_type, asset_label), count in combo_counts.items()
             ]
         else:
-            source_iter = [
-                ((str(comp_type) or "(unknown)", "", ""), count)
-                for comp_type, count in type_counts.items()
-            ]
+            source_iter = [((str(comp_type) or "(unknown)", "", ""), count) for comp_type, count in type_counts.items()]
         for key, count in source_iter:
             if isinstance(key, tuple) and len(key) == 3:
                 base_type, asset_label, name = key

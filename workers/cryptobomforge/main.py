@@ -199,9 +199,7 @@ class CryptobomForgeClient:
                 capture_output=True,
                 timeout=10,
             )
-            flags = [
-                line.strip() for line in result.stdout.decode("utf-8", "replace").splitlines() if line.strip()
-            ]
+            flags = [line.strip() for line in result.stdout.decode("utf-8", "replace").splitlines() if line.strip()]
             logger.info("Resolved RAM flags: %s", flags)
             return flags
         except Exception as e:

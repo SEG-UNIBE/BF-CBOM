@@ -10,7 +10,11 @@ from common.utils import (
     get_status_emoji,
 )
 from coordinator.redis_io import delete_benchmark, get_redis, list_benchmarks
-from coordinator.utils import build_minimal_config_json, human_duration, set_query_bench_id
+from coordinator.utils import (
+    build_minimal_config_json,
+    human_duration,
+    set_query_bench_id,
+)
 
 
 def _init_logging():
@@ -130,9 +134,7 @@ with left:
                                 workers_list = __import__("json").loads(meta.get("workers_json", "[]"))
                             except Exception:
                                 workers_list = []
-                            cfg_text = build_minimal_config_json(
-                                name=name_txt, workers=workers_list, repos=repos
-                            )
+                            cfg_text = build_minimal_config_json(name=name_txt, workers=workers_list, repos=repos)
                             st.download_button(
                                 "⬇️",
                                 data=cfg_text,

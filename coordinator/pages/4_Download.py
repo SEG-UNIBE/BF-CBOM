@@ -102,10 +102,7 @@ def _render_job_results(
         on_change=reset_page,
     )
     if deep:
-        st.caption(
-            "Deep search scans JobResult metadata and CBOM JSON bodies for your tokens. "
-            "Expect slower response."
-        )
+        st.caption("Deep search scans JobResult metadata and CBOM JSON bodies for your tokens. Expect slower response.")
 
     pairs_all: list[tuple[str, str, str]] = []
     for repo in repos:
@@ -286,8 +283,7 @@ bench_id = st.selectbox(
     "Select benchmark",
     options=bench_order,
     index=bench_order.index(initial_id),
-    format_func=lambda bid: f"{bench_map.get(bid, {}).get('name', '(unnamed)')} · "
-                            f"{bid[:8]} · {bench_map.get(bid, {}).get('status', '?')}",
+    format_func=lambda bid: f"{bench_map.get(bid, {}).get('name', '(unnamed)')} · {bid[:8]} · {bench_map.get(bid, {}).get('status', '?')}",
 )
 set_query_bench_id(bench_id)
 

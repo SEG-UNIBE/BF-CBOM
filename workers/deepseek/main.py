@@ -90,9 +90,7 @@ class DeepSeekClient:
 
 def _produce(instr: JobInstruction, trace: Trace) -> str | tuple[str, float]:
     client = DeepSeekClient()
-    cbom_data, duration, err = client.generate_cbom(
-        git_url=instr.repo_info.git_url, branch=instr.repo_info.branch
-    )
+    cbom_data, duration, err = client.generate_cbom(git_url=instr.repo_info.git_url, branch=instr.repo_info.branch)
     if cbom_data is None:
         raise RuntimeError(err or "deepseek_failed")
     return json.dumps(cbom_data), duration

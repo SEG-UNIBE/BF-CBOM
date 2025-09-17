@@ -162,9 +162,7 @@ class MsSbomToolClient:
         _run(cmd, cwd=repo_dir, timeout=CMD_TIMEOUT_SEC)
         return self._list_manifest_jsons(repo_dir)
 
-    def _run_sbom_docker(
-        self, repo_dir: Path, pkg_name: str, pkg_version: str, pkg_supplier: str
-    ) -> list[Path]:
+    def _run_sbom_docker(self, repo_dir: Path, pkg_name: str, pkg_version: str, pkg_supplier: str) -> list[Path]:
         """
         Invoke `sbom-tool` via Docker image `ms_sbom_tool`.
         Mount the repo at /work inside the container.

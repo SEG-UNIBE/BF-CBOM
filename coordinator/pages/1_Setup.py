@@ -99,9 +99,7 @@ with col1:
                 f"stars:{stars_min}..{stars_max}",
                 f"size:{size_min}..{size_max}",
             ]
-            pushed_date = (
-                (dt.datetime.now(dt.UTC) - dt.timedelta(days=int(days_since))).date().isoformat()
-            )
+            pushed_date = (dt.datetime.now(dt.UTC) - dt.timedelta(days=int(days_since))).date().isoformat()
             base_parts.append(f"pushed:>={pushed_date}")
 
             params = {
@@ -135,9 +133,8 @@ with col1:
                     config_data = json.loads(config_text)
                     st.session_state[CONFIG_SESSION_KEY] = config_data
                     st.session_state[CONFIG_TEXT_KEY] = config_text
-                    st.caption( 
-                        f"Config contains {len(config_data.get('repos') or [])} "
-                        "repos and {len(config_data.get('workers') or [])} workers."
+                    st.caption(
+                        f"Config contains {len(config_data.get('repos') or [])} repos and {{len(config_data.get('workers') or [])}} workers."
                     )
                 except Exception as exc:
                     st.error(f"Invalid config JSON: {exc}")
@@ -145,8 +142,7 @@ with col1:
                     st.session_state.pop(CONFIG_TEXT_KEY, None)
             elif cached_config:
                 st.caption(
-                    f"Loaded config with {len(cached_config.get('repos') or [])} "
-                    f"repos and {len(cached_config.get('workers') or [])} workers."
+                    f"Loaded config with {len(cached_config.get('repos') or [])} repos and {len(cached_config.get('workers') or [])} workers."
                 )
             else:
                 st.caption("Uploaded a config.")
