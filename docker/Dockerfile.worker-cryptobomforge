@@ -36,7 +36,7 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
     && mv /root/.local/bin/uv /usr/local/bin/uv
 
 # Copy dependency files first to leverage Docker's build cache.
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml uv.lock README.md LICENSE ./
 
 # Use uv for all Python package installations for consistency and speed.
 # Note: uv sync handles requirements from pyproject.toml.

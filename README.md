@@ -27,6 +27,59 @@ In short, your **b**est **f**riend for generating and analyzing CBOMs.*
 </br>
 </br>
 
+## Setup
+
+### macOS / Linux
+
+1. Install Docker (Desktop or Engine) with Compose v2 enabled and allocate at least 6 GB RAM to the Docker runtime.
+2. Install Python 3.12 and `uv` (e.g., `brew install uv` on macOS or `pipx install uv` on Linux). The project expects `uv` on the `PATH`.
+3. Clone the repository and change into it:
+   ```bash
+   git clone https://github.com/SEG-UNIBE/BF-CBOM.git
+   cd BF-CBOM
+   ```
+4. Sync dependencies once for local tooling: `uv sync --frozen --no-dev`.
+5. Start the full stack: `make up-all`. Other common targets are `make up-dev` (skip heavy workers) and `make down` to stop services.
+
+### Windows (Git Bash)
+
+1. Install Docker Desktop with the WSL 2 backend and confirm virtualization is enabled in BIOS/UEFI.
+2. Install Git for Windows (includes Git Bash) and run all future commands from a Git Bash shell.
+3. Install GNU Make (e.g., `choco install make` or the MSYS2 package). Verify `make --version` inside Git Bash.
+4. Install Python 3.12 (via the official installer or `winget install Python.Python.3.12`) and add it to `PATH`. Then install `uv` with `pipx install uv` (requires `pipx`, which ships with the Python installer) and ensure `uv --version` succeeds in Git Bash.
+5. Clone the repository using Git Bash and enter the folder:
+   ```bash
+   git clone https://github.com/SEG-UNIBE/BF-CBOM.git
+   cd BF-CBOM
+   ```
+6. Initialize dependencies: `uv sync --frozen --no-dev` (still from Git Bash).
+7. Launch services with `make up-all`. If you need a lighter profile, use `make up-dev`. Always invoke `make down` from Git Bash to stop the stack cleanly.
+
+On both platforms the first `make up-…` run can take several minutes while worker images build. Subsequent runs are much faster thanks to caching.
+
+### Disposable Builder Container (optional)
+
+If you want to avoid installing Git, Make, and Python tooling locally, you can run the workflow from inside a purpose-built container that only requires Docker on the host:
+
+1. Build the helper image:
+   ```bash
+   docker build -f docker/Dockerfile.builder -t bf-cbom/builder .
+   ```
+2. Run the builder, mounting the Docker socket so it can orchestrate sibling containers. If the repository is private, pass a Git token via `GIT_TOKEN` (or mount the already-cloned repo into `/workspace` instead of cloning inside the container). Replace the clone URL below with the remote you use:
+   ```bash
+   docker run --rm -it \
+     -v /var/run/docker.sock:/var/run/docker.sock \
+     --name bf-cbom-builder \
+     bf-cbom/builder -lc "\
+       git clone https://github.com/SEG-UNIBE/BF-CBOM.git repo && \
+       cd repo && \
+       make up-dev \
+     "
+   ```
+3. When you're done, stop everything with `make down` (either within the running builder session or by re-running the container with `make down`).
+
+This approach keeps all build tooling inside an ephemeral container while still using the host's Docker daemon for the heavy lifting.
+
 ## Tool under Scrutinize
 
 - [`CBOMKit`](https://github.com/PQCA/cbomkit): Reference backend used here to standardize CBOM requests, normalize outputs, and provide APIs for storage, comparison, and scoring across workers.
