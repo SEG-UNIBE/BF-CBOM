@@ -1,0 +1,20 @@
+{
+  "id": "cp-sat",
+  "name": "OR Tools CP-SAT",
+  "description": "Google's Operations Research CP-SAT-LP FlatZinc interface",
+  "version": "9.12.4544",
+  "mznlib": "../cp-sat",
+  "executable": "../../../bin/fzn-cp-sat",
+  "tags": ["cp-sat", "cp", "lcg", "int"],
+  "stdFlags": ["-a", "-i", "-f", "-p", "-r", "-s", "-v"],
+  "extraFlags": [
+    ["--params", "Provide parameters interpreted as a text SatParameters proto", "string", ""],
+    ["--fz_int_max", "Provide the maximum value for integer variables", "int", "1125899906842624"]
+  ],
+  "supportsMzn": false,
+  "supportsFzn": true,
+  "needsSolns2Out": true,
+  "needsMznExecutable": false,
+  "needsStdlibDir": false,
+  "isGUIApplication": false
+}
