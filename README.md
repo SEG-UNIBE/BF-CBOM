@@ -67,6 +67,7 @@ If you want to avoid installing Git, Make, and Python tooling locally, you can r
    ```
 2. Run the builder, mounting the Docker socket so it can orchestrate sibling containers. If the repository is private, pass a Git token via `GIT_TOKEN` (or mount the already-cloned repo into `/workspace` instead of cloning inside the container). Replace the clone URL below with the remote you use:
    ```bash
+   docker build -f docker/Dockerfile.builder -t bf-cbom/builder . && \
    docker run --rm -it \
       -v /var/run/docker.sock:/var/run/docker.sock \
       -v "$(pwd)/docker/env":/workspace/secrets/env:ro \
@@ -108,3 +109,15 @@ Follow these steps to integrate a new CBOM worker efficiently:
 - CLI usage (runs outside Docker once Redis is up):
   - `uv sync --frozen --no-dev`
   - `uv run misc/cli/cli.py --help`
+  - `uv run misc/cli/cli.py export config <BENCH_ID> -o bench.json`
+  - `uv run misc/cli/cli.py export cboms <BENCH_ID> --dest ./downloads`
+
+## Windows Quickstart
+
+1. `git clone https://github.com/SEG-UNIBE/BF-CBOM.git`
+2. `cd BF-CBOM`
+3. Generate `.env` files from their templates:
+   - Windows PowerShell: `pwsh ./scripts/ensure_env.ps1`
+   - macOS/Linux (for reference): `./scripts/ensure_env.sh`
+4. Edit the newly created `docker/env/*.env` files to add secrets or overrides as needed.
+5. Run the builder image (example): `docker run --rm -it bf-cbom/builder`

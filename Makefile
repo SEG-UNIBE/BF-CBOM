@@ -13,6 +13,7 @@ DEV_WORKERS := skeleton,testing
 ENV_DIR := docker/env
 ENV_TEMPLATE_FILES := $(wildcard $(ENV_DIR)/*.env.template)
 ENV_FILES := $(ENV_TEMPLATE_FILES:.env.template=.env)
+ENSURE_ENV_SCRIPT := ./scripts/ensure_env.sh
 # ====================================================
 
 # --- internals: don't edit below ---
@@ -76,12 +77,7 @@ show-workers:
 ensure-env: $(ENV_FILES)
 
 $(ENV_DIR)/%.env: $(ENV_DIR)/%.env.template
-	@if [ ! -f $@ ]; then \
-		echo "Creating $@ from template"; \
-		cp $< $@; \
-	else \
-		echo "$@ already exists; leaving unchanged"; \
-	fi
+	@$(ENSURE_ENV_SCRIPT) $< $@
 
 .PHONY: prune prune-build clean-docker build-base build-all release up-dev up-prod up-all down logs ps show-workers
 
