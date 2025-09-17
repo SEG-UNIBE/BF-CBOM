@@ -1,9 +1,10 @@
 import sys
 import os
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "build"))
 from glob import glob
 
-import json_matching
+import json_matching  # type: ignore  # pylint: disable=import-error,wrong-import-position
 
 try:
     json_directory = "assets"
@@ -18,6 +19,8 @@ try:
 
     print(f"Found {len(matches)} matches:")
     for match in matches:
-        print(f"  Doc {match.query_file.split('/')[-1]} comp {match.query_comp} -> Doc {match.target_file.split('/')[-1]} comp {match.target_comp}, cost: {match.cost}")
+        print(
+            f"  Doc {match.query_file.split('/')[-1]} comp {match.query_comp} -> Doc {match.target_file.split('/')[-1]} comp {match.target_comp}, cost: {match.cost}"
+        )
 except Exception as e:
     print(f"Error: {e}")
