@@ -26,13 +26,22 @@
 
 ## Introduction
 
-BF-CBOM is a research-grade harness for comparing heterogeneous CBOM generators side-by-side. It orchestrates full container stacks, captures worker outputs, normalizes results, and surfaces scoring dashboards for reviewers.
+BF-CBOM is a research-grade harness for comparing heterogeneous CBOM generators side-by-side.
+It orchestrates full container stacks, captures worker outputs, normalizes results, and surfaces scoring dashboards for reviewers.
 
-**Key highlights**
-- **Coordinator-first design** – a Streamlit control plane backed by Redis manages benchmark lifecycles and result aggregation.
-- **Pluggable workers** – each CBOM generator runs inside its own Docker container, driven by a unified instruction protocol.
-- **Native CLI** – a Typer-based CLI scripts benchmarks and exports configs or CBOM bundles for offline analysis.
-- **Reproducible envs** – `.env` templates, Docker build recipes, and uv-managed Python tooling keep runs deterministic.
+### Key Features
+
+**Coordinator-first control plane:** a Streamlit UI backed by Redis schedules benchmarks, tracks job state, and surfaces results for reviewers.
+**Containerised worker plugins:** every CBOM generator runs in its own Docker image but speaks the same Redis-driven instruction protocol.
+**Scriptable CLI:** a Typer-based interface can launch benchmarks, export configs, or bundle CBOM artefacts for offline analysis.
+**Reproducible runs:** checked-in `.env` templates, Dockerfiles, and `uv`-managed Python dependencies keep environments consistent across machines.
+
+### Tools Under Scrutinize
+
+[`CBOMKit`](https://github.com/PQCA/cbomkit): PQCA's reference backend that normalises requests, aggregates worker responses, and produces scored CBOM comparisons.
+[`cdxgen`](https://github.com/CycloneDX/cdxgen): Open-source CycloneDX generator maintained by the OWASP CycloneDX project (OWASP Foundation); supports Node.js, Python, Java, Go, container images, and more.
+[`DeepSeek`](https://www.deepseek.com/): Research prototype from DeepSeek Inc. (China) exploring large language models to infer cryptographic usage from documentation and source code.
+[`sbom-tool`](https://github.com/microsoft/sbom-tool): Microsoft's official SPDX 2.2 generator designed for CI/CD pipelines and Azure DevOps release processes.
 
 ## Setup
 
@@ -135,7 +144,7 @@ The project uses [GNU Make](https://www.gnu.org/software/make/) to simplify cont
 Most Linux distributions include `make` by default.
 On macOS, it comes with the *Xcode command line tools*, which you can install by running `xcode-select --install` in a terminal if not already present.
 
-From the repository’s root folder, start the full stack of services with:
+From the repository's root folder, start the full stack of services with:
 
 ```bash
 make up-prod
@@ -186,7 +195,7 @@ Because the CLI runs locally, a minimal Python setup is required before invoking
 Install Python 3.12 and `uv`, the dependency manager used by BF-CBOM.
 
 - For Python, download at least the version 3.12 from the [official site](https://www.python.org/downloads/).
-- To install `uv`, follow the `curl` instructions on [uv’s webpage](https://docs.astral.sh/uv/#installation).
+- To install `uv`, follow the `curl` instructions on [uv's webpage](https://docs.astral.sh/uv/#installation).
 
 > [!NOTE]
 > Using a package manager is often easiest: `brew install python@3.12 uv` on macOS, or `sudo apt-get install python3.12 uv` on Linux.
@@ -200,3 +209,20 @@ uv run misc/cli/cli.py
 ```
 
 The command prints the CLI's commands and options in the terminal.
+
+## Developer Notes
+
+### Adding Additional Workers
+
+1. Duplicate `workers/skeleton` to `workers/<mytool>` and implement `handle_instruction`.
+2. Create `docker/env/<mytool>.env` for credentials and configuration specific to the worker.
+3. Start from `docker/Dockerfile.worker-skeleton` (or craft a bespoke Dockerfile if required).
+4. Register the worker service in `docker-compose.yml`, pointing at the new `env_file`.
+5. Append the worker name to the `AVAILABLE_WORKERS` list in the `Makefile` so shared targets pick it up.
+
+### Formatting and Linting
+
+Ruff is configured in `pyproject.toml` for both formatting and linting:
+
+- `uv run ruff format`
+- `uv run ruff check --fix`
