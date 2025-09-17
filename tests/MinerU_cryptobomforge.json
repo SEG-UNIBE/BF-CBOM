@@ -1,0 +1,306 @@
+{
+  "$schema": "https://raw.githubusercontent.com/IBM/CBOM/main/bom-1.4-cbom-1.0.schema.json",
+  "bomFormat": "CBOM",
+  "components": [
+    {
+      "bom-ref": "cryptography:algorithm:4d543f0a-59fc-4fc5-9826-1bc404816216",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "padding": "unknown",
+          "primitive": "unknown",
+          "variant": "UNKNOWN"
+        },
+        "assetType": "algorithm",
+        "detectionContext": [
+          {
+            "additionalContext": "    if not isinstance(path, Path):\n        path = Path(path)\n    with open(str(path), \"rb\") as input_file:\n        file_bytes = input_file.read()\n        if path.suffix in image_suffixes:\n",
+            "filePath": "mineru/cli/common.py",
+            "lineNumbers": [
+              24,
+              25,
+              26,
+              27,
+              28
+            ]
+          },
+          {
+            "additionalContext": "    local_md_dir = str(os.path.join(output_dir, pdf_file_name, parse_method))\n    local_image_dir = os.path.join(str(local_md_dir), \"images\")\n    os.makedirs(local_image_dir, exist_ok=True)\n    os.makedirs(local_md_dir, exist_ok=True)\n    return local_image_dir, local_md_dir\n\n",
+            "filePath": "mineru/cli/common.py",
+            "lineNumbers": [
+              37,
+              38,
+              39,
+              40,
+              41,
+              42
+            ]
+          },
+          {
+            "additionalContext": "    \"\"\"从结果文件中读取推理结果\"\"\"\n    result_file_path = os.path.join(parse_dir, f\"{pdf_name}{file_suffix_identifier}\")\n    if os.path.exists(result_file_path):\n        with open(result_file_path, \"r\", encoding=\"utf-8\") as fp:\n            return fp.read()\n    return None\n",
+            "filePath": "mineru/cli/fast_api.py",
+            "lineNumbers": [
+              54,
+              55,
+              56,
+              57,
+              58,
+              59
+            ]
+          },
+          {
+            "additionalContext": "        # 创建唯一的输出目录\n        unique_dir = os.path.join(output_dir, str(uuid.uuid4()))\n        os.makedirs(unique_dir, exist_ok=True)\n\n        # 处理上传的PDF文件\n",
+            "filePath": "mineru/cli/fast_api.py",
+            "lineNumbers": [
+              86,
+              87,
+              88,
+              89,
+              90
+            ]
+          },
+          {
+            "additionalContext": "                # 创建临时文件以便使用read_fn\n                temp_path = Path(unique_dir) / file_path.name\n                with open(temp_path, \"wb\") as f:\n                    f.write(content)\n\n",
+            "filePath": "mineru/cli/fast_api.py",
+            "lineNumbers": [
+              100,
+              101,
+              102,
+              103,
+              104
+            ]
+          },
+          {
+            "additionalContext": "                    pdf_bytes_list.append(pdf_bytes)\n                    pdf_file_names.append(file_path.stem)\n                    os.remove(temp_path)  # 删除临时文件\n                except Exception as e:\n                    return JSONResponse(\n                        status_code=400,\n                        content={\"error\": f\"Failed to load file: {str(e)}\"}\n                    )\n            else:\n",
+            "filePath": "mineru/cli/fast_api.py",
+            "lineNumbers": [
+              107,
+              108,
+              109,
+              110,
+              111,
+              112,
+              113,
+              114,
+              115
+            ]
+          },
+          {
+            "additionalContext": "                        parse_dir = os.path.join(unique_dir, pdf_name, \"vlm\")\n\n                    if not os.path.exists(parse_dir):\n                        continue\n\n",
+            "filePath": "mineru/cli/fast_api.py",
+            "lineNumbers": [
+              161,
+              162,
+              163,
+              164,
+              165
+            ]
+          },
+          {
+            "additionalContext": "                    if return_md:\n                        path = os.path.join(parse_dir, f\"{pdf_name}.md\")\n                        if os.path.exists(path):\n                            zf.write(path, arcname=os.path.join(safe_pdf_name, f\"{safe_pdf_name}.md\"))\n\n",
+            "filePath": "mineru/cli/fast_api.py",
+            "lineNumbers": [
+              167,
+              168,
+              169,
+              170,
+              171
+            ]
+          },
+          {
+            "additionalContext": "                    if return_middle_json:\n                        path = os.path.join(parse_dir, f\"{pdf_name}_middle.json\")\n                        if os.path.exists(path):\n                            zf.write(path, arcname=os.path.join(safe_pdf_name, f\"{safe_pdf_name}_middle.json\"))\n\n",
+            "filePath": "mineru/cli/fast_api.py",
+            "lineNumbers": [
+              172,
+              173,
+              174,
+              175,
+              176
+            ]
+          },
+          {
+            "additionalContext": "                        else:\n                            path = os.path.join(parse_dir, f\"{pdf_name}_model_output.txt\")\n                        if os.path.exists(path): \n                            zf.write(path, arcname=os.path.join(safe_pdf_name, os.path.basename(path)))\n\n",
+            "filePath": "mineru/cli/fast_api.py",
+            "lineNumbers": [
+              180,
+              181,
+              182,
+              183,
+              184
+            ]
+          },
+          {
+            "additionalContext": "                    if return_content_list:\n                        path = os.path.join(parse_dir, f\"{pdf_name}_content_list.json\")\n                        if os.path.exists(path):\n                            zf.write(path, arcname=os.path.join(safe_pdf_name, f\"{safe_pdf_name}_content_list.json\"))\n\n",
+            "filePath": "mineru/cli/fast_api.py",
+            "lineNumbers": [
+              185,
+              186,
+              187,
+              188,
+              189
+            ]
+          },
+          {
+            "additionalContext": "                    parse_dir = os.path.join(unique_dir, pdf_name, \"vlm\")\n\n                if os.path.exists(parse_dir):\n                    if return_md:\n                        data[\"md_content\"] = get_infer_result(\".md\", pdf_name, parse_dir)\n",
+            "filePath": "mineru/cli/fast_api.py",
+            "lineNumbers": [
+              213,
+              214,
+              215,
+              216,
+              217
+            ]
+          },
+          {
+            "additionalContext": "        return JSONResponse(\n            status_code=500,\n            content={\"error\": f\"Failed to process file: {str(e)}\"}\n        )\n\n",
+            "filePath": "mineru/cli/fast_api.py",
+            "lineNumbers": [
+              248,
+              249,
+              250,
+              251,
+              252
+            ]
+          },
+          {
+            "additionalContext": "\n            # 遍历目录中的所有文件和子目录\n            for root, dirs, files in os.walk(directory_path):\n                for file in files:\n                    # 构建完整的文件路径\n",
+            "filePath": "mineru/cli/gradio_app.py",
+            "lineNumbers": [
+              61,
+              62,
+              63,
+              64,
+              65
+            ]
+          },
+          {
+            "additionalContext": "        logger.error('Compression failed')\n    md_path = os.path.join(local_md_dir, file_name + '.md')\n    with open(md_path, 'r', encoding='utf-8') as f:\n        txt_content = f.read()\n    md_content = replace_image_with_base64(txt_content, local_md_dir)\n",
+            "filePath": "mineru/cli/gradio_app.py",
+            "lineNumbers": [
+              106,
+              107,
+              108,
+              109,
+              110
+            ]
+          },
+          {
+            "additionalContext": "\n    # 将字节数据写入文件\n    with open(tmp_file_path, 'wb') as tmp_pdf_file:\n        tmp_pdf_file.write(pdf_bytes)\n\n",
+            "filePath": "mineru/cli/gradio_app.py",
+            "lineNumbers": [
+              175,
+              176,
+              177,
+              178,
+              179
+            ]
+          },
+          {
+            "additionalContext": "            fn_path = os.path.join(self._parent_dir, path)\n\n        if not os.path.exists(os.path.dirname(fn_path)) and os.path.dirname(fn_path) != \"\":\n            os.makedirs(os.path.dirname(fn_path), exist_ok=True)\n\n        with open(fn_path, 'wb') as f:\n            f.write(data)\n",
+            "filePath": "mineru/data/data_reader_writer/filebase.py",
+            "lineNumbers": [
+              56,
+              57,
+              58,
+              59,
+              60,
+              61,
+              62
+            ]
+          },
+          {
+            "additionalContext": "\n    # 保存结果\n    with open(f\"{out_path}/{filename}\", \"wb\") as f:\n        output_pdf.write(f)\n\n",
+            "filePath": "mineru/utils/draw_bbox.py",
+            "lineNumbers": [
+              264,
+              265,
+              266,
+              267,
+              268
+            ]
+          },
+          {
+            "additionalContext": "\n    # Save the PDF\n    with open(f\"{out_path}/{filename}\", \"wb\") as f:\n        output_pdf.write(f)\n\n",
+            "filePath": "mineru/utils/draw_bbox.py",
+            "lineNumbers": [
+              367,
+              368,
+              369,
+              370,
+              371
+            ]
+          }
+        ]
+      },
+      "name": "UNKNOWN",
+      "type": "crypto-asset"
+    }
+  ],
+  "dependencies": [
+    {
+      "dependsOn": [
+        "cryptography:algorithm:4d543f0a-59fc-4fc5-9826-1bc404816216"
+      ],
+      "ref": "5c61573a-1cfb-49b5-94ec-25515666d336"
+    },
+    {
+      "ref": "cryptography:algorithm:4d543f0a-59fc-4fc5-9826-1bc404816216"
+    }
+  ],
+  "metadata": {
+    "component": {
+      "bom-ref": "5c61573a-1cfb-49b5-94ec-25515666d336",
+      "name": "root",
+      "type": "application"
+    },
+    "timestamp": "2025-09-17T11:23:38.211243+00:00",
+    "tools": [
+      {
+        "externalReferences": [
+          {
+            "type": "build-system",
+            "url": "https://github.com/CycloneDX/cyclonedx-python-lib/actions"
+          },
+          {
+            "type": "distribution",
+            "url": "https://pypi.org/project/cyclonedx-python-lib/"
+          },
+          {
+            "type": "documentation",
+            "url": "https://cyclonedx.github.io/cyclonedx-python-lib/"
+          },
+          {
+            "type": "issue-tracker",
+            "url": "https://github.com/CycloneDX/cyclonedx-python-lib/issues"
+          },
+          {
+            "type": "license",
+            "url": "https://github.com/CycloneDX/cyclonedx-python-lib/blob/main/LICENSE"
+          },
+          {
+            "type": "release-notes",
+            "url": "https://github.com/CycloneDX/cyclonedx-python-lib/blob/main/CHANGELOG.md"
+          },
+          {
+            "type": "vcs",
+            "url": "https://github.com/CycloneDX/cyclonedx-python-lib"
+          },
+          {
+            "type": "website",
+            "url": "https://cyclonedx.org"
+          }
+        ],
+        "name": "cyclonedx-python-lib",
+        "vendor": "CycloneDX",
+        "version": "4.2.2"
+      },
+      {
+        "name": "CodeQL",
+        "vendor": "GitHub",
+        "version": "2.23.0"
+      }
+    ]
+  },
+  "serialNumber": "urn:uuid:2365539e-b603-422c-92df-0d002c999b3d",
+  "specVersion": "1.4-cbom-1.0",
+  "version": 1
+}

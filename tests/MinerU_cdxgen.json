@@ -1,0 +1,3709 @@
+{
+  "annotations": [
+    {
+      "annotator": {
+        "component": {
+          "authors": [
+            {
+              "name": "OWASP Foundation"
+            }
+          ],
+          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@11.7.0",
+          "group": "@cyclonedx",
+          "name": "cdxgen",
+          "publisher": "OWASP Foundation",
+          "purl": "pkg:npm/%40cyclonedx/cdxgen@11.7.0",
+          "type": "application",
+          "version": "11.7.0"
+        }
+      },
+      "bom-ref": "metadata-annotations",
+      "subjects": [
+        "pkg:pypi/mineru@latest"
+      ],
+      "text": "This Software Bill-of-Materials (SBOM) document was created on Wednesday, September 17, 2025 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'mineru'. There are 62 components. 2 package type(s) and 5 purl namespaces are described in the document under components.",
+      "timestamp": "2025-09-17T11:17:12Z"
+    }
+  ],
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "authors": [
+        {
+          "name": "\"Jeffrey A. Clark\" <aclark@aclark.net>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/pillow@11.3.0",
+      "description": "Python Imaging Library (Fork)",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: pillow",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: pillow"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "1b9c17fd4ace828b3003dfd1e30bff24863e0eb59b535e8f80194d9cc7ecf860"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT-CMU",
+            "url": "https://opensource.org/licenses/MIT-CMU"
+          }
+        }
+      ],
+      "name": "pillow",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "PIL.ImageOps,PIL.UnidentifiedImageError,PIL.Image,PIL.ImageDraw"
+        }
+      ],
+      "purl": "pkg:pypi/pillow@11.3.0",
+      "scope": "required",
+      "type": "library",
+      "version": "11.3.0"
+    },
+    {
+      "bom-ref": "pkg:pypi/aiohttp@3.12.15",
+      "description": "Async http client/server framework (asyncio)",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: aiohttp",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: aiohttp"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/aio-libs/aiohttp"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "b6fc902bff74d9b1879ad55f5404153e2b33a82e72a95c89cec5eb6cc9e92fbc"
+        }
+      ],
+      "licenses": [
+        {
+          "expression": "Apache-2.0 AND MIT"
+        }
+      ],
+      "name": "aiohttp",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "aiohttp"
+        }
+      ],
+      "purl": "pkg:pypi/aiohttp@3.12.15",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "3.12.15"
+    },
+    {
+      "authors": [
+        {
+          "name": "Vladimir Iglovikov"
+        }
+      ],
+      "bom-ref": "pkg:pypi/albumentations@2.0.8",
+      "description": "Fast, flexible, and advanced augmentation library for deep learning, computer vision, and medical imaging. Albumentations offers a wide range of transformations for both 2D (images, masks, bboxes, keypoints) and 3D (volumes, volumetric masks, keypoints) data, with optimized performance and seamless integration into ML workflows.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: albumentations",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: albumentations"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "c4c4259aaf04a7386ad85c7fdcb73c6c7146ca3057446b745cc035805acb1017"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "albumentations",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "albumentations,albumentations.pytorch.ToTensorV2"
+        }
+      ],
+      "purl": "pkg:pypi/albumentations@2.0.8",
+      "scope": "required",
+      "tags": [
+        "ml",
+        "performance"
+      ],
+      "type": "library",
+      "version": "2.0.8"
+    },
+    {
+      "authors": [
+        {
+          "name": "Amazon Web Services"
+        }
+      ],
+      "bom-ref": "pkg:pypi/boto3@1.40.32",
+      "description": "The AWS SDK for Python",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: boto3",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: boto3"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/boto/boto3"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "9edf07327f444ddd142f45120c6979902712921b6e90fdb05963996b97bd7689"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "boto3",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "boto3"
+        }
+      ],
+      "purl": "pkg:pypi/boto3@1.40.32",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "1.40.32"
+    },
+    {
+      "authors": [
+        {
+          "name": "Amazon Web Services"
+        }
+      ],
+      "bom-ref": "pkg:pypi/botocore@1.40.32",
+      "description": "Low-level, data-driven core of boto 3.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: botocore",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: botocore"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/boto/botocore"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "a7cc409648aaf08a7d1aab76c675818868a0b76745b9deb478f91c1d8898aa8a"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "botocore",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "botocore.config.Config"
+        }
+      ],
+      "purl": "pkg:pypi/botocore@1.40.32",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "1.40.32"
+    },
+    {
+      "authors": [
+        {
+          "name": "Leonard Richardson <leonardr@segfault.org>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/beautifulsoup4@4.13.5",
+      "description": "Screen-scraping library",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: beautifulsoup4",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: beautifulsoup4"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "642085eaa22233aceadff9c69651bc51e8bf3f874fb6d7104ece2beb24b47c4a"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "beautifulsoup4",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "bs4.BeautifulSoup"
+        }
+      ],
+      "purl": "pkg:pypi/beautifulsoup4@4.13.5",
+      "scope": "required",
+      "type": "library",
+      "version": "4.13.5"
+    },
+    {
+      "bom-ref": "pkg:pypi/click@8.2.1",
+      "description": "Composable command line interface toolkit",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: click",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: click"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "61a3265b914e850b85317d0b3109c7f8cd35a670f963866005d6ef1d5175a12b"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "click",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "click"
+        }
+      ],
+      "purl": "pkg:pypi/click@8.2.1",
+      "scope": "required",
+      "type": "library",
+      "version": "8.2.1"
+    },
+    {
+      "bom-ref": "pkg:pypi/opencv-python@4.12.0.88",
+      "description": "Wrapper package for OpenCV python bindings.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: opencv-python",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: opencv-python"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/opencv/opencv-python"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "f9a1f08883257b95a5764bf517a32d75aec325319c8ed0f89739a57fae9e92a5"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "opencv-python",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "cv2"
+        }
+      ],
+      "purl": "pkg:pypi/opencv-python@4.12.0.88",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "4.12.0.88"
+    },
+    {
+      "authors": [
+        {
+          "name": "Zhiyuan Zhao"
+        },
+        {
+          "name": " Hengrui Kang"
+        },
+        {
+          "name": " Bin Wang"
+        },
+        {
+          "name": " Conghui He"
+        }
+      ],
+      "bom-ref": "pkg:pypi/doclayout-yolo@0.0.4",
+      "description": "DocLayout-YOLO: an effecient and robust document layout analysis method.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: doclayout-yolo",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: doclayout-yolo"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "934451385a6e50d71fbbda12e5866eb4003d87186364d0151d8e8ec898a21723"
+        }
+      ],
+      "licenses": [
+        {
+          "expression": "GNU Affero General Public License v3 or later (AGPLv3+)"
+        }
+      ],
+      "name": "doclayout-yolo",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "doclayout_yolo.YOLOv10"
+        }
+      ],
+      "purl": "pkg:pypi/doclayout-yolo@0.0.4",
+      "scope": "required",
+      "type": "library",
+      "version": "0.0.4"
+    },
+    {
+      "authors": [
+        {
+          "name": "Saurabh Kumar <me+github@saurabh-kumar.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/python-dotenv@1.1.1",
+      "description": "Read key-value pairs from a .env file and set them as environment variables",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: python-dotenv",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: python-dotenv"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/theskumar/python-dotenv"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "31f23644fe2602f88ff55e1f5c79ba497e01224ee7737937930c448e4d0e24dc"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        },
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "python-dotenv",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "dotenv.load_dotenv"
+        }
+      ],
+      "purl": "pkg:pypi/python-dotenv@1.1.1",
+      "scope": "required",
+      "type": "library",
+      "version": "1.1.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "sudoskys <coldlando@hotmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/fast-langdetect@1.0.0",
+      "description": "Quickly detect text language and segment language",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: fast-langdetect",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: fast-langdetect"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "aab9e3435cc667ac8ba8b1a38872f75492f65b7087901d0f3a02a88d436cd22a"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "fast-langdetect",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "fast_langdetect.detect_language"
+        }
+      ],
+      "purl": "pkg:pypi/fast-langdetect@1.0.0",
+      "scope": "required",
+      "type": "library",
+      "version": "1.0.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "=?utf-8?q?Sebasti=C3=A1n_Ram=C3=ADrez?= <tiangolo@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/fastapi@0.116.2",
+      "description": "FastAPI framework, high performance, easy to learn, fast to code, ready for production",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: fastapi",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: fastapi"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "c3a7a8fb830b05f7e087d920e0d786ca1fc9892eb4e9a84b227be4c1bc7569db"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "fastapi",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "fastapi.Form,fastapi.responses.FileResponse,fastapi.Request,fastapi.FastAPI,fastapi.middleware.gzip.GZipMiddleware,fastapi.UploadFile,fastapi.HTTPException,fastapi.responses.JSONResponse,fastapi,fastapi.File"
+        }
+      ],
+      "purl": "pkg:pypi/fastapi@0.116.2",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "0.116.2"
+    },
+    {
+      "authors": [
+        {
+          "name": "Jeremiah Lowin"
+        }
+      ],
+      "bom-ref": "pkg:pypi/fastmcp@2.12.3",
+      "description": "The fast, Pythonic way to build MCP servers and clients.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: fastmcp",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: fastmcp"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "aee50872923a9cba731861fc0120e7dbe4642a2685ba251b2b202b82fb6c25a9"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "fastmcp",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "fastmcp.FastMCP"
+        }
+      ],
+      "purl": "pkg:pypi/fastmcp@2.12.3",
+      "scope": "required",
+      "type": "library",
+      "version": "2.12.3"
+    },
+    {
+      "authors": [
+        {
+          "name": "Onur Celebi <celebio@fb.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/fasttext@0.9.3",
+      "description": "fasttext Python bindings",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: fasttext",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: fasttext"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/facebookresearch/fastText"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "8b39f3ac5df43873648ea400cb75d4f7f9455730ac5105490b23b70f14e03ea7"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "fasttext",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "fasttext"
+        }
+      ],
+      "purl": "pkg:pypi/fasttext@0.9.3",
+      "scope": "required",
+      "type": "library",
+      "version": "0.9.3"
+    },
+    {
+      "authors": [
+        {
+          "name": "Tri Dao <tri@tridao.me>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/flash-attn@2.8.3",
+      "description": "Flash Attention: Fast and Memory-Efficient Exact Attention",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: flash-attn",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: flash-attn"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/Dao-AILab/flash-attention"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "1e71dd64a9e0280e0447b8a0c2541bad4bf6ac65bdeaa2f90e51a9e57de0370d"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "flash-attn",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "flash_attn.flash_attn_func,flash_attn.bert_padding.pad_input,flash_attn.bert_padding.unpad_input,flash_attn.flash_attn_varlen_func,flash_attn.bert_padding.index_first_axis"
+        }
+      ],
+      "purl": "pkg:pypi/flash-attn@2.8.3",
+      "scope": "required",
+      "type": "library",
+      "version": "2.8.3"
+    },
+    {
+      "authors": [
+        {
+          "name": "Robyn Speer <rspeer@arborelia.net>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/ftfy@6.3.1",
+      "description": "Fixes mojibake and other problems with Unicode, after the fact",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: ftfy",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: ftfy"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "7c70eb532015cd2f9adb53f101fb6c7945988d023a085d127d1573dc49dd0083"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "ftfy",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "ftfy.fix_text"
+        }
+      ],
+      "purl": "pkg:pypi/ftfy@6.3.1",
+      "scope": "required",
+      "type": "library",
+      "version": "6.3.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "Adam Cohen <adam@seatgeek.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/fuzzywuzzy@0.18.0",
+      "description": "Fuzzy string matching in python",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: fuzzywuzzy",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: fuzzywuzzy"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/seatgeek/fuzzywuzzy"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "928244b28db720d1e0ee7587acf660ea49d7e4c632569cad4f1cd7e68a5f0993"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "GPL-2.0-only",
+            "url": "https://opensource.org/licenses/GPL-2.0-only"
+          }
+        }
+      ],
+      "name": "fuzzywuzzy",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "fuzzywuzzy.fuzz"
+        }
+      ],
+      "purl": "pkg:pypi/fuzzywuzzy@0.18.0",
+      "scope": "required",
+      "type": "library",
+      "version": "0.18.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Abubakar Abid <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Ali Abid <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Ali Abdalla <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Dawood Khan <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Ahsen Khaliq <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Pete Allen <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Ömer Faruk Özdemir <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Freddy A Boulton <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Hannah Blair <gradio-team@huggingface.co>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/gradio@5.46.0",
+      "description": "Python library for easily interacting with trained machine learning models",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: gradio",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: gradio"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "e088fd68a3a04365caf3c7d6846c6e1fff1aca3b4e5b49ec5003f18bdbe343d5"
+        }
+      ],
+      "licenses": [],
+      "name": "gradio",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "gradio"
+        }
+      ],
+      "purl": "pkg:pypi/gradio@5.46.0",
+      "scope": "required",
+      "type": "library",
+      "version": "5.46.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Freddy Boulton <alfonsoboulton@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/gradio-pdf@0.0.22",
+      "description": "Easily display PDFs in Gradio",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: gradio-pdf",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: gradio-pdf"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "6f710eca3464d2d37aee742eb2f10dbe76772ebe5dfcfb993da40c710c9ad1b5"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "gradio-pdf",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "gradio_pdf.PDF"
+        }
+      ],
+      "purl": "pkg:pypi/gradio-pdf@0.0.22",
+      "scope": "required",
+      "type": "library",
+      "version": "0.0.22"
+    },
+    {
+      "authors": [
+        {
+          "name": "Tom Christie <tom@tomchristie.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/httpx@0.28.1",
+      "description": "The next generation HTTP client.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: httpx",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: httpx"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        },
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "httpx",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "httpx"
+        }
+      ],
+      "purl": "pkg:pypi/httpx@0.28.1",
+      "scope": "required",
+      "type": "library",
+      "version": "0.28.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "Hugging Face"
+        },
+        {
+          "name": " Inc. <julien@huggingface.co>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/huggingface-hub@0.35.0",
+      "description": "Client library to download and publish models, datasets and other repos on the huggingface.co hub",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: huggingface-hub",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: huggingface-hub"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/huggingface/huggingface_hub"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "f2e2f693bca9a26530b1c0b9bcd4c1495644dad698e6a0060f90e22e772c31e9"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        },
+        {
+          "license": {
+            "name": "Apache"
+          }
+        }
+      ],
+      "name": "huggingface-hub",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "huggingface_hub.snapshot_download"
+        }
+      ],
+      "purl": "pkg:pypi/huggingface-hub@0.35.0",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "0.35.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Stefano Baccianella <4247706+mangiucugna@users.noreply.github.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/json-repair@0.50.1",
+      "description": "A package to repair broken json strings",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: json-repair",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: json-repair"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "9b78358bb7572a6e0b8effe7a8bd8cb959a3e311144842b1d2363fe39e2f13c5"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "json-repair",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "json_repair"
+        }
+      ],
+      "purl": "pkg:pypi/json-repair@0.50.1",
+      "scope": "required",
+      "tags": [
+        "json"
+      ],
+      "type": "library",
+      "version": "0.50.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "\"Lightning-AI et al.\" <community@lightning.ai>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/litserve@0.2.15",
+      "description": "Lightweight AI server.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: litserve",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: litserve"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "67e5357382ddd123ac667a90a70925cd88d8d29814854634d578d5b27f0f29d2"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "litserve",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "litserve"
+        }
+      ],
+      "purl": "pkg:pypi/litserve@0.2.15",
+      "scope": "required",
+      "tags": [
+        "ai"
+      ],
+      "type": "library",
+      "version": "0.2.15"
+    },
+    {
+      "authors": [
+        {
+          "name": "Delgan <delgan.py@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/loguru@0.7.3",
+      "description": "Python logging made (stupidly) simple",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: loguru",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: loguru"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "31a33c10c8e1e10422bfd431aeb5d351c7cf7fa671e3c4df004162264b28220c"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "loguru",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "loguru.logger,loguru"
+        }
+      ],
+      "purl": "pkg:pypi/loguru@0.7.3",
+      "scope": "required",
+      "tags": [
+        "logging"
+      ],
+      "type": "library",
+      "version": "0.7.3"
+    },
+    {
+      "authors": [
+        {
+          "name": "Anthropic"
+        },
+        {
+          "name": " PBC."
+        }
+      ],
+      "bom-ref": "pkg:pypi/mcp@1.14.0",
+      "description": "Model Context Protocol SDK",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: mcp",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: mcp"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "b2d27feba27b4c53d41b58aa7f4d090ae0cb740cbc4e339af10f8cbe54c4e19d"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "mcp",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "mcp.server.sse.SseServerTransport,mcp.client.MCPClient"
+        }
+      ],
+      "purl": "pkg:pypi/mcp@1.14.0",
+      "scope": "required",
+      "type": "library",
+      "version": "1.14.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "ModelScope team <contact@modelscope.cn>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/modelscope@1.30.0",
+      "description": "ModelScope: bring the notion of Model-as-a-Service to life.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: modelscope",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: modelscope"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/modelscope/modelscope"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "a391c63a20f286e50010498ec3cc2aa1a86210a9dd74c55cfa4609fd2f8a999f"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "modelscope",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "modelscope.snapshot_download"
+        }
+      ],
+      "purl": "pkg:pypi/modelscope@1.30.0",
+      "scope": "required",
+      "type": "library",
+      "version": "1.30.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Travis E. Oliphant et al."
+        }
+      ],
+      "bom-ref": "pkg:pypi/numpy@2.3.3",
+      "description": "Fundamental package for array computing in Python",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: numpy",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: numpy"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "0ffc4f5caba7dfcbe944ed674b7eef683c7e94874046454bb79ed7ee0236f59d"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        },
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "numpy",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "numpy"
+        }
+      ],
+      "purl": "pkg:pypi/numpy@2.3.3",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "2.3.3"
+    },
+    {
+      "authors": [
+        {
+          "name": "Omry Yadan <omry@yadan.net>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/omegaconf@2.3.0",
+      "description": "A flexible configuration library",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: omegaconf",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: omegaconf"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/omry/omegaconf"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "7b4df175cdb08ba400f45cae3bdcae7ba8365db4d165fc65fd04b050ab63b46b"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "omegaconf",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "omegaconf.OmegaConf"
+        }
+      ],
+      "purl": "pkg:pypi/omegaconf@2.3.0",
+      "scope": "required",
+      "type": "library",
+      "version": "2.3.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Microsoft Corporation <onnxruntime@microsoft.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/onnxruntime@1.22.1",
+      "description": "ONNX Runtime is a runtime accelerator for Machine Learning models",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: onnxruntime",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: onnxruntime"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://onnxruntime.ai"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "80e7f51da1f5201c1379b8d6ef6170505cd800e40da216290f5e06be01aadf95"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "onnxruntime",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "onnxruntime.InferenceSession,onnxruntime,onnxruntime.GraphOptimizationLevel,onnxruntime.get_device,onnxruntime.get_available_providers,onnxruntime.SessionOptions"
+        }
+      ],
+      "purl": "pkg:pypi/onnxruntime@1.22.1",
+      "scope": "required",
+      "type": "library",
+      "version": "1.22.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "OpenAI <support@openai.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/openai@1.107.3",
+      "description": "The official Python library for the openai API",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: openai",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: openai"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "4ca54a847235ac04c6320da70fdc06b62d71439de9ec0aa40d5690c3064d4025"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "openai",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "openai.OpenAI"
+        }
+      ],
+      "purl": "pkg:pypi/openai@1.107.3",
+      "scope": "required",
+      "tags": [
+        "ml"
+      ],
+      "type": "library",
+      "version": "1.107.3"
+    },
+    {
+      "authors": [
+        {
+          "name": "Donald Stufft <donald@stufft.io>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/packaging@25.0",
+      "description": "Core utilities for Python packages",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: packaging",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: packaging"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "29572ef2b1f17581046b3a2227d5c611fb25ec70ca1ba8554b24b0e69331a484"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        },
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "packaging",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "packaging.version"
+        }
+      ],
+      "purl": "pkg:pypi/packaging@25.0",
+      "scope": "required",
+      "type": "library",
+      "version": "25.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Yusuke Shinyama <yusuke@shinyama.jp>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/pdfminer@20191125",
+      "description": "PDF parser and analyzer",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: pdfminer",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: pdfminer"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "http://github.com/euske/pdfminer"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "9e700bc731300ed5c8936343c1dd4529638184198e54e91dd2b59b64a755dc01"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "pdfminer",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "pdfminer.layout.LAParams,pdfminer.pdfpage.PDFPage,pdfminer.layout.LTImage,pdfminer.layout.LTFigure,pdfminer.high_level.extract_text,pdfminer.pdfinterp.PDFResourceManager,pdfminer.pdfinterp.PDFPageInterpreter,pdfminer.pdfdocument.PDFDocument,pdfminer.pdfparser.PDFParser,pdfminer.converter.PDFPageAggregator"
+        }
+      ],
+      "purl": "pkg:pypi/pdfminer@20191125",
+      "scope": "required",
+      "type": "library",
+      "version": "20191125"
+    },
+    {
+      "authors": [
+        {
+          "name": "Vik Paruchuri <vik.paruchuri@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/pdftext@0.6.3",
+      "description": "Extract structured text from pdfs quickly",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: pdftext",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: pdftext"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/VikParuchuri/pdftext"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "528431ed8bdce39d74372cd3d27e8544af812f1f1adc81db229cf9fb48dacacb"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "pdftext",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "pdftext.pdf.pages.assign_scripts,pdftext.pdf.chars.get_chars,pdftext.pdf.pages.get_lines,pdftext.pdf.pages.get_blocks,pdftext.pdf.chars.deduplicate_chars,pdftext.pdf.pages.get_spans"
+        }
+      ],
+      "purl": "pkg:pypi/pdftext@0.6.3",
+      "scope": "required",
+      "type": "library",
+      "version": "0.6.3"
+    },
+    {
+      "authors": [
+        {
+          "name": "Angus Johnson"
+        },
+        {
+          "name": " Maxime Chalton"
+        },
+        {
+          "name": " Lukas Treyer"
+        },
+        {
+          "name": " Gregor Ratajc <me@gregorratajc.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/pyclipper@1.3.0.post6",
+      "description": "Cython wrapper for the C++ translation of the Angus Johnson's Clipper library (ver. 6.4.2)",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: pyclipper",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: pyclipper"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/greginvm/pyclipper"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "fa0f5e78cfa8262277bb3d0225537b3c2a90ef68fd90a229d5d24cf49955dcf4"
+        }
+      ],
+      "licenses": [
+        {
+          "expression": "OSI Approved"
+        }
+      ],
+      "name": "pyclipper",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "pyclipper"
+        }
+      ],
+      "purl": "pkg:pypi/pyclipper@1.3.0.post6",
+      "scope": "required",
+      "type": "library",
+      "version": "1.3.0.post6"
+    },
+    {
+      "authors": [
+        {
+          "name": "Samuel Colvin <s@muelcolvin.com>"
+        },
+        {
+          "name": " Eric Jolibois <em.jolibois@gmail.com>"
+        },
+        {
+          "name": " Hasan Ramezani <hasan.r67@gmail.com>"
+        },
+        {
+          "name": " Adrian Garcia Badaracco <1755071+adriangb@users.noreply.github.com>"
+        },
+        {
+          "name": " Terrence Dorsey <terry@pydantic.dev>"
+        },
+        {
+          "name": " David Montague <david@pydantic.dev>"
+        },
+        {
+          "name": " Serge Matveenko <lig@countzero.co>"
+        },
+        {
+          "name": " Marcelo Trylesinski <marcelotryle@gmail.com>"
+        },
+        {
+          "name": " Sydney Runkle <sydneymarierunkle@gmail.com>"
+        },
+        {
+          "name": " David Hewitt <mail@davidhewitt.io>"
+        },
+        {
+          "name": " Alex Hall <alex.mojaki@gmail.com>"
+        },
+        {
+          "name": " Victorien Plot <contact@vctrn.dev>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/pydantic@2.11.9",
+      "description": "Data validation using Python type hints",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: pydantic",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: pydantic"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "c42dd626f5cfc1c6950ce6205ea58c93efa406da65f479dcb4029d5934857da2"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "pydantic",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "pydantic.BaseModel,pydantic.Field,pydantic.model_validator,pydantic.computed_field"
+        }
+      ],
+      "purl": "pkg:pypi/pydantic@2.11.9",
+      "scope": "required",
+      "tags": [
+        "validation"
+      ],
+      "type": "library",
+      "version": "2.11.9"
+    },
+    {
+      "authors": [
+        {
+          "name": "Mathieu Fenniak <biziqe@mathieu.fenniak.net>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/pypdf@6.0.0",
+      "description": "A pure-python PDF library capable of splitting, merging, cropping, and transforming PDF files",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: pypdf",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: pypdf"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "56ea60100ce9f11fc3eec4f359da15e9aec3821b036c1f06d2b660d35683abb8"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "pypdf",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "pypdf.PdfWriter,pypdf.PdfReader,pypdf.PageObject"
+        }
+      ],
+      "purl": "pkg:pypi/pypdf@6.0.0",
+      "scope": "required",
+      "type": "library",
+      "version": "6.0.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "pypdfium2-team <geisserml@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/pypdfium2@4.30.0",
+      "description": "Python bindings to PDFium",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: pypdfium2",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: pypdfium2"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/pypdfium2-team/pypdfium2"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "b33ceded0b6ff5b2b93bc1fe0ad4b71aa6b7e7bd5875f1ca0cdfb6ba6ac01aab"
+        }
+      ],
+      "licenses": [
+        {
+          "expression": "(Apache-2.0 OR BSD-3-Clause) AND LicenseRef-PdfiumThirdParty"
+        }
+      ],
+      "name": "pypdfium2",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "pypdfium2.PdfPage,pypdfium2.PdfBitmap,pypdfium2.PdfDocument,pypdfium2"
+        }
+      ],
+      "purl": "pkg:pypi/pypdfium2@4.30.0",
+      "scope": "required",
+      "type": "library",
+      "version": "4.30.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "SWHL <liekkaskono@163.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/rapid-table@3.0.1",
+      "description": "Table Recognition",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: rapid-table",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: rapid-table"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/RapidAI/RapidTable"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "bb2825db5f0e32d668d610371705b1713632ca68af7403082842ed40bb189eda"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "rapid-table",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "rapid_table.utils.RapidTableOutput,rapid_table.RapidTable,rapid_table.RapidTableInput,rapid_table.ModelType"
+        }
+      ],
+      "purl": "pkg:pypi/rapid-table@3.0.1",
+      "scope": "required",
+      "type": "library",
+      "version": "3.0.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "Andy Robinson"
+        },
+        {
+          "name": " Robin Becker"
+        },
+        {
+          "name": " the ReportLab team and the community <reportlab-users@lists2.reportlab.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/reportlab@4.4.3",
+      "description": "The Reportlab Toolkit",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: reportlab",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: reportlab"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.reportlab.com/"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "df905dc5ec5ddaae91fc9cb3371af863311271d555236410954961c5ee6ee1b5"
+        }
+      ],
+      "licenses": [
+        {
+          "expression": "BSD license (see license.txt for details), Copyright (c) 2000-2025, ReportLab Inc."
+        }
+      ],
+      "name": "reportlab",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "reportlab.pdfgen.canvas"
+        }
+      ],
+      "purl": "pkg:pypi/reportlab@4.4.3",
+      "scope": "required",
+      "type": "library",
+      "version": "4.4.3"
+    },
+    {
+      "authors": [
+        {
+          "name": "Kenneth Reitz <me@kennethreitz.org>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/requests@2.32.5",
+      "description": "Python HTTP for Humans.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: requests",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: requests"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://requests.readthedocs.io"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "2462f94637a34fd532264295e186976db0f5d453d1cdd31473c85a6a161affb6"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "requests",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "requests"
+        }
+      ],
+      "purl": "pkg:pypi/requests@2.32.5",
+      "scope": "required",
+      "type": "library",
+      "version": "2.32.5"
+    },
+    {
+      "bom-ref": "pkg:pypi/scipy@1.16.2",
+      "description": "Fundamental algorithms for scientific computing in Python",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: scipy",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: scipy"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "6ab88ea43a57da1af33292ebd04b417e8e2eaf9d5aa05700be8d6e1b6501cd92"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "scipy",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "scipy.spatial.distance"
+        }
+      ],
+      "purl": "pkg:pypi/scipy@1.16.2",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "1.16.2"
+    },
+    {
+      "bom-ref": "pkg:pypi/sglang@0.5.2",
+      "description": "SGLang is a fast serving framework for large language models and vision language models.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: sglang",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: sglang"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "83aae146f3913ed0802bb1ea356facff47efe0e7d18041a3f143de9ef6e44b2c"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "sglang",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "sglang.srt.utils.add_prefix,sglang.srt.mm_utils.divide_to_patches,sglang.srt.models.qwen2.Qwen2ForCausalLM,sglang.srt.model_loader.weight_utils.default_weight_loader,sglang.srt.managers.multimodal_processors.base_processor.BaseMultimodalProcessor,sglang.srt.utils.logger,sglang.srt.entrypoints.http_server.launch_server,sglang.srt.mm_utils.get_anyres_image_grid_shape,sglang.srt.layers.quantization.base_config.QuantizationConfig,sglang.srt.sampling.custom_logit_processor.CustomLogitProcessor,sglang.srt.managers.io_struct.EmbeddingReqInput,sglang.utils.get_exception_traceback,sglang.srt.multimodal.mm_utils.get_anyres_image_grid_shape,sglang.srt.configs.model_config.multimodal_model_archs,sglang.srt.entrypoints.http_server.app,sglang.srt.entrypoints.engine.Engine,sglang.srt.managers.tokenizer_manager.TokenizerManager,sglang.srt.utils.load_image,sglang.version.__version__,sglang.srt.managers.tokenizer_manager.logger,sglang.srt.multimodal.mm_utils.expand2square,sglang.srt.conversation.Conversation,sglang.srt.multimodal.mm_utils.select_best_resolution,sglang.srt.server_args.ServerArgs,sglang.srt.mm_utils.select_best_resolution,sglang.srt.models.registry.ModelRegistry,sglang.srt.managers.io_struct.GenerateReqInput,sglang.srt.sampling.sampling_params.SamplingParams,sglang.srt.managers.schedule_batch.Req,sglang.srt.multimodal.processors.base_processor.BaseMultimodalProcessor,sglang.srt.server_args.prepare_server_args,sglang.srt.managers.tokenizer_manager.dataclass_to_string_truncated,sglang.srt.managers.schedule_batch.MultimodalDataItem,sglang.srt.managers.multimodal_processor.PROCESSOR_MAPPING,sglang.srt.entrypoints.http_server.generate_request,sglang.srt.managers.schedule_batch.Modality,sglang.srt.utils.kill_process_tree,sglang.srt.model_executor.forward_batch_info.ForwardBatch,sglang.srt.mm_utils.expand2square,sglang.srt.multimodal.mm_utils.divide_to_patches"
+        }
+      ],
+      "purl": "pkg:pypi/sglang@0.5.2",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "0.5.2"
+    },
+    {
+      "authors": [
+        {
+          "name": "Sean Gillies"
+        }
+      ],
+      "bom-ref": "pkg:pypi/shapely@2.1.1",
+      "description": "Manipulation and analysis of geometric objects",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: shapely",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: shapely"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "d8ccc872a632acb7bdcb69e5e78df27213f7efd195882668ffba5405497337c6"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        },
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "shapely",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "shapely.geometry.Polygon"
+        }
+      ],
+      "purl": "pkg:pypi/shapely@2.1.1",
+      "scope": "required",
+      "type": "library",
+      "version": "2.1.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "Benjamin Peterson <benjamin@python.org>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/six@1.17.0",
+      "description": "Python 2 and 3 compatibility utilities",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: six",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: six"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/benjaminp/six"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "six",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "six"
+        }
+      ],
+      "purl": "pkg:pypi/six@1.17.0",
+      "scope": "required",
+      "type": "library",
+      "version": "1.17.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Stefan van der Walt <stefanv@berkeley.edu>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/skimage@0.0",
+      "description": "Dummy package that points to scikit-image",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: skimage",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: skimage"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/scikit-image/scikit-image"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "6c96a11d9deea68489c9b80b38fad1dcdab582c36d4fa093b99b24a3b30c38ec"
+        }
+      ],
+      "licenses": [],
+      "name": "skimage",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "skimage.measure"
+        }
+      ],
+      "purl": "pkg:pypi/skimage@0.0",
+      "scope": "required",
+      "type": "library",
+      "version": "0.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Tom Christie <tom@tomchristie.com>"
+        },
+        {
+          "name": " Marcelo Trylesinski <marcelotryle@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/starlette@0.48.0",
+      "description": "The little ASGI library that shines.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: starlette",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: starlette"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "0764ca97b097582558ecb498132ed0c7d942f233f365b86ba37770e026510659"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        },
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "starlette",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "starlette.routing.Mount,starlette.routing.Route,starlette.requests.Request,starlette.applications.Starlette,starlette.background.BackgroundTask"
+        }
+      ],
+      "purl": "pkg:pypi/starlette@0.48.0",
+      "scope": "required",
+      "type": "library",
+      "version": "0.48.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "PyTorch Team <packages@pytorch.org>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/torch@2.8.0",
+      "description": "Tensors and Dynamic neural networks in Python with strong GPU acceleration",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: torch",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: torch"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://pytorch.org/"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "0be92c08b44009d4131d1ff7a8060d10bafdb7ddcb7359ef8d8c5169007ea905"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        },
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "torch",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "torch.nn,torch.nn.functional,torch.nn.MSELoss,torch.nn.CrossEntropyLoss,torch.utils.data.DataLoader,torch.nn.BCEWithLogitsLoss,torch.utils.checkpoint,torch.utils.data.Dataset,torch"
+        }
+      ],
+      "purl": "pkg:pypi/torch@2.8.0",
+      "scope": "required",
+      "type": "library",
+      "version": "2.8.0"
+    },
+    {
+      "bom-ref": "pkg:pypi/torch-npu@2.6.0",
+      "description": "NPU bridge for PyTorch",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: torch-npu",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: torch-npu"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://gitee.com/ascend/pytorch"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "d9adfdbce7c61ef132546a54ad70d61879dd773f5c3592f374b13fad4711f0dc"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "torch-npu",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "torch_npu"
+        }
+      ],
+      "purl": "pkg:pypi/torch-npu@2.6.0",
+      "scope": "required",
+      "type": "library",
+      "version": "2.6.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "PyTorch Core Team <soumith@pytorch.org>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/torchvision@0.23.0",
+      "description": "image and video datasets and models for torch deep learning",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: torchvision",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: torchvision"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/pytorch/vision"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "7266871daca00ad46d1c073e55d972179d12a58fa5c9adec9a3db9bbed71284a"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "torchvision",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "torchvision.transforms.functional.resize"
+        }
+      ],
+      "purl": "pkg:pypi/torchvision@0.23.0",
+      "scope": "required",
+      "type": "library",
+      "version": "0.23.0"
+    },
+    {
+      "bom-ref": "pkg:pypi/tqdm@4.67.1",
+      "description": "Fast, Extensible Progress Meter",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: tqdm",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: tqdm"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "26445eca388f82e72884e0d580d5464cd801a3ea01e63e5601bdff9ba6a48de2"
+        }
+      ],
+      "licenses": [
+        {
+          "expression": "MPL-2.0 AND MIT"
+        }
+      ],
+      "name": "tqdm",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "tqdm.tqdm"
+        }
+      ],
+      "purl": "pkg:pypi/tqdm@4.67.1",
+      "scope": "required",
+      "type": "library",
+      "version": "4.67.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "The Hugging Face team (past and future) with the help of all our contributors (https://github.com/huggingface/transformers/graphs/contributors) <transformers@huggingface.co>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/transformers@4.56.1",
+      "description": "State-of-the-art Machine Learning for JAX, PyTorch and TensorFlow",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: transformers",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: transformers"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/huggingface/transformers"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "1697af6addfb6ddbce9618b763f4b52d5a756f6da4899ffd1b4febf58b779248"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "transformers",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "transformers.activations.ACT2FN,transformers.utils.add_code_sample_docstrings,transformers.Qwen2Model,transformers.CLIPVisionConfig,transformers.utils.TensorType,transformers.modeling_outputs.CausalLMOutputWithPast,transformers.image_utils.to_numpy_array,transformers.image_processing_utils.get_size_dict,transformers.modeling_utils.PreTrainedModel,transformers.image_processing_utils.BatchFeature,transformers.utils.logging,transformers.utils.add_start_docstrings_to_model_forward,transformers.BitsAndBytesConfig,transformers.VisionEncoderDecoderModel,transformers.LayoutLMv3ForTokenClassification,transformers.Qwen2Config,transformers.AutoModel,transformers.PretrainedConfig,transformers.image_transforms.resize,transformers.models.vision_encoder_decoder.modeling_vision_encoder_decoder.logger,transformers.utils.is_flash_attn_greater_or_equal_2_10,transformers.image_processing_utils.BaseImageProcessor,transformers.utils.replace_return_docstrings,transformers.pytorch_utils.find_pruneable_heads_and_indices,transformers.pytorch_utils.meshgrid,transformers.Qwen2ForCausalLM,transformers.utils.torch_int,transformers.utils.ModelOutput,transformers.image_utils.PILImageResampling,transformers.VisionEncoderDecoderConfig,transformers.image_transforms.rescale,transformers.image_transforms.to_channel_dimension_format,transformers.generation.utils.GenerateOutput,transformers.PreTrainedModel,transformers.modeling_attn_mask_utils._prepare_4d_attention_mask,transformers.modeling_attn_mask_utils._prepare_4d_attention_mask_for_sdpa,transformers.modeling_outputs.Seq2SeqLMOutput,transformers.__version__,transformers.configuration_utils.PretrainedConfig,transformers.SiglipVisionConfig,transformers.image_transforms.normalize,transformers.modeling_outputs.Seq2SeqSequenceClassifierOutput,transformers.GenerationMixin,transformers.modeling_attn_mask_utils._prepare_4d_causal_attention_mask_for_sdpa,transformers.modeling_outputs.CausalLMOutputWithCrossAttentions,transformers.modeling_attn_mask_utils._prepare_4d_causal_attention_mask,transformers.pytorch_utils.prune_linear_layer,transformers.utils.add_end_docstrings,transformers.AutoModelForCausalLM,transformers.SiglipVisionModel,transformers.utils.add_start_docstrings,transformers.modeling_outputs.Seq2SeqModelOutput,transformers.AutoImageProcessor,transformers.image_transforms.convert_to_rgb,transformers.AutoConfig,transformers.image_utils.ChannelDimension,transformers.utils.is_flash_attn_2_available,transformers.modeling_outputs.BaseModelOutputWithPastAndCrossAttentions,transformers.AutoTokenizer,transformers.modeling_outputs.Seq2SeqQuestionAnsweringModelOutput,transformers.CLIPVisionModel,transformers.modeling_outputs.BaseModelOutput"
+        }
+      ],
+      "purl": "pkg:pypi/transformers@4.56.1",
+      "scope": "required",
+      "tags": [
+        "transform"
+      ],
+      "type": "library",
+      "version": "4.56.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "Glenn Jocher <glenn.jocher@ultralytics.com>"
+        },
+        {
+          "name": " Jing Qiu <jing.qiu@ultralytics.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/ultralytics@8.3.201",
+      "description": "Ultralytics YOLO 🚀 for SOTA object detection, multi-object tracking, instance segmentation, pose estimation and image classification.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: ultralytics",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: ultralytics"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "d6ed2876a2e6d5d2812ff69fe0678b48777e141f3ad07c526754ffa662d8ed3a"
+        }
+      ],
+      "licenses": [
+        {
+          "expression": "GNU Affero General Public License v3 or later (AGPLv3+)"
+        }
+      ],
+      "name": "ultralytics",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "ultralytics.YOLO"
+        }
+      ],
+      "purl": "pkg:pypi/ultralytics@8.3.201",
+      "scope": "required",
+      "type": "library",
+      "version": "8.3.201"
+    },
+    {
+      "authors": [
+        {
+          "name": "Tom Christie <tom@tomchristie.com>"
+        },
+        {
+          "name": " Marcelo Trylesinski <marcelotryle@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/uvicorn@0.35.0",
+      "description": "The lightning-fast ASGI server.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: uvicorn",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: uvicorn"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "197535216b25ff9b785e29a0b79199f55222193d47f820816e7da751e9bc8d4a"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        },
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "uvicorn",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "uvicorn"
+        }
+      ],
+      "purl": "pkg:pypi/uvicorn@0.35.0",
+      "scope": "required",
+      "type": "library",
+      "version": "0.35.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Kirill Simonov <xi@resolvent.net>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/pyyaml@6.0.2",
+      "description": "YAML parser and emitter for Python",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: PyYAML",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: PyYAML"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://pyyaml.org/"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "0a9a2848a5b7feac301353437eb7d5957887edbf81d56e903999a75a3d743086"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "PyYAML",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ""
+        },
+        {
+          "name": "ImportedModules",
+          "value": "yaml"
+        }
+      ],
+      "purl": "pkg:pypi/pyyaml@6.0.2",
+      "scope": "required",
+      "type": "library",
+      "version": "6.0.2"
+    },
+    {
+      "bom-ref": "pkg:github/actions/checkout@v4",
+      "group": "actions",
+      "name": "checkout",
+      "purl": "pkg:github/actions/checkout@v4",
+      "type": "application",
+      "version": "v4"
+    },
+    {
+      "bom-ref": "pkg:github/actions/setup-python@v5",
+      "group": "actions",
+      "name": "setup-python",
+      "purl": "pkg:github/actions/setup-python@v5",
+      "type": "application",
+      "version": "v5"
+    },
+    {
+      "bom-ref": "pkg:github/actions/upload-artifact@v4",
+      "group": "actions",
+      "name": "upload-artifact",
+      "purl": "pkg:github/actions/upload-artifact@v4",
+      "type": "application",
+      "version": "v4"
+    },
+    {
+      "bom-ref": "pkg:github/actions/download-artifact@v4",
+      "group": "actions",
+      "name": "download-artifact",
+      "purl": "pkg:github/actions/download-artifact@v4",
+      "type": "application",
+      "version": "v4"
+    },
+    {
+      "bom-ref": "pkg:github/softprops/action-gh-release@4634c16e79c963813287e889244c50009e7f0981",
+      "group": "softprops",
+      "name": "action-gh-release",
+      "purl": "pkg:github/softprops/action-gh-release@4634c16e79c963813287e889244c50009e7f0981",
+      "type": "library",
+      "version": "4634c16e79c963813287e889244c50009e7f0981"
+    },
+    {
+      "bom-ref": "pkg:github/mhausenblas/mkdocs-deploy-gh-pages@master",
+      "group": "mhausenblas",
+      "name": "mkdocs-deploy-gh-pages",
+      "purl": "pkg:github/mhausenblas/mkdocs-deploy-gh-pages@master",
+      "type": "library",
+      "version": "master"
+    },
+    {
+      "bom-ref": "pkg:github/astral-sh/setup-uv@v5",
+      "group": "astral-sh",
+      "name": "setup-uv",
+      "purl": "pkg:github/astral-sh/setup-uv@v5",
+      "type": "library",
+      "version": "v5"
+    },
+    {
+      "bom-ref": "pkg:github/contributor-assistant/github-action@v2.6.1",
+      "group": "contributor-assistant",
+      "name": "github-action",
+      "purl": "pkg:github/contributor-assistant/github-action@v2.6.1",
+      "type": "library",
+      "version": "v2.6.1"
+    }
+  ],
+  "dependencies": [
+    {
+      "dependsOn": [
+        "pkg:pypi/aiohttp@3.12.15",
+        "pkg:pypi/albumentations@2.0.8",
+        "pkg:pypi/beautifulsoup4@4.13.5",
+        "pkg:pypi/boto3@1.40.32",
+        "pkg:pypi/botocore@1.40.32",
+        "pkg:pypi/click@8.2.1",
+        "pkg:pypi/doclayout-yolo@0.0.4",
+        "pkg:pypi/fast-langdetect@1.0.0",
+        "pkg:pypi/fastapi@0.116.2",
+        "pkg:pypi/fastmcp@2.12.3",
+        "pkg:pypi/fasttext@0.9.3",
+        "pkg:pypi/flash-attn@2.8.3",
+        "pkg:pypi/ftfy@6.3.1",
+        "pkg:pypi/fuzzywuzzy@0.18.0",
+        "pkg:pypi/gradio-pdf@0.0.22",
+        "pkg:pypi/gradio@5.46.0",
+        "pkg:pypi/httpx@0.28.1",
+        "pkg:pypi/huggingface-hub@0.35.0",
+        "pkg:pypi/json-repair@0.50.1",
+        "pkg:pypi/litserve@0.2.15",
+        "pkg:pypi/loguru@0.7.3",
+        "pkg:pypi/mcp@1.14.0",
+        "pkg:pypi/modelscope@1.30.0",
+        "pkg:pypi/numpy@2.3.3",
+        "pkg:pypi/omegaconf@2.3.0",
+        "pkg:pypi/onnxruntime@1.22.1",
+        "pkg:pypi/openai@1.107.3",
+        "pkg:pypi/opencv-python@4.12.0.88",
+        "pkg:pypi/packaging@25.0",
+        "pkg:pypi/pdfminer@20191125",
+        "pkg:pypi/pdftext@0.6.3",
+        "pkg:pypi/pillow@11.3.0",
+        "pkg:pypi/pyclipper@1.3.0.post6",
+        "pkg:pypi/pydantic@2.11.9",
+        "pkg:pypi/pypdf@6.0.0",
+        "pkg:pypi/pypdfium2@4.30.0",
+        "pkg:pypi/python-dotenv@1.1.1",
+        "pkg:pypi/pyyaml@6.0.2",
+        "pkg:pypi/rapid-table@3.0.1",
+        "pkg:pypi/reportlab@4.4.3",
+        "pkg:pypi/requests@2.32.5",
+        "pkg:pypi/scipy@1.16.2",
+        "pkg:pypi/sglang@0.5.2",
+        "pkg:pypi/shapely@2.1.1",
+        "pkg:pypi/six@1.17.0",
+        "pkg:pypi/skimage@0.0",
+        "pkg:pypi/starlette@0.48.0",
+        "pkg:pypi/torch-npu@2.6.0",
+        "pkg:pypi/torch@2.8.0",
+        "pkg:pypi/torchvision@0.23.0",
+        "pkg:pypi/tqdm@4.67.1",
+        "pkg:pypi/transformers@4.56.1",
+        "pkg:pypi/ultralytics@8.3.201",
+        "pkg:pypi/uvicorn@0.35.0"
+      ],
+      "ref": "pkg:pypi/mineru@latest"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/pillow@11.3.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/aiohttp@3.12.15"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/albumentations@2.0.8"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/boto3@1.40.32"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/botocore@1.40.32"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/beautifulsoup4@4.13.5"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/click@8.2.1"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/opencv-python@4.12.0.88"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/doclayout-yolo@0.0.4"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/python-dotenv@1.1.1"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/fast-langdetect@1.0.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/fastapi@0.116.2"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/fastmcp@2.12.3"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/fasttext@0.9.3"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/flash-attn@2.8.3"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/ftfy@6.3.1"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/fuzzywuzzy@0.18.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/gradio@5.46.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/gradio-pdf@0.0.22"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/httpx@0.28.1"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/huggingface-hub@0.35.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/json-repair@0.50.1"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/litserve@0.2.15"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/loguru@0.7.3"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/mcp@1.14.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/modelscope@1.30.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/numpy@2.3.3"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/omegaconf@2.3.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/onnxruntime@1.22.1"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/openai@1.107.3"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/packaging@25.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/pdfminer@20191125"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/pdftext@0.6.3"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/pyclipper@1.3.0.post6"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/pydantic@2.11.9"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/pypdf@6.0.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/pypdfium2@4.30.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/rapid-table@3.0.1"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/reportlab@4.4.3"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/requests@2.32.5"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/scipy@1.16.2"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/sglang@0.5.2"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/shapely@2.1.1"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/six@1.17.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/skimage@0.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/starlette@0.48.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/torch@2.8.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/torch-npu@2.6.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/torchvision@0.23.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/tqdm@4.67.1"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/transformers@4.56.1"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/ultralytics@8.3.201"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/uvicorn@0.35.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/pyyaml@6.0.2"
+    }
+  ],
+  "metadata": {
+    "authors": [
+      {
+        "name": "OWASP Foundation"
+      }
+    ],
+    "component": {
+      "bom-ref": "pkg:pypi/mineru@latest",
+      "description": "A practical tool for converting PDF to Markdown",
+      "name": "mineru",
+      "properties": [
+        {
+          "name": "cdx:pypi:requiresPython",
+          "value": ">=3.10,<3.14"
+        }
+      ],
+      "purl": "pkg:pypi/mineru@latest",
+      "tags": [
+        "MinerU",
+        "convert",
+        "magic-pdf",
+        "markdown",
+        "mineru",
+        "pdf"
+      ],
+      "type": "application",
+      "version": "latest"
+    },
+    "lifecycles": [
+      {
+        "phase": "build"
+      }
+    ],
+    "properties": [
+      {
+        "name": "cdx:bom:componentTypes",
+        "value": "github\\npypi"
+      },
+      {
+        "name": "cdx:bom:componentNamespaces",
+        "value": "actions\\nastral-sh\\ncontributor-assistant\\nmhausenblas\\nsoftprops"
+      },
+      {
+        "name": "cdx:bom:componentSrcFiles",
+        "value": "PyPI package: PyYAML\\nPyPI package: aiohttp\\nPyPI package: albumentations\\nPyPI package: beautifulsoup4\\nPyPI package: boto3\\nPyPI package: botocore\\nPyPI package: click\\nPyPI package: doclayout-yolo\\nPyPI package: fast-langdetect\\nPyPI package: fastapi\\nPyPI package: fastmcp\\nPyPI package: fasttext\\nPyPI package: flash-attn\\nPyPI package: ftfy\\nPyPI package: fuzzywuzzy\\nPyPI package: gradio\\nPyPI package: gradio-pdf\\nPyPI package: httpx\\nPyPI package: huggingface-hub\\nPyPI package: json-repair\\nPyPI package: litserve\\nPyPI package: loguru\\nPyPI package: mcp\\nPyPI package: modelscope\\nPyPI package: numpy\\nPyPI package: omegaconf\\nPyPI package: onnxruntime\\nPyPI package: openai\\nPyPI package: opencv-python\\nPyPI package: packaging\\nPyPI package: pdfminer\\nPyPI package: pdftext\\nPyPI package: pillow\\nPyPI package: pyclipper\\nPyPI package: pydantic\\nPyPI package: pypdf\\nPyPI package: pypdfium2\\nPyPI package: python-dotenv\\nPyPI package: rapid-table\\nPyPI package: reportlab\\nPyPI package: requests\\nPyPI package: scipy\\nPyPI package: sglang\\nPyPI package: shapely\\nPyPI package: six\\nPyPI package: skimage\\nPyPI package: starlette\\nPyPI package: torch\\nPyPI package: torch-npu\\nPyPI package: torchvision\\nPyPI package: tqdm\\nPyPI package: transformers\\nPyPI package: ultralytics\\nPyPI package: uvicorn"
+      },
+      {
+        "name": "cdx:bom:componentTypes",
+        "value": "github\\npypi"
+      },
+      {
+        "name": "cdx:bom:componentNamespaces",
+        "value": "actions\\nastral-sh\\ncontributor-assistant\\nmhausenblas\\nsoftprops"
+      },
+      {
+        "name": "cdx:bom:componentSrcFiles",
+        "value": "PyPI package: PyYAML\\nPyPI package: aiohttp\\nPyPI package: albumentations\\nPyPI package: beautifulsoup4\\nPyPI package: boto3\\nPyPI package: botocore\\nPyPI package: click\\nPyPI package: doclayout-yolo\\nPyPI package: fast-langdetect\\nPyPI package: fastapi\\nPyPI package: fastmcp\\nPyPI package: fasttext\\nPyPI package: flash-attn\\nPyPI package: ftfy\\nPyPI package: fuzzywuzzy\\nPyPI package: gradio\\nPyPI package: gradio-pdf\\nPyPI package: httpx\\nPyPI package: huggingface-hub\\nPyPI package: json-repair\\nPyPI package: litserve\\nPyPI package: loguru\\nPyPI package: mcp\\nPyPI package: modelscope\\nPyPI package: numpy\\nPyPI package: omegaconf\\nPyPI package: onnxruntime\\nPyPI package: openai\\nPyPI package: opencv-python\\nPyPI package: packaging\\nPyPI package: pdfminer\\nPyPI package: pdftext\\nPyPI package: pillow\\nPyPI package: pyclipper\\nPyPI package: pydantic\\nPyPI package: pypdf\\nPyPI package: pypdfium2\\nPyPI package: python-dotenv\\nPyPI package: rapid-table\\nPyPI package: reportlab\\nPyPI package: requests\\nPyPI package: scipy\\nPyPI package: sglang\\nPyPI package: shapely\\nPyPI package: six\\nPyPI package: skimage\\nPyPI package: starlette\\nPyPI package: torch\\nPyPI package: torch-npu\\nPyPI package: torchvision\\nPyPI package: tqdm\\nPyPI package: transformers\\nPyPI package: ultralytics\\nPyPI package: uvicorn"
+      }
+    ],
+    "timestamp": "2025-09-17T11:17:12Z",
+    "tools": {
+      "components": [
+        {
+          "authors": [
+            {
+              "name": "OWASP Foundation"
+            }
+          ],
+          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@11.7.0",
+          "group": "@cyclonedx",
+          "name": "cdxgen",
+          "publisher": "OWASP Foundation",
+          "purl": "pkg:npm/%40cyclonedx/cdxgen@11.7.0",
+          "type": "application",
+          "version": "11.7.0"
+        }
+      ]
+    }
+  },
+  "serialNumber": "urn:uuid:b2cf7f0f-773e-4185-9c5c-8ab429f6006c",
+  "services": [],
+  "specVersion": "1.6",
+  "version": 2
+}
