@@ -50,16 +50,12 @@ with col1:
     config_data = cached_config
 
     with st.form("create_bench_form", clear_on_submit=False):
-        name = st.text_input(
-            "Benchmark name", placeholder="e.g. python-top1k-cdxgen-vs-syft"
-        )
+        name = st.text_input("Benchmark name", placeholder="e.g. python-top1k-cdxgen-vs-syft")
 
         available_workers = get_available_workers()
         workers: list[str] = []
         if source != "Paste config":
-            workers = st.multiselect(
-                "Workers", options=available_workers, default=available_workers
-            )
+            workers = st.multiselect("Workers", options=available_workers, default=available_workers)
         else:
             st.caption("")
 
@@ -96,20 +92,14 @@ with col1:
                 step=1,
             )
 
-            limit = st.slider(
-                "Number of repositories", min_value=1, max_value=200, value=50, step=1
-            )
+            limit = st.slider("Number of repositories", min_value=1, max_value=200, value=50, step=1)
 
             # Build base query parts (without language)
             base_parts = [
                 f"stars:{stars_min}..{stars_max}",
                 f"size:{size_min}..{size_max}",
             ]
-            pushed_date = (
-                (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=int(days_since)))
-                .date()
-                .isoformat()
-            )
+            pushed_date = (dt.datetime.now(dt.UTC) - dt.timedelta(days=int(days_since))).date().isoformat()
             base_parts.append(f"pushed:>={pushed_date}")
 
             params = {
@@ -144,7 +134,7 @@ with col1:
                     st.session_state[CONFIG_SESSION_KEY] = config_data
                     st.session_state[CONFIG_TEXT_KEY] = config_text
                     st.caption(
-                        f"Config contains {len(config_data.get('repos') or [])} repos and {len(config_data.get('workers') or [])} workers."
+                        f"Config contains {len(config_data.get('repos') or [])} repos and {{len(config_data.get('workers') or [])}} workers."
                     )
                 except Exception as exc:
                     st.error(f"Invalid config JSON: {exc}")
@@ -248,9 +238,7 @@ with col1:
             st.warning("No repositories found for the given input.")
             st.stop()
 
-        bench_id = create_benchmark(
-            r, name=bench_name, params=params, repos=repos, workers=workers
-        )
+        bench_id = create_benchmark(r, name=bench_name, params=params, repos=repos, workers=workers)
 
         # Persist deep-link and offer navigation
         set_query_bench_id(bench_id)

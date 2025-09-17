@@ -237,11 +237,7 @@ class CbomKitClient:
             obj = json.loads(text or "{}")
         except Exception:
             return text
-        target = (
-            obj.get("bom")
-            if isinstance(obj, dict) and isinstance(obj.get("bom"), dict)
-            else obj
-        )
+        target = obj.get("bom") if isinstance(obj, dict) and isinstance(obj.get("bom"), dict) else obj
         try:
             comps = target.get("components") if isinstance(target, dict) else None
             if isinstance(comps, list):
@@ -284,9 +280,7 @@ class CbomKitClient:
         return None
 
     # ---- ProjectIdentifier reconstruction helpers ----
-    def _owner_repo_from_giturl(
-        self, git_url: str
-    ) -> tuple[str | None, str | None, str | None]:
+    def _owner_repo_from_giturl(self, git_url: str) -> tuple[str | None, str | None, str | None]:
         try:
             parts = parse.urlsplit(git_url.strip())
             host = (parts.netloc or "").lower()
@@ -337,9 +331,7 @@ class CbomKitClient:
             logger.debug("github head sha fetch failed: %s", e)
         return None
 
-    def _build_purl_candidates(
-        self, namespace: str, name: str, branch: str, sha7: str | None
-    ) -> list[str]:
+    def _build_purl_candidates(self, namespace: str, name: str, branch: str, sha7: str | None) -> list[str]:
         base = f"pkg:github/{namespace}/{name}"
         qs = f"?branch={branch}" if branch and branch.lower() != "main" else ""
         cands: list[str] = []
@@ -370,9 +362,7 @@ class CbomKitClient:
                 time.sleep(self.poll_interval)
         return None
 
-    def trigger_scan_ws(
-        self, git_url: str, branch: str, budget_sec: float
-    ) -> tuple[bool, bool, str | None]:
+    def trigger_scan_ws(self, git_url: str, branch: str, budget_sec: float) -> tuple[bool, bool, str | None]:
         """Send scan over persistent WS and wait for Finished within budget."""
         if not self._ensure_ws():
             return False, False, self._ws_error or "ws_not_connected"
@@ -425,21 +415,15 @@ class CbomKitClient:
             url = f"{self.base}/api/v1/cbom/{rid}"
             st, _, body = _http_delete(url, timeout=10)
             if st not in (200, 204, 404):
-                logger.warning(
-                    "CBOM delete returned %s for id=%s: %s", st, rid, (body or "")[:120]
-                )
+                logger.warning("CBOM delete returned %s for id=%s: %s", st, rid, (body or "")[:120])
 
-    def generate_cbom(
-        self, git_url, branch="main"
-    ) -> tuple[str | None, float, str | None]:
+    def generate_cbom(self, git_url, branch="main") -> tuple[str | None, float, str | None]:
         start = time.monotonic()
         # 1) Snapshot last/1 before scan (sequential change detection)
         before = self._get_last_raw()
         # 2) Trigger via WebSocket and wait until Finished (within budget)
         budget = max(5.0, float(str(max(10, TIMEOUT_SEC - 5))))
-        ws_started, ws_finished, trig_err = self.trigger_scan_ws(
-            git_url, branch, budget
-        )
+        ws_started, ws_finished, trig_err = self.trigger_scan_ws(git_url, branch, budget)
 
         if not ws_started:
             return (
@@ -491,9 +475,7 @@ class CbomKitClient:
             cur = self._get_last_raw()
             if cur and cur != before:
                 cur_lower = cur.lower()
-                if (needle_host in cur_lower) or (
-                    needle_purl_prefix and needle_purl_prefix in cur_lower
-                ):
+                if (needle_host in cur_lower) or (needle_purl_prefix and needle_purl_prefix in cur_lower):
                     duration = time.monotonic() - start
                     cur = self._normalize_cbom_text(cur)
                     # Best-effort cleanup for a fresh store next run

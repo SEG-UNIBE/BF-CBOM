@@ -102,10 +102,7 @@ def _render_job_results(
         on_change=reset_page,
     )
     if deep:
-        st.caption(
-            "Deep search scans JobResult metadata and CBOM JSON bodies for your tokens. "
-            "Expect slower response."
-        )
+        st.caption("Deep search scans JobResult metadata and CBOM JSON bodies for your tokens. Expect slower response.")
 
     pairs_all: list[tuple[str, str, str]] = []
     for repo in repos:
@@ -250,9 +247,7 @@ def _render_job_results(
                     cbom_txt = payload.get("json") or "{}"
                     try:
                         obj = json.loads(cbom_txt)
-                        pretty = json.dumps(
-                            obj, indent=2, ensure_ascii=False, sort_keys=False
-                        )
+                        pretty = json.dumps(obj, indent=2, ensure_ascii=False, sort_keys=False)
                         st.code(pretty, language="json")
                     except Exception:
                         st.text_area(
@@ -301,9 +296,7 @@ repos = get_bench_repos(r, bench_id)
 workers = get_bench_workers(r, bench_id)
 job_idx = r.hgetall(f"bench:{bench_id}:job_index") or {}
 
-st.markdown(
-    format_benchmark_header(name, bench_id, created, expected), unsafe_allow_html=True
-)
+st.markdown(format_benchmark_header(name, bench_id, created, expected), unsafe_allow_html=True)
 st.caption(f"Status: {status}")
 
 zip_bytes = build_cboms_zip(r, bench_id)

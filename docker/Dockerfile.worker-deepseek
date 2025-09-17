@@ -6,8 +6,8 @@ USER appuser
 COPY --chown=appuser:appuser pyproject.toml uv.lock ./
 COPY --chown=appuser:appuser common/ ./common/
 RUN pip install --no-cache-dir --upgrade pip
-RUN uv sync --frozen --no-dev
+RUN uv sync --no-dev
 
 COPY --chown=appuser:appuser workers/deepseek/ ./workers/deepseek/
 ENV PYTHONPATH=/app
-ENTRYPOINT ["tini","-g","--","uv","run","workers/deepseek/main.py"]
+ENTRYPOINT ["tini","-g","--","uv","run","--no-dev","workers/deepseek/main.py"]

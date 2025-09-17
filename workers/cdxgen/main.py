@@ -51,9 +51,7 @@ class CdxgenClient:
                 cwd=str(repo_dir),
                 capture_output=True,
                 text=True,
-                timeout=(
-                    self.timeout_sec - 5 if self.timeout_sec > 10 else self.timeout_sec
-                ),
+                timeout=(self.timeout_sec - 5 if self.timeout_sec > 10 else self.timeout_sec),
                 check=False,
                 env=env,
             )
@@ -68,9 +66,7 @@ class CdxgenClient:
             stderr = (proc.stderr or "").strip()
             stdout = (proc.stdout or "").strip()
             trace.add(f"cdxgen_failed rc={proc.returncode}: {stderr or stdout}")
-            raise RuntimeError(
-                f"cdxgen_failed rc={proc.returncode}: {stderr or stdout}"
-            )
+            raise RuntimeError(f"cdxgen_failed rc={proc.returncode}: {stderr or stdout}")
 
         if not out_file.exists() or out_file.stat().st_size == 0:
             # Try common alternate output locations
@@ -100,11 +96,9 @@ class CdxgenClient:
                 f"stdout_tail: {stdout_tail or '(empty)'}"
             )
 
-    def generate_cbom(
-        self, git_url: str, branch: str = "main", trace: Trace | None = None
-    ) -> str:
+    def generate_cbom(self, git_url: str, branch: str = "main", trace: Trace | None = None) -> str:
         trace = trace or Trace()
-        work_root = Path("/tmp") / f"cdxgen-{int(time.time()*1000)}"
+        work_root = Path("/tmp") / f"cdxgen-{int(time.time() * 1000)}"
         repo_dir = work_root / "repo"
         out_file = work_root / "bom.json"
         self._ensure_clean_dir(work_root)

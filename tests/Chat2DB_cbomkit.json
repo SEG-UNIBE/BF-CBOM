@@ -1,0 +1,599 @@
+{
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "bom-ref": "8a44f8be-bac4-41ed-a141-a0e03679e619",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "mode": "cfb",
+          "padding": "pkcs5",
+          "parameterSetIdentifier": "56",
+          "primitive": "block-cipher"
+        },
+        "assetType": "algorithm"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.Cipher#getInstance(Ljava/lang/String;)Ljavax/crypto/Cipher;",
+            "line": 194,
+            "location": "chat2db-server/chat2db-server-domain/chat2db-server-domain-core/src/main/java/ai/chat2db/server/domain/core/util/DesUtil.java",
+            "offset": 25
+          }
+        ]
+      },
+      "name": "DES56-CFB-PKCS5",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "f4ea1468-6c17-4ce1-aeef-880bcbcf6076",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "decrypt",
+            "encrypt"
+          ],
+          "mode": "cbc",
+          "padding": "pkcs5",
+          "parameterSetIdentifier": "56",
+          "primitive": "block-cipher"
+        },
+        "assetType": "algorithm"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.Cipher#getInstance(Ljava/lang/String;)Ljavax/crypto/Cipher;",
+            "line": 186,
+            "location": "chat2db-server/chat2db-server-domain/chat2db-server-domain-core/src/main/java/ai/chat2db/server/domain/core/util/DesUtil.java",
+            "offset": 25
+          }
+        ]
+      },
+      "name": "DES56-CBC-PKCS5",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "d5f2cada-8630-44be-8d1d-c986823929cf",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "digest"
+          ],
+          "parameterSetIdentifier": "160",
+          "primitive": "hash"
+        },
+        "assetType": "algorithm",
+        "oid": "1.3.14.3.2.26"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "java.security.MessageDigest#getInstance(Ljava/lang/String;)Ljava/security/MessageDigest;",
+            "line": 26,
+            "location": "chat2db-server/chat2db-server-web/chat2db-server-web-api/src/main/java/ai/chat2db/server/web/api/controller/ncx/cipher/Navicat11Cipher.java",
+            "offset": 33
+          }
+        ]
+      },
+      "name": "SHA1",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "e51bbb6a-ffde-4667-88b3-9ee3f5ff5ebf",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "encrypt"
+          ],
+          "mode": "cbc",
+          "padding": "pkcs5",
+          "parameterSetIdentifier": "128",
+          "primitive": "block-cipher"
+        },
+        "assetType": "algorithm",
+        "oid": "2.16.840.1.101.3.4.1"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.Cipher#getInstance(Ljava/lang/String;)Ljavax/crypto/Cipher;",
+            "line": 27,
+            "location": "chat2db-server/chat2db-server-web/chat2db-server-web-api/src/main/java/ai/chat2db/server/web/api/controller/ncx/cipher/Navicat12Cipher.java",
+            "offset": 28
+          },
+          {
+            "additionalContext": "javax.crypto.Cipher#getInstance(Ljava/lang/String;)Ljavax/crypto/Cipher;",
+            "line": 42,
+            "location": "chat2db-server/chat2db-server-web/chat2db-server-web-api/src/main/java/ai/chat2db/server/web/api/controller/ncx/cipher/Navicat12Cipher.java",
+            "offset": 28
+          },
+          {
+            "additionalContext": "javax.crypto.Cipher#getInstance(Ljava/lang/String;)Ljavax/crypto/Cipher;",
+            "line": 51,
+            "location": "chat2db-server/chat2db-server-web/chat2db-server-web-api/src/main/java/ai/chat2db/server/web/api/controller/ncx/dbeaver/DefaultValueEncryptor.java",
+            "offset": 26
+          }
+        ]
+      },
+      "name": "AES128-CBC-PKCS5",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "28c9f830-ca3c-49c6-b0e1-e181c2bce9a2",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "tag"
+          ],
+          "primitive": "mac"
+        },
+        "assetType": "algorithm",
+        "oid": "1.2.840.113549.2.9"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.Mac#getInstance(Ljava/lang/String;)Ljavax/crypto/Mac;",
+            "line": 65,
+            "location": "chat2db-server/chat2db-server-domain/chat2db-server-domain-core/src/main/java/ai/chat2db/server/domain/core/notification/DingTalkWebhookSender.java",
+            "offset": 18
+          },
+          {
+            "additionalContext": "javax.crypto.spec.SecretKeySpec#<init>([BLjava/lang/String;)V",
+            "line": 66,
+            "location": "chat2db-server/chat2db-server-domain/chat2db-server-domain-core/src/main/java/ai/chat2db/server/domain/core/notification/DingTalkWebhookSender.java",
+            "offset": 17
+          },
+          {
+            "additionalContext": "javax.crypto.Mac#getInstance(Ljava/lang/String;)Ljavax/crypto/Mac;",
+            "line": 64,
+            "location": "chat2db-server/chat2db-server-domain/chat2db-server-domain-core/src/main/java/ai/chat2db/server/domain/core/notification/LarkWebhookSender.java",
+            "offset": 18
+          },
+          {
+            "additionalContext": "javax.crypto.spec.SecretKeySpec#<init>([BLjava/lang/String;)V",
+            "line": 65,
+            "location": "chat2db-server/chat2db-server-domain/chat2db-server-domain-core/src/main/java/ai/chat2db/server/domain/core/notification/LarkWebhookSender.java",
+            "offset": 17
+          }
+        ]
+      },
+      "name": "HMAC-SHA256",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "733ffabd-7947-47ac-b663-e9b7e1036880",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "size": 128,
+          "type": "secret-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.spec.SecretKeySpec#<init>([BLjava/lang/String;)V",
+            "line": 20,
+            "location": "chat2db-server/chat2db-server-web/chat2db-server-web-api/src/main/java/ai/chat2db/server/web/api/controller/ncx/cipher/Navicat12Cipher.java",
+            "offset": 18
+          }
+        ]
+      },
+      "name": "secret-key@733ffabd-7947-47ac-b663-e9b7e1036880",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "9ec148a0-0736-49f5-bdbb-6db0f1dd09d8",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "parameterSetIdentifier": "56",
+          "primitive": "block-cipher"
+        },
+        "assetType": "algorithm"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.KeyGenerator#getInstance(Ljava/lang/String;)Ljavax/crypto/KeyGenerator;",
+            "line": 125,
+            "location": "chat2db-server/chat2db-server-domain/chat2db-server-domain-core/src/main/java/ai/chat2db/server/domain/core/util/DesUtil.java",
+            "offset": 28
+          },
+          {
+            "additionalContext": "javax.crypto.Cipher#getInstance(Ljava/lang/String;)Ljavax/crypto/Cipher;",
+            "line": 198,
+            "location": "chat2db-server/chat2db-server-domain/chat2db-server-domain-core/src/main/java/ai/chat2db/server/domain/core/util/DesUtil.java",
+            "offset": 25
+          }
+        ]
+      },
+      "name": "DES56",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "dcfada47-8706-4825-b68f-d7a30cdf7642",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "secret-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.spec.SecretKeySpec#<init>([BLjava/lang/String;)V",
+            "line": 29,
+            "location": "chat2db-server/chat2db-server-web/chat2db-server-web-api/src/main/java/ai/chat2db/server/web/api/controller/ncx/cipher/Navicat11Cipher.java",
+            "offset": 18
+          }
+        ]
+      },
+      "name": "secret-key@dcfada47-8706-4825-b68f-d7a30cdf7642",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "64f3af3f-4518-463c-a489-6940b50d67b9",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "secret-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.KeyGenerator#getInstance(Ljava/lang/String;)Ljavax/crypto/KeyGenerator;",
+            "line": 125,
+            "location": "chat2db-server/chat2db-server-domain/chat2db-server-domain-core/src/main/java/ai/chat2db/server/domain/core/util/DesUtil.java",
+            "offset": 28
+          }
+        ]
+      },
+      "name": "secret-key@64f3af3f-4518-463c-a489-6940b50d67b9",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "070baacb-a637-4fdc-a3f6-62d1f2e4eaa4",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "digest"
+          ],
+          "parameterSetIdentifier": "256",
+          "primitive": "hash"
+        },
+        "assetType": "algorithm",
+        "oid": "2.16.840.1.101.3.4.2.1"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.Mac#getInstance(Ljava/lang/String;)Ljavax/crypto/Mac;",
+            "line": 65,
+            "location": "chat2db-server/chat2db-server-domain/chat2db-server-domain-core/src/main/java/ai/chat2db/server/domain/core/notification/DingTalkWebhookSender.java",
+            "offset": 18
+          },
+          {
+            "additionalContext": "javax.crypto.spec.SecretKeySpec#<init>([BLjava/lang/String;)V",
+            "line": 66,
+            "location": "chat2db-server/chat2db-server-domain/chat2db-server-domain-core/src/main/java/ai/chat2db/server/domain/core/notification/DingTalkWebhookSender.java",
+            "offset": 17
+          },
+          {
+            "additionalContext": "javax.crypto.Mac#getInstance(Ljava/lang/String;)Ljavax/crypto/Mac;",
+            "line": 64,
+            "location": "chat2db-server/chat2db-server-domain/chat2db-server-domain-core/src/main/java/ai/chat2db/server/domain/core/notification/LarkWebhookSender.java",
+            "offset": 18
+          },
+          {
+            "additionalContext": "javax.crypto.spec.SecretKeySpec#<init>([BLjava/lang/String;)V",
+            "line": 65,
+            "location": "chat2db-server/chat2db-server-domain/chat2db-server-domain-core/src/main/java/ai/chat2db/server/domain/core/notification/LarkWebhookSender.java",
+            "offset": 17
+          }
+        ]
+      },
+      "name": "SHA256",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "8d06b038-4e7d-4ade-9089-d1c03ec7be9c",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "secret-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.spec.SecretKeySpec#<init>([BLjava/lang/String;)V",
+            "line": 66,
+            "location": "chat2db-server/chat2db-server-domain/chat2db-server-domain-core/src/main/java/ai/chat2db/server/domain/core/notification/DingTalkWebhookSender.java",
+            "offset": 17
+          }
+        ]
+      },
+      "name": "secret-key@8d06b038-4e7d-4ade-9089-d1c03ec7be9c",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "0edc3db3-5f34-4b82-945b-a33079ba63da",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "secret-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.spec.SecretKeySpec#<init>([BLjava/lang/String;)V",
+            "line": 65,
+            "location": "chat2db-server/chat2db-server-domain/chat2db-server-domain-core/src/main/java/ai/chat2db/server/domain/core/notification/LarkWebhookSender.java",
+            "offset": 17
+          }
+        ]
+      },
+      "name": "secret-key@0edc3db3-5f34-4b82-945b-a33079ba63da",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "f21da3ff-661d-4614-b2e2-d18b045452f2",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "parameterSetIdentifier": "128",
+          "primitive": "block-cipher"
+        },
+        "assetType": "algorithm",
+        "oid": "2.16.840.1.101.3.4.1"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.spec.SecretKeySpec#<init>([BLjava/lang/String;)V",
+            "line": 20,
+            "location": "chat2db-server/chat2db-server-web/chat2db-server-web-api/src/main/java/ai/chat2db/server/web/api/controller/ncx/cipher/Navicat12Cipher.java",
+            "offset": 18
+          },
+          {
+            "additionalContext": "javax.crypto.spec.SecretKeySpec#<init>([BLjava/lang/String;)V",
+            "line": 61,
+            "location": "chat2db-server/chat2db-server-web/chat2db-server-web-api/src/main/java/ai/chat2db/server/web/api/controller/ncx/dbeaver/DefaultValueEncryptor.java",
+            "offset": 15
+          },
+          {
+            "additionalContext": "javax.crypto.spec.SecretKeySpec#<init>([BLjava/lang/String;)V",
+            "line": 67,
+            "location": "chat2db-server/chat2db-server-web/chat2db-server-web-api/src/main/java/ai/chat2db/server/web/api/controller/ncx/dbeaver/DefaultValueEncryptor.java",
+            "offset": 15
+          }
+        ]
+      },
+      "name": "AES128",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "f8c645a6-e992-4fe5-a388-c3dbbabd1480",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "mode": "ofb",
+          "padding": "pkcs5",
+          "parameterSetIdentifier": "56",
+          "primitive": "block-cipher"
+        },
+        "assetType": "algorithm"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.Cipher#getInstance(Ljava/lang/String;)Ljavax/crypto/Cipher;",
+            "line": 190,
+            "location": "chat2db-server/chat2db-server-domain/chat2db-server-domain-core/src/main/java/ai/chat2db/server/domain/core/util/DesUtil.java",
+            "offset": 25
+          }
+        ]
+      },
+      "name": "DES56-OFB-PKCS5",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "22d2130b-0610-4f60-94b1-746586ac864c",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "secret-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.spec.SecretKeySpec#<init>([BLjava/lang/String;)V",
+            "line": 61,
+            "location": "chat2db-server/chat2db-server-web/chat2db-server-web-api/src/main/java/ai/chat2db/server/web/api/controller/ncx/dbeaver/DefaultValueEncryptor.java",
+            "offset": 15
+          }
+        ]
+      },
+      "name": "secret-key@22d2130b-0610-4f60-94b1-746586ac864c",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "40c2c5f0-97fe-45fb-8a7e-007309901759",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "secret-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.spec.SecretKeySpec#<init>([BLjava/lang/String;)V",
+            "line": 67,
+            "location": "chat2db-server/chat2db-server-web/chat2db-server-web-api/src/main/java/ai/chat2db/server/web/api/controller/ncx/dbeaver/DefaultValueEncryptor.java",
+            "offset": 15
+          }
+        ]
+      },
+      "name": "secret-key@40c2c5f0-97fe-45fb-8a7e-007309901759",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "9b95b2ef-027d-44a4-8966-997749b851df",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "primitive": "block-cipher"
+        },
+        "assetType": "algorithm"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.spec.SecretKeySpec#<init>([BLjava/lang/String;)V",
+            "line": 29,
+            "location": "chat2db-server/chat2db-server-web/chat2db-server-web-api/src/main/java/ai/chat2db/server/web/api/controller/ncx/cipher/Navicat11Cipher.java",
+            "offset": 18
+          },
+          {
+            "additionalContext": "javax.crypto.Cipher#getInstance(Ljava/lang/String;)Ljavax/crypto/Cipher;",
+            "line": 38,
+            "location": "chat2db-server/chat2db-server-web/chat2db-server-web-api/src/main/java/ai/chat2db/server/web/api/controller/ncx/cipher/Navicat11Cipher.java",
+            "offset": 24
+          },
+          {
+            "additionalContext": "javax.crypto.Cipher#getInstance(Ljava/lang/String;)Ljavax/crypto/Cipher;",
+            "line": 48,
+            "location": "chat2db-server/chat2db-server-web/chat2db-server-web-api/src/main/java/ai/chat2db/server/web/api/controller/ncx/cipher/Navicat11Cipher.java",
+            "offset": 22
+          }
+        ]
+      },
+      "name": "Blowfish",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "a83697e8-9853-494e-b4d0-a8daeca18efd",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "digest"
+          ],
+          "parameterSetIdentifier": "128",
+          "primitive": "hash"
+        },
+        "assetType": "algorithm"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "java.security.MessageDigest#getInstance(Ljava/lang/String;)Ljava/security/MessageDigest;",
+            "line": 74,
+            "location": "chat2db-server/chat2db-server-web/chat2db-server-web-api/src/main/java/ai/chat2db/server/web/api/controller/ai/baichuan/interceptor/BaichuanHeaderAuthorizationInterceptor.java",
+            "offset": 35
+          },
+          {
+            "additionalContext": "java.security.MessageDigest#getInstance(Ljava/lang/String;)Ljava/security/MessageDigest;",
+            "line": 93,
+            "location": "chat2db-server/chat2db-server-web/chat2db-server-web-api/src/main/java/ai/chat2db/server/web/api/controller/ai/baichuan/interceptor/BaichuanHeaderAuthorizationInterceptor.java",
+            "offset": 31
+          }
+        ]
+      },
+      "name": "MD5",
+      "type": "cryptographic-asset"
+    }
+  ],
+  "dependencies": [
+    {
+      "dependsOn": [
+        "9ec148a0-0736-49f5-bdbb-6db0f1dd09d8"
+      ],
+      "ref": "64f3af3f-4518-463c-a489-6940b50d67b9"
+    },
+    {
+      "dependsOn": [
+        "f21da3ff-661d-4614-b2e2-d18b045452f2"
+      ],
+      "ref": "40c2c5f0-97fe-45fb-8a7e-007309901759"
+    },
+    {
+      "dependsOn": [
+        "28c9f830-ca3c-49c6-b0e1-e181c2bce9a2"
+      ],
+      "ref": "0edc3db3-5f34-4b82-945b-a33079ba63da"
+    },
+    {
+      "dependsOn": [
+        "f21da3ff-661d-4614-b2e2-d18b045452f2"
+      ],
+      "ref": "733ffabd-7947-47ac-b663-e9b7e1036880"
+    },
+    {
+      "dependsOn": [
+        "070baacb-a637-4fdc-a3f6-62d1f2e4eaa4"
+      ],
+      "ref": "28c9f830-ca3c-49c6-b0e1-e181c2bce9a2"
+    },
+    {
+      "dependsOn": [
+        "9b95b2ef-027d-44a4-8966-997749b851df"
+      ],
+      "ref": "dcfada47-8706-4825-b68f-d7a30cdf7642"
+    },
+    {
+      "dependsOn": [
+        "28c9f830-ca3c-49c6-b0e1-e181c2bce9a2"
+      ],
+      "ref": "8d06b038-4e7d-4ade-9089-d1c03ec7be9c"
+    },
+    {
+      "dependsOn": [
+        "f21da3ff-661d-4614-b2e2-d18b045452f2"
+      ],
+      "ref": "22d2130b-0610-4f60-94b1-746586ac864c"
+    }
+  ],
+  "metadata": {
+    "properties": [
+      {
+        "name": "gitUrl",
+        "value": "https://github.com/CodePhiliaX/Chat2DB"
+      },
+      {
+        "name": "revision",
+        "value": "Revision[value=main]"
+      },
+      {
+        "name": "commit",
+        "value": "a6b6b94"
+      }
+    ],
+    "timestamp": "2025-09-17T11:27:28Z",
+    "tools": {
+      "components": [],
+      "services": [
+        {
+          "name": "CBOMkit",
+          "provider": {
+            "name": "PQCA"
+          }
+        }
+      ]
+    }
+  },
+  "serialNumber": "urn:uuid:813e6662-abcb-4633-a293-7b51318f9c86",
+  "specVersion": "1.6",
+  "version": 1
+}

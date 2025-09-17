@@ -1,0 +1,117 @@
+{
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "cryptoProperties": {
+        "algorithm": "AES",
+        "implementation": "symmetric",
+        "purpose": "encryption"
+      },
+      "name": "cryptography",
+      "purl": "pkg:pypi/cryptography@41.0.7",
+      "type": "library",
+      "version": "41.0.7"
+    },
+    {
+      "cryptoProperties": {
+        "algorithm": "RSA",
+        "implementation": "asymmetric",
+        "purpose": "asymmetric-encryption"
+      },
+      "name": "cryptography",
+      "purl": "pkg:pypi/cryptography@41.0.7",
+      "type": "library",
+      "version": "41.0.7"
+    },
+    {
+      "cryptoProperties": {
+        "algorithm": "SHA256",
+        "implementation": "hash-function",
+        "purpose": "hashing"
+      },
+      "name": "cryptography",
+      "purl": "pkg:pypi/cryptography@41.0.7",
+      "type": "library",
+      "version": "41.0.7"
+    },
+    {
+      "cryptoProperties": {
+        "algorithm": "HMAC",
+        "implementation": "mac",
+        "purpose": "message-authentication"
+      },
+      "name": "cryptography",
+      "purl": "pkg:pypi/cryptography@41.0.7",
+      "type": "library",
+      "version": "41.0.7"
+    },
+    {
+      "cryptoProperties": {
+        "algorithm": "TLS",
+        "implementation": "protocol",
+        "purpose": "secure-communication"
+      },
+      "name": "requests",
+      "purl": "pkg:pypi/requests@2.31.0",
+      "type": "library",
+      "version": "2.31.0"
+    },
+    {
+      "cryptoProperties": {
+        "algorithm": "TLS",
+        "implementation": "protocol",
+        "purpose": "secure-communication"
+      },
+      "name": "urllib3",
+      "purl": "pkg:pypi/urllib3@2.0.7",
+      "type": "library",
+      "version": "2.0.7"
+    },
+    {
+      "cryptoProperties": {
+        "algorithm": "X.509",
+        "implementation": "certificate",
+        "purpose": "certificate-management"
+      },
+      "name": "cryptography",
+      "purl": "pkg:pypi/cryptography@41.0.7",
+      "type": "library",
+      "version": "41.0.7"
+    },
+    {
+      "cryptoProperties": {
+        "algorithm": "PKCS7",
+        "implementation": "message-format",
+        "purpose": "cryptographic-message-syntax"
+      },
+      "name": "cryptography",
+      "purl": "pkg:pypi/cryptography@41.0.7",
+      "type": "library",
+      "version": "41.0.7"
+    },
+    {
+      "cryptoProperties": {
+        "algorithm": "PBKDF2",
+        "implementation": "key-derivation-function",
+        "purpose": "key-derivation"
+      },
+      "name": "cryptography",
+      "purl": "pkg:pypi/cryptography@41.0.7",
+      "type": "library",
+      "version": "41.0.7"
+    },
+    {
+      "cryptoProperties": {
+        "algorithm": "OSRNG",
+        "implementation": "random-number-generator",
+        "purpose": "random-number-generation"
+      },
+      "name": "cryptography",
+      "purl": "pkg:pypi/cryptography@41.0.7",
+      "type": "library",
+      "version": "41.0.7"
+    }
+  ],
+  "specVersion": "1.6",
+  "version": 1
+}

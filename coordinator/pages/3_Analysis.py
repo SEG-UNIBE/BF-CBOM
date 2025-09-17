@@ -4,7 +4,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from common.cbom_analysis import analyze_cbom_json
+from common.cbom_analysis import analyze_cbom_json, summarize_component_types
 from common.utils import get_status_emoji, get_status_keys_order, status_text
 from coordinator.redis_io import (
     get_bench_meta,
@@ -37,10 +37,7 @@ if not benches:
     st.info("No benchmarks found. Please create one first.")
     st.stop()
 
-labels = [
-    f"{m.get('name', '(unnamed)')} · {bid[:8]} · {m.get('status', '?')}"
-    for bid, m in benches
-]
+labels = [f"{m.get('name', '(unnamed)')} · {bid[:8]} · {m.get('status', '?')}" for bid, m in benches]
 default_idx = 0
 if bench_id_hint:
     try:
@@ -64,15 +61,11 @@ repos = get_bench_repos(r, bench_id)
 created = meta.get("created_at") or meta.get("started_at") or "?"
 expected = meta.get("expected_jobs") or "?"
 
-st.markdown(
-    format_benchmark_header(name, bench_id, created, expected), unsafe_allow_html=True
-)
+st.markdown(format_benchmark_header(name, bench_id, created, expected), unsafe_allow_html=True)
 
 job_idx = r.hgetall(f"bench:{bench_id}:job_index") or {}
 order_keys = get_status_keys_order()
-worker_status_counts = {
-    w: {status_text(k, "label"): 0 for k in order_keys} for w in workers
-}
+worker_status_counts = {w: {status_text(k, "label"): 0 for k in order_keys} for w in workers}
 comp_rows = []  # rows: repo, worker, total_components, types (Counter)
 repo_worker_status: dict[str, dict[str, str]] = {}
 
@@ -133,13 +126,15 @@ for repo in repos:
                 try:
                     payload = json.loads(raw)
                     cbom_text = payload.get("json", "{}")
-                    total, types = analyze_cbom_json(cbom_text, w)
+                    total, types, type_assets, type_asset_names = analyze_cbom_json(cbom_text, w)
                     comp_rows.append(
                         {
                             "repo": full,
                             "worker": w,
                             "total_components": total,
                             "types": dict(types),
+                            "type_asset_counts": dict(type_assets),
+                            "type_asset_name_counts": dict(type_asset_names),
                         }
                     )
                     duration = payload.get("duration_sec")
@@ -153,7 +148,8 @@ for repo in repos:
                         if not size_val:
                             repo_info = payload.get("repo_info") or {}
                             size_val = safe_int(
-                                repo_info.get("size") or repo_info.get("size_kb"), default=0
+                                repo_info.get("size") or repo_info.get("size_kb"),
+                                default=0,
                             )
                         scatter_rows.append(
                             {
@@ -183,10 +179,7 @@ if chart_data:
     domain = order
     # Map from label to color via key order
     key_order = get_status_keys_order()
-    label_to_color = {
-        status_text(k, "label"): status_meta[k].get("color", "#999999")
-        for k in key_order
-    }
+    label_to_color = {status_text(k, "label"): status_meta[k].get("color", "#999999") for k in key_order}
     colors = [label_to_color.get(lbl, "#999999") for lbl in domain]
 
     chart = (
@@ -232,9 +225,7 @@ if scatter_rows:
         y_title = "Reported components"
         y_scale = alt.Scale(zero=True)
 
-    filtered = df_scatter[
-        df_scatter["worker"].isin(selected_workers)
-    ]
+    filtered = df_scatter[df_scatter["worker"].isin(selected_workers)]
 
     if filtered.empty:
         st.info("No data points for the selected filters.")
@@ -335,9 +326,7 @@ if comp_rows:
     comp_df = pd.DataFrame(comp_rows)
     # Pivot: rows=repo, cols=workers, values=total_components
     pivot = (
-        comp_df.pivot_table(
-            index="repo", columns="worker", values="total_components", aggfunc="max"
-        )
+        comp_df.pivot_table(index="repo", columns="worker", values="total_components", aggfunc="max")
         .fillna(0)
         .astype(int)
     )
@@ -349,12 +338,8 @@ if comp_rows:
     # Add split columns: info (lang/stars/size) and URL link
     pivot_reset = pivot.reset_index()
     info_url_map = build_repo_info_url_map(repos)
-    pivot_reset["info"] = pivot_reset["repo"].apply(
-        lambda name: (info_url_map.get(name, {}) or {}).get("info", "")
-    )
-    pivot_reset["url"] = pivot_reset["repo"].apply(
-        lambda name: (info_url_map.get(name, {}) or {}).get("url", "")
-    )
+    pivot_reset["info"] = pivot_reset["repo"].apply(lambda name: (info_url_map.get(name, {}) or {}).get("info", ""))
+    pivot_reset["url"] = pivot_reset["repo"].apply(lambda name: (info_url_map.get(name, {}) or {}).get("url", ""))
     # Order columns: repo/info/url then worker counts
     ordered = ["repo", "info", "url"] + [w for w in workers]
     view_df = pivot_reset[ordered]
@@ -368,45 +353,31 @@ if comp_rows:
     )
 
     st.subheader("Component Types")
-    type_summary: dict[str, dict[str, dict[str, int]]] = {}
-    for row in comp_rows:
-        repo_name = row.get("repo")
-        worker_name = row.get("worker")
-        type_counts = row.get("types") or {}
-        if not repo_name or not worker_name:
-            continue
-        repo_map = type_summary.setdefault(repo_name, {})
-        for comp_type, count in type_counts.items():
-            type_map = repo_map.setdefault(str(comp_type) or "(unknown)", {})
-            type_map[worker_name] = safe_int(count)
-
-    if not type_summary:
+    component_tables = summarize_component_types(comp_rows, workers)
+    if not component_tables:
         st.caption("No component type information available yet.")
     else:
-        for repo_name in sorted(type_summary.keys()):
+        for repo_name in sorted(component_tables.keys()):
             with st.expander(f"{repo_name}"):
-                type_map = type_summary[repo_name]
-                df_counts = pd.DataFrame.from_dict(type_map, orient="index")
-                df_counts.index.name = "component.type"
-                for w in workers:
-                    if w not in df_counts.columns:
-                        df_counts[w] = 0
-                df_counts = df_counts.fillna(0).astype(int)
-                ordered_cols = []
-                rename_map = {}
+                rows = component_tables.get(repo_name) or []
+                if not rows:
+                    st.caption("No component type information available yet.")
+                    continue
+                df_counts = pd.DataFrame(rows)
                 status_map = repo_worker_status.get(repo_name, {})
+                rename_map = {
+                    "component.type": "Component type",
+                    "name": "Name",
+                    "asset.type": "Asset type",
+                }
+                ordered_cols = ["component.type", "name", "asset.type"]
                 for w in workers:
-                    if w in df_counts.columns:
-                        ordered_cols.append(w)
                     status_key = status_map.get(w, "pending")
                     emoji = get_status_emoji(status_key)
                     rename_map[w] = f"{emoji} {w}" if emoji else w
-                for col in df_counts.columns:
-                    if col not in ordered_cols:
-                        ordered_cols.append(col)
-                        rename_map.setdefault(col, col)
+                    ordered_cols.append(w)
                 df_counts = df_counts[ordered_cols]
-                view_types = df_counts.reset_index().rename(columns=rename_map)
+                view_types = df_counts.rename(columns=rename_map)
                 st.dataframe(
                     view_types,
                     hide_index=True,

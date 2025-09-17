@@ -17,8 +17,12 @@ dependencies = [
     "typer>=0.12.5",
 ]
 
+[tool.black]
+line-length = 120
+target-version = ["py312"]
+
 [tool.ruff]
-line-length = 110
+line-length = 120
 target-version = "py312"
 
 [tool.ruff.lint]

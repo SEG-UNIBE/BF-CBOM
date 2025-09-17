@@ -142,9 +142,7 @@ def build_handle_instruction(
         duration = time.monotonic() - start
         # If producer provided a duration, prefer it
         try:
-            if "override_duration" in locals() and isinstance(
-                override_duration, int | float
-            ):
+            if "override_duration" in locals() and isinstance(override_duration, int | float):
                 duration = float(override_duration)
         except Exception:
             pass

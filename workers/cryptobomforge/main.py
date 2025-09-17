@@ -105,9 +105,7 @@ class CryptobomForgeClient:
 
         return modified
 
-    def run_codeql_scan(
-        self, repo_path: str, language: str | None
-    ) -> tuple[bool, str | None]:
+    def run_codeql_scan(self, repo_path: str, language: str | None) -> tuple[bool, str | None]:
         """
         Backwards-compat wrapper: execute CodeQL steps while collecting a trace.
         """
@@ -116,12 +114,8 @@ class CryptobomForgeClient:
         return ok, trace.text()
 
     # New modular entry (preferred inside this class)
-    def _run_codeql_scan(
-        self, repo_path: str, language: str | None, trace: Trace
-    ) -> bool:
-        logger.info(
-            "CodeQL scan requested: repo_path=%r, language=%r", repo_path, language
-        )
+    def _run_codeql_scan(self, repo_path: str, language: str | None, trace: Trace) -> bool:
+        logger.info("CodeQL scan requested: repo_path=%r, language=%r", repo_path, language)
         if not language:
             trace.add("codeql: missing main_language")
             return False
@@ -140,9 +134,7 @@ class CryptobomForgeClient:
         return self._codeql_analyze_db(repo_path, db_path, lang, ram_flags, trace)
 
     # ----- CodeQL helpers -----
-    def _codeql_create_db(
-        self, repo_path: str, db_path: str, lang: str, trace: Trace
-    ) -> bool:
+    def _codeql_create_db(self, repo_path: str, db_path: str, lang: str, trace: Trace) -> bool:
         cmd = [
             "codeql",
             "database",
@@ -172,9 +164,7 @@ class CryptobomForgeClient:
         if not os.path.exists(db_path):
             trace.add(f"codeql create: db missing at {db_path}")
             return False
-        logger.info(
-            "CodeQL DB created: %s (contents: %s)", db_path, os.listdir(db_path)
-        )
+        logger.info("CodeQL DB created: %s (contents: %s)", db_path, os.listdir(db_path))
         logger.debug("codeql create stdout: %s", cp.stdout.decode("utf-8", "replace"))
         return True
 
@@ -209,11 +199,7 @@ class CryptobomForgeClient:
                 capture_output=True,
                 timeout=10,
             )
-            flags = [
-                line.strip()
-                for line in result.stdout.decode("utf-8", "replace").splitlines()
-                if line.strip()
-            ]
+            flags = [line.strip() for line in result.stdout.decode("utf-8", "replace").splitlines() if line.strip()]
             logger.info("Resolved RAM flags: %s", flags)
             return flags
         except Exception as e:
@@ -281,11 +267,7 @@ class CryptobomForgeClient:
                 logger.warning("CodeQL scan failed for language: %s", main_language)
                 raise RuntimeError("codeql_scan_failed")
 
-            sarif_files = [
-                os.path.join(repo_path, f)
-                for f in os.listdir(repo_path)
-                if f.endswith(".sarif")
-            ]
+            sarif_files = [os.path.join(repo_path, f) for f in os.listdir(repo_path) if f.endswith(".sarif")]
             if not sarif_files:
                 trace.add("no SARIF files found for cryptobom input")
                 raise RuntimeError("no_sarif_found")
@@ -319,9 +301,7 @@ class CryptobomForgeClient:
             _cnt = 0
             for _r in _runs:
                 _cnt += len(_r.get("results") or [])
-            logger.info(
-                "First SARIF run count: %d run(s), %d result(s)", len(_runs), _cnt
-            )
+            logger.info("First SARIF run count: %d run(s), %d result(s)", len(_runs), _cnt)
             return _cnt
         except Exception as e:
             logger.debug("Failed to read SARIF stats: %s", e)
@@ -340,9 +320,7 @@ class CryptobomForgeClient:
             logger.warning("SARIF normalization step failed: %s", e)
             trace.add(f"sarif normalize failed: {e}")
 
-    def _run_cryptobom(
-        self, cryptobom_input: str, output_path: str, trace: Trace
-    ) -> bool:
+    def _run_cryptobom(self, cryptobom_input: str, output_path: str, trace: Trace) -> bool:
         timeout_secs = max(1, self.timeout_sec - 5)
         cmd = ["cryptobom", "generate", cryptobom_input, "--output-file", output_path]
         logger.info("Running cryptobom: %s", " ".join(cmd))
@@ -353,26 +331,12 @@ class CryptobomForgeClient:
                 capture_output=True,
                 timeout=timeout_secs,
             )
-            logger.info(
-                "cryptobom CLI stdout:\n%s", result.stdout.decode("utf-8", "replace")
-            )
-            logger.info(
-                "cryptobom CLI stderr:\n%s", result.stderr.decode("utf-8", "replace")
-            )
+            logger.info("cryptobom CLI stdout:\n%s", result.stdout.decode("utf-8", "replace"))
+            logger.info("cryptobom CLI stderr:\n%s", result.stderr.decode("utf-8", "replace"))
         except subprocess.CalledProcessError as e:
-            stdout = (
-                getattr(e, "stdout", b"").decode("utf-8", "replace")
-                if hasattr(e, "stdout")
-                else ""
-            )
-            stderr = (
-                getattr(e, "stderr", b"").decode("utf-8", "replace")
-                if hasattr(e, "stderr")
-                else ""
-            )
-            trace.add_exc(
-                f"cryptobom CLI failed (rc={e.returncode})", e, stdout, stderr
-            )
+            stdout = getattr(e, "stdout", b"").decode("utf-8", "replace") if hasattr(e, "stdout") else ""
+            stderr = getattr(e, "stderr", b"").decode("utf-8", "replace") if hasattr(e, "stderr") else ""
+            trace.add_exc(f"cryptobom CLI failed (rc={e.returncode})", e, stdout, stderr)
             return False
         except Exception as e:
             trace.add_exc("cryptobom unexpected error", e)

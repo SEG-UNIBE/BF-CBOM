@@ -1,0 +1,589 @@
+{
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "bom-ref": "b327b942-e98e-4858-b48e-89143c499085",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 122,
+            "location": "mineru/model/mfr/unimernet/Unimernet.py",
+            "offset": 29
+          }
+        ]
+      },
+      "name": "private-key@b327b942-e98e-4858-b48e-89143c499085",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "c6fdedfd-e942-4644-b344-eea4e1df3b3c",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "curve": "Edwards448",
+          "primitive": "signature"
+        },
+        "assetType": "algorithm",
+        "oid": "1.3.101.113"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 58,
+            "location": "mineru/model/mfr/unimernet/Unimernet.py",
+            "offset": 25
+          },
+          {
+            "additionalContext": "generate",
+            "line": 122,
+            "location": "mineru/model/mfr/unimernet/Unimernet.py",
+            "offset": 29
+          },
+          {
+            "additionalContext": "generate",
+            "line": 125,
+            "location": "mineru/backend/vlm/sglang_engine_predictor.py",
+            "offset": 17
+          },
+          {
+            "additionalContext": "generate",
+            "line": 149,
+            "location": "mineru/backend/vlm/hf_predictor.py",
+            "offset": 25
+          }
+        ]
+      },
+      "name": "Ed448",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "e3e21e95-f71d-40ca-b1c5-f5cfc20f8788",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "digest"
+          ],
+          "parameterSetIdentifier": "256",
+          "primitive": "xof"
+        },
+        "assetType": "algorithm"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 58,
+            "location": "mineru/model/mfr/unimernet/Unimernet.py",
+            "offset": 25
+          },
+          {
+            "additionalContext": "generate",
+            "line": 122,
+            "location": "mineru/model/mfr/unimernet/Unimernet.py",
+            "offset": 29
+          },
+          {
+            "additionalContext": "generate",
+            "line": 125,
+            "location": "mineru/backend/vlm/sglang_engine_predictor.py",
+            "offset": 17
+          },
+          {
+            "additionalContext": "generate",
+            "line": 149,
+            "location": "mineru/backend/vlm/hf_predictor.py",
+            "offset": 25
+          }
+        ]
+      },
+      "name": "SHAKE256",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "45d00ea8-599d-4e14-8623-53ad1f0476b1",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 122,
+            "location": "mineru/model/mfr/unimernet/Unimernet.py",
+            "offset": 29
+          }
+        ]
+      },
+      "name": "private-key@45d00ea8-599d-4e14-8623-53ad1f0476b1",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "b1af11f1-e3dd-409f-87b5-582bc63fa7a1",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 58,
+            "location": "mineru/model/mfr/unimernet/Unimernet.py",
+            "offset": 25
+          }
+        ]
+      },
+      "name": "private-key@b1af11f1-e3dd-409f-87b5-582bc63fa7a1",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "ce0b2ac9-f752-4e4c-b296-4f45cc9695ee",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 58,
+            "location": "mineru/model/mfr/unimernet/Unimernet.py",
+            "offset": 25
+          }
+        ]
+      },
+      "name": "private-key@ce0b2ac9-f752-4e4c-b296-4f45cc9695ee",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "dc3e4bac-0944-4692-8814-1d94bc432f6d",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 149,
+            "location": "mineru/backend/vlm/hf_predictor.py",
+            "offset": 25
+          }
+        ]
+      },
+      "name": "private-key@dc3e4bac-0944-4692-8814-1d94bc432f6d",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "93e4a6b8-b474-4330-8f68-c71d3ad77fbe",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 149,
+            "location": "mineru/backend/vlm/hf_predictor.py",
+            "offset": 25
+          }
+        ]
+      },
+      "name": "private-key@93e4a6b8-b474-4330-8f68-c71d3ad77fbe",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "baab9e75-29ed-42ba-a839-af5c2442e976",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 125,
+            "location": "mineru/backend/vlm/sglang_engine_predictor.py",
+            "offset": 17
+          }
+        ]
+      },
+      "name": "private-key@baab9e75-29ed-42ba-a839-af5c2442e976",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "99678b1c-cc21-4ec7-b04f-0f482fee23e4",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "curve": "Curve448",
+          "primitive": "key-agree"
+        },
+        "assetType": "algorithm",
+        "oid": "1.3.101.111"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 58,
+            "location": "mineru/model/mfr/unimernet/Unimernet.py",
+            "offset": 25
+          },
+          {
+            "additionalContext": "generate",
+            "line": 122,
+            "location": "mineru/model/mfr/unimernet/Unimernet.py",
+            "offset": 29
+          },
+          {
+            "additionalContext": "generate",
+            "line": 125,
+            "location": "mineru/backend/vlm/sglang_engine_predictor.py",
+            "offset": 17
+          },
+          {
+            "additionalContext": "generate",
+            "line": 149,
+            "location": "mineru/backend/vlm/hf_predictor.py",
+            "offset": 25
+          }
+        ]
+      },
+      "name": "x448",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "ba785a14-5b50-4f7b-95b3-1fe0d54a79c3",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "curve": "Edwards25519",
+          "primitive": "signature"
+        },
+        "assetType": "algorithm",
+        "oid": "1.3.101.112"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 58,
+            "location": "mineru/model/mfr/unimernet/Unimernet.py",
+            "offset": 25
+          },
+          {
+            "additionalContext": "generate",
+            "line": 122,
+            "location": "mineru/model/mfr/unimernet/Unimernet.py",
+            "offset": 29
+          },
+          {
+            "additionalContext": "generate",
+            "line": 125,
+            "location": "mineru/backend/vlm/sglang_engine_predictor.py",
+            "offset": 17
+          },
+          {
+            "additionalContext": "generate",
+            "line": 149,
+            "location": "mineru/backend/vlm/hf_predictor.py",
+            "offset": 25
+          }
+        ]
+      },
+      "name": "Ed25519",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "a8bbb925-4f02-4d8c-8242-2c7eedb1629c",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "curve": "Curve25519",
+          "primitive": "key-agree"
+        },
+        "assetType": "algorithm",
+        "oid": "1.3.101.110"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 58,
+            "location": "mineru/model/mfr/unimernet/Unimernet.py",
+            "offset": 25
+          },
+          {
+            "additionalContext": "generate",
+            "line": 122,
+            "location": "mineru/model/mfr/unimernet/Unimernet.py",
+            "offset": 29
+          },
+          {
+            "additionalContext": "generate",
+            "line": 125,
+            "location": "mineru/backend/vlm/sglang_engine_predictor.py",
+            "offset": 17
+          },
+          {
+            "additionalContext": "generate",
+            "line": 149,
+            "location": "mineru/backend/vlm/hf_predictor.py",
+            "offset": 25
+          }
+        ]
+      },
+      "name": "x25519",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "dc331e9f-af3d-451b-840a-9506ce3ee98b",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "digest"
+          ],
+          "parameterSetIdentifier": "512",
+          "primitive": "hash"
+        },
+        "assetType": "algorithm",
+        "oid": "2.16.840.1.101.3.4.2.3"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 58,
+            "location": "mineru/model/mfr/unimernet/Unimernet.py",
+            "offset": 25
+          },
+          {
+            "additionalContext": "generate",
+            "line": 122,
+            "location": "mineru/model/mfr/unimernet/Unimernet.py",
+            "offset": 29
+          },
+          {
+            "additionalContext": "generate",
+            "line": 125,
+            "location": "mineru/backend/vlm/sglang_engine_predictor.py",
+            "offset": 17
+          },
+          {
+            "additionalContext": "generate",
+            "line": 149,
+            "location": "mineru/backend/vlm/hf_predictor.py",
+            "offset": 25
+          }
+        ]
+      },
+      "name": "SHA512",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "4bfc07bb-ed92-4c35-b661-b9032f38a417",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 125,
+            "location": "mineru/backend/vlm/sglang_engine_predictor.py",
+            "offset": 17
+          }
+        ]
+      },
+      "name": "private-key@4bfc07bb-ed92-4c35-b661-b9032f38a417",
+      "type": "cryptographic-asset"
+    }
+  ],
+  "dependencies": [
+    {
+      "dependsOn": [
+        "e3e21e95-f71d-40ca-b1c5-f5cfc20f8788"
+      ],
+      "ref": "c6fdedfd-e942-4644-b344-eea4e1df3b3c"
+    },
+    {
+      "dependsOn": [
+        "ba785a14-5b50-4f7b-95b3-1fe0d54a79c3"
+      ],
+      "ref": "93e4a6b8-b474-4330-8f68-c71d3ad77fbe"
+    },
+    {
+      "dependsOn": [
+        "c6fdedfd-e942-4644-b344-eea4e1df3b3c"
+      ],
+      "ref": "45d00ea8-599d-4e14-8623-53ad1f0476b1"
+    },
+    {
+      "dependsOn": [
+        "dc331e9f-af3d-451b-840a-9506ce3ee98b"
+      ],
+      "ref": "ba785a14-5b50-4f7b-95b3-1fe0d54a79c3"
+    },
+    {
+      "dependsOn": [
+        "c6fdedfd-e942-4644-b344-eea4e1df3b3c"
+      ],
+      "ref": "ce0b2ac9-f752-4e4c-b296-4f45cc9695ee"
+    },
+    {
+      "dependsOn": [
+        "ba785a14-5b50-4f7b-95b3-1fe0d54a79c3"
+      ],
+      "ref": "b1af11f1-e3dd-409f-87b5-582bc63fa7a1"
+    },
+    {
+      "dependsOn": [
+        "ba785a14-5b50-4f7b-95b3-1fe0d54a79c3"
+      ],
+      "ref": "b327b942-e98e-4858-b48e-89143c499085"
+    },
+    {
+      "dependsOn": [
+        "c6fdedfd-e942-4644-b344-eea4e1df3b3c"
+      ],
+      "ref": "baab9e75-29ed-42ba-a839-af5c2442e976"
+    },
+    {
+      "dependsOn": [
+        "c6fdedfd-e942-4644-b344-eea4e1df3b3c"
+      ],
+      "ref": "dc3e4bac-0944-4692-8814-1d94bc432f6d"
+    },
+    {
+      "dependsOn": [
+        "ba785a14-5b50-4f7b-95b3-1fe0d54a79c3"
+      ],
+      "ref": "4bfc07bb-ed92-4c35-b661-b9032f38a417"
+    },
+    {
+      "dependsOn": [
+        "e3e21e95-f71d-40ca-b1c5-f5cfc20f8788"
+      ],
+      "ref": "c6fdedfd-e942-4644-b344-eea4e1df3b3c"
+    },
+    {
+      "dependsOn": [
+        "ba785a14-5b50-4f7b-95b3-1fe0d54a79c3"
+      ],
+      "ref": "93e4a6b8-b474-4330-8f68-c71d3ad77fbe"
+    },
+    {
+      "dependsOn": [
+        "c6fdedfd-e942-4644-b344-eea4e1df3b3c"
+      ],
+      "ref": "45d00ea8-599d-4e14-8623-53ad1f0476b1"
+    },
+    {
+      "dependsOn": [
+        "dc331e9f-af3d-451b-840a-9506ce3ee98b"
+      ],
+      "ref": "ba785a14-5b50-4f7b-95b3-1fe0d54a79c3"
+    },
+    {
+      "dependsOn": [
+        "c6fdedfd-e942-4644-b344-eea4e1df3b3c"
+      ],
+      "ref": "ce0b2ac9-f752-4e4c-b296-4f45cc9695ee"
+    },
+    {
+      "dependsOn": [
+        "ba785a14-5b50-4f7b-95b3-1fe0d54a79c3"
+      ],
+      "ref": "b1af11f1-e3dd-409f-87b5-582bc63fa7a1"
+    },
+    {
+      "dependsOn": [
+        "ba785a14-5b50-4f7b-95b3-1fe0d54a79c3"
+      ],
+      "ref": "b327b942-e98e-4858-b48e-89143c499085"
+    },
+    {
+      "dependsOn": [
+        "c6fdedfd-e942-4644-b344-eea4e1df3b3c"
+      ],
+      "ref": "baab9e75-29ed-42ba-a839-af5c2442e976"
+    },
+    {
+      "dependsOn": [
+        "c6fdedfd-e942-4644-b344-eea4e1df3b3c"
+      ],
+      "ref": "dc3e4bac-0944-4692-8814-1d94bc432f6d"
+    },
+    {
+      "dependsOn": [
+        "ba785a14-5b50-4f7b-95b3-1fe0d54a79c3"
+      ],
+      "ref": "4bfc07bb-ed92-4c35-b661-b9032f38a417"
+    }
+  ],
+  "metadata": {
+    "properties": [
+      {
+        "name": "gitUrl",
+        "value": "https://github.com/opendatalab/MinerU"
+      },
+      {
+        "name": "revision",
+        "value": "Revision[value=master]"
+      },
+      {
+        "name": "commit",
+        "value": "70f6204"
+      }
+    ],
+    "timestamp": "2025-09-17T11:17:29Z",
+    "tools": {
+      "components": [],
+      "services": [
+        {
+          "name": "CBOMkit",
+          "provider": {
+            "name": "PQCA"
+          }
+        }
+      ]
+    }
+  },
+  "serialNumber": "urn:uuid:77ff003d-b925-4fa1-b49c-eaefccebfc17",
+  "specVersion": "1.6",
+  "version": 1
+}
