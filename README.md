@@ -68,13 +68,15 @@ If you want to avoid installing Git, Make, and Python tooling locally, you can r
 2. Run the builder, mounting the Docker socket so it can orchestrate sibling containers. If the repository is private, pass a Git token via `GIT_TOKEN` (or mount the already-cloned repo into `/workspace` instead of cloning inside the container). Replace the clone URL below with the remote you use:
    ```bash
    docker run --rm -it \
-     -v /var/run/docker.sock:/var/run/docker.sock \
-     --name bf-cbom-builder \
-    bf-cbom/builder -lc "\
-      git clone --branch dev --single-branch https://github.com/SEG-UNIBE/BF-CBOM.git repo && \
-       cd repo && \
-       make up-prod \
-     "
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      -v "$(pwd)/docker/env":/workspace/secrets/env:ro \
+      --name bf-cbom-builder \
+      bf-cbom/builder -lc "\
+        git clone --branch dev --single-branch https://github.com/SEG-UNIBE/BF-CBOM.git repo && \
+        cp -vf /workspace/secrets/env/*.env repo/docker/env/ && \
+        cd repo && \
+        make up-prod \
+      "
    ```
 3. When you're done, stop everything with `make down` (either within the running builder session or by re-running the container with `make down`).
 
