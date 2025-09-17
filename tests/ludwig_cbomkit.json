@@ -1,0 +1,589 @@
+{
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "bom-ref": "ffcdcbf6-985c-4656-8e96-ba08421392f7",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 341,
+            "location": "ludwig/models/llm.py",
+            "offset": 36
+          }
+        ]
+      },
+      "name": "private-key@ffcdcbf6-985c-4656-8e96-ba08421392f7",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "6b980317-addd-475d-9e91-4bef6c03d91a",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "curve": "Edwards448",
+          "primitive": "signature"
+        },
+        "assetType": "algorithm",
+        "oid": "1.3.101.113"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 1047,
+            "location": "ludwig/api.py",
+            "offset": 35
+          },
+          {
+            "additionalContext": "generate",
+            "line": 1078,
+            "location": "ludwig/api.py",
+            "offset": 19
+          },
+          {
+            "additionalContext": "generate",
+            "line": 345,
+            "location": "ludwig/models/predictor.py",
+            "offset": 15
+          },
+          {
+            "additionalContext": "generate",
+            "line": 341,
+            "location": "ludwig/models/llm.py",
+            "offset": 36
+          }
+        ]
+      },
+      "name": "Ed448",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "108eda75-03ec-4c8f-a453-e9abade3117f",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "digest"
+          ],
+          "parameterSetIdentifier": "256",
+          "primitive": "xof"
+        },
+        "assetType": "algorithm"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 1047,
+            "location": "ludwig/api.py",
+            "offset": 35
+          },
+          {
+            "additionalContext": "generate",
+            "line": 1078,
+            "location": "ludwig/api.py",
+            "offset": 19
+          },
+          {
+            "additionalContext": "generate",
+            "line": 345,
+            "location": "ludwig/models/predictor.py",
+            "offset": 15
+          },
+          {
+            "additionalContext": "generate",
+            "line": 341,
+            "location": "ludwig/models/llm.py",
+            "offset": 36
+          }
+        ]
+      },
+      "name": "SHAKE256",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "35c347f8-077b-4d83-89ad-0ea80fe5055a",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 1078,
+            "location": "ludwig/api.py",
+            "offset": 19
+          }
+        ]
+      },
+      "name": "private-key@35c347f8-077b-4d83-89ad-0ea80fe5055a",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "1454bc61-10c7-401a-97f9-00f2b9bf1a6d",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 1078,
+            "location": "ludwig/api.py",
+            "offset": 19
+          }
+        ]
+      },
+      "name": "private-key@1454bc61-10c7-401a-97f9-00f2b9bf1a6d",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "ec9a0a68-6cb3-4e02-a9b2-0cc152c609fb",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 341,
+            "location": "ludwig/models/llm.py",
+            "offset": 36
+          }
+        ]
+      },
+      "name": "private-key@ec9a0a68-6cb3-4e02-a9b2-0cc152c609fb",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "fec5bad9-de2d-40ef-9491-355f32f5402c",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "curve": "Curve448",
+          "primitive": "key-agree"
+        },
+        "assetType": "algorithm",
+        "oid": "1.3.101.111"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 1047,
+            "location": "ludwig/api.py",
+            "offset": 35
+          },
+          {
+            "additionalContext": "generate",
+            "line": 1078,
+            "location": "ludwig/api.py",
+            "offset": 19
+          },
+          {
+            "additionalContext": "generate",
+            "line": 345,
+            "location": "ludwig/models/predictor.py",
+            "offset": 15
+          },
+          {
+            "additionalContext": "generate",
+            "line": 341,
+            "location": "ludwig/models/llm.py",
+            "offset": 36
+          }
+        ]
+      },
+      "name": "x448",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "8db72780-12c2-4362-81e5-fe31a85fed4b",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "curve": "Edwards25519",
+          "primitive": "signature"
+        },
+        "assetType": "algorithm",
+        "oid": "1.3.101.112"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 1047,
+            "location": "ludwig/api.py",
+            "offset": 35
+          },
+          {
+            "additionalContext": "generate",
+            "line": 1078,
+            "location": "ludwig/api.py",
+            "offset": 19
+          },
+          {
+            "additionalContext": "generate",
+            "line": 345,
+            "location": "ludwig/models/predictor.py",
+            "offset": 15
+          },
+          {
+            "additionalContext": "generate",
+            "line": 341,
+            "location": "ludwig/models/llm.py",
+            "offset": 36
+          }
+        ]
+      },
+      "name": "Ed25519",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "2fd56720-893a-43d7-8fe8-98c125468521",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 1047,
+            "location": "ludwig/api.py",
+            "offset": 35
+          }
+        ]
+      },
+      "name": "private-key@2fd56720-893a-43d7-8fe8-98c125468521",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "c45ca9b0-159f-4361-bba2-7cbb7cfea299",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 345,
+            "location": "ludwig/models/predictor.py",
+            "offset": 15
+          }
+        ]
+      },
+      "name": "private-key@c45ca9b0-159f-4361-bba2-7cbb7cfea299",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "4e966c1b-cc6d-40a8-b500-34ce11d738e2",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 345,
+            "location": "ludwig/models/predictor.py",
+            "offset": 15
+          }
+        ]
+      },
+      "name": "private-key@4e966c1b-cc6d-40a8-b500-34ce11d738e2",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "00fe38a6-3701-40b1-88ab-8ac041fbf158",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "curve": "Curve25519",
+          "primitive": "key-agree"
+        },
+        "assetType": "algorithm",
+        "oid": "1.3.101.110"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 1047,
+            "location": "ludwig/api.py",
+            "offset": 35
+          },
+          {
+            "additionalContext": "generate",
+            "line": 1078,
+            "location": "ludwig/api.py",
+            "offset": 19
+          },
+          {
+            "additionalContext": "generate",
+            "line": 345,
+            "location": "ludwig/models/predictor.py",
+            "offset": 15
+          },
+          {
+            "additionalContext": "generate",
+            "line": 341,
+            "location": "ludwig/models/llm.py",
+            "offset": 36
+          }
+        ]
+      },
+      "name": "x25519",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "10e6a9cf-e7cb-4c71-9409-d9ed6882a5de",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "digest"
+          ],
+          "parameterSetIdentifier": "512",
+          "primitive": "hash"
+        },
+        "assetType": "algorithm",
+        "oid": "2.16.840.1.101.3.4.2.3"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 1047,
+            "location": "ludwig/api.py",
+            "offset": 35
+          },
+          {
+            "additionalContext": "generate",
+            "line": 1078,
+            "location": "ludwig/api.py",
+            "offset": 19
+          },
+          {
+            "additionalContext": "generate",
+            "line": 345,
+            "location": "ludwig/models/predictor.py",
+            "offset": 15
+          },
+          {
+            "additionalContext": "generate",
+            "line": 341,
+            "location": "ludwig/models/llm.py",
+            "offset": 36
+          }
+        ]
+      },
+      "name": "SHA512",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "e02441b1-3515-4af4-984e-37087068f23b",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 1047,
+            "location": "ludwig/api.py",
+            "offset": 35
+          }
+        ]
+      },
+      "name": "private-key@e02441b1-3515-4af4-984e-37087068f23b",
+      "type": "cryptographic-asset"
+    }
+  ],
+  "dependencies": [
+    {
+      "dependsOn": [
+        "6b980317-addd-475d-9e91-4bef6c03d91a"
+      ],
+      "ref": "e02441b1-3515-4af4-984e-37087068f23b"
+    },
+    {
+      "dependsOn": [
+        "8db72780-12c2-4362-81e5-fe31a85fed4b"
+      ],
+      "ref": "ec9a0a68-6cb3-4e02-a9b2-0cc152c609fb"
+    },
+    {
+      "dependsOn": [
+        "108eda75-03ec-4c8f-a453-e9abade3117f"
+      ],
+      "ref": "6b980317-addd-475d-9e91-4bef6c03d91a"
+    },
+    {
+      "dependsOn": [
+        "6b980317-addd-475d-9e91-4bef6c03d91a"
+      ],
+      "ref": "c45ca9b0-159f-4361-bba2-7cbb7cfea299"
+    },
+    {
+      "dependsOn": [
+        "8db72780-12c2-4362-81e5-fe31a85fed4b"
+      ],
+      "ref": "2fd56720-893a-43d7-8fe8-98c125468521"
+    },
+    {
+      "dependsOn": [
+        "6b980317-addd-475d-9e91-4bef6c03d91a"
+      ],
+      "ref": "ffcdcbf6-985c-4656-8e96-ba08421392f7"
+    },
+    {
+      "dependsOn": [
+        "8db72780-12c2-4362-81e5-fe31a85fed4b"
+      ],
+      "ref": "35c347f8-077b-4d83-89ad-0ea80fe5055a"
+    },
+    {
+      "dependsOn": [
+        "6b980317-addd-475d-9e91-4bef6c03d91a"
+      ],
+      "ref": "1454bc61-10c7-401a-97f9-00f2b9bf1a6d"
+    },
+    {
+      "dependsOn": [
+        "10e6a9cf-e7cb-4c71-9409-d9ed6882a5de"
+      ],
+      "ref": "8db72780-12c2-4362-81e5-fe31a85fed4b"
+    },
+    {
+      "dependsOn": [
+        "8db72780-12c2-4362-81e5-fe31a85fed4b"
+      ],
+      "ref": "4e966c1b-cc6d-40a8-b500-34ce11d738e2"
+    },
+    {
+      "dependsOn": [
+        "6b980317-addd-475d-9e91-4bef6c03d91a"
+      ],
+      "ref": "e02441b1-3515-4af4-984e-37087068f23b"
+    },
+    {
+      "dependsOn": [
+        "8db72780-12c2-4362-81e5-fe31a85fed4b"
+      ],
+      "ref": "ec9a0a68-6cb3-4e02-a9b2-0cc152c609fb"
+    },
+    {
+      "dependsOn": [
+        "108eda75-03ec-4c8f-a453-e9abade3117f"
+      ],
+      "ref": "6b980317-addd-475d-9e91-4bef6c03d91a"
+    },
+    {
+      "dependsOn": [
+        "6b980317-addd-475d-9e91-4bef6c03d91a"
+      ],
+      "ref": "c45ca9b0-159f-4361-bba2-7cbb7cfea299"
+    },
+    {
+      "dependsOn": [
+        "8db72780-12c2-4362-81e5-fe31a85fed4b"
+      ],
+      "ref": "2fd56720-893a-43d7-8fe8-98c125468521"
+    },
+    {
+      "dependsOn": [
+        "6b980317-addd-475d-9e91-4bef6c03d91a"
+      ],
+      "ref": "ffcdcbf6-985c-4656-8e96-ba08421392f7"
+    },
+    {
+      "dependsOn": [
+        "8db72780-12c2-4362-81e5-fe31a85fed4b"
+      ],
+      "ref": "35c347f8-077b-4d83-89ad-0ea80fe5055a"
+    },
+    {
+      "dependsOn": [
+        "6b980317-addd-475d-9e91-4bef6c03d91a"
+      ],
+      "ref": "1454bc61-10c7-401a-97f9-00f2b9bf1a6d"
+    },
+    {
+      "dependsOn": [
+        "10e6a9cf-e7cb-4c71-9409-d9ed6882a5de"
+      ],
+      "ref": "8db72780-12c2-4362-81e5-fe31a85fed4b"
+    },
+    {
+      "dependsOn": [
+        "8db72780-12c2-4362-81e5-fe31a85fed4b"
+      ],
+      "ref": "4e966c1b-cc6d-40a8-b500-34ce11d738e2"
+    }
+  ],
+  "metadata": {
+    "properties": [
+      {
+        "name": "gitUrl",
+        "value": "https://github.com/ludwig-ai/ludwig"
+      },
+      {
+        "name": "revision",
+        "value": "Revision[value=master]"
+      },
+      {
+        "name": "commit",
+        "value": "00c51e0"
+      }
+    ],
+    "timestamp": "2025-09-10T14:12:01Z",
+    "tools": {
+      "components": [],
+      "services": [
+        {
+          "name": "CBOMkit",
+          "provider": {
+            "name": "PQCA"
+          }
+        }
+      ]
+    }
+  },
+  "serialNumber": "urn:uuid:09591eca-a471-40de-bb24-2750bd7fcfc0",
+  "specVersion": "1.6",
+  "version": 1
+}

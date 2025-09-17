@@ -1,0 +1,283 @@
+{
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "bom-ref": "b262d3d1-538d-4a1d-97de-1a47713cbcae",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "curve": "Edwards448",
+          "primitive": "signature"
+        },
+        "assetType": "algorithm",
+        "oid": "1.3.101.113"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 116,
+            "location": "sparrow-data/parse/sparrow_parse/vllm/infra/qwen2_vl_7b/app.py",
+            "offset": 28
+          }
+        ]
+      },
+      "name": "Ed448",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "f686bce8-fb53-480a-a283-127087d80339",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "digest"
+          ],
+          "parameterSetIdentifier": "256",
+          "primitive": "xof"
+        },
+        "assetType": "algorithm"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 116,
+            "location": "sparrow-data/parse/sparrow_parse/vllm/infra/qwen2_vl_7b/app.py",
+            "offset": 28
+          }
+        ]
+      },
+      "name": "SHAKE256",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "d1f0cc8a-8926-4cef-8b75-3449ba1da596",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 116,
+            "location": "sparrow-data/parse/sparrow_parse/vllm/infra/qwen2_vl_7b/app.py",
+            "offset": 28
+          }
+        ]
+      },
+      "name": "private-key@d1f0cc8a-8926-4cef-8b75-3449ba1da596",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "a9beaa88-7363-48e2-a377-bec865d40ece",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "curve": "Curve448",
+          "primitive": "key-agree"
+        },
+        "assetType": "algorithm",
+        "oid": "1.3.101.111"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 116,
+            "location": "sparrow-data/parse/sparrow_parse/vllm/infra/qwen2_vl_7b/app.py",
+            "offset": 28
+          }
+        ]
+      },
+      "name": "x448",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "32523390-bbaa-4cb7-838d-900f1d0cc2d6",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "curve": "Edwards25519",
+          "primitive": "signature"
+        },
+        "assetType": "algorithm",
+        "oid": "1.3.101.112"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 116,
+            "location": "sparrow-data/parse/sparrow_parse/vllm/infra/qwen2_vl_7b/app.py",
+            "offset": 28
+          }
+        ]
+      },
+      "name": "Ed25519",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "752891c8-a0ef-4490-9aaf-c49482aa79d0",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "curve": "Curve25519",
+          "primitive": "key-agree"
+        },
+        "assetType": "algorithm",
+        "oid": "1.3.101.110"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 116,
+            "location": "sparrow-data/parse/sparrow_parse/vllm/infra/qwen2_vl_7b/app.py",
+            "offset": 28
+          }
+        ]
+      },
+      "name": "x25519",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "9a28c688-a4b8-4a62-9d8c-5b345a9da341",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "digest"
+          ],
+          "parameterSetIdentifier": "512",
+          "primitive": "hash"
+        },
+        "assetType": "algorithm",
+        "oid": "2.16.840.1.101.3.4.2.3"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 116,
+            "location": "sparrow-data/parse/sparrow_parse/vllm/infra/qwen2_vl_7b/app.py",
+            "offset": 28
+          }
+        ]
+      },
+      "name": "SHA512",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "350e8881-6c5a-456f-b822-d5af43035d85",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 116,
+            "location": "sparrow-data/parse/sparrow_parse/vllm/infra/qwen2_vl_7b/app.py",
+            "offset": 28
+          }
+        ]
+      },
+      "name": "private-key@350e8881-6c5a-456f-b822-d5af43035d85",
+      "type": "cryptographic-asset"
+    }
+  ],
+  "dependencies": [
+    {
+      "dependsOn": [
+        "9a28c688-a4b8-4a62-9d8c-5b345a9da341"
+      ],
+      "ref": "32523390-bbaa-4cb7-838d-900f1d0cc2d6"
+    },
+    {
+      "dependsOn": [
+        "f686bce8-fb53-480a-a283-127087d80339"
+      ],
+      "ref": "b262d3d1-538d-4a1d-97de-1a47713cbcae"
+    },
+    {
+      "dependsOn": [
+        "b262d3d1-538d-4a1d-97de-1a47713cbcae"
+      ],
+      "ref": "d1f0cc8a-8926-4cef-8b75-3449ba1da596"
+    },
+    {
+      "dependsOn": [
+        "32523390-bbaa-4cb7-838d-900f1d0cc2d6"
+      ],
+      "ref": "350e8881-6c5a-456f-b822-d5af43035d85"
+    },
+    {
+      "dependsOn": [
+        "9a28c688-a4b8-4a62-9d8c-5b345a9da341"
+      ],
+      "ref": "32523390-bbaa-4cb7-838d-900f1d0cc2d6"
+    },
+    {
+      "dependsOn": [
+        "f686bce8-fb53-480a-a283-127087d80339"
+      ],
+      "ref": "b262d3d1-538d-4a1d-97de-1a47713cbcae"
+    },
+    {
+      "dependsOn": [
+        "b262d3d1-538d-4a1d-97de-1a47713cbcae"
+      ],
+      "ref": "d1f0cc8a-8926-4cef-8b75-3449ba1da596"
+    },
+    {
+      "dependsOn": [
+        "32523390-bbaa-4cb7-838d-900f1d0cc2d6"
+      ],
+      "ref": "350e8881-6c5a-456f-b822-d5af43035d85"
+    }
+  ],
+  "metadata": {
+    "properties": [
+      {
+        "name": "gitUrl",
+        "value": "https://github.com/katanaml/sparrow"
+      },
+      {
+        "name": "revision",
+        "value": "Revision[value=main]"
+      },
+      {
+        "name": "commit",
+        "value": "6af96a9"
+      }
+    ],
+    "timestamp": "2025-09-10T14:12:16Z",
+    "tools": {
+      "components": [],
+      "services": [
+        {
+          "name": "CBOMkit",
+          "provider": {
+            "name": "PQCA"
+          }
+        }
+      ]
+    }
+  },
+  "serialNumber": "urn:uuid:524f42f4-9703-47a1-9339-cf698f9c493d",
+  "specVersion": "1.6",
+  "version": 1
+}

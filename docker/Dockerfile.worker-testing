@@ -1,0 +1,21 @@
+# docker/Dockerfile.worker-testing
+ARG BASE_IMAGE=base
+ARG BASE_TAG=latest
+FROM ${BASE_IMAGE}:${BASE_TAG}
+
+USER appuser
+WORKDIR /app
+ENV PYTHONPATH=/app \
+    UV_PROJECT_ENVIRONMENT=/home/appuser/.venvs/testing
+
+# Dependencies first for caching
+COPY --chown=appuser:appuser pyproject.toml uv.lock ./
+COPY --chown=appuser:appuser common/ ./common/
+RUN pip install --no-cache-dir --upgrade pip \
+ && uv sync --frozen --no-dev
+
+# Worker code
+COPY --chown=appuser:appuser workers/testing/ ./workers/testing/
+
+# Proper PID 1 and clean shutdown
+ENTRYPOINT ["tini","-g","--","uv","run","workers/testing/main.py"]

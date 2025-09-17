@@ -1,0 +1,32 @@
+# docker/Dockerfile.base
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    UV_SYSTEM_PYTHON=1 \
+    UV_LINK_MODE=copy
+
+# Minimal OS deps; include toolchain for native wheels when needed
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    git \
+    tini \
+    build-essential \
+    pkg-config \
+    libssl-dev \
+    libffi-dev \
+ && rm -rf /var/lib/apt/lists/* \
+ && update-ca-certificates || true
+
+# Install uv (Astral) as a static binary and make it available system-wide
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
+ && mv /root/.local/bin/uv /usr/local/bin/uv
+
+# Non-root user and writable workdir
+RUN useradd -m appuser && mkdir -p /app && chown -R appuser:appuser /app
+WORKDIR /app
+ENV PATH="/home/appuser/.local/bin:${PATH}"
+USER appuser

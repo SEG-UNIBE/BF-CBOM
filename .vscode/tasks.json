@@ -1,0 +1,23 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "docker-compose-up-redis",
+      "type": "shell",
+      "command": "docker-compose up -d redis"
+    },
+    {
+      "label": "docker-compose-down",
+      "type": "shell",
+      "command": "docker-compose rm -sf redis"
+    },
+    {
+      "label": "run-streamlit-coordinator",
+      "type": "shell",
+      "command": "streamlit run coordinator/Start.py",
+      "isBackground": true,
+      "problemMatcher": [],
+      "group": "build"
+    }
+  ]
+}

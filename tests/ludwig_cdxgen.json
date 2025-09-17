@@ -1,0 +1,6294 @@
+{
+  "annotations": [
+    {
+      "annotator": {
+        "component": {
+          "authors": [
+            {
+              "name": "OWASP Foundation"
+            }
+          ],
+          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@11.7.0",
+          "group": "@cyclonedx",
+          "name": "cdxgen",
+          "publisher": "OWASP Foundation",
+          "purl": "pkg:npm/%40cyclonedx/cdxgen@11.7.0",
+          "type": "application",
+          "version": "11.7.0"
+        }
+      },
+      "bom-ref": "metadata-annotations",
+      "subjects": [
+        "pkg:pypi/repo@latest"
+      ],
+      "text": "This Software Bill-of-Materials (SBOM) document was created on Wednesday, September 10, 2025 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'repo'. There are 125 components. 2 package type(s) and 10 purl namespaces are described in the document under components.",
+      "timestamp": "2025-09-10T16:26:58Z"
+    }
+  ],
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "authors": [
+        {
+          "name": "John D. Hunter"
+        },
+        {
+          "name": " Michael Droettboom <matplotlib-users@python.org>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/matplotlib@3.4",
+      "description": "Python plotting package",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements_viz.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements_viz.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://matplotlib.org"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "PSF-2.0",
+            "url": "https://opensource.org/licenses/PSF-2.0"
+          }
+        },
+        {
+          "license": {
+            "name": "PSF"
+          }
+        }
+      ],
+      "name": "matplotlib",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_viz.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ">3.4,<3.9.0"
+        },
+        {
+          "name": "cdx:pip:markers",
+          "value": "python_version > '3.6'"
+        },
+        {
+          "name": "cdx:pip:structuredMarkers",
+          "value": "[{\"variable\":\"python_version\",\"operator\":\">\",\"value\":\"3.6\"}]"
+        },
+        {
+          "name": "cdx:pypi:latest_version",
+          "value": "3.4.0"
+        },
+        {
+          "name": "cdx:pypi:resolved_from",
+          "value": "matplotlib"
+        }
+      ],
+      "purl": "pkg:pypi/matplotlib@3.4",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "3.4"
+    },
+    {
+      "authors": [
+        {
+          "name": "John D. Hunter"
+        },
+        {
+          "name": " Michael Droettboom <matplotlib-users@python.org>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/matplotlib@3.0",
+      "description": "Python plotting package",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements_viz.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements_viz.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "http://matplotlib.org"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "PSF-2.0",
+            "url": "https://opensource.org/licenses/PSF-2.0"
+          }
+        },
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "matplotlib",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_viz.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ">=3.0,<3.4"
+        },
+        {
+          "name": "cdx:pip:markers",
+          "value": "python_version <= '3.6'"
+        },
+        {
+          "name": "cdx:pip:structuredMarkers",
+          "value": "[{\"variable\":\"python_version\",\"operator\":\"<=\",\"value\":\"3.6\"}]"
+        },
+        {
+          "name": "cdx:pypi:latest_version",
+          "value": "3.0.0"
+        },
+        {
+          "name": "cdx:pypi:resolved_from",
+          "value": "matplotlib"
+        }
+      ],
+      "purl": "pkg:pypi/matplotlib@3.0",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "3.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Michael Waskom <mwaskom@stanford.edu>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/seaborn@0.7",
+      "description": "Seaborn: statistical data visualization",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements_viz.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements_viz.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "http://stanford.edu/~mwaskom/software/seaborn/"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        },
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "seaborn",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_viz.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ">=0.7,<0.12"
+        },
+        {
+          "name": "cdx:pypi:latest_version",
+          "value": "0.7.0"
+        },
+        {
+          "name": "cdx:pypi:resolved_from",
+          "value": "seaborn"
+        }
+      ],
+      "purl": "pkg:pypi/seaborn@0.7",
+      "type": "library",
+      "version": "0.7"
+    },
+    {
+      "authors": [
+        {
+          "name": "Facebook AI Research"
+        }
+      ],
+      "bom-ref": "pkg:pypi/hiplot@0.1.33",
+      "description": "High dimensional Interactive Plotting tool",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: hiplot",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: hiplot"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/facebookresearch/hiplot"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "82761a0e087a04d696914f4e141197e9f6ae776a590369ec9db01e26710f9f85"
+        }
+      ],
+      "licenses": [],
+      "name": "hiplot",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_viz.txt"
+        }
+      ],
+      "purl": "pkg:pypi/hiplot@0.1.33",
+      "type": "library",
+      "version": "0.1.33"
+    },
+    {
+      "authors": [
+        {
+          "name": "Davide Poggiali <davide.poggiali@unipd.it>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/ptitprince@0.2.7",
+      "description": "A Python implementation of Rainclouds, originally on R, ggplot2. Written on top of seaborn.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: ptitprince",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: ptitprince"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/pog87/PtitPrince"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "bbd19d4f8615935ac1b750651907303913fbdddc3fe864c1cb80faa3a2a3acfb"
+        }
+      ],
+      "licenses": [
+        {
+          "expression": "OSI Approved"
+        }
+      ],
+      "name": "ptitprince",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_viz.txt"
+        }
+      ],
+      "purl": "pkg:pypi/ptitprince@0.2.7",
+      "type": "library",
+      "version": "0.2.7"
+    },
+    {
+      "authors": [
+        {
+          "name": "Microsoft Corporation <hummingbird-dev@microsoft.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/hummingbird-ml@0.4.8",
+      "description": "Convert trained traditional machine learning models into tensor computations",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements_tree.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements_tree.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/microsoft/hummingbird"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "hummingbird-ml",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_tree.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ">=0.4.8"
+        }
+      ],
+      "purl": "pkg:pypi/hummingbird-ml@0.4.8",
+      "type": "library",
+      "version": "0.4.8"
+    },
+    {
+      "bom-ref": "pkg:pypi/lightgbm@4.6.0",
+      "description": "LightGBM Python-package",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: lightgbm",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: lightgbm"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/microsoft/LightGBM"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "b7a393de8a334d5c8e490df91270f0763f83f959574d504c7ccb9eee4aef70ed"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "lightgbm",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_tree.txt"
+        }
+      ],
+      "purl": "pkg:pypi/lightgbm@4.6.0",
+      "type": "library",
+      "version": "4.6.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Ray Team"
+        }
+      ],
+      "bom-ref": "pkg:pypi/lightgbm-ray@0.1.9",
+      "description": "A Ray backend for distributed LightGBM",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: lightgbm-ray",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: lightgbm-ray"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/ray-project/lightgbm_ray"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "1e6246b022015312c218a38d3d32d24c018c3795ed70c586e435f3e663372b66"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "lightgbm-ray",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_tree.txt"
+        }
+      ],
+      "purl": "pkg:pypi/lightgbm-ray@0.1.9",
+      "type": "library",
+      "version": "0.1.9"
+    },
+    {
+      "authors": [
+        {
+          "name": "Holger Krekel"
+        },
+        {
+          "name": " Bruno Oliveira"
+        },
+        {
+          "name": " Ronny Pfannschmidt"
+        },
+        {
+          "name": " Floris Bruynooghe"
+        },
+        {
+          "name": " Brianna Laugher"
+        },
+        {
+          "name": " Florian Bruhin"
+        },
+        {
+          "name": " Others (See AUTHORS)"
+        }
+      ],
+      "bom-ref": "pkg:pypi/pytest@8.4.2",
+      "description": "pytest: simple powerful testing with Python",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: pytest",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: pytest"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "872f880de3fc3a5bdc88a11b39c9710c3497a547cfa9320bc3c5e62fbf272e79"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "pytest",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_test.txt"
+        }
+      ],
+      "purl": "pkg:pypi/pytest@8.4.2",
+      "type": "library",
+      "version": "8.4.2"
+    },
+    {
+      "authors": [
+        {
+          "name": "Floris Bruynooghe <flub@devork.be>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/pytest-timeout@2.4.0",
+      "description": "pytest plugin to abort hanging tests",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: pytest-timeout",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: pytest-timeout"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/pytest-dev/pytest-timeout"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "c42667e5cdadb151aeb5b26d114aff6bdf5a907f176a007a30b940d3d865b5c2"
+        }
+      ],
+      "licenses": [
+        {
+          "expression": "DFSG approved"
+        }
+      ],
+      "name": "pytest-timeout",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_test.txt"
+        }
+      ],
+      "purl": "pkg:pypi/pytest-timeout@2.4.0",
+      "type": "library",
+      "version": "2.4.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Christoph Gohlke <cgohlke@cgohlke.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/tifffile@2025.9.9",
+      "description": "Read and write TIFF files",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: tifffile",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: tifffile"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.cgohlke.com"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "239247551fa10b5679036ee030cdbeb7762bc1b3f11b1ddaaf50759ef8b4eb26"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "tifffile",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_test.txt"
+        },
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/tifffile@2025.9.9",
+      "tags": [
+        "native"
+      ],
+      "type": "library",
+      "version": "2025.9.9"
+    },
+    {
+      "authors": [
+        {
+          "name": "anatoly techtonik <techtonik@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/wget@3.2",
+      "description": "pure python download utility",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: wget",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: wget"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "http://bitbucket.org/techtonik/python-wget/"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "35e630eca2aa50ce998b9b1a127bb26b30dfee573702782aa982f875e3f16061"
+        }
+      ],
+      "licenses": [
+        {
+          "expression": "Public Domain"
+        }
+      ],
+      "name": "wget",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_test.txt"
+        }
+      ],
+      "purl": "pkg:pypi/wget@3.2",
+      "type": "library",
+      "version": "3.2"
+    },
+    {
+      "authors": [
+        {
+          "name": "Benjamin Peterson <benjamin@python.org>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/six@1.13.0",
+      "description": "Python 2 and 3 compatibility utilities",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements_test.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements_test.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/benjaminp/six"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "six",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_test.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ">=1.13.0"
+        }
+      ],
+      "purl": "pkg:pypi/six@1.13.0",
+      "type": "library",
+      "version": "1.13.0"
+    },
+    {
+      "bom-ref": "pkg:pypi/aim@3.29.1",
+      "description": "A super-easy way to record, search and compare AI experiments.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: aim",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: aim"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "2604793a69c2ec17aa915a5fe0fecb526923c3a2f056c9ba5ab6a482272abb49"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "aim",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_test.txt"
+        }
+      ],
+      "purl": "pkg:pypi/aim@3.29.1",
+      "tags": [
+        "ai"
+      ],
+      "type": "library",
+      "version": "3.29.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "Weights & Biases <support@wandb.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/wandb@0.12.11",
+      "description": "A CLI and library for interacting with the Weights and Biases API.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements_test.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements_test.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/wandb/client"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "wandb",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_test.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": "<0.12.11"
+        }
+      ],
+      "purl": "pkg:pypi/wandb@0.12.11",
+      "tags": [
+        "api",
+        "cli"
+      ],
+      "type": "library",
+      "version": "0.12.11"
+    },
+    {
+      "authors": [
+        {
+          "name": "Comet ML Inc. <mail@comet.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/comet-ml@3.52.1",
+      "description": "Supercharging Machine Learning",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: comet_ml",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: comet_ml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.comet.com"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "fb9e26515024da4e38e39cdb6cda750a555f8c76e70a74ba9f99ec39de63ecc9"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "comet_ml",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_test.txt"
+        }
+      ],
+      "purl": "pkg:pypi/comet-ml@3.52.1",
+      "type": "library",
+      "version": "3.52.1"
+    },
+    {
+      "bom-ref": "pkg:pypi/mlflow@3.3.2",
+      "description": "MLflow is an open source platform for the complete machine learning lifecycle",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: mlflow",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: mlflow"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "df2bfb11bf0ed3a39cf3cefd1a114ecdcd9c44291358b4b818e3bed50878b444"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "mlflow",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_test.txt"
+        }
+      ],
+      "purl": "pkg:pypi/mlflow@3.3.2",
+      "type": "library",
+      "version": "3.3.2"
+    },
+    {
+      "authors": [
+        {
+          "name": "Stefan Falkner <sfalkner@cs.uni-freiburg.de>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/hpbandster@0.7.4",
+      "description": "HyPerBAND on STERoids, a distributed Hyperband implementation with lots of room for improvement",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: hpbandster",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: hpbandster"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/automl/HpBandSter"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "49ffc32688155b509e62f3617b52ae15a96c9bff2c996a23df83f279106c5921"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "hpbandster",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_test.txt"
+        }
+      ],
+      "purl": "pkg:pypi/hpbandster@0.7.4",
+      "type": "library",
+      "version": "0.7.4"
+    },
+    {
+      "authors": [
+        {
+          "name": "Matthias Feurer"
+        },
+        {
+          "name": " Katharina Eggensperger"
+        },
+        {
+          "name": " Syed Mohsin Ali"
+        },
+        {
+          "name": " Christina Hernandez Wunsch"
+        },
+        {
+          "name": " Julien-Charles Levesque"
+        },
+        {
+          "name": " Jost Tobias Springenberg"
+        },
+        {
+          "name": " Philipp Mueller"
+        },
+        {
+          "name": " Marius Lindauer"
+        },
+        {
+          "name": " Jorn Tuyls"
+        },
+        {
+          "name": " Eddie Bergman"
+        },
+        {
+          "name": " Arjun Krishnakumar"
+        }
+      ],
+      "bom-ref": "pkg:pypi/configspace@0.7.1",
+      "description": "Creation and manipulation of parameter configuration spaces for automated algorithm configuration and hyperparameter tuning.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements_test.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements_test.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "ConfigSpace",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_test.txt"
+        }
+      ],
+      "purl": "pkg:pypi/configspace@0.7.1",
+      "type": "library",
+      "version": "0.7.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "Meta Platforms"
+        },
+        {
+          "name": " Inc."
+        }
+      ],
+      "bom-ref": "pkg:pypi/ax-platform@1.1.2",
+      "description": "Adaptive Experimentation",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: ax-platform",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: ax-platform"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "7e58e584689a0278f2840fc44892ed5126dc806082749bab7b16d02acd159685"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "ax-platform",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_test.txt"
+        }
+      ],
+      "purl": "pkg:pypi/ax-platform@1.1.2",
+      "type": "library",
+      "version": "1.1.2"
+    },
+    {
+      "authors": [
+        {
+          "name": "Mike Bayer <mike_mp@zzzcomputing.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/sqlalchemy@2",
+      "description": "Database Abstraction Library",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements_test.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements_test.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.sqlalchemy.org"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "SQLAlchemy",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_test.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": "<2"
+        },
+        {
+          "name": "cdx:pypi:latest_version",
+          "value": "2.0.0"
+        },
+        {
+          "name": "cdx:pypi:resolved_from",
+          "value": "sqlalchemy"
+        }
+      ],
+      "purl": "pkg:pypi/sqlalchemy@2",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "2"
+    },
+    {
+      "authors": [
+        {
+          "name": "Fernando Nogueira <Fernando Nogueira <fmfnogueira@gmail.com>>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/bayesian-optimization@3.1.0",
+      "description": "Bayesian Optimization package",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: bayesian-optimization",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: bayesian-optimization"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "c5547cb49878f1e8d1d5235ef54646feaec7cd161f98d35c24ec16b0ef6a5162"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "bayesian-optimization",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_test.txt"
+        }
+      ],
+      "purl": "pkg:pypi/bayesian-optimization@3.1.0",
+      "type": "library",
+      "version": "3.1.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Microsoft Corporation <hpo@microsoft.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/flaml@2.3.6",
+      "description": "A fast library for automated machine learning and tuning",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: FLAML",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: FLAML"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/microsoft/FLAML"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "7c8bc03340686f7a6b8e338672ff4819e9b3e7115749724169c1b55f8047f27a"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "FLAML",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_test.txt"
+        },
+        {
+          "name": "cdx:pypi:extras",
+          "value": "blendsearch"
+        }
+      ],
+      "purl": "pkg:pypi/flaml@2.3.6",
+      "type": "library",
+      "version": "2.3.6"
+    },
+    {
+      "bom-ref": "pkg:pypi/hebo@0.3.6",
+      "description": "Heteroscedastic evolutionary bayesian optimisation",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: HEBO",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: HEBO"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/huawei-noah/HEBO/tree/master/HEBO"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "f3d46a106205eac5340822e5ad1aeb389109ea302dfe35f17d24e69c7c1d0665"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "HEBO",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_test.txt"
+        }
+      ],
+      "purl": "pkg:pypi/hebo@0.3.6",
+      "type": "library",
+      "version": "0.3.6"
+    },
+    {
+      "authors": [
+        {
+          "name": "Facebook AI Research"
+        }
+      ],
+      "bom-ref": "pkg:pypi/nevergrad@1.0.12",
+      "description": "A Python toolbox for performing gradient-free optimization",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: nevergrad",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: nevergrad"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/facebookresearch/nevergrad"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "56ff65d6a2f497ecd79af5a796968ee946c05705a6a69ca616eae5988cc5d999"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "nevergrad",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_test.txt"
+        }
+      ],
+      "purl": "pkg:pypi/nevergrad@1.0.12",
+      "type": "library",
+      "version": "1.0.12"
+    },
+    {
+      "authors": [
+        {
+          "name": "Takuya Akiba"
+        }
+      ],
+      "bom-ref": "pkg:pypi/optuna@4.5.0",
+      "description": "A hyperparameter optimization framework",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: optuna",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: optuna"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "5b8a783e84e448b0742501bc27195344a28d2c77bd2feef5b558544d954851b0"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "optuna",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_test.txt"
+        }
+      ],
+      "purl": "pkg:pypi/optuna@4.5.0",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "4.5.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "The scikit-optimize contributors"
+        }
+      ],
+      "bom-ref": "pkg:pypi/scikit-optimize@0.10.2",
+      "description": "Sequential model-based optimization toolbox.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: scikit-optimize",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: scikit-optimize"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "45bc7e879b086133984721f2f6735a86c085073f6c481c2ec665b5c67b44d723"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        },
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "scikit-optimize",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_test.txt"
+        }
+      ],
+      "purl": "pkg:pypi/scikit-optimize@0.10.2",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "0.10.2"
+    },
+    {
+      "authors": [
+        {
+          "name": "Yang Yu <yuy@nju.edu.cn>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/zoopt@0.4.2",
+      "description": "A Python Package for Zeroth-Order Optimization",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: zoopt",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: zoopt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/polixir/ZOOpt"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "d015ab3633b8f1951c5caa59b05adff08bcd6655e6cc3a5f397b7abd2171faa5"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "zoopt",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_test.txt"
+        }
+      ],
+      "purl": "pkg:pypi/zoopt@0.4.2",
+      "type": "library",
+      "version": "0.4.2"
+    },
+    {
+      "bom-ref": "pkg:pypi/s3fs@2022.8.2",
+      "description": "Convenient Filesystem interface over S3",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements_test.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements_test.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "http://github.com/fsspec/s3fs/"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "s3fs",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_test.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ">=2022.8.2"
+        }
+      ],
+      "purl": "pkg:pypi/s3fs@2022.8.2",
+      "type": "library",
+      "version": "2022.8.2"
+    },
+    {
+      "authors": [
+        {
+          "name": "Tom Christie <tom@tomchristie.com>"
+        },
+        {
+          "name": " Marcelo Trylesinski <marcelotryle@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/uvicorn@0.35.0",
+      "description": "The lightning-fast ASGI server.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: uvicorn",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: uvicorn"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "197535216b25ff9b785e29a0b79199f55222193d47f820816e7da751e9bc8d4a"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        },
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "uvicorn",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_serve.txt"
+        }
+      ],
+      "purl": "pkg:pypi/uvicorn@0.35.0",
+      "type": "library",
+      "version": "0.35.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Tom Christie <tom@tomchristie.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/httpx@0.28.1",
+      "description": "The next generation HTTP client.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: httpx",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: httpx"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        },
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "httpx",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_serve.txt"
+        }
+      ],
+      "purl": "pkg:pypi/httpx@0.28.1",
+      "type": "library",
+      "version": "0.28.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "=?utf-8?q?Sebasti=C3=A1n_Ram=C3=ADrez?= <tiangolo@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/fastapi@0.116.1",
+      "description": "FastAPI framework, high performance, easy to learn, fast to code, ready for production",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: fastapi",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: fastapi"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "c46ac7c312df840f0c9e220f7964bada936781bc4e2e6eb71f1c4d7553786565"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "fastapi",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_serve.txt"
+        }
+      ],
+      "purl": "pkg:pypi/fastapi@0.116.1",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "0.116.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "Andrew Dunham <andrew@du.nham.ca>"
+        },
+        {
+          "name": " Marcelo Trylesinski <marcelotryle@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/python-multipart@0.0.20",
+      "description": "A streaming multipart parser for Python",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: python-multipart",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: python-multipart"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "8a62d3a8335e06589fe01f2a3e178cdcc632f3fbe0d492ad9ee0ec35aab1f104"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "python-multipart",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_serve.txt"
+        }
+      ],
+      "purl": "pkg:pypi/python-multipart@0.0.20",
+      "type": "library",
+      "version": "0.0.20"
+    },
+    {
+      "bom-ref": "pkg:pypi/neuropod@0.3.0rc6",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements_serve.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements_serve.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [],
+      "name": "neuropod",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_serve.txt"
+        },
+        {
+          "name": "cdx:pip:markers",
+          "value": "platform_system != \"Windows\" and python_version < '3.9'"
+        },
+        {
+          "name": "cdx:pip:structuredMarkers",
+          "value": "[{\"variable\":\"platform_system\",\"operator\":\"!=\",\"value\":\"Windows\"},{\"operator\":\"and\"},{\"variable\":\"python_version\",\"operator\":\"<\",\"value\":\"3.9\"}]"
+        }
+      ],
+      "purl": "pkg:pypi/neuropod@0.3.0rc6",
+      "type": "library",
+      "version": "0.3.0rc6"
+    },
+    {
+      "bom-ref": "pkg:pypi/cartonml-nightly@0.0.1.dev20231020",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: cartonml-nightly",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: cartonml-nightly"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "c8067acd918e6b6e173d3ef3db26cbc2ac17e900b73ffddd7e791da97964297a"
+        }
+      ],
+      "licenses": [],
+      "name": "cartonml-nightly",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_serve.txt"
+        }
+      ],
+      "purl": "pkg:pypi/cartonml-nightly@0.0.1.dev20231020",
+      "type": "library",
+      "version": "0.0.1.dev20231020"
+    },
+    {
+      "authors": [
+        {
+          "name": "Nils Reimers <info@nils-reimers.de>"
+        },
+        {
+          "name": " Tom Aarsen <tom.aarsen@huggingface.co>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/sentence-transformers@5.1.0",
+      "description": "Embeddings, Retrieval, and Reranking",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: sentence-transformers",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: sentence-transformers"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "fc803929f6a3ce82e2b2c06e0efed7a36de535c633d5ce55efac0b710ea5643e"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "sentence-transformers",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_llm.txt"
+        }
+      ],
+      "purl": "pkg:pypi/sentence-transformers@5.1.0",
+      "tags": [
+        "transform"
+      ],
+      "type": "library",
+      "version": "5.1.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Kota Yamaguchi <yamaguchi_kota@cyberagent.co.jp>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/faiss-cpu@1.12.0",
+      "description": "A library for efficient similarity search and clustering of dense vectors.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: faiss-cpu",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: faiss-cpu"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "be96f9290edd13d56fb3c69b8dd6be487552b4401f2e95b437cabf5309c424ad"
+        }
+      ],
+      "licenses": [
+        {
+          "expression": "MIT AND BSD-3-Clause"
+        }
+      ],
+      "name": "faiss-cpu",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_llm.txt"
+        }
+      ],
+      "purl": "pkg:pypi/faiss-cpu@1.12.0",
+      "type": "library",
+      "version": "1.12.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "The HuggingFace team <zach.mueller@huggingface.co>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/accelerate@1.10.1",
+      "description": "Accelerate",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: accelerate",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: accelerate"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/huggingface/accelerate"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "3621cff60b9a27ce798857ece05e2b9f56fcc71631cfb31ccf71f0359c311f11"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        },
+        {
+          "license": {
+            "name": "Apache"
+          }
+        }
+      ],
+      "name": "accelerate",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_llm.txt"
+        }
+      ],
+      "purl": "pkg:pypi/accelerate@1.10.1",
+      "type": "library",
+      "version": "1.10.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "Edward J. Hu"
+        },
+        {
+          "name": " Yelong Shen"
+        },
+        {
+          "name": " Phillip Wallis"
+        },
+        {
+          "name": " Zeyuan Allen-Zhu"
+        },
+        {
+          "name": " Yuanzhi Li"
+        },
+        {
+          "name": " Shean Wang"
+        },
+        {
+          "name": " Lu Wang"
+        },
+        {
+          "name": " Weizhu Chen <edward.hu@microsoft.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/loralib@0.1.2",
+      "description": "PyTorch implementation of low-rank adaptation (LoRA), a parameter-efficient approach to adapt a large pre-trained deep learning model which obtains performance on-par with full fine-tuning.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: loralib",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: loralib"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/microsoft/LoRA"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "e341c9a507b180f3b8e70914efef9f6b19d1aa3996dec546b180cfbd027059e9"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "loralib",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_llm.txt"
+        }
+      ],
+      "purl": "pkg:pypi/loralib@0.1.2",
+      "tags": [
+        "performance"
+      ],
+      "type": "library",
+      "version": "0.1.2"
+    },
+    {
+      "authors": [
+        {
+          "name": "The HuggingFace team <sourab@huggingface.co>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/peft@0.10.0",
+      "description": "Parameter-Efficient Fine-Tuning (PEFT)",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements_llm.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements_llm.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/huggingface/peft"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        },
+        {
+          "license": {
+            "name": "Apache"
+          }
+        }
+      ],
+      "name": "peft",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_llm.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ">=0.10.0"
+        }
+      ],
+      "purl": "pkg:pypi/peft@0.10.0",
+      "type": "library",
+      "version": "0.10.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Ray Team <ray-dev@googlegroups.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/ray@2.0.0",
+      "description": "Ray provides a simple, universal API for building distributed applications.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements_hyperopt.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements_hyperopt.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/ray-project/ray"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "ray",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_hyperopt.txt"
+        },
+        {
+          "name": "cdx:pypi:extras",
+          "value": "default,tune"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ">=2.0.0"
+        }
+      ],
+      "purl": "pkg:pypi/ray@2.0.0",
+      "tags": [
+        "api"
+      ],
+      "type": "library",
+      "version": "2.0.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "James Bergstra <james.bergstra@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/hyperopt@0.2.7",
+      "description": "Distributed Asynchronous Hyperparameter Optimization",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: hyperopt",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: hyperopt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://hyperopt.github.io/hyperopt"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "f3046d91fe4167dbf104365016596856b2524a609d22f047a066fc1ac796427c"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "hyperopt",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_hyperopt.txt"
+        }
+      ],
+      "purl": "pkg:pypi/hyperopt@0.2.7",
+      "type": "library",
+      "version": "0.2.7"
+    },
+    {
+      "authors": [
+        {
+          "name": "The Horovod Authors"
+        }
+      ],
+      "bom-ref": "pkg:pypi/horovod@0.24.0",
+      "description": "Distributed training framework for TensorFlow, Keras, PyTorch, and Apache MXNet.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements_extra.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements_extra.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/horovod/horovod"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "horovod",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_extra.txt"
+        },
+        {
+          "name": "cdx:pypi:extras",
+          "value": "pytorch"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ">=0.24.0,!=0.26.0"
+        }
+      ],
+      "purl": "pkg:pypi/horovod@0.24.0",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "0.24.0"
+    },
+    {
+      "bom-ref": "pkg:pypi/modin@0.36.0",
+      "description": "Modin: Make your pandas code run faster by changing one line of code.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: modin",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: modin"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/modin-project/modin"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "e3f2885e813003ff76fb2b08e3a95055a30133a896d49258014a37dcaa374842"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "modin",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_extra.txt"
+        },
+        {
+          "name": "cdx:pypi:extras",
+          "value": "ray"
+        }
+      ],
+      "purl": "pkg:pypi/modin@0.36.0",
+      "type": "library",
+      "version": "0.36.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Predibase Inc."
+        }
+      ],
+      "bom-ref": "pkg:pypi/predibase@2023.10.2",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements_extra.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements_extra.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [],
+      "name": "predibase",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_extra.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ">=2023.10.2"
+        }
+      ],
+      "purl": "pkg:pypi/predibase@2023.10.2",
+      "type": "library",
+      "version": "2023.10.2"
+    },
+    {
+      "authors": [
+        {
+          "name": "PyTorch Team"
+        }
+      ],
+      "bom-ref": "pkg:pypi/captum@0.8.0",
+      "description": "Model interpretability for PyTorch",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: captum",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: captum"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://captum.ai"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "b0465431f5cbc666d86c14ee853ee6155e97460369238f85bd10a241b87eea47"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        },
+        {
+          "license": {
+            "name": "BSD-3"
+          }
+        }
+      ],
+      "name": "captum",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_explain.txt"
+        }
+      ],
+      "purl": "pkg:pypi/captum@0.8.0",
+      "type": "library",
+      "version": "0.8.0"
+    },
+    {
+      "bom-ref": "pkg:pypi/dask@2023.4.0",
+      "description": "Parallel PyData with Task Scheduling",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements_distributed.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements_distributed.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "dask",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_distributed.txt"
+        },
+        {
+          "name": "cdx:pypi:extras",
+          "value": "dataframe"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": "<2023.4.0"
+        }
+      ],
+      "purl": "pkg:pypi/dask@2023.4.0",
+      "type": "library",
+      "version": "2023.4.0"
+    },
+    {
+      "bom-ref": "pkg:pypi/pyarrow@21.0.0",
+      "description": "Python library for Apache Arrow",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: pyarrow",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: pyarrow"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "e563271e2c5ff4d4a4cbeb2c83d5cf0d4938b891518e676025f7268c6fe5fe26"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "pyarrow",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_distributed.txt"
+        }
+      ],
+      "purl": "pkg:pypi/pyarrow@21.0.0",
+      "type": "library",
+      "version": "21.0.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Ray Team <ray-dev@googlegroups.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/ray@2.3.1",
+      "description": "Ray provides a simple, universal API for building distributed applications.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements_distributed.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements_distributed.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/ray-project/ray"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "ray",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_distributed.txt"
+        },
+        {
+          "name": "cdx:pypi:extras",
+          "value": "default,data,serve,tune"
+        }
+      ],
+      "purl": "pkg:pypi/ray@2.3.1",
+      "tags": [
+        "api"
+      ],
+      "type": "library",
+      "version": "2.3.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "Tzu-Wei Huang <huang.dexter@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/tensorboardx@2.3",
+      "description": "TensorBoardX lets you watch Tensors Flow without Tensorflow",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements_distributed.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements_distributed.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/lanpa/tensorboardX"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "tensorboardX",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_distributed.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": "<2.3"
+        }
+      ],
+      "purl": "pkg:pypi/tensorboardx@2.3",
+      "type": "library",
+      "version": "2.3"
+    },
+    {
+      "authors": [
+        {
+          "name": "Anders Krogh Mortensen <anderskroghm@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/gputil@1.4.0",
+      "description": "GPUtil is a Python module for getting the GPU status from NVIDA GPUs using nvidia-smi.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: GPUtil",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: GPUtil"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/anderskm/gputil"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "099e52c65e512cdfa8c8763fca67f5a5c2afb63469602d5dcb4d296b3661efb9"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "GPUtil",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_distributed.txt"
+        }
+      ],
+      "purl": "pkg:pypi/gputil@1.4.0",
+      "type": "library",
+      "version": "1.4.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Ionel Cristian Mărieș <contact@ionelmc.ro>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/tblib@3.1.0",
+      "description": "Traceback serialization library.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: tblib",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: tblib"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/ionelmc/python-tblib"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "670bb4582578134b3d81a84afa1b016128b429f3d48e6cbbaecc9d15675e984e"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-2-Clause",
+            "url": "https://opensource.org/licenses/BSD-2-Clause"
+          }
+        }
+      ],
+      "name": "tblib",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_distributed.txt"
+        }
+      ],
+      "purl": "pkg:pypi/tblib@3.1.0",
+      "tags": [
+        "serialization"
+      ],
+      "type": "library",
+      "version": "3.1.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Amazon Web Services"
+        }
+      ],
+      "bom-ref": "pkg:pypi/awscli@1.42.27",
+      "description": "Universal Command Line Environment for AWS.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: awscli",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: awscli"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "http://aws.amazon.com/cli/"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "452f3642af0fcfcba63fa3f81688481d95302e30e126c6cf429a0914d42bb6f4"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "awscli",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_distributed.txt"
+        }
+      ],
+      "purl": "pkg:pypi/awscli@1.42.27",
+      "type": "library",
+      "version": "1.42.27"
+    },
+    {
+      "authors": [
+        {
+          "name": "DeepSpeed Team <deepspeed-info@microsoft.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/deepspeed@0.11.0",
+      "description": "DeepSpeed library",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements_distributed.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements_distributed.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "http://deepspeed.ai"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "expression": "Apache Software License 2.0"
+        }
+      ],
+      "name": "deepspeed",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_distributed.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": "!=0.11.0,<0.13.0"
+        }
+      ],
+      "purl": "pkg:pypi/deepspeed@0.11.0",
+      "type": "library",
+      "version": "0.11.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Eventual Inc <daft@eventualcomputing.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/getdaft@0.1.20",
+      "description": "A Distributed DataFrame library for large scale complex data processing.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [],
+      "name": "getdaft",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_distributed.txt"
+        },
+        {
+          "name": "cdx:pypi:extras",
+          "value": "ray"
+        },
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/getdaft@0.1.20",
+      "type": "library",
+      "version": "0.1.20"
+    },
+    {
+      "bom-ref": "pkg:pypi/s3fs@2025.9.0",
+      "description": "Convenient Filesystem interface over S3",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: s3fs",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: s3fs"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "http://github.com/fsspec/s3fs/"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "c33c93d48f66ed440dbaf6600be149cdf8beae4b6f8f0201a209c5801aeb7e30"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "s3fs",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements_benchmarking.txt"
+        }
+      ],
+      "purl": "pkg:pypi/s3fs@2025.9.0",
+      "type": "library",
+      "version": "2025.9.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Robert Bradshaw"
+        },
+        {
+          "name": " Stefan Behnel"
+        },
+        {
+          "name": " Dag Seljebotn"
+        },
+        {
+          "name": " Greg Ewing"
+        },
+        {
+          "name": " et al. <cython-devel@python.org>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/cython@0.25",
+      "description": "The Cython compiler for writing C extensions for the Python language.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "http://cython.org/"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        },
+        {
+          "license": {
+            "name": "Apache"
+          }
+        }
+      ],
+      "name": "Cython",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ">=0.25"
+        }
+      ],
+      "purl": "pkg:pypi/cython@0.25",
+      "type": "library",
+      "version": "0.25"
+    },
+    {
+      "authors": [
+        {
+          "name": "Andrew Collette <andrew dot collette at gmail dot com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/h5py@2.6",
+      "description": "Read and write HDF5 files from Python",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "http://www.h5py.org"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "h5py",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ">=2.6,!=3.0.0"
+        },
+        {
+          "name": "cdx:pypi:latest_version",
+          "value": "2.6.0"
+        },
+        {
+          "name": "cdx:pypi:resolved_from",
+          "value": "h5py"
+        }
+      ],
+      "purl": "pkg:pypi/h5py@2.6",
+      "type": "library",
+      "version": "2.6"
+    },
+    {
+      "authors": [
+        {
+          "name": "Travis E. Oliphant et al."
+        }
+      ],
+      "bom-ref": "pkg:pypi/numpy@1.15",
+      "description": "NumPy: array processing for numbers, strings, records, and objects.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "http://www.numpy.org"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "expression": "OSI Approved"
+        }
+      ],
+      "name": "numpy",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ">=1.15"
+        },
+        {
+          "name": "cdx:pypi:latest_version",
+          "value": "1.15.0"
+        },
+        {
+          "name": "cdx:pypi:resolved_from",
+          "value": "numpy"
+        }
+      ],
+      "purl": "pkg:pypi/numpy@1.15",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "1.15"
+    },
+    {
+      "bom-ref": "pkg:pypi/pandas@1.0",
+      "description": "Powerful data structures for data analysis, time series, and statistics",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://pandas.pydata.org"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "pandas",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ">=1.0,!=1.1.5,<2.2.0"
+        },
+        {
+          "name": "cdx:pypi:latest_version",
+          "value": "1.0.0"
+        },
+        {
+          "name": "cdx:pypi:resolved_from",
+          "value": "pandas"
+        }
+      ],
+      "purl": "pkg:pypi/pandas@1.0",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "1.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "SciPy Developers <scipy-dev@scipy.org>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/scipy@0.18",
+      "description": "SciPy: Scientific Library for Python",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.scipy.org"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "scipy",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ">=0.18"
+        },
+        {
+          "name": "cdx:pypi:latest_version",
+          "value": "0.18.0"
+        },
+        {
+          "name": "cdx:pypi:resolved_from",
+          "value": "scipy"
+        }
+      ],
+      "purl": "pkg:pypi/scipy@0.18",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "0.18"
+    },
+    {
+      "authors": [
+        {
+          "name": "Sergey Astanin <s.astanin@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/tabulate@0.7",
+      "description": "Pretty-print tabular data",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://bitbucket.org/astanin/python-tabulate"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "tabulate",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ">=0.7"
+        }
+      ],
+      "purl": "pkg:pypi/tabulate@0.7",
+      "type": "library",
+      "version": "0.7"
+    },
+    {
+      "bom-ref": "pkg:pypi/scikit-learn@1.7.2",
+      "description": "A set of python modules for machine learning and data mining",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: scikit-learn",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: scikit-learn"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "6b33579c10a3081d076ab403df4a4190da4f4432d443521674637677dc91e61f"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "scikit-learn",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/scikit-learn@1.7.2",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "1.7.2"
+    },
+    {
+      "bom-ref": "pkg:pypi/tqdm@4.67.1",
+      "description": "Fast, Extensible Progress Meter",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: tqdm",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: tqdm"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "26445eca388f82e72884e0d580d5464cd801a3ea01e63e5601bdff9ba6a48de2"
+        }
+      ],
+      "licenses": [
+        {
+          "expression": "MPL-2.0 AND MIT"
+        }
+      ],
+      "name": "tqdm",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/tqdm@4.67.1",
+      "type": "library",
+      "version": "4.67.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "PyTorch Team <packages@pytorch.org>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/torch@2.0.0",
+      "description": "Tensors and Dynamic neural networks in Python with strong GPU acceleration",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://pytorch.org/"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        },
+        {
+          "license": {
+            "name": "BSD-3"
+          }
+        }
+      ],
+      "name": "torch",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ">=2.0.0"
+        }
+      ],
+      "purl": "pkg:pypi/torch@2.0.0",
+      "type": "library",
+      "version": "2.0.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Soumith Chintala"
+        },
+        {
+          "name": " David Pollack"
+        },
+        {
+          "name": " Sean Naren"
+        },
+        {
+          "name": " Peter Goldsborough"
+        },
+        {
+          "name": " Moto Hira"
+        },
+        {
+          "name": " Caroline Chen"
+        },
+        {
+          "name": " Jeff Hwang"
+        },
+        {
+          "name": " Zhaoheng Ni"
+        },
+        {
+          "name": " Xiaohui Zhang <soumith@pytorch.org>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/torchaudio@2.8.0",
+      "description": "An audio package for PyTorch",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: torchaudio",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: torchaudio"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/pytorch/audio"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "c2f44cf279f673cfcdd8f576c349eee8bedf8caab351a5dd78b32970cc34a212"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "torchaudio",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/torchaudio@2.8.0",
+      "type": "library",
+      "version": "2.8.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "PyTorch Text Team <packages@pytorch.org>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/torchtext@0.18.0",
+      "description": "Text utilities, models, transforms, and datasets for PyTorch.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: torchtext",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: torchtext"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/pytorch/text"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "5826d5bbfe84a3c533e7e97659f72dbff73e1614c00c06709607d17c8446e09c"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "torchtext",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/torchtext@0.18.0",
+      "type": "library",
+      "version": "0.18.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "PyTorch Core Team <soumith@pytorch.org>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/torchvision@0.23.0",
+      "description": "image and video datasets and models for torch deep learning",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: torchvision",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: torchvision"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/pytorch/vision"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "7266871daca00ad46d1c073e55d972179d12a58fa5c9adec9a3db9bbed71284a"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "torchvision",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/torchvision@0.23.0",
+      "type": "library",
+      "version": "0.23.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Samuel Colvin <s@muelcolvin.com>"
+        },
+        {
+          "name": " Eric Jolibois <em.jolibois@gmail.com>"
+        },
+        {
+          "name": " Hasan Ramezani <hasan.r67@gmail.com>"
+        },
+        {
+          "name": " Adrian Garcia Badaracco <1755071+adriangb@users.noreply.github.com>"
+        },
+        {
+          "name": " Terrence Dorsey <terry@pydantic.dev>"
+        },
+        {
+          "name": " David Montague <david@pydantic.dev>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/pydantic@2.0",
+      "description": "Data validation using Python type hints",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "pydantic",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": "<2.0"
+        }
+      ],
+      "purl": "pkg:pypi/pydantic@2.0",
+      "tags": [
+        "validation"
+      ],
+      "type": "library",
+      "version": "2.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "The Hugging Face team (past and future) with the help of all our contributors (https://github.com/huggingface/transformers/graphs/contributors) <transformers@huggingface.co>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/transformers@4.42.3",
+      "description": "State-of-the-art Machine Learning for JAX, PyTorch and TensorFlow",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/huggingface/transformers"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "transformers",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ">=4.42.3"
+        }
+      ],
+      "purl": "pkg:pypi/transformers@4.42.3",
+      "tags": [
+        "transform"
+      ],
+      "type": "library",
+      "version": "4.42.3"
+    },
+    {
+      "authors": [
+        {
+          "name": "Christoph Gohlke <cgohlke@cgohlke.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/imagecodecs@2025.8.2",
+      "description": "Image transformation, compression, and decompression codecs",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: imagecodecs",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: imagecodecs"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.cgohlke.com"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "be6524a5aaaa22684390d7450b647e4c2ffcf284eb2433ca344518292eb484ba"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "imagecodecs",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/imagecodecs@2025.8.2",
+      "type": "library",
+      "version": "2025.8.2"
+    },
+    {
+      "authors": [
+        {
+          "name": "Anthony MOI <m.anthony.moi@gmail.com> <Nicolas Patry <patry.nicolas@protonmail.com>"
+        },
+        {
+          "name": " Anthony Moi <anthony@huggingface.co>>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/tokenizers@0.15",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "tokenizers",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ">=0.15"
+        },
+        {
+          "name": "cdx:pypi:latest_version",
+          "value": "0.15.0"
+        },
+        {
+          "name": "cdx:pypi:resolved_from",
+          "value": "tokenizers"
+        }
+      ],
+      "purl": "pkg:pypi/tokenizers@0.15",
+      "type": "library",
+      "version": "0.15"
+    },
+    {
+      "authors": [
+        {
+          "name": "Explosion <contact@explosion.ai>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/spacy@2.3",
+      "description": "Industrial-strength Natural Language Processing (NLP) in Python",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://spacy.io"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "spacy",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ">=2.3"
+        },
+        {
+          "name": "cdx:pypi:latest_version",
+          "value": "2.3.0"
+        },
+        {
+          "name": "cdx:pypi:resolved_from",
+          "value": "spacy"
+        }
+      ],
+      "purl": "pkg:pypi/spacy@2.3",
+      "type": "library",
+      "version": "2.3"
+    },
+    {
+      "authors": [
+        {
+          "name": "Kirill Simonov <xi@resolvent.net>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/pyyaml@3.12",
+      "description": "YAML parser and emitter for Python",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "http://pyyaml.org/wiki/PyYAML"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "PyYAML",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ">=3.12,<6.0.1,!=5.4.* #Exlude PyYAML 5.4.* due to incompatibility with awscli"
+        }
+      ],
+      "purl": "pkg:pypi/pyyaml@3.12",
+      "type": "library",
+      "version": "3.12"
+    },
+    {
+      "authors": [
+        {
+          "name": "The Abseil Authors"
+        }
+      ],
+      "bom-ref": "pkg:pypi/absl-py@2.3.1",
+      "description": "Abseil Python Common Libraries, see https://github.com/abseil/abseil-py.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: absl-py",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: absl-py"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "eeecf07f0c2a93ace0772c92e596ace6d3d3996c042b2128459aaae2a76de11d"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "absl-py",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/absl-py@2.3.1",
+      "type": "library",
+      "version": "2.3.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "Kaggle <support@kaggle.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/kaggle@1.7.4.5",
+      "description": "Access Kaggle resources anywhere",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: kaggle",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: kaggle"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "9732afb1c073f14acc7e49dfab98456f887d10b735bcd6348bc1340e92393882"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "kaggle",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/kaggle@1.7.4.5",
+      "type": "library",
+      "version": "1.7.4.5"
+    },
+    {
+      "authors": [
+        {
+          "name": "Kenneth Reitz <me@kennethreitz.org>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/requests@2.32.5",
+      "description": "Python HTTP for Humans.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: requests",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: requests"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://requests.readthedocs.io"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "2462f94637a34fd532264295e186976db0f5d453d1cdd31473c85a6a161affb6"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "requests",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/requests@2.32.5",
+      "type": "library",
+      "version": "2.32.5"
+    },
+    {
+      "bom-ref": "pkg:pypi/fsspec@2023.10.0",
+      "description": "File-system specification",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/fsspec/filesystem_spec"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "fsspec",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        },
+        {
+          "name": "cdx:pypi:extras",
+          "value": "http"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": "<=2023.10.0"
+        }
+      ],
+      "purl": "pkg:pypi/fsspec@2023.10.0",
+      "type": "library",
+      "version": "2023.10.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Charles Li <charles.dt.li@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/dataclasses-json@0.6.7",
+      "description": "Easily serialize dataclasses to and from JSON.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: dataclasses-json",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: dataclasses-json"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/lidatong/dataclasses-json"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "0dbf33f26c8d5305befd61b39d2b3414e8a407bedc2834dea9b8d642666fb40a"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "dataclasses-json",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/dataclasses-json@0.6.7",
+      "tags": [
+        "json"
+      ],
+      "type": "library",
+      "version": "0.6.7"
+    },
+    {
+      "authors": [
+        {
+          "name": "Julian Berman <Julian@GrayVines.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/jsonschema@4.5.0",
+      "description": "An implementation of JSON Schema validation for Python",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/python-jsonschema/jsonschema"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "jsonschema",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ">=4.5.0,<4.7"
+        }
+      ],
+      "purl": "pkg:pypi/jsonschema@4.5.0",
+      "tags": [
+        "json",
+        "validation"
+      ],
+      "type": "library",
+      "version": "4.5.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Steven Loria <sloria1@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/marshmallow@4.0.1",
+      "description": "A lightweight library for converting complex datatypes to and from native Python datatypes.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: marshmallow",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: marshmallow"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "72f14ef346f81269dbddee891bac547dda1501e9e08b6a809756ea3dbb7936a1"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "marshmallow",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/marshmallow@4.0.1",
+      "type": "library",
+      "version": "4.0.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "Stephen Fuhry <fuhrysteve@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/marshmallow-jsonschema@0.13.0",
+      "description": "JSON Schema Draft v7 (http://json-schema.org/) formatting with marshmallow",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: marshmallow-jsonschema",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: marshmallow-jsonschema"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/fuhrysteve/marshmallow-jsonschema"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "2814f2afb94a6e01b3c0a5795b3dfb142b628763655f20378400af5c0a2307fb"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "marshmallow-jsonschema",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/marshmallow-jsonschema@0.13.0",
+      "type": "library",
+      "version": "0.13.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Ophir LOJKINE <pere.jobs@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/marshmallow-dataclass@8.5.4",
+      "description": "Python library to convert dataclasses into marshmallow schemas.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/lovasoa/marshmallow_dataclass"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "marshmallow-dataclass",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/marshmallow-dataclass@8.5.4",
+      "type": "library",
+      "version": "8.5.4"
+    },
+    {
+      "authors": [
+        {
+          "name": "Google Inc. <packages@tensorflow.org>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/tensorboard@2.20.0",
+      "description": "TensorBoard lets you watch Tensors Flow",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: tensorboard",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: tensorboard"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/tensorflow/tensorboard"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "9dc9f978cb84c0723acf9a345d96c184f0293d18f166bb8d59ee098e6cfaaba6"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "tensorboard",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/tensorboard@2.20.0",
+      "type": "library",
+      "version": "2.20.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "NLTK Team <nltk.team@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/nltk@3.9.1",
+      "description": "Natural Language Toolkit",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: nltk",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: nltk"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.nltk.org/"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "4fa26829c5b00715afe3061398a8989dc643b92ce7dd93fb4585a70930d168a1"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "nltk",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": "# Required for rouge scores."
+        }
+      ],
+      "purl": "pkg:pypi/nltk@3.9.1",
+      "type": "library",
+      "version": "3.9.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "Lightning-AI et al. <name@pytorchlightning.ai>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/torchmetrics@0.11.0",
+      "description": "PyTorch native Metrics",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/Lightning-AI/metrics"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "torchmetrics",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ">=0.11.0"
+        }
+      ],
+      "purl": "pkg:pypi/torchmetrics@0.11.0",
+      "type": "library",
+      "version": "0.11.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Tyler Yep @tyleryep <tyep@cs.stanford.edu>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/torchinfo@1.8.0",
+      "description": "Model summary in PyTorch, based off of the original torchsummary.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: torchinfo",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: torchinfo"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/tyleryep/torchinfo"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "2e911c2918603f945c26ff21a3a838d12709223dc4ccf243407bce8b6e897b46"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "torchinfo",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/torchinfo@1.8.0",
+      "type": "library",
+      "version": "1.8.0"
+    },
+    {
+      "bom-ref": "pkg:pypi/filelock@3.19.1",
+      "description": "A platform independent file lock.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: filelock",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: filelock"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "d38e30481def20772f5baf097c122c3babc4fcdb7e14e57049eb9d88c6dc017d"
+        }
+      ],
+      "licenses": [
+        {
+          "expression": "The Unlicense (Unlicense)"
+        }
+      ],
+      "name": "filelock",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/filelock@3.19.1",
+      "type": "library",
+      "version": "3.19.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "Giampaolo Rodola <g.rodola@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/psutil@7.0.0",
+      "description": "Cross-platform lib for process and system monitoring in Python.  NOTE: the syntax of this script MUST be kept compatible with Python 2.7.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: psutil",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: psutil"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/giampaolo/psutil"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "101d71dc322e3cffd7cea0650b09b3d08b8e7c4109dd6809fe452dfd00e58b25"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        },
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "psutil",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/psutil@7.0.0",
+      "type": "library",
+      "version": "7.0.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "protobuf@googlegroups.com <protobuf@googlegroups.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/protobuf@6.32.0",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: protobuf",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: protobuf"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://developers.google.com/protocol-buffers/"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "84f9e3c1ff6fb0308dbacb0950d8aa90694b0d0ee68e75719cb044b7078fe741"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "protobuf",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/protobuf@6.32.0",
+      "type": "library",
+      "version": "6.32.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Matthew Brennan Jones <matthew.brennan.jones@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/py-cpuinfo@9.0.0",
+      "description": "Get CPU info with pure Python",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/workhorsy/py-cpuinfo"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "py-cpuinfo",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/py-cpuinfo@9.0.0",
+      "type": "library",
+      "version": "9.0.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Jongwook Choi <wookayin@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/gpustat@1.1.1",
+      "description": "An utility to monitor NVIDIA GPU status and usage",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: gpustat",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: gpustat"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/wookayin/gpustat"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "c18d3ed5518fc16300c42d694debc70aebb3be55cae91f1db64d63b5fa8af9d8"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "gpustat",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/gpustat@1.1.1",
+      "type": "library",
+      "version": "1.1.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "Will McGugan <willmcgugan@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/rich@12.4.4",
+      "description": "Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/willmcgugan/rich"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "rich",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": "~=12.4.4"
+        }
+      ],
+      "purl": "pkg:pypi/rich@12.4.4",
+      "type": "library",
+      "version": "12.4.4"
+    },
+    {
+      "authors": [
+        {
+          "name": "Donald Stufft <donald@stufft.io>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/packaging@25.0",
+      "description": "Core utilities for Python packages",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: packaging",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: packaging"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "29572ef2b1f17581046b3a2227d5c611fb25ec70ca1ba8554b24b0e69331a484"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        },
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "packaging",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/packaging@25.0",
+      "type": "library",
+      "version": "25.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "invl <invlpg@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/retry@0.9.2",
+      "description": "Easy to use retry decorator.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: retry",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: retry"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/invl/retry"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "ccddf89761fa2c726ab29391837d4327f819ea14d244c232a1d24c67a2f98606"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "retry",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/retry@0.9.2",
+      "type": "library",
+      "version": "0.9.2"
+    },
+    {
+      "bom-ref": "pkg:pypi/sacremoses@0.1.1",
+      "description": "SacreMoses",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: sacremoses",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: sacremoses"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/hplt-project/sacremoses"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "31e04c98b169bfd902144824d191825cd69220cdb4ae4bcf1ec58a7db5587b1a"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "sacremoses",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/sacremoses@0.1.1",
+      "type": "library",
+      "version": "0.1.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "Taku Kudo <taku@google.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/sentencepiece@0.2.1",
+      "description": "Unsupervised text tokenizer and detokenizer.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: sentencepiece",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: sentencepiece"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "e10fa50bdbaa5e2445dbd387979980d391760faf0ec99a09bd7780ff37eaec44"
+        }
+      ],
+      "licenses": [],
+      "name": "sentencepiece",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/sentencepiece@0.2.1",
+      "type": "library",
+      "version": "0.2.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "Tim Dettmers <dettmers@cs.washington.edu>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/bitsandbytes@0.41.0",
+      "description": "k-bit optimizers and matrix multiplication routines.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/TimDettmers/bitsandbytes"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "bitsandbytes",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": "<0.41.0"
+        }
+      ],
+      "purl": "pkg:pypi/bitsandbytes@0.41.0",
+      "type": "library",
+      "version": "0.41.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "John Machin <sjmachin@lexicon.net>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/xlwt@1.3.0",
+      "description": "Library to create spreadsheet files compatible with MS Excel 97/2000/XP/2003 XLS files, on any platform, with Python 2.6, 2.7, 3.3+",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: xlwt",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: xlwt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "http://www.python-excel.org/"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "a082260524678ba48a297d922cc385f58278b8aa68741596a87de01a9c628b2e"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "xlwt",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": "# excel"
+        }
+      ],
+      "purl": "pkg:pypi/xlwt@1.3.0",
+      "type": "library",
+      "version": "1.3.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Chris Withers <chris@withers.org>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/xlrd@2.0.1",
+      "description": "Library for developers to extract data from Microsoft Excel (tm) .xls spreadsheet files",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "http://www.python-excel.org/"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "xlrd",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ">=2.0.1         # excel"
+        }
+      ],
+      "purl": "pkg:pypi/xlrd@2.0.1",
+      "type": "library",
+      "version": "2.0.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "John McNamara <jmcnamara@cpan.org>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/xlsxwriter@1.4.3",
+      "description": "A Python module for creating Excel XLSX files.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/jmcnamara/XlsxWriter"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "xlsxwriter",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ">=1.4.3   # excel"
+        }
+      ],
+      "purl": "pkg:pypi/xlsxwriter@1.4.3",
+      "type": "library",
+      "version": "1.4.3"
+    },
+    {
+      "authors": [
+        {
+          "name": "See AUTHORS <charlie.clark@clark-consulting.eu>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/openpyxl@3.0.7",
+      "description": "A Python library to read/write Excel 2010 xlsx/xlsm files",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://openpyxl.readthedocs.io"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "openpyxl",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ">=3.0.7     # excel"
+        }
+      ],
+      "purl": "pkg:pypi/openpyxl@3.0.7",
+      "type": "library",
+      "version": "3.0.7"
+    },
+    {
+      "authors": [
+        {
+          "name": "William Turner <willtur.will@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/pyxlsb@1.0.8",
+      "description": "Excel 2007-2010 Binary Workbook (xlsb) parser",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/willtrnr/pyxlsb"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "LGPL-3.0-or-later",
+            "url": "https://opensource.org/licenses/LGPL-3.0-or-later"
+          }
+        }
+      ],
+      "name": "pyxlsb",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ">=1.0.8       # excel"
+        }
+      ],
+      "purl": "pkg:pypi/pyxlsb@1.0.8",
+      "tags": [
+        "binary"
+      ],
+      "type": "library",
+      "version": "1.0.8"
+    },
+    {
+      "bom-ref": "pkg:pypi/pyarrow@15.0.0",
+      "description": "Python library for Apache Arrow",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://arrow.apache.org/"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "pyarrow",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": "<15.0.0      # parquet"
+        }
+      ],
+      "purl": "pkg:pypi/pyarrow@15.0.0",
+      "type": "library",
+      "version": "15.0.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "lxml dev team <lxml@lxml.de>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/lxml@6.0.1",
+      "description": "Powerful and Pythonic XML processing library combining libxml2/libxslt with the ElementTree API.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: lxml",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: lxml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://lxml.de/"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "3b38e20c578149fdbba1fd3f36cb1928a3aaca4b011dfd41ba09d11fb396e1b9"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        },
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "lxml",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": "# html"
+        }
+      ],
+      "purl": "pkg:pypi/lxml@6.0.1",
+      "tags": [
+        "api",
+        "xml"
+      ],
+      "type": "library",
+      "version": "6.0.1"
+    },
+    {
+      "bom-ref": "pkg:pypi/html5lib@1.1",
+      "description": "HTML parser based on the WHATWG HTML specification",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: html5lib",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: html5lib"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/html5lib/html5lib-python"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "0d78f8fde1c230e99fe37986a60526d7049ed4bf8a9fadbad5f00e22e58e041d"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "html5lib",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": "# html"
+        }
+      ],
+      "purl": "pkg:pypi/html5lib@1.1",
+      "tags": [
+        "html"
+      ],
+      "type": "library",
+      "version": "1.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "HuggingFace Inc. <thomas@huggingface.co>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/datasets@4.0.0",
+      "description": "HuggingFace community-driven open-source library of datasets",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: datasets",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: datasets"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/huggingface/datasets"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "7ef95e62025fd122882dbce6cb904c8cd3fbc829de6669a5eb939c77d50e203d"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "datasets",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/datasets@4.0.0",
+      "type": "library",
+      "version": "4.0.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Andrey Petrov <andrey.petrov@shazow.net>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/urllib3@2",
+      "description": "HTTP library with thread-safe connection pooling, file post, and more.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "urllib3",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "requirements.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": "<2"
+        },
+        {
+          "name": "cdx:pypi:latest_version",
+          "value": "2.0.0"
+        },
+        {
+          "name": "cdx:pypi:resolved_from",
+          "value": "urllib3"
+        }
+      ],
+      "purl": "pkg:pypi/urllib3@2",
+      "type": "library",
+      "version": "2"
+    },
+    {
+      "bom-ref": "pkg:github/actions/checkout@v2",
+      "group": "actions",
+      "name": "checkout",
+      "purl": "pkg:github/actions/checkout@v2",
+      "type": "application",
+      "version": "v2"
+    },
+    {
+      "bom-ref": "pkg:github/actions/setup-python@v2",
+      "group": "actions",
+      "name": "setup-python",
+      "purl": "pkg:github/actions/setup-python@v2",
+      "type": "application",
+      "version": "v2"
+    },
+    {
+      "bom-ref": "pkg:github/pypa/gh-action-pypi-publish@release/v1",
+      "group": "pypa",
+      "name": "gh-action-pypi-publish",
+      "purl": "pkg:github/pypa/gh-action-pypi-publish@release%2Fv1",
+      "type": "library",
+      "version": "release/v1"
+    },
+    {
+      "bom-ref": "pkg:github/EnricoMi/publish-unit-test-result-action@v1",
+      "group": "EnricoMi",
+      "name": "publish-unit-test-result-action",
+      "purl": "pkg:github/EnricoMi/publish-unit-test-result-action@v1",
+      "type": "library",
+      "version": "v1"
+    },
+    {
+      "bom-ref": "pkg:github/actions/cache@v2",
+      "group": "actions",
+      "name": "cache",
+      "purl": "pkg:github/actions/cache@v2",
+      "type": "application",
+      "version": "v2"
+    },
+    {
+      "bom-ref": "pkg:github/actions/upload-artifact@v2",
+      "group": "actions",
+      "name": "upload-artifact",
+      "purl": "pkg:github/actions/upload-artifact@v2",
+      "type": "application",
+      "version": "v2"
+    },
+    {
+      "bom-ref": "pkg:github/jlumbroso/free-disk-space@main",
+      "group": "jlumbroso",
+      "name": "free-disk-space",
+      "purl": "pkg:github/jlumbroso/free-disk-space@main",
+      "type": "library",
+      "version": "main"
+    },
+    {
+      "bom-ref": "pkg:github/aws-actions/configure-aws-credentials@v1",
+      "group": "aws-actions",
+      "name": "configure-aws-credentials",
+      "purl": "pkg:github/aws-actions/configure-aws-credentials@v1",
+      "type": "library",
+      "version": "v1"
+    },
+    {
+      "bom-ref": "pkg:github/machulav/ec2-github-runner@v2.3.2",
+      "group": "machulav",
+      "name": "ec2-github-runner",
+      "purl": "pkg:github/machulav/ec2-github-runner@v2.3.2",
+      "type": "library",
+      "version": "v2.3.2"
+    },
+    {
+      "bom-ref": "pkg:github/crazy-max/ghaction-docker-meta@v2",
+      "group": "crazy-max",
+      "name": "ghaction-docker-meta",
+      "purl": "pkg:github/crazy-max/ghaction-docker-meta@v2",
+      "type": "library",
+      "version": "v2"
+    },
+    {
+      "bom-ref": "pkg:github/docker/setup-qemu-action@v1",
+      "group": "docker",
+      "name": "setup-qemu-action",
+      "purl": "pkg:github/docker/setup-qemu-action@v1",
+      "type": "library",
+      "version": "v1"
+    },
+    {
+      "bom-ref": "pkg:github/docker/setup-buildx-action@v1",
+      "group": "docker",
+      "name": "setup-buildx-action",
+      "purl": "pkg:github/docker/setup-buildx-action@v1",
+      "type": "library",
+      "version": "v1"
+    },
+    {
+      "bom-ref": "pkg:github/docker/login-action@v1",
+      "group": "docker",
+      "name": "login-action",
+      "purl": "pkg:github/docker/login-action@v1",
+      "type": "library",
+      "version": "v1"
+    },
+    {
+      "bom-ref": "pkg:github/docker/build-push-action@v2",
+      "group": "docker",
+      "name": "build-push-action",
+      "purl": "pkg:github/docker/build-push-action@v2",
+      "type": "library",
+      "version": "v2"
+    },
+    {
+      "bom-ref": "pkg:github/actions/checkout@v1",
+      "group": "actions",
+      "name": "checkout",
+      "purl": "pkg:github/actions/checkout@v1",
+      "type": "application",
+      "version": "v1"
+    },
+    {
+      "bom-ref": "pkg:github/shioyang/check-pr-labels-on-push-action@v1.0.6",
+      "group": "shioyang",
+      "name": "check-pr-labels-on-push-action",
+      "purl": "pkg:github/shioyang/check-pr-labels-on-push-action@v1.0.6",
+      "type": "library",
+      "version": "v1.0.6"
+    },
+    {
+      "bom-ref": "pkg:github/gorillio/github-action-cherry-pick@master",
+      "group": "gorillio",
+      "name": "github-action-cherry-pick",
+      "purl": "pkg:github/gorillio/github-action-cherry-pick@master",
+      "type": "library",
+      "version": "master"
+    }
+  ],
+  "dependencies": [
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/repo@latest"
+    }
+  ],
+  "metadata": {
+    "authors": [
+      {
+        "name": "OWASP Foundation"
+      }
+    ],
+    "component": {
+      "bom-ref": "pkg:pypi/repo@latest",
+      "group": "",
+      "name": "repo",
+      "purl": "pkg:pypi/repo@latest",
+      "type": "application",
+      "version": "latest"
+    },
+    "lifecycles": [
+      {
+        "phase": "build"
+      }
+    ],
+    "properties": [
+      {
+        "name": "cdx:bom:componentTypes",
+        "value": "github\\npypi"
+      },
+      {
+        "name": "cdx:bom:componentNamespaces",
+        "value": "EnricoMi\\nactions\\naws-actions\\ncrazy-max\\ndocker\\ngorillio\\njlumbroso\\nmachulav\\npypa\\nshioyang"
+      },
+      {
+        "name": "cdx:bom:componentSrcFiles",
+        "value": "PyPI package: FLAML\\nPyPI package: GPUtil\\nPyPI package: HEBO\\nPyPI package: absl-py\\nPyPI package: accelerate\\nPyPI package: aim\\nPyPI package: awscli\\nPyPI package: ax-platform\\nPyPI package: bayesian-optimization\\nPyPI package: captum\\nPyPI package: cartonml-nightly\\nPyPI package: comet_ml\\nPyPI package: dataclasses-json\\nPyPI package: datasets\\nPyPI package: faiss-cpu\\nPyPI package: fastapi\\nPyPI package: filelock\\nPyPI package: gpustat\\nPyPI package: hiplot\\nPyPI package: hpbandster\\nPyPI package: html5lib\\nPyPI package: httpx\\nPyPI package: hyperopt\\nPyPI package: imagecodecs\\nPyPI package: kaggle\\nPyPI package: lightgbm\\nPyPI package: lightgbm-ray\\nPyPI package: loralib\\nPyPI package: lxml\\nPyPI package: marshmallow\\nPyPI package: marshmallow-jsonschema\\nPyPI package: mlflow\\nPyPI package: modin\\nPyPI package: nevergrad\\nPyPI package: nltk\\nPyPI package: optuna\\nPyPI package: packaging\\nPyPI package: protobuf\\nPyPI package: psutil\\nPyPI package: ptitprince\\nPyPI package: pyarrow\\nPyPI package: pytest\\nPyPI package: pytest-timeout\\nPyPI package: python-multipart\\nPyPI package: requests\\nPyPI package: retry\\nPyPI package: s3fs\\nPyPI package: sacremoses\\nPyPI package: scikit-learn\\nPyPI package: scikit-optimize\\nPyPI package: sentence-transformers\\nPyPI package: sentencepiece\\nPyPI package: tblib\\nPyPI package: tensorboard\\nPyPI package: tifffile\\nPyPI package: torchaudio\\nPyPI package: torchinfo\\nPyPI package: torchtext\\nPyPI package: torchvision\\nPyPI package: tqdm\\nPyPI package: uvicorn\\nPyPI package: wget\\nPyPI package: xlwt\\nPyPI package: zoopt\\nrequirements.txt\\nrequirements_benchmarking.txt\\nrequirements_distributed.txt\\nrequirements_explain.txt\\nrequirements_extra.txt\\nrequirements_hyperopt.txt\\nrequirements_llm.txt\\nrequirements_serve.txt\\nrequirements_test.txt\\nrequirements_tree.txt\\nrequirements_viz.txt"
+      },
+      {
+        "name": "cdx:bom:componentTypes",
+        "value": "github\\npypi"
+      },
+      {
+        "name": "cdx:bom:componentNamespaces",
+        "value": "EnricoMi\\nactions\\naws-actions\\ncrazy-max\\ndocker\\ngorillio\\njlumbroso\\nmachulav\\npypa\\nshioyang"
+      },
+      {
+        "name": "cdx:bom:componentSrcFiles",
+        "value": "PyPI package: FLAML\\nPyPI package: GPUtil\\nPyPI package: HEBO\\nPyPI package: absl-py\\nPyPI package: accelerate\\nPyPI package: aim\\nPyPI package: awscli\\nPyPI package: ax-platform\\nPyPI package: bayesian-optimization\\nPyPI package: captum\\nPyPI package: cartonml-nightly\\nPyPI package: comet_ml\\nPyPI package: dataclasses-json\\nPyPI package: datasets\\nPyPI package: faiss-cpu\\nPyPI package: fastapi\\nPyPI package: filelock\\nPyPI package: gpustat\\nPyPI package: hiplot\\nPyPI package: hpbandster\\nPyPI package: html5lib\\nPyPI package: httpx\\nPyPI package: hyperopt\\nPyPI package: imagecodecs\\nPyPI package: kaggle\\nPyPI package: lightgbm\\nPyPI package: lightgbm-ray\\nPyPI package: loralib\\nPyPI package: lxml\\nPyPI package: marshmallow\\nPyPI package: marshmallow-jsonschema\\nPyPI package: mlflow\\nPyPI package: modin\\nPyPI package: nevergrad\\nPyPI package: nltk\\nPyPI package: optuna\\nPyPI package: packaging\\nPyPI package: protobuf\\nPyPI package: psutil\\nPyPI package: ptitprince\\nPyPI package: pyarrow\\nPyPI package: pytest\\nPyPI package: pytest-timeout\\nPyPI package: python-multipart\\nPyPI package: requests\\nPyPI package: retry\\nPyPI package: s3fs\\nPyPI package: sacremoses\\nPyPI package: scikit-learn\\nPyPI package: scikit-optimize\\nPyPI package: sentence-transformers\\nPyPI package: sentencepiece\\nPyPI package: tblib\\nPyPI package: tensorboard\\nPyPI package: tifffile\\nPyPI package: torchaudio\\nPyPI package: torchinfo\\nPyPI package: torchtext\\nPyPI package: torchvision\\nPyPI package: tqdm\\nPyPI package: uvicorn\\nPyPI package: wget\\nPyPI package: xlwt\\nPyPI package: zoopt\\nrequirements.txt\\nrequirements_benchmarking.txt\\nrequirements_distributed.txt\\nrequirements_explain.txt\\nrequirements_extra.txt\\nrequirements_hyperopt.txt\\nrequirements_llm.txt\\nrequirements_serve.txt\\nrequirements_test.txt\\nrequirements_tree.txt\\nrequirements_viz.txt"
+      }
+    ],
+    "timestamp": "2025-09-10T16:26:58Z",
+    "tools": {
+      "components": [
+        {
+          "authors": [
+            {
+              "name": "OWASP Foundation"
+            }
+          ],
+          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@11.7.0",
+          "group": "@cyclonedx",
+          "name": "cdxgen",
+          "publisher": "OWASP Foundation",
+          "purl": "pkg:npm/%40cyclonedx/cdxgen@11.7.0",
+          "type": "application",
+          "version": "11.7.0"
+        }
+      ]
+    }
+  },
+  "serialNumber": "urn:uuid:55a10d0d-9a71-491d-bc0b-827938e1ca75",
+  "services": [],
+  "specVersion": "1.6",
+  "version": 2
+}

@@ -1,0 +1,676 @@
+{
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "bom-ref": "50ece37a-ae77-437c-a7e2-130a571b628b",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "size": 1024,
+          "type": "secret-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "java.security.KeyPairGenerator#getInstance(Ljava/lang/String;)Ljava/security/KeyPairGenerator;",
+            "line": 61,
+            "location": "common/src/main/java/bisq/common/crypto/Sig.java",
+            "offset": 48
+          }
+        ]
+      },
+      "name": "key@50ece37a-ae77-437c-a7e2-130a571b628b",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "02711205-48b8-44bb-8967-af53f999b178",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "primitive": "other"
+        },
+        "assetType": "algorithm",
+        "oid": "1.2.840.113549.1.1.8"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.Cipher#getInstance(Ljava/lang/String;)Ljavax/crypto/Cipher;",
+            "line": 193,
+            "location": "common/src/main/java/bisq/common/crypto/Encryption.java",
+            "offset": 28
+          },
+          {
+            "additionalContext": "javax.crypto.Cipher#getInstance(Ljava/lang/String;)Ljavax/crypto/Cipher;",
+            "line": 206,
+            "location": "common/src/main/java/bisq/common/crypto/Encryption.java",
+            "offset": 28
+          }
+        ]
+      },
+      "name": "MGF1",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "87699db3-a81a-4c56-9003-960c2fb7e227",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "line": 41,
+            "location": "common/src/main/java/bisq/common/crypto/KeyRing.java",
+            "offset": 54
+          }
+        ]
+      },
+      "name": "private-key@87699db3-a81a-4c56-9003-960c2fb7e227",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "a1142b5b-4606-4f33-bdc2-74e68cb9ba82",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "digest"
+          ],
+          "parameterSetIdentifier": "160",
+          "primitive": "hash"
+        },
+        "assetType": "algorithm",
+        "oid": "1.3.14.3.2.26"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "java.security.MessageDigest#getInstance(Ljava/lang/String;)Ljava/security/MessageDigest;",
+            "line": 89,
+            "location": "desktop/src/main/java/bisq/desktop/components/PeerInfoIcon.java",
+            "offset": 31
+          }
+        ]
+      },
+      "name": "SHA1",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "de201357-ff39-455b-b581-8269f884f8b8",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "size": 2048,
+          "type": "secret-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "java.security.KeyPairGenerator#getInstance(Ljava/lang/String;)Ljava/security/KeyPairGenerator;",
+            "line": 65,
+            "location": "common/src/main/java/bisq/common/crypto/Encryption.java",
+            "offset": 48
+          }
+        ]
+      },
+      "name": "key@de201357-ff39-455b-b581-8269f884f8b8",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "6c78cf38-1c6c-4804-9ca0-83ccc7ff36f0",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "encapsulate"
+          ],
+          "mode": "ecb",
+          "padding": "oaep",
+          "parameterSetIdentifier": "2048",
+          "primitive": "pke"
+        },
+        "assetType": "algorithm",
+        "oid": "1.2.840.113549.1.1.7"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.Cipher#getInstance(Ljava/lang/String;)Ljavax/crypto/Cipher;",
+            "line": 193,
+            "location": "common/src/main/java/bisq/common/crypto/Encryption.java",
+            "offset": 28
+          },
+          {
+            "additionalContext": "javax.crypto.Cipher#getInstance(Ljava/lang/String;)Ljavax/crypto/Cipher;",
+            "line": 206,
+            "location": "common/src/main/java/bisq/common/crypto/Encryption.java",
+            "offset": 28
+          }
+        ]
+      },
+      "name": "RSA-OAEP",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "80e4a403-0869-436f-9352-bdbb23211c32",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "line": 42,
+            "location": "common/src/main/java/bisq/common/crypto/KeyRing.java",
+            "offset": 55
+          }
+        ]
+      },
+      "name": "private-key@80e4a403-0869-436f-9352-bdbb23211c32",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "6eee0c63-045c-43e8-9810-b9fecb00d5f9",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "tag"
+          ],
+          "primitive": "mac"
+        },
+        "assetType": "algorithm",
+        "oid": "1.2.840.113549.2.9"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.Mac#getInstance(Ljava/lang/String;)Ljavax/crypto/Mac;",
+            "line": 155,
+            "location": "common/src/main/java/bisq/common/crypto/Encryption.java",
+            "offset": 18
+          }
+        ]
+      },
+      "name": "HMAC-SHA256",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "7d2cf506-3ab8-405b-9f3c-258dc0f521ad",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "public-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "java.security.KeyFactory#getInstance(Ljava/lang/String;)Ljava/security/KeyFactory;",
+            "line": 243,
+            "location": "common/src/main/java/bisq/common/crypto/Encryption.java",
+            "offset": 19
+          }
+        ]
+      },
+      "name": "public-key@7d2cf506-3ab8-405b-9f3c-258dc0f521ad",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "ae2d333a-fec1-4f22-ae18-5fbd096e9378",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "secret-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.KeyGenerator#getInstance(Ljava/lang/String;)Ljavax/crypto/KeyGenerator;",
+            "line": 224,
+            "location": "common/src/main/java/bisq/common/crypto/Encryption.java",
+            "offset": 44
+          }
+        ]
+      },
+      "name": "secret-key@ae2d333a-fec1-4f22-ae18-5fbd096e9378",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "21e28c4d-3808-4909-baac-5603573f2cce",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "parameterSetIdentifier": "2048",
+          "primitive": "pke"
+        },
+        "assetType": "algorithm",
+        "oid": "1.2.840.113549.1.1.1"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "java.security.KeyPairGenerator#getInstance(Ljava/lang/String;)Ljava/security/KeyPairGenerator;",
+            "line": 65,
+            "location": "common/src/main/java/bisq/common/crypto/Encryption.java",
+            "offset": 48
+          },
+          {
+            "additionalContext": "java.security.KeyFactory#getInstance(Ljava/lang/String;)Ljava/security/KeyFactory;",
+            "line": 243,
+            "location": "common/src/main/java/bisq/common/crypto/Encryption.java",
+            "offset": 19
+          }
+        ]
+      },
+      "name": "RSA-2048",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "01dac2f1-92d0-4535-a87b-d38169250b0f",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "public-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "java.security.KeyFactory#getInstance(Ljava/lang/String;)Ljava/security/KeyFactory;",
+            "line": 130,
+            "location": "common/src/main/java/bisq/common/crypto/Sig.java",
+            "offset": 19
+          }
+        ]
+      },
+      "name": "public-key@01dac2f1-92d0-4535-a87b-d38169250b0f",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "589350bd-f49c-414c-92b8-c6c87b778b84",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "sign"
+          ],
+          "parameterSetIdentifier": "2048",
+          "primitive": "signature"
+        },
+        "assetType": "algorithm",
+        "oid": "2.16.840.1.101.3.4.3.2"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "java.security.Signature#getInstance(Ljava/lang/String;)Ljava/security/Signature;",
+            "line": 78,
+            "location": "common/src/main/java/bisq/common/crypto/Sig.java",
+            "offset": 28
+          },
+          {
+            "additionalContext": "java.security.Signature#getInstance(Ljava/lang/String;)Ljava/security/Signature;",
+            "line": 105,
+            "location": "common/src/main/java/bisq/common/crypto/Sig.java",
+            "offset": 28
+          }
+        ]
+      },
+      "name": "SHA256withDSA",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "f54dd8d5-81b9-4842-92b2-590ff859cf86",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "digest"
+          ],
+          "parameterSetIdentifier": "256",
+          "primitive": "hash"
+        },
+        "assetType": "algorithm",
+        "oid": "2.16.840.1.101.3.4.2.1"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "java.security.MessageDigest#getInstance(Ljava/lang/String;)Ljava/security/MessageDigest;",
+            "line": 42,
+            "location": "common/src/main/java/bisq/common/crypto/Hash.java",
+            "offset": 35
+          },
+          {
+            "additionalContext": "java.security.Signature#getInstance(Ljava/lang/String;)Ljava/security/Signature;",
+            "line": 78,
+            "location": "common/src/main/java/bisq/common/crypto/Sig.java",
+            "offset": 28
+          },
+          {
+            "additionalContext": "java.security.Signature#getInstance(Ljava/lang/String;)Ljava/security/Signature;",
+            "line": 105,
+            "location": "common/src/main/java/bisq/common/crypto/Sig.java",
+            "offset": 28
+          },
+          {
+            "additionalContext": "javax.crypto.Mac#getInstance(Ljava/lang/String;)Ljavax/crypto/Mac;",
+            "line": 155,
+            "location": "common/src/main/java/bisq/common/crypto/Encryption.java",
+            "offset": 18
+          },
+          {
+            "additionalContext": "javax.crypto.Cipher#getInstance(Ljava/lang/String;)Ljavax/crypto/Cipher;",
+            "line": 193,
+            "location": "common/src/main/java/bisq/common/crypto/Encryption.java",
+            "offset": 28
+          },
+          {
+            "additionalContext": "javax.crypto.Cipher#getInstance(Ljava/lang/String;)Ljavax/crypto/Cipher;",
+            "line": 206,
+            "location": "common/src/main/java/bisq/common/crypto/Encryption.java",
+            "offset": 28
+          }
+        ]
+      },
+      "name": "SHA256",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "b720f580-4dc7-4869-917a-7ef8cacf2410",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "parameterSetIdentifier": "1024",
+          "primitive": "signature"
+        },
+        "assetType": "algorithm",
+        "oid": "1.2.840.10040.4.1"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "java.security.KeyPairGenerator#getInstance(Ljava/lang/String;)Ljava/security/KeyPairGenerator;",
+            "line": 61,
+            "location": "common/src/main/java/bisq/common/crypto/Sig.java",
+            "offset": 48
+          },
+          {
+            "additionalContext": "java.security.KeyFactory#getInstance(Ljava/lang/String;)Ljava/security/KeyFactory;",
+            "line": 130,
+            "location": "common/src/main/java/bisq/common/crypto/Sig.java",
+            "offset": 19
+          }
+        ]
+      },
+      "name": "DSA",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "97378443-5f5d-45c1-91b4-09854eb0fdd2",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "secret-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.spec.SecretKeySpec#<init>([BLjava/lang/String;)V",
+            "line": 47,
+            "location": "core/src/main/java/bisq/core/notifications/MobileMessageEncryption.java",
+            "offset": 18
+          }
+        ]
+      },
+      "name": "secret-key@97378443-5f5d-45c1-91b4-09854eb0fdd2",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "18d7519e-d0bd-40a8-8666-aec59a8d2ae3",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "parameterSetIdentifier": "128",
+          "primitive": "block-cipher"
+        },
+        "assetType": "algorithm",
+        "oid": "2.16.840.1.101.3.4.1"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.spec.SecretKeySpec#<init>([BLjava/lang/String;)V",
+            "line": 47,
+            "location": "core/src/main/java/bisq/core/notifications/MobileMessageEncryption.java",
+            "offset": 18
+          },
+          {
+            "additionalContext": "javax.crypto.Cipher#getInstance(Ljava/lang/String;)Ljavax/crypto/Cipher;",
+            "line": 81,
+            "location": "common/src/main/java/bisq/common/crypto/Encryption.java",
+            "offset": 28
+          },
+          {
+            "additionalContext": "javax.crypto.Cipher#getInstance(Ljava/lang/String;)Ljavax/crypto/Cipher;",
+            "line": 92,
+            "location": "common/src/main/java/bisq/common/crypto/Encryption.java",
+            "offset": 28
+          },
+          {
+            "additionalContext": "javax.crypto.KeyGenerator#getInstance(Ljava/lang/String;)Ljavax/crypto/KeyGenerator;",
+            "line": 224,
+            "location": "common/src/main/java/bisq/common/crypto/Encryption.java",
+            "offset": 44
+          }
+        ]
+      },
+      "name": "AES128",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "a91342ae-db96-4d72-a2b1-3ffb2d32563d",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "primitive": "other"
+        },
+        "assetType": "algorithm"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "line": 42,
+            "location": "common/src/main/java/bisq/common/crypto/KeyRing.java",
+            "offset": 55
+          }
+        ]
+      },
+      "name": "MSG_ENCRYPTION",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "e4a2c645-deae-4a2d-8853-32e00764df3b",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "mode": "cbc",
+          "parameterSetIdentifier": "128",
+          "primitive": "block-cipher"
+        },
+        "assetType": "algorithm",
+        "oid": "2.16.840.1.101.3.4.1"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.Cipher#getInstance(Ljava/lang/String;)Ljavax/crypto/Cipher;",
+            "line": 49,
+            "location": "core/src/main/java/bisq/core/notifications/MobileMessageEncryption.java",
+            "offset": 21
+          }
+        ]
+      },
+      "name": "AES128-CBC",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "6cf8258b-0a99-4abc-9ef1-c8f7e2e0be69",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "sign"
+          ],
+          "primitive": "signature"
+        },
+        "assetType": "algorithm"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "org.bouncycastle.crypto.signers.ECDSASigner#<init>(Lorg/bouncycastle/crypto/signers/DSAKCalculator;)V",
+            "line": 59,
+            "location": "core/src/main/java/bisq/core/crypto/LowRSigningKey.java",
+            "offset": 29
+          }
+        ]
+      },
+      "name": "ECDSA",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "8ab46e9d-352a-47ae-a132-4cf789b548c3",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "primitive": "other"
+        },
+        "assetType": "algorithm"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "line": 41,
+            "location": "common/src/main/java/bisq/common/crypto/KeyRing.java",
+            "offset": 54
+          }
+        ]
+      },
+      "name": "MSG_SIGNATURE",
+      "type": "cryptographic-asset"
+    }
+  ],
+  "dependencies": [
+    {
+      "dependsOn": [
+        "f54dd8d5-81b9-4842-92b2-590ff859cf86",
+        "02711205-48b8-44bb-8967-af53f999b178"
+      ],
+      "ref": "6c78cf38-1c6c-4804-9ca0-83ccc7ff36f0"
+    },
+    {
+      "dependsOn": [
+        "a91342ae-db96-4d72-a2b1-3ffb2d32563d"
+      ],
+      "ref": "80e4a403-0869-436f-9352-bdbb23211c32"
+    },
+    {
+      "dependsOn": [
+        "21e28c4d-3808-4909-baac-5603573f2cce"
+      ],
+      "ref": "de201357-ff39-455b-b581-8269f884f8b8"
+    },
+    {
+      "dependsOn": [
+        "b720f580-4dc7-4869-917a-7ef8cacf2410"
+      ],
+      "ref": "01dac2f1-92d0-4535-a87b-d38169250b0f"
+    },
+    {
+      "dependsOn": [
+        "8ab46e9d-352a-47ae-a132-4cf789b548c3"
+      ],
+      "ref": "87699db3-a81a-4c56-9003-960c2fb7e227"
+    },
+    {
+      "dependsOn": [
+        "f54dd8d5-81b9-4842-92b2-590ff859cf86"
+      ],
+      "ref": "6eee0c63-045c-43e8-9810-b9fecb00d5f9"
+    },
+    {
+      "dependsOn": [
+        "18d7519e-d0bd-40a8-8666-aec59a8d2ae3"
+      ],
+      "ref": "ae2d333a-fec1-4f22-ae18-5fbd096e9378"
+    },
+    {
+      "dependsOn": [
+        "21e28c4d-3808-4909-baac-5603573f2cce"
+      ],
+      "ref": "7d2cf506-3ab8-405b-9f3c-258dc0f521ad"
+    },
+    {
+      "dependsOn": [
+        "b720f580-4dc7-4869-917a-7ef8cacf2410"
+      ],
+      "ref": "50ece37a-ae77-437c-a7e2-130a571b628b"
+    },
+    {
+      "dependsOn": [
+        "f54dd8d5-81b9-4842-92b2-590ff859cf86"
+      ],
+      "ref": "589350bd-f49c-414c-92b8-c6c87b778b84"
+    },
+    {
+      "dependsOn": [
+        "18d7519e-d0bd-40a8-8666-aec59a8d2ae3"
+      ],
+      "ref": "97378443-5f5d-45c1-91b4-09854eb0fdd2"
+    }
+  ],
+  "metadata": {
+    "properties": [
+      {
+        "name": "gitUrl",
+        "value": "https://github.com/bisq-network/bisq"
+      },
+      {
+        "name": "revision",
+        "value": "Revision[value=master]"
+      },
+      {
+        "name": "commit",
+        "value": "d52a307"
+      }
+    ],
+    "timestamp": "2025-09-10T14:10:43Z",
+    "tools": {
+      "components": [],
+      "services": [
+        {
+          "name": "CBOMkit",
+          "provider": {
+            "name": "PQCA"
+          }
+        }
+      ]
+    }
+  },
+  "serialNumber": "urn:uuid:1418c0cf-29ed-44e0-97be-ce5a710dd6ee",
+  "specVersion": "1.6",
+  "version": 1
+}

@@ -1,0 +1,57 @@
+# docker/Dockerfile.worker-cbomkit
+ARG BASE_IMAGE=base
+ARG BASE_TAG=latest
+
+# --- Upstream stage: use prebuilt CBOMkit backend image (pinned) ---
+FROM ghcr.io/pqca/cbomkit:2.1.10 AS cbomkit-upstream
+
+# --- Runtime stage: single worker container running DB + backend + worker ---
+FROM ${BASE_IMAGE}:${BASE_TAG}
+
+USER appuser
+WORKDIR /app
+ENV PYTHONPATH=/app
+
+# 1) Deps first for better caching
+COPY --chown=appuser:appuser pyproject.toml uv.lock ./
+COPY --chown=appuser:appuser common/ ./common/
+RUN pip install --no-cache-dir --upgrade pip \
+ && uv sync --frozen --no-dev
+
+# 2) Runtime OS deps for backend
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      openjdk-21-jre-headless \
+      postgresql \
+      postgresql-client \
+      procps \
+  && rm -rf /var/lib/apt/lists/*
+USER appuser
+
+# 3) Mirror CBOMkit layout from upstream image
+COPY --from=cbomkit-upstream --chown=appuser:appuser /deployments/ /deployments/
+
+# 4) Worker sources + entrypoint
+COPY --chown=appuser:appuser workers/cbomkit/ ./workers/cbomkit/
+USER root
+RUN install -m 0755 workers/cbomkit/entrypoint.sh /usr/local/bin/cbomkit-entrypoint.sh
+
+# Ensure a writable Postgres data dir for appuser
+RUN mkdir -p /home/appuser/pgdata && chown -R appuser:appuser /home/appuser/pgdata
+RUN mkdir -p /home/appuser/.cbomkit && chown -R appuser:appuser /home/appuser/.cbomkit
+USER appuser
+
+ENV LANGUAGE='en_US:en' \
+    PGDATA=/home/appuser/pgdata \
+    POSTGRES_DB=cbomkit \
+    POSTGRES_USER=cbomkit \
+    POSTGRES_PASSWORD=cbomkit \
+    CBOMKIT_PORT=8081 \
+    CBOMKIT_BASE_URL=http://127.0.0.1:8081 \
+    CBOMKIT_JAVA_JAR_DIR="/deployments/java/scan/" \
+    JAVA_OPTS="-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager -Xmx2g" \
+    JAVA_APP_JAR="/deployments/quarkus-run.jar"
+
+EXPOSE 8081
+
+ENTRYPOINT ["/usr/local/bin/cbomkit-entrypoint.sh"]

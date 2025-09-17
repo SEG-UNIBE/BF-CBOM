@@ -1,0 +1,75 @@
+# syntax=docker/dockerfile:1.4
+FROM --platform=linux/amd64 python:3.11-slim
+
+# Set working directory inside the container
+WORKDIR /app
+
+# Set environment variables for Python and uv
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    UV_SYSTEM_PYTHON=1 \
+    UV_LINK_MODE=copy
+
+# Install all necessary OS dependencies in a single layer to minimize image size.
+# This includes build tools, git, and Java for CodeQL.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        git \
+        tini \
+        build-essential \
+        pkg-config \
+        libssl-dev \
+        libffi-dev \
+        unzip \
+        openjdk-21-jdk-headless \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set JAVA_HOME and ensure it's in the PATH for CodeQL
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+ENV PATH=$PATH:${JAVA_HOME}/bin
+
+# Install uv (Astral) as a static binary and move it to a system-wide path.
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
+    && mv /root/.local/bin/uv /usr/local/bin/uv
+
+# Copy dependency files first to leverage Docker's build cache.
+COPY pyproject.toml uv.lock ./
+
+# Use uv for all Python package installations for consistency and speed.
+# Note: uv sync handles requirements from pyproject.toml.
+ARG CRYPTOBOM_FORGE_VERSION=1.1.0
+RUN uv sync --frozen --no-dev \
+    && uv pip install \
+        https://github.com/pre-quantum-research/cyclonedx-python-lib/archive/refs/heads/cbom.tar.gz \
+    && uv pip install --no-deps \
+        "https://github.com/Santandersecurityresearch/cryptobom-forge/releases/download/${CRYPTOBOM_FORGE_VERSION}/cryptobom_forge-${CRYPTOBOM_FORGE_VERSION}-py3-none-any.whl" \
+    && uv pip install click jsonschema PyYAML requests dataclasses_json normalize_json tqdm redis
+
+# Install CodeQL CLI in a separate, cached layer.
+ARG CODEQL_VERSION=2.23.0
+RUN mkdir -p /opt/codeql \
+    && curl -#Lf --retry 5 --retry-all-errors --retry-delay 5 --continue-at - \
+         -o /tmp/codeql.zip \
+         "https://github.com/github/codeql-cli-binaries/releases/download/v${CODEQL_VERSION}/codeql-linux64.zip" \
+    && unzip /tmp/codeql.zip -d /opt/codeql \
+    && rm /tmp/codeql.zip \
+    && ln -s /opt/codeql/codeql/codeql /usr/local/bin/codeql \
+    && chmod -R a+rx /opt/codeql \
+    && chmod a+rx /usr/local/bin/codeql
+
+
+# Download CodeQL query packs and resolve languages.
+RUN /usr/local/bin/codeql pack download codeql/python-queries codeql/java-queries \
+    && codeql resolve packs \
+    && codeql resolve languages
+
+# Copy the application code. This should be the final step to benefit from caching.
+COPY common/ ./common/
+COPY workers/cryptobomforge/ ./workers/cryptobomforge/
+
+# Define the entrypoint for the application.
+ENTRYPOINT ["tini", "--", "python", "-m", "workers.cryptobomforge.main"]
+

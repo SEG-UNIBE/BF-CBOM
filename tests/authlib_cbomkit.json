@@ -1,0 +1,940 @@
+{
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "bom-ref": "6812c599-18ac-4788-ab6c-cd7ae79bdb1c",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "secret-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate_key",
+            "line": 21,
+            "location": "authlib/jose/rfc7517/jwk.py",
+            "offset": 15
+          }
+        ]
+      },
+      "name": "secret-key@6812c599-18ac-4788-ab6c-cd7ae79bdb1c",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "8d3fafd1-512f-46d7-aae6-782cd1d6d757",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "digest"
+          ],
+          "parameterSetIdentifier": "256",
+          "primitive": "xof"
+        },
+        "assetType": "algorithm"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 96,
+            "location": "authlib/jose/rfc8037/okp_key.py",
+            "offset": 18
+          }
+        ]
+      },
+      "name": "SHAKE256",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "4029beef-7a14-4d90-b520-7397e8caa2ea",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 96,
+            "location": "authlib/jose/rfc8037/okp_key.py",
+            "offset": 18
+          }
+        ]
+      },
+      "name": "private-key@4029beef-7a14-4d90-b520-7397e8caa2ea",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "df0960da-8037-4b28-884b-a2facba846e1",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "public-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "RSAPublicNumbers",
+            "line": 54,
+            "location": "authlib/jose/rfc7518/rsa_key.py",
+            "offset": 25
+          }
+        ]
+      },
+      "name": "public-key@df0960da-8037-4b28-884b-a2facba846e1",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "380af05d-9b3a-4ff3-a9a8-dfded02313b4",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "tag"
+          ],
+          "primitive": "mac"
+        },
+        "assetType": "algorithm",
+        "oid": "1.2.840.113549.2.9"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate_key",
+            "line": 256,
+            "location": "authlib/jose/rfc7518/jwe_algs.py",
+            "offset": 15
+          },
+          {
+            "additionalContext": "generate_key",
+            "line": 21,
+            "location": "authlib/jose/rfc7517/jwk.py",
+            "offset": 15
+          },
+          {
+            "additionalContext": "generate_key",
+            "line": 117,
+            "location": "authlib/jose/drafts/_jwe_algorithms.py",
+            "offset": 15
+          }
+        ]
+      },
+      "name": "HMAC-SHA256",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "10902258-9303-4d35-b4f3-507e76a5260c",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 96,
+            "location": "authlib/jose/rfc8037/okp_key.py",
+            "offset": 18
+          }
+        ]
+      },
+      "name": "private-key@10902258-9303-4d35-b4f3-507e76a5260c",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "e1a7b58c-c890-4b75-a40c-fb59a99eee1d",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "public-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "RSAPublicNumbers",
+            "line": 84,
+            "location": "authlib/jose/rfc7518/rsa_key.py",
+            "offset": 18
+          }
+        ]
+      },
+      "name": "public-key@e1a7b58c-c890-4b75-a40c-fb59a99eee1d",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "f375966a-3e7b-42d5-9160-17672f499614",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "curve": "Edwards25519",
+          "primitive": "signature"
+        },
+        "assetType": "algorithm",
+        "oid": "1.3.101.112"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 96,
+            "location": "authlib/jose/rfc8037/okp_key.py",
+            "offset": 18
+          }
+        ]
+      },
+      "name": "Ed25519",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "fa752e6b-aec6-440a-b300-26f1a2749e65",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "RSAPrivateNumbers",
+            "line": 59,
+            "location": "authlib/jose/rfc7518/rsa_key.py",
+            "offset": 22
+          }
+        ]
+      },
+      "name": "private-key@fa752e6b-aec6-440a-b300-26f1a2749e65",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "2e42dfe7-790a-4fd7-802d-ef0ed7b50435",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "secret-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate_key",
+            "line": 117,
+            "location": "authlib/jose/drafts/_jwe_algorithms.py",
+            "offset": 15
+          }
+        ]
+      },
+      "name": "secret-key@2e42dfe7-790a-4fd7-802d-ef0ed7b50435",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "7e9268c2-01ee-4bcc-8b7a-8ab34218c8c8",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "curve": "Curve25519",
+          "primitive": "key-agree"
+        },
+        "assetType": "algorithm",
+        "oid": "1.3.101.110"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 96,
+            "location": "authlib/jose/rfc8037/okp_key.py",
+            "offset": 18
+          }
+        ]
+      },
+      "name": "x25519",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "2bc83352-d9ff-4ab5-9d6a-289b8b5707ea",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "primitive": "pke"
+        },
+        "assetType": "algorithm",
+        "oid": "1.2.840.113549.1.1.1"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "RSAPublicNumbers",
+            "line": 54,
+            "location": "authlib/jose/rfc7518/rsa_key.py",
+            "offset": 25
+          },
+          {
+            "additionalContext": "RSAPrivateNumbers",
+            "line": 59,
+            "location": "authlib/jose/rfc7518/rsa_key.py",
+            "offset": 22
+          },
+          {
+            "additionalContext": "RSAPrivateNumbers",
+            "line": 71,
+            "location": "authlib/jose/rfc7518/rsa_key.py",
+            "offset": 22
+          },
+          {
+            "additionalContext": "RSAPublicNumbers",
+            "line": 84,
+            "location": "authlib/jose/rfc7518/rsa_key.py",
+            "offset": 18
+          }
+        ]
+      },
+      "name": "RSA",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "fbe64650-2af6-4bc6-bbff-f0dcd7077b9b",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "curve": "Edwards448",
+          "primitive": "signature"
+        },
+        "assetType": "algorithm",
+        "oid": "1.3.101.113"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 96,
+            "location": "authlib/jose/rfc8037/okp_key.py",
+            "offset": 18
+          }
+        ]
+      },
+      "name": "Ed448",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "c1ecb0d4-5a54-4ec0-a656-1f4a37246a53",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "secret-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate_key",
+            "line": 21,
+            "location": "authlib/jose/rfc7517/jwk.py",
+            "offset": 15
+          }
+        ]
+      },
+      "name": "secret-key@c1ecb0d4-5a54-4ec0-a656-1f4a37246a53",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "546c3cf3-2c7b-480d-8b7a-86f750df1cd1",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "mode": "cbc",
+          "padding": "pkcs7",
+          "parameterSetIdentifier": "128",
+          "primitive": "block-cipher"
+        },
+        "assetType": "algorithm",
+        "oid": "2.16.840.1.101.3.4.1.2"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate_key",
+            "line": 256,
+            "location": "authlib/jose/rfc7518/jwe_algs.py",
+            "offset": 15
+          },
+          {
+            "additionalContext": "generate_key",
+            "line": 21,
+            "location": "authlib/jose/rfc7517/jwk.py",
+            "offset": 15
+          },
+          {
+            "additionalContext": "generate_key",
+            "line": 117,
+            "location": "authlib/jose/drafts/_jwe_algorithms.py",
+            "offset": 15
+          }
+        ]
+      },
+      "name": "AES128-CBC-PKCS7",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "cfac3bfb-9bfe-4b3d-b751-f6be3dd9164d",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "secret-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate_key",
+            "line": 117,
+            "location": "authlib/jose/drafts/_jwe_algorithms.py",
+            "offset": 15
+          }
+        ]
+      },
+      "name": "secret-key@cfac3bfb-9bfe-4b3d-b751-f6be3dd9164d",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "755340ff-788c-4576-962c-674f45f66d94",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "secret-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate_key",
+            "line": 256,
+            "location": "authlib/jose/rfc7518/jwe_algs.py",
+            "offset": 15
+          }
+        ]
+      },
+      "name": "secret-key@755340ff-788c-4576-962c-674f45f66d94",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "c1215a5d-c553-41fb-b2a3-3190ff637d1d",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "digest"
+          ],
+          "primitive": "hash"
+        },
+        "assetType": "algorithm"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate_key",
+            "line": 256,
+            "location": "authlib/jose/rfc7518/jwe_algs.py",
+            "offset": 15
+          },
+          {
+            "additionalContext": "generate_key",
+            "line": 21,
+            "location": "authlib/jose/rfc7517/jwk.py",
+            "offset": 15
+          },
+          {
+            "additionalContext": "generate_key",
+            "line": 117,
+            "location": "authlib/jose/drafts/_jwe_algorithms.py",
+            "offset": 15
+          }
+        ]
+      },
+      "name": "Poly1305",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "9e7e90b4-0670-400d-9b56-e3e5e904c5a6",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "primitive": "ae"
+        },
+        "assetType": "algorithm"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate_key",
+            "line": 256,
+            "location": "authlib/jose/rfc7518/jwe_algs.py",
+            "offset": 15
+          },
+          {
+            "additionalContext": "generate_key",
+            "line": 21,
+            "location": "authlib/jose/rfc7517/jwk.py",
+            "offset": 15
+          },
+          {
+            "additionalContext": "generate_key",
+            "line": 117,
+            "location": "authlib/jose/drafts/_jwe_algorithms.py",
+            "offset": 15
+          }
+        ]
+      },
+      "name": "ChaCha20Poly1305",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "989a6ba4-3e76-40f2-86d8-cbd4b7d30666",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "digest"
+          ],
+          "parameterSetIdentifier": "256",
+          "primitive": "hash"
+        },
+        "assetType": "algorithm",
+        "oid": "2.16.840.1.101.3.4.2.1"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate_key",
+            "line": 256,
+            "location": "authlib/jose/rfc7518/jwe_algs.py",
+            "offset": 15
+          },
+          {
+            "additionalContext": "generate_key",
+            "line": 21,
+            "location": "authlib/jose/rfc7517/jwk.py",
+            "offset": 15
+          },
+          {
+            "additionalContext": "generate_key",
+            "line": 117,
+            "location": "authlib/jose/drafts/_jwe_algorithms.py",
+            "offset": 15
+          }
+        ]
+      },
+      "name": "SHA256",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "4b3ce6ad-c339-4b82-8c87-cb77f44dc7b5",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "RSAPrivateNumbers",
+            "line": 71,
+            "location": "authlib/jose/rfc7518/rsa_key.py",
+            "offset": 22
+          }
+        ]
+      },
+      "name": "private-key@4b3ce6ad-c339-4b82-8c87-cb77f44dc7b5",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "8b78edbe-a70e-4d28-8dea-d248beb4da38",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "encapsulate"
+          ],
+          "parameterSetIdentifier": "128",
+          "primitive": "other"
+        },
+        "assetType": "algorithm",
+        "oid": "2.16.840.1.101.3.4.1"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "aes_key_wrap",
+            "line": 106,
+            "location": "authlib/jose/rfc7518/jwe_algs.py",
+            "offset": 13
+          }
+        ]
+      },
+      "name": "AES128",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "90df990b-dedd-42ef-bfe4-aa9c49cea291",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "curve": "Curve448",
+          "primitive": "key-agree"
+        },
+        "assetType": "algorithm",
+        "oid": "1.3.101.111"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 96,
+            "location": "authlib/jose/rfc8037/okp_key.py",
+            "offset": 18
+          }
+        ]
+      },
+      "name": "x448",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "cf855030-265d-4959-b8c3-91b0c4ea9927",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "digest"
+          ],
+          "parameterSetIdentifier": "512",
+          "primitive": "hash"
+        },
+        "assetType": "algorithm",
+        "oid": "2.16.840.1.101.3.4.2.3"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate",
+            "line": 96,
+            "location": "authlib/jose/rfc8037/okp_key.py",
+            "offset": 18
+          }
+        ]
+      },
+      "name": "SHA512",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "71c5709d-8e4a-4b96-a2d3-bad2d54055fa",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "secret-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate_key",
+            "line": 256,
+            "location": "authlib/jose/rfc7518/jwe_algs.py",
+            "offset": 15
+          }
+        ]
+      },
+      "name": "secret-key@71c5709d-8e4a-4b96-a2d3-bad2d54055fa",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "ed83968a-15a5-4175-91de-5025280a75b0",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "primitive": "ae"
+        },
+        "assetType": "algorithm"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "generate_key",
+            "line": 256,
+            "location": "authlib/jose/rfc7518/jwe_algs.py",
+            "offset": 15
+          },
+          {
+            "additionalContext": "generate_key",
+            "line": 21,
+            "location": "authlib/jose/rfc7517/jwk.py",
+            "offset": 15
+          },
+          {
+            "additionalContext": "generate_key",
+            "line": 117,
+            "location": "authlib/jose/drafts/_jwe_algorithms.py",
+            "offset": 15
+          }
+        ]
+      },
+      "name": "Fernet",
+      "type": "cryptographic-asset"
+    }
+  ],
+  "dependencies": [
+    {
+      "dependsOn": [
+        "2bc83352-d9ff-4ab5-9d6a-289b8b5707ea"
+      ],
+      "ref": "fa752e6b-aec6-440a-b300-26f1a2749e65"
+    },
+    {
+      "dependsOn": [
+        "8d3fafd1-512f-46d7-aae6-782cd1d6d757"
+      ],
+      "ref": "fbe64650-2af6-4bc6-bbff-f0dcd7077b9b"
+    },
+    {
+      "dependsOn": [
+        "9e7e90b4-0670-400d-9b56-e3e5e904c5a6"
+      ],
+      "ref": "71c5709d-8e4a-4b96-a2d3-bad2d54055fa"
+    },
+    {
+      "dependsOn": [
+        "ed83968a-15a5-4175-91de-5025280a75b0"
+      ],
+      "ref": "755340ff-788c-4576-962c-674f45f66d94"
+    },
+    {
+      "dependsOn": [
+        "9e7e90b4-0670-400d-9b56-e3e5e904c5a6"
+      ],
+      "ref": "c1ecb0d4-5a54-4ec0-a656-1f4a37246a53"
+    },
+    {
+      "dependsOn": [
+        "2bc83352-d9ff-4ab5-9d6a-289b8b5707ea"
+      ],
+      "ref": "4b3ce6ad-c339-4b82-8c87-cb77f44dc7b5"
+    },
+    {
+      "dependsOn": [
+        "ed83968a-15a5-4175-91de-5025280a75b0"
+      ],
+      "ref": "6812c599-18ac-4788-ab6c-cd7ae79bdb1c"
+    },
+    {
+      "dependsOn": [
+        "9e7e90b4-0670-400d-9b56-e3e5e904c5a6"
+      ],
+      "ref": "cfac3bfb-9bfe-4b3d-b751-f6be3dd9164d"
+    },
+    {
+      "dependsOn": [
+        "c1215a5d-c553-41fb-b2a3-3190ff637d1d"
+      ],
+      "ref": "9e7e90b4-0670-400d-9b56-e3e5e904c5a6"
+    },
+    {
+      "dependsOn": [
+        "2bc83352-d9ff-4ab5-9d6a-289b8b5707ea"
+      ],
+      "ref": "e1a7b58c-c890-4b75-a40c-fb59a99eee1d"
+    },
+    {
+      "dependsOn": [
+        "ed83968a-15a5-4175-91de-5025280a75b0"
+      ],
+      "ref": "2e42dfe7-790a-4fd7-802d-ef0ed7b50435"
+    },
+    {
+      "dependsOn": [
+        "380af05d-9b3a-4ff3-a9a8-dfded02313b4",
+        "546c3cf3-2c7b-480d-8b7a-86f750df1cd1"
+      ],
+      "ref": "ed83968a-15a5-4175-91de-5025280a75b0"
+    },
+    {
+      "dependsOn": [
+        "fbe64650-2af6-4bc6-bbff-f0dcd7077b9b"
+      ],
+      "ref": "10902258-9303-4d35-b4f3-507e76a5260c"
+    },
+    {
+      "dependsOn": [
+        "2bc83352-d9ff-4ab5-9d6a-289b8b5707ea"
+      ],
+      "ref": "df0960da-8037-4b28-884b-a2facba846e1"
+    },
+    {
+      "dependsOn": [
+        "f375966a-3e7b-42d5-9160-17672f499614"
+      ],
+      "ref": "4029beef-7a14-4d90-b520-7397e8caa2ea"
+    },
+    {
+      "dependsOn": [
+        "989a6ba4-3e76-40f2-86d8-cbd4b7d30666"
+      ],
+      "ref": "380af05d-9b3a-4ff3-a9a8-dfded02313b4"
+    },
+    {
+      "dependsOn": [
+        "cf855030-265d-4959-b8c3-91b0c4ea9927"
+      ],
+      "ref": "f375966a-3e7b-42d5-9160-17672f499614"
+    },
+    {
+      "dependsOn": [
+        "2bc83352-d9ff-4ab5-9d6a-289b8b5707ea"
+      ],
+      "ref": "fa752e6b-aec6-440a-b300-26f1a2749e65"
+    },
+    {
+      "dependsOn": [
+        "8d3fafd1-512f-46d7-aae6-782cd1d6d757"
+      ],
+      "ref": "fbe64650-2af6-4bc6-bbff-f0dcd7077b9b"
+    },
+    {
+      "dependsOn": [
+        "9e7e90b4-0670-400d-9b56-e3e5e904c5a6"
+      ],
+      "ref": "71c5709d-8e4a-4b96-a2d3-bad2d54055fa"
+    },
+    {
+      "dependsOn": [
+        "ed83968a-15a5-4175-91de-5025280a75b0"
+      ],
+      "ref": "755340ff-788c-4576-962c-674f45f66d94"
+    },
+    {
+      "dependsOn": [
+        "9e7e90b4-0670-400d-9b56-e3e5e904c5a6"
+      ],
+      "ref": "c1ecb0d4-5a54-4ec0-a656-1f4a37246a53"
+    },
+    {
+      "dependsOn": [
+        "2bc83352-d9ff-4ab5-9d6a-289b8b5707ea"
+      ],
+      "ref": "4b3ce6ad-c339-4b82-8c87-cb77f44dc7b5"
+    },
+    {
+      "dependsOn": [
+        "ed83968a-15a5-4175-91de-5025280a75b0"
+      ],
+      "ref": "6812c599-18ac-4788-ab6c-cd7ae79bdb1c"
+    },
+    {
+      "dependsOn": [
+        "9e7e90b4-0670-400d-9b56-e3e5e904c5a6"
+      ],
+      "ref": "cfac3bfb-9bfe-4b3d-b751-f6be3dd9164d"
+    },
+    {
+      "dependsOn": [
+        "c1215a5d-c553-41fb-b2a3-3190ff637d1d"
+      ],
+      "ref": "9e7e90b4-0670-400d-9b56-e3e5e904c5a6"
+    },
+    {
+      "dependsOn": [
+        "2bc83352-d9ff-4ab5-9d6a-289b8b5707ea"
+      ],
+      "ref": "e1a7b58c-c890-4b75-a40c-fb59a99eee1d"
+    },
+    {
+      "dependsOn": [
+        "ed83968a-15a5-4175-91de-5025280a75b0"
+      ],
+      "ref": "2e42dfe7-790a-4fd7-802d-ef0ed7b50435"
+    },
+    {
+      "dependsOn": [
+        "380af05d-9b3a-4ff3-a9a8-dfded02313b4",
+        "546c3cf3-2c7b-480d-8b7a-86f750df1cd1"
+      ],
+      "ref": "ed83968a-15a5-4175-91de-5025280a75b0"
+    },
+    {
+      "dependsOn": [
+        "fbe64650-2af6-4bc6-bbff-f0dcd7077b9b"
+      ],
+      "ref": "10902258-9303-4d35-b4f3-507e76a5260c"
+    },
+    {
+      "dependsOn": [
+        "2bc83352-d9ff-4ab5-9d6a-289b8b5707ea"
+      ],
+      "ref": "df0960da-8037-4b28-884b-a2facba846e1"
+    },
+    {
+      "dependsOn": [
+        "f375966a-3e7b-42d5-9160-17672f499614"
+      ],
+      "ref": "4029beef-7a14-4d90-b520-7397e8caa2ea"
+    },
+    {
+      "dependsOn": [
+        "989a6ba4-3e76-40f2-86d8-cbd4b7d30666"
+      ],
+      "ref": "380af05d-9b3a-4ff3-a9a8-dfded02313b4"
+    },
+    {
+      "dependsOn": [
+        "cf855030-265d-4959-b8c3-91b0c4ea9927"
+      ],
+      "ref": "f375966a-3e7b-42d5-9160-17672f499614"
+    }
+  ],
+  "metadata": {
+    "properties": [
+      {
+        "name": "gitUrl",
+        "value": "https://github.com/authlib/authlib"
+      },
+      {
+        "name": "revision",
+        "value": "Revision[value=main]"
+      },
+      {
+        "name": "commit",
+        "value": "72a00e7"
+      }
+    ],
+    "timestamp": "2025-09-10T14:07:22Z",
+    "tools": {
+      "components": [],
+      "services": [
+        {
+          "name": "CBOMkit",
+          "provider": {
+            "name": "PQCA"
+          }
+        }
+      ]
+    }
+  },
+  "serialNumber": "urn:uuid:b39140ce-4217-4059-9dee-a117017104f1",
+  "specVersion": "1.6",
+  "version": 1
+}

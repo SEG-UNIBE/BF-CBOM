@@ -1,0 +1,196 @@
+{
+  "annotations": [
+    {
+      "annotator": {
+        "component": {
+          "authors": [
+            {
+              "name": "OWASP Foundation"
+            }
+          ],
+          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@11.7.0",
+          "group": "@cyclonedx",
+          "name": "cdxgen",
+          "publisher": "OWASP Foundation",
+          "purl": "pkg:npm/%40cyclonedx/cdxgen@11.7.0",
+          "type": "application",
+          "version": "11.7.0"
+        }
+      },
+      "bom-ref": "metadata-annotations",
+      "subjects": [
+        "pkg:pypi/authlib@latest"
+      ],
+      "text": "This Software Bill-of-Materials (SBOM) document was created on Wednesday, September 10, 2025 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'Authlib'. There are 11 components. 2 package type(s) and 5 purl namespaces are described in the document under components.",
+      "timestamp": "2025-09-10T14:28:23Z"
+    }
+  ],
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "bom-ref": "pkg:pypi/cryptography@3.2",
+      "group": "",
+      "name": "cryptography",
+      "properties": [
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": ">=3.2"
+        }
+      ],
+      "purl": "pkg:pypi/cryptography@3.2",
+      "type": "library",
+      "version": "3.2"
+    },
+    {
+      "bom-ref": "pkg:github/actions/checkout@v4",
+      "group": "actions",
+      "name": "checkout",
+      "purl": "pkg:github/actions/checkout@v4",
+      "type": "application",
+      "version": "v4"
+    },
+    {
+      "bom-ref": "pkg:github/astral-sh/setup-uv@v6",
+      "group": "astral-sh",
+      "name": "setup-uv",
+      "purl": "pkg:github/astral-sh/setup-uv@v6",
+      "type": "library",
+      "version": "v6"
+    },
+    {
+      "bom-ref": "pkg:github/codecov/codecov-action@v5",
+      "group": "codecov",
+      "name": "codecov-action",
+      "purl": "pkg:github/codecov/codecov-action@v5",
+      "type": "library",
+      "version": "v5"
+    },
+    {
+      "bom-ref": "pkg:github/SonarSource/sonarqube-scan-action@v5",
+      "group": "SonarSource",
+      "name": "sonarqube-scan-action",
+      "purl": "pkg:github/SonarSource/sonarqube-scan-action@v5",
+      "type": "library",
+      "version": "v5"
+    },
+    {
+      "bom-ref": "pkg:github/actions/setup-python@v5",
+      "group": "actions",
+      "name": "setup-python",
+      "purl": "pkg:github/actions/setup-python@v5",
+      "type": "application",
+      "version": "v5"
+    },
+    {
+      "bom-ref": "pkg:github/actions/upload-artifact@v4",
+      "group": "actions",
+      "name": "upload-artifact",
+      "purl": "pkg:github/actions/upload-artifact@v4",
+      "type": "application",
+      "version": "v4"
+    },
+    {
+      "bom-ref": "pkg:github/actions/download-artifact@v4",
+      "group": "actions",
+      "name": "download-artifact",
+      "purl": "pkg:github/actions/download-artifact@v4",
+      "type": "application",
+      "version": "v4"
+    },
+    {
+      "bom-ref": "pkg:github/pypa/gh-action-pypi-publish@release/v1",
+      "group": "pypa",
+      "name": "gh-action-pypi-publish",
+      "purl": "pkg:github/pypa/gh-action-pypi-publish@release%2Fv1",
+      "type": "library",
+      "version": "release/v1"
+    },
+    {
+      "bom-ref": "pkg:github/github/codeql-action/init@v1",
+      "group": "",
+      "name": "github/codeql-action/init",
+      "purl": "pkg:github/github%2Fcodeql-action%2Finit@v1",
+      "type": "library",
+      "version": "v1"
+    },
+    {
+      "bom-ref": "pkg:github/github/codeql-action/analyze@v1",
+      "group": "",
+      "name": "github/codeql-action/analyze",
+      "purl": "pkg:github/github%2Fcodeql-action%2Fanalyze@v1",
+      "type": "library",
+      "version": "v1"
+    }
+  ],
+  "dependencies": [
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/authlib@latest"
+    }
+  ],
+  "metadata": {
+    "authors": [
+      {
+        "name": "OWASP Foundation"
+      }
+    ],
+    "component": {
+      "authors": [
+        {
+          "email": "me@lepture.com",
+          "name": "Hsiaoming Yang"
+        }
+      ],
+      "bom-ref": "pkg:pypi/authlib@latest",
+      "description": "The ultimate Python library in building OAuth and OpenID Connect servers and clients.",
+      "name": "Authlib",
+      "properties": [
+        {
+          "name": "cdx:pypi:requiresPython",
+          "value": ">=3.9"
+        }
+      ],
+      "purl": "pkg:pypi/authlib@latest",
+      "type": "application",
+      "version": "latest"
+    },
+    "lifecycles": [
+      {
+        "phase": "build"
+      }
+    ],
+    "properties": [
+      {
+        "name": "cdx:bom:componentTypes",
+        "value": "github\\npypi"
+      },
+      {
+        "name": "cdx:bom:componentNamespaces",
+        "value": "SonarSource\\nactions\\nastral-sh\\ncodecov\\npypa"
+      }
+    ],
+    "timestamp": "2025-09-10T14:28:23Z",
+    "tools": {
+      "components": [
+        {
+          "authors": [
+            {
+              "name": "OWASP Foundation"
+            }
+          ],
+          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@11.7.0",
+          "group": "@cyclonedx",
+          "name": "cdxgen",
+          "publisher": "OWASP Foundation",
+          "purl": "pkg:npm/%40cyclonedx/cdxgen@11.7.0",
+          "type": "application",
+          "version": "11.7.0"
+        }
+      ]
+    }
+  },
+  "serialNumber": "urn:uuid:fbe5d18b-feae-4e60-aedc-65b1b5dd8c00",
+  "services": [],
+  "specVersion": "1.6",
+  "version": 1
+}

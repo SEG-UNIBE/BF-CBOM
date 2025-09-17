@@ -1,0 +1,23 @@
+# docker/Dockerfile.coordinator
+ARG BASE_IMAGE=base
+ARG BASE_TAG=latest
+FROM ${BASE_IMAGE}:${BASE_TAG}
+USER appuser
+WORKDIR /app
+
+# Dependency resolution first (better caching)
+COPY --chown=appuser:appuser pyproject.toml uv.lock ./
+COPY --chown=appuser:appuser common/ ./common/
+RUN pip install --no-cache-dir --upgrade pip
+RUN uv sync --frozen --no-dev
+
+# Now copy the actual service code
+COPY --chown=appuser:appuser coordinator/ ./coordinator/
+
+# TODO: Remove this after workers are no longer discovered using parent folder lookups
+COPY --chown=appuser:appuser workers/ ./workers/
+
+ENV PYTHONPATH=/app
+ENV STREAMLIT_CONFIG=coordinator/.streamlit/config.toml
+
+ENTRYPOINT ["tini", "-g", "--", "uv", "run", "streamlit", "run", "coordinator/0_Start.py", "--server.port=8501", "--server.address=0.0.0.0"]

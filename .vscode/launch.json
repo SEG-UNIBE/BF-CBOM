@@ -1,0 +1,57 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "DebugCoordinator",
+      "type": "python",
+      "request": "launch",
+      "module": "streamlit",
+      "args": [
+        "run",
+        "coordinator/0_Start.py",
+        "--server.headless=false"
+      ],
+      "console": "integratedTerminal",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}",
+        "REDIS_HOST": "localhost",
+        "REDIS_PORT": "6379"
+      },
+      "envFile": "${workspaceFolder}/.env.secrets",
+      "preLaunchTask": "docker-compose-up-redis",
+      "postDebugTask": "docker-compose-down"
+    },
+    {
+      "name": "DebugWorker",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/workers/${input:workerName}/main.py",
+      "console": "integratedTerminal",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}",
+        "REDIS_HOST": "localhost",
+        "REDIS_PORT": "6379",
+        "AVAILABLE_LANGUAGES": "python,java",
+      },
+      "envFile": "${workspaceFolder}/.env.worker-${input:workerName}",
+      "subProcess": true,
+      "preLaunchTask": "docker-compose-up-redis",
+      "postDebugTask": "docker-compose-down"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "DebugCoordinator + DebugWorker",
+      "configurations": ["DebugCoordinator", "DebugWorker"],
+      "stopAll": true
+    }
+  ],
+  "inputs": [
+    {
+      "id": "workerName",
+      "type": "pickString",
+      "description": "Select worker to debug",
+      "options": ["skeleton", "deepseek", "cryptobomforge"]
+    }
+  ]
+}

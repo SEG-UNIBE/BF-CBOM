@@ -1,0 +1,2920 @@
+{
+  "annotations": [
+    {
+      "annotator": {
+        "component": {
+          "authors": [
+            {
+              "name": "OWASP Foundation"
+            }
+          ],
+          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@11.7.0",
+          "group": "@cyclonedx",
+          "name": "cdxgen",
+          "publisher": "OWASP Foundation",
+          "purl": "pkg:npm/%40cyclonedx/cdxgen@11.7.0",
+          "type": "application",
+          "version": "11.7.0"
+        }
+      },
+      "bom-ref": "metadata-annotations",
+      "subjects": [
+        "pkg:pypi/repo@latest"
+      ],
+      "text": "This Software Bill-of-Materials (SBOM) document was created on Wednesday, September 10, 2025 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'repo'. There are 52 components.",
+      "timestamp": "2025-09-10T14:29:40Z"
+    }
+  ],
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "authors": [
+        {
+          "name": "Abubakar Abid <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Ali Abid <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Ali Abdalla <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Dawood Khan <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Ahsen Khaliq <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Pete Allen <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Ömer Faruk Özdemir <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Freddy A Boulton <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Hannah Blair <gradio-team@huggingface.co>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/gradio@5.29.0",
+      "description": "Python library for easily interacting with trained machine learning models",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-ui/shell/requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-ui/shell/requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [],
+      "name": "gradio",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ui/shell/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/gradio@5.29.0",
+      "type": "library",
+      "version": "5.29.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Gregory Oschwald <goschwald@maxmind.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/geoip2@4.8.1",
+      "description": "MaxMind GeoIP2 API",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-ui/shell/requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-ui/shell/requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "geoip2",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ui/shell/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/geoip2@4.8.1",
+      "type": "library",
+      "version": "4.8.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "Anthony Tuininga <anthony.tuininga@oracle.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/oracledb@3.1.0",
+      "description": "Python interface to Oracle Database",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_sparrow_parse.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_sparrow_parse.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://oracle.github.io/python-oracledb"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "expression": "UPL-1.0 OR Apache-2.0"
+        }
+      ],
+      "name": "oracledb",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ui/shell/requirements.txt"
+        },
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_sparrow_parse.txt"
+        }
+      ],
+      "purl": "pkg:pypi/oracledb@3.1.0",
+      "tags": [
+        "oracle"
+      ],
+      "type": "library",
+      "version": "3.1.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Mathieu Fenniak <biziqe@mathieu.fenniak.net>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/pypdf@5.4.0",
+      "description": "A pure-python PDF library capable of splitting, merging, cropping, and transforming PDF files",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-ui/shell/requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-ui/shell/requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "pypdf",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ui/shell/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/pypdf@5.4.0",
+      "type": "library",
+      "version": "5.4.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Chris P <chris@plot.ly>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/plotly@6.0.1",
+      "description": "An open-source interactive data visualization library for Python",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-ui/shell/requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-ui/shell/requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "plotly",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ui/shell/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/plotly@6.0.1",
+      "type": "library",
+      "version": "6.0.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "Andrew Dunham <andrew@du.nham.ca>"
+        },
+        {
+          "name": " Marcelo Trylesinski <marcelotryle@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/python-multipart@0.0.20",
+      "description": "A streaming multipart parser for Python",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: python-multipart",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: python-multipart"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "8a62d3a8335e06589fe01f2a3e178cdcc632f3fbe0d492ad9ee0ec35aab1f104"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "python-multipart",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_sparrow_parse.txt"
+        },
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_instructor.txt"
+        },
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/agents/requirements_sparrow_agents.txt"
+        },
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/ocr/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/python-multipart@0.0.20",
+      "type": "library",
+      "version": "0.0.20"
+    },
+    {
+      "authors": [
+        {
+          "name": "Will McGugan <willmcgugan@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/rich@14.1.0",
+      "description": "Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: rich",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: rich"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/Textualize/rich"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "536f5f1785986d6dbdea3c75205c473f970777b4a0d6c6dd1b696aa05a3fa04f"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "rich",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_sparrow_parse.txt"
+        },
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_instructor.txt"
+        },
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/agents/requirements_sparrow_agents.txt"
+        },
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt"
+        },
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/ocr/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/rich@14.1.0",
+      "type": "library",
+      "version": "14.1.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "=?utf-8?q?Sebasti=C3=A1n_Ram=C3=ADrez?= <tiangolo@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/typer@0.17.4",
+      "description": "Typer, build great CLIs. Easy to code. Based on Python type hints.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: typer",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: typer"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "015534a6edaa450e7007eba705d5c18c3349dcea50a6ad79a5ed530967575824"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "typer",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_sparrow_parse.txt"
+        },
+        {
+          "name": "cdx:pypi:extras",
+          "value": "all"
+        },
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_instructor.txt"
+        },
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/agents/requirements_sparrow_agents.txt"
+        }
+      ],
+      "purl": "pkg:pypi/typer@0.17.4",
+      "type": "library",
+      "version": "0.17.4"
+    },
+    {
+      "authors": [
+        {
+          "name": "=?utf-8?q?Sebasti=C3=A1n_Ram=C3=ADrez?= <tiangolo@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/fastapi@0.115.12",
+      "description": "FastAPI framework, high performance, easy to learn, fast to code, ready for production",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_sparrow_parse.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_sparrow_parse.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "fastapi",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_sparrow_parse.txt"
+        }
+      ],
+      "purl": "pkg:pypi/fastapi@0.115.12",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "0.115.12"
+    },
+    {
+      "authors": [
+        {
+          "name": "Tom Christie <tom@tomchristie.com>"
+        },
+        {
+          "name": " Marcelo Trylesinski <marcelotryle@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/uvicorn@0.35.0",
+      "description": "The lightning-fast ASGI server.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: uvicorn",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: uvicorn"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "197535216b25ff9b785e29a0b79199f55222193d47f820816e7da751e9bc8d4a"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        },
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "uvicorn",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_sparrow_parse.txt"
+        },
+        {
+          "name": "cdx:pypi:extras",
+          "value": "standard"
+        },
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_instructor.txt"
+        },
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/agents/requirements_sparrow_agents.txt"
+        },
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/ocr/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/uvicorn@0.35.0",
+      "type": "library",
+      "version": "0.35.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Andrej Baranovskij <andrejus.baranovskis@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/sparrow-parse@1.1.2",
+      "description": "Sparrow Parse is a Python package (part of Sparrow) for parsing and extracting information from documents.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_sparrow_parse.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_sparrow_parse.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/katanaml/sparrow/tree/main/sparrow-data/parse"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "expression": "GNU General Public License v3 (GPLv3)"
+        }
+      ],
+      "name": "sparrow-parse",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_sparrow_parse.txt"
+        }
+      ],
+      "purl": "pkg:pypi/sparrow-parse@1.1.2",
+      "tags": [
+        "parse"
+      ],
+      "type": "library",
+      "version": "1.1.2"
+    },
+    {
+      "authors": [
+        {
+          "name": "Jon Wolverton <wolverton.jr@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/genson@1.3.0",
+      "description": "GenSON is a powerful, user-friendly JSON Schema generator.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_sparrow_parse.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_sparrow_parse.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/wolverdude/genson/"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "genson",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_sparrow_parse.txt"
+        }
+      ],
+      "purl": "pkg:pypi/genson@1.3.0",
+      "tags": [
+        "json"
+      ],
+      "type": "library",
+      "version": "1.3.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Julian Berman <Julian+jsonschema@GrayVines.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/jsonschema@4.23.0",
+      "description": "An implementation of JSON Schema validation for Python",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_sparrow_parse.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_sparrow_parse.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "jsonschema",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_sparrow_parse.txt"
+        }
+      ],
+      "purl": "pkg:pypi/jsonschema@4.23.0",
+      "tags": [
+        "json",
+        "validation"
+      ],
+      "type": "library",
+      "version": "4.23.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Saurabh Kumar <me+github@saurabh-kumar.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/python-dotenv@1.1.1",
+      "description": "Read key-value pairs from a .env file and set them as environment variables",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: python-dotenv",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: python-dotenv"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/theskumar/python-dotenv"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "31f23644fe2602f88ff55e1f5c79ba497e01224ee7737937930c448e4d0e24dc"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        },
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "python-dotenv",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_sparrow_parse.txt"
+        }
+      ],
+      "purl": "pkg:pypi/python-dotenv@1.1.1",
+      "type": "library",
+      "version": "1.1.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "Chris Griffith <chris@cdgriffith.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/python-box@7.3.2",
+      "description": "Advanced Python dictionaries with dot notation access",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: python-box",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: python-box"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/cdgriffith/Box"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "d136163294fd61a1554db7dd203f2e3035064798d30c17d67d948f0de5c572de"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "python-box",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_sparrow_parse.txt"
+        },
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_instructor.txt"
+        }
+      ],
+      "purl": "pkg:pypi/python-box@7.3.2",
+      "type": "library",
+      "version": "7.3.2"
+    },
+    {
+      "authors": [
+        {
+          "name": "PyTorch Core Team <soumith@pytorch.org>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/torchvision@0.23.0",
+      "description": "image and video datasets and models for torch deep learning",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: torchvision",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: torchvision"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/pytorch/vision"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "7266871daca00ad46d1c073e55d972179d12a58fa5c9adec9a3db9bbed71284a"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "torchvision",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_sparrow_parse.txt"
+        },
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/parse/sparrow_parse/vllm/infra/qwen2_vl_7b/requirements.txt"
+        },
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/ocr/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/torchvision@0.23.0",
+      "type": "library",
+      "version": "0.23.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Ollama <hello@ollama.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/ollama@0.2.1",
+      "description": "The official Python client for Ollama.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_instructor.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_instructor.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://ollama.ai"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "ollama",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_instructor.txt"
+        }
+      ],
+      "purl": "pkg:pypi/ollama@0.2.1",
+      "type": "library",
+      "version": "0.2.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "Ran Aroussi <ran@aroussi.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/yfinance@0.2.40",
+      "description": "Download market data from Yahoo! Finance API",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_instructor.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_instructor.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/ranaroussi/yfinance"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        },
+        {
+          "license": {
+            "name": "Apache"
+          }
+        }
+      ],
+      "name": "yfinance",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_instructor.txt"
+        }
+      ],
+      "purl": "pkg:pypi/yfinance@0.2.40",
+      "tags": [
+        "finance"
+      ],
+      "type": "library",
+      "version": "0.2.40"
+    },
+    {
+      "authors": [
+        {
+          "name": "Jason Liu <jason@jxnl.co>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/instructor@1.3.5",
+      "description": "structured outputs for llm",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_instructor.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_instructor.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/jxnl/instructor"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "instructor",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_instructor.txt"
+        }
+      ],
+      "purl": "pkg:pypi/instructor@1.3.5",
+      "type": "library",
+      "version": "1.3.5"
+    },
+    {
+      "authors": [
+        {
+          "name": "Kirill Simonov <xi@resolvent.net>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/pyyaml@6.0.2",
+      "description": "YAML parser and emitter for Python",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: PyYAML",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: PyYAML"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://pyyaml.org/"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "0a9a2848a5b7feac301353437eb7d5957887edbf81d56e903999a75a3d743086"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "PyYAML",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_instructor.txt"
+        }
+      ],
+      "purl": "pkg:pypi/pyyaml@6.0.2",
+      "type": "library",
+      "version": "6.0.2"
+    },
+    {
+      "authors": [
+        {
+          "name": "=?utf-8?q?Sebasti=C3=A1n_Ram=C3=ADrez?= <tiangolo@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/fastapi@0.111.1",
+      "description": "FastAPI framework, high performance, easy to learn, fast to code, ready for production",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_instructor.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_instructor.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "fastapi",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_instructor.txt"
+        }
+      ],
+      "purl": "pkg:pypi/fastapi@0.111.1",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "0.111.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "Travis E. Oliphant et al."
+        }
+      ],
+      "bom-ref": "pkg:pypi/numpy@1.26.4",
+      "description": "Fundamental package for array computing in Python",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_instructor.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_instructor.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://numpy.org"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        },
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "numpy",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/llm/requirements_instructor.txt"
+        }
+      ],
+      "purl": "pkg:pypi/numpy@1.26.4",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "1.26.4"
+    },
+    {
+      "authors": [
+        {
+          "name": "=?utf-8?q?Sebasti=C3=A1n_Ram=C3=ADrez?= <tiangolo@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/fastapi@0.115.9",
+      "description": "FastAPI framework, high performance, easy to learn, fast to code, ready for production",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-ml/agents/requirements_sparrow_agents.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-ml/agents/requirements_sparrow_agents.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "fastapi",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/agents/requirements_sparrow_agents.txt"
+        }
+      ],
+      "purl": "pkg:pypi/fastapi@0.115.9",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "0.115.9"
+    },
+    {
+      "bom-ref": "pkg:pypi/aiohttp@3.11.13",
+      "description": "Async http client/server framework (asyncio)",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-ml/agents/requirements_sparrow_agents.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-ml/agents/requirements_sparrow_agents.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/aio-libs/aiohttp"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "aiohttp",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/agents/requirements_sparrow_agents.txt"
+        }
+      ],
+      "purl": "pkg:pypi/aiohttp@3.11.13",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "3.11.13"
+    },
+    {
+      "authors": [
+        {
+          "name": "\"Prefect Technologies"
+        },
+        {
+          "name": " Inc.\" <help@prefect.io>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/prefect@3.2.7",
+      "description": "Workflow orchestration and management.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-ml/agents/requirements_sparrow_agents.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-ml/agents/requirements_sparrow_agents.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "prefect",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/agents/requirements_sparrow_agents.txt"
+        }
+      ],
+      "purl": "pkg:pypi/prefect@3.2.7",
+      "type": "library",
+      "version": "3.2.7"
+    },
+    {
+      "authors": [
+        {
+          "name": "Travis E. Oliphant et al."
+        }
+      ],
+      "bom-ref": "pkg:pypi/numpy@2.2.3",
+      "description": "Fundamental package for array computing in Python",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-ml/agents/requirements_sparrow_agents.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-ml/agents/requirements_sparrow_agents.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        },
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "numpy",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/agents/requirements_sparrow_agents.txt"
+        }
+      ],
+      "purl": "pkg:pypi/numpy@2.2.3",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "2.2.3"
+    },
+    {
+      "authors": [
+        {
+          "name": "Mathieu Fenniak <biziqe@mathieu.fenniak.net>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/pypdf@5.3.0",
+      "description": "A pure-python PDF library capable of splitting, merging, cropping, and transforming PDF files",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-ml/agents/requirements_sparrow_agents.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-ml/agents/requirements_sparrow_agents.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "pypdf",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/agents/requirements_sparrow_agents.txt"
+        }
+      ],
+      "purl": "pkg:pypi/pypdf@5.3.0",
+      "type": "library",
+      "version": "5.3.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Edouard Belval <edouard@belval.org>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/pdf2image@1.17.0",
+      "description": "A wrapper around the pdftoppm and pdftocairo command line tools to convert PDF to a PIL Image list.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-data/ocr/requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-data/ocr/requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/Belval/pdf2image"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "ecdd58d7afb810dffe21ef2b1bbc057ef434dabbac6c33778a38a3f7744a27e2"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "pdf2image",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-ml/agents/requirements_sparrow_agents.txt"
+        },
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt"
+        },
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/ocr/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/pdf2image@1.17.0",
+      "tags": [
+        "tools"
+      ],
+      "type": "library",
+      "version": "1.17.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "The Hugging Face team (past and future) with the help of all our contributors (https://github.com/huggingface/transformers/graphs/contributors) <transformers@huggingface.co>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/transformers@4.51.3",
+      "description": "State-of-the-art Machine Learning for JAX, PyTorch and TensorFlow",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/huggingface/transformers"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "transformers",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/transformers@4.51.3",
+      "tags": [
+        "transform"
+      ],
+      "type": "library",
+      "version": "4.51.3"
+    },
+    {
+      "authors": [
+        {
+          "name": "PyTorch Core Team <soumith@pytorch.org>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/torchvision@0.22.0",
+      "description": "image and video datasets and models for torch deep learning",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/pytorch/vision"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "torchvision",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/torchvision@0.22.0",
+      "type": "library",
+      "version": "0.22.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "PyTorch Team <packages@pytorch.org>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/torch@2.7.0",
+      "description": "Tensors and Dynamic neural networks in Python with strong GPU acceleration",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://pytorch.org/"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        },
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "torch",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/torch@2.7.0",
+      "type": "library",
+      "version": "2.7.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Nils Reimers <info@nils-reimers.de>"
+        },
+        {
+          "name": " Tom Aarsen <tom.aarsen@huggingface.co>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/sentence-transformers@4.1.0",
+      "description": "Embeddings, Retrieval, and Reranking",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "sentence-transformers",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/sentence-transformers@4.1.0",
+      "tags": [
+        "transform"
+      ],
+      "type": "library",
+      "version": "4.1.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Travis E. Oliphant et al."
+        }
+      ],
+      "bom-ref": "pkg:pypi/numpy@2.2.5",
+      "description": "Fundamental package for array computing in Python",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        },
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "numpy",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/numpy@2.2.5",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "2.2.5"
+    },
+    {
+      "authors": [
+        {
+          "name": "Mathieu Fenniak <biziqe@mathieu.fenniak.net>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/pypdf@5.5.0",
+      "description": "A pure-python PDF library capable of splitting, merging, cropping, and transforming PDF files",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "pypdf",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/pypdf@5.5.0",
+      "type": "library",
+      "version": "5.5.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Abubakar Abid <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Ali Abid <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Ali Abdalla <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Dawood Khan <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Ahsen Khaliq <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Pete Allen <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Freddy Boulton <gradio-team@huggingface.co>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/gradio-client@1.7.2",
+      "description": "Python library for easily interacting with trained machine learning models",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "gradio_client",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/gradio-client@1.7.2",
+      "type": "library",
+      "version": "1.7.2"
+    },
+    {
+      "authors": [
+        {
+          "name": "MLX Contributors <mlx@group.apple.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/mlx@0.25.2",
+      "description": "A framework for machine learning on Apple silicon.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/ml-explore/mlx"
+        }
+      ],
+      "group": "",
+      "licenses": [],
+      "name": "mlx",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt"
+        },
+        {
+          "name": "cdx:pip:markers",
+          "value": "sys_platform == \"darwin\" and platform_machine == \"arm64\""
+        },
+        {
+          "name": "cdx:pip:structuredMarkers",
+          "value": "[{\"variable\":\"sys_platform\",\"operator\":\"==\",\"value\":\"darwin\"},{\"operator\":\"and\"},{\"variable\":\"platform_machine\",\"operator\":\"==\",\"value\":\"arm64\"}]"
+        }
+      ],
+      "purl": "pkg:pypi/mlx@0.25.2",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "0.25.2"
+    },
+    {
+      "authors": [
+        {
+          "name": "Prince Canuma <prince.gdt@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/mlx-vlm@0.1.26",
+      "description": "Vision LLMs on Apple silicon with MLX and the Hugging Face Hub",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/Blaizzy/mlx-vlm"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "mlx-vlm",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt"
+        },
+        {
+          "name": "cdx:pip:markers",
+          "value": "sys_platform == \"darwin\" and platform_machine == \"arm64\""
+        },
+        {
+          "name": "cdx:pip:structuredMarkers",
+          "value": "[{\"variable\":\"sys_platform\",\"operator\":\"==\",\"value\":\"darwin\"},{\"operator\":\"and\"},{\"variable\":\"platform_machine\",\"operator\":\"==\",\"value\":\"arm64\"}]"
+        }
+      ],
+      "purl": "pkg:pypi/mlx-vlm@0.1.26",
+      "type": "library",
+      "version": "0.1.26"
+    },
+    {
+      "authors": [
+        {
+          "name": "Travis E. Oliphant et al."
+        }
+      ],
+      "bom-ref": "pkg:pypi/numpy@1.24.4",
+      "description": "Fundamental package for array computing in Python",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-data/parse/sparrow_parse/vllm/infra/qwen2_vl_7b/requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-data/parse/sparrow_parse/vllm/infra/qwen2_vl_7b/requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.numpy.org"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        },
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "numpy",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/parse/sparrow_parse/vllm/infra/qwen2_vl_7b/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/numpy@1.24.4",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "1.24.4"
+    },
+    {
+      "authors": [
+        {
+          "name": "\"Jeffrey A. Clark\" <aclark@aclark.net>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/pillow@10.3.0",
+      "description": "Python Imaging Library (Fork)",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-data/parse/sparrow_parse/vllm/infra/qwen2_vl_7b/requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-data/parse/sparrow_parse/vllm/infra/qwen2_vl_7b/requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [
+        {
+          "expression": "Historical Permission Notice and Disclaimer (HPND)"
+        }
+      ],
+      "name": "pillow",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/parse/sparrow_parse/vllm/infra/qwen2_vl_7b/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/pillow@10.3.0",
+      "type": "library",
+      "version": "10.3.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Kenneth Reitz <me@kennethreitz.org>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/requests@2.31.0",
+      "description": "Python HTTP for Humans.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-data/parse/sparrow_parse/vllm/infra/qwen2_vl_7b/requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-data/parse/sparrow_parse/vllm/infra/qwen2_vl_7b/requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://requests.readthedocs.io"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "requests",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/parse/sparrow_parse/vllm/infra/qwen2_vl_7b/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/requests@2.31.0",
+      "type": "library",
+      "version": "2.31.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "PyTorch Team <packages@pytorch.org>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/torch@2.8.0",
+      "description": "Tensors and Dynamic neural networks in Python with strong GPU acceleration",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: torch",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: torch"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://pytorch.org/"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "0be92c08b44009d4131d1ff7a8060d10bafdb7ddcb7359ef8d8c5169007ea905"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        },
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "torch",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/parse/sparrow_parse/vllm/infra/qwen2_vl_7b/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/torch@2.8.0",
+      "type": "library",
+      "version": "2.8.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Seth Buntin <sethtrain@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/django-git@0.1",
+      "description": "django gitweb replacement",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: django-git",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: django-git"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "http://code.google.com/p/django-git"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "e2320fcea2accf78128c3520d94e9865fc938d386a9e4bf49d9973277c0a7f7d"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "django-git",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/parse/sparrow_parse/vllm/infra/qwen2_vl_7b/requirements.txt"
+        },
+        {
+          "name": "cdx:pypi:versionSpecifiers",
+          "value": "+https://github.com/huggingface/transformers.git"
+        }
+      ],
+      "purl": "pkg:pypi/django-git@0.1",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "0.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "The HuggingFace team <zach.mueller@huggingface.co>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/accelerate@1.10.1",
+      "description": "Accelerate",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: accelerate",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: accelerate"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/huggingface/accelerate"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "3621cff60b9a27ce798857ece05e2b9f56fcc71631cfb31ccf71f0359c311f11"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        },
+        {
+          "license": {
+            "name": "Apache"
+          }
+        }
+      ],
+      "name": "accelerate",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/parse/sparrow_parse/vllm/infra/qwen2_vl_7b/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/accelerate@1.10.1",
+      "type": "library",
+      "version": "1.10.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "Qwen Team <chenkeqin.ckq@alibaba-inc.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/qwen-vl-utils@0.0.11",
+      "description": "Qwen Vision Language Model Utils - PyTorch",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: qwen-vl-utils",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: qwen-vl-utils"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "7fd5287ac04d6c1f01b93bf053b0be236a35149e414c9e864e3cc5bf2fe8cb7b"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "qwen-vl-utils",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/parse/sparrow_parse/vllm/infra/qwen2_vl_7b/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/qwen-vl-utils@0.0.11",
+      "type": "library",
+      "version": "0.0.11"
+    },
+    {
+      "authors": [
+        {
+          "name": "Abubakar Abid <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Ali Abid <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Ali Abdalla <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Dawood Khan <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Ahsen Khaliq <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Pete Allen <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Ömer Faruk Özdemir <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Freddy A Boulton <gradio-team@huggingface.co>"
+        },
+        {
+          "name": " Hannah Blair <gradio-team@huggingface.co>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/gradio@4.44.1",
+      "description": "Python library for easily interacting with trained machine learning models",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-data/parse/sparrow_parse/vllm/infra/qwen2_vl_7b/requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-data/parse/sparrow_parse/vllm/infra/qwen2_vl_7b/requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "gradio",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/parse/sparrow_parse/vllm/infra/qwen2_vl_7b/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/gradio@4.44.1",
+      "type": "library",
+      "version": "4.44.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "PyTorch Team <packages@pytorch.org>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/torch@2.7.1",
+      "description": "Tensors and Dynamic neural networks in Python with strong GPU acceleration",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-data/ocr/requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-data/ocr/requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://pytorch.org/"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        },
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "torch",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/ocr/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/torch@2.7.1",
+      "type": "library",
+      "version": "2.7.1"
+    },
+    {
+      "authors": [
+        {
+          "name": "Soumith Chintala"
+        },
+        {
+          "name": " David Pollack"
+        },
+        {
+          "name": " Sean Naren"
+        },
+        {
+          "name": " Peter Goldsborough"
+        },
+        {
+          "name": " Moto Hira"
+        },
+        {
+          "name": " Caroline Chen"
+        },
+        {
+          "name": " Jeff Hwang"
+        },
+        {
+          "name": " Zhaoheng Ni"
+        },
+        {
+          "name": " Xiaohui Zhang <soumith@pytorch.org>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/torchaudio@2.8.0",
+      "description": "An audio package for PyTorch",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "PyPI package: torchaudio",
+            "confidence": 0.5,
+            "field": "version",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "source-code-analysis",
+                "value": "PyPI package: torchaudio"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/pytorch/audio"
+        }
+      ],
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "c2f44cf279f673cfcdd8f576c349eee8bedf8caab351a5dd78b32970cc34a212"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD",
+            "url": "https://opensource.org/licenses/0BSD"
+          }
+        }
+      ],
+      "name": "torchaudio",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/ocr/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/torchaudio@2.8.0",
+      "type": "library",
+      "version": "2.8.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "HuggingFace Inc. <thomas@huggingface.co>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/datasets@3.6.0",
+      "description": "HuggingFace community-driven open-source library of datasets",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-data/ocr/requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-data/ocr/requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/huggingface/datasets"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "datasets",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/ocr/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/datasets@3.6.0",
+      "type": "library",
+      "version": "3.6.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "PaddlePaddle <Paddle-better@baidu.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/paddleocr@3.1.0",
+      "description": "Awesome multilingual OCR and document parsing toolkits based on PaddlePaddle",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-data/ocr/requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-data/ocr/requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "paddleocr",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/ocr/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/paddleocr@3.1.0",
+      "type": "library",
+      "version": "3.1.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "Paddle-better@baidu.com"
+        }
+      ],
+      "bom-ref": "pkg:pypi/paddlepaddle@3.1.0",
+      "description": "Parallel Distributed Deep Learning",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-data/ocr/requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-data/ocr/requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "paddlepaddle",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/ocr/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/paddlepaddle@3.1.0",
+      "type": "library",
+      "version": "3.1.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "\"Jeffrey A. Clark\" <aclark@aclark.net>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/pillow@11.3.0",
+      "description": "Python Imaging Library (Fork)",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-data/ocr/requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-data/ocr/requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT-CMU",
+            "url": "https://opensource.org/licenses/MIT-CMU"
+          }
+        }
+      ],
+      "name": "pillow",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/ocr/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/pillow@11.3.0",
+      "type": "library",
+      "version": "11.3.0"
+    },
+    {
+      "authors": [
+        {
+          "name": "=?utf-8?q?Sebasti=C3=A1n_Ram=C3=ADrez?= <tiangolo@gmail.com>"
+        }
+      ],
+      "bom-ref": "pkg:pypi/fastapi@0.115.14",
+      "description": "FastAPI framework, high performance, easy to learn, fast to code, ready for production",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "cdxgen-1757514574314/repo/sparrow-data/ocr/requirements.txt",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "cdxgen-1757514574314/repo/sparrow-data/ocr/requirements.txt"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "fastapi",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "cdxgen-1757514574314/repo/sparrow-data/ocr/requirements.txt"
+        }
+      ],
+      "purl": "pkg:pypi/fastapi@0.115.14",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "0.115.14"
+    }
+  ],
+  "dependencies": [
+    {
+      "dependsOn": [],
+      "ref": "pkg:pypi/repo@latest"
+    }
+  ],
+  "metadata": {
+    "authors": [
+      {
+        "name": "OWASP Foundation"
+      }
+    ],
+    "component": {
+      "bom-ref": "pkg:pypi/repo@latest",
+      "group": "",
+      "name": "repo",
+      "purl": "pkg:pypi/repo@latest",
+      "type": "application",
+      "version": "latest"
+    },
+    "lifecycles": [
+      {
+        "phase": "build"
+      }
+    ],
+    "properties": [
+      {
+        "name": "cdx:bom:componentTypes",
+        "value": "pypi"
+      },
+      {
+        "name": "cdx:bom:componentSrcFiles",
+        "value": "PyPI package: PyYAML\\nPyPI package: accelerate\\nPyPI package: django-git\\nPyPI package: python-box\\nPyPI package: python-dotenv\\nPyPI package: python-multipart\\nPyPI package: qwen-vl-utils\\nPyPI package: rich\\nPyPI package: torch\\nPyPI package: torchaudio\\nPyPI package: torchvision\\nPyPI package: typer\\nPyPI package: uvicorn\\ncdxgen-1757514574314/repo/sparrow-data/ocr/requirements.txt\\ncdxgen-1757514574314/repo/sparrow-data/parse/requirements.txt\\ncdxgen-1757514574314/repo/sparrow-data/parse/sparrow_parse/vllm/infra/qwen2_vl_7b/requirements.txt\\ncdxgen-1757514574314/repo/sparrow-ml/agents/requirements_sparrow_agents.txt\\ncdxgen-1757514574314/repo/sparrow-ml/llm/requirements_instructor.txt\\ncdxgen-1757514574314/repo/sparrow-ml/llm/requirements_sparrow_parse.txt\\ncdxgen-1757514574314/repo/sparrow-ui/shell/requirements.txt"
+      }
+    ],
+    "timestamp": "2025-09-10T14:29:40Z",
+    "tools": {
+      "components": [
+        {
+          "authors": [
+            {
+              "name": "OWASP Foundation"
+            }
+          ],
+          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@11.7.0",
+          "group": "@cyclonedx",
+          "name": "cdxgen",
+          "publisher": "OWASP Foundation",
+          "purl": "pkg:npm/%40cyclonedx/cdxgen@11.7.0",
+          "type": "application",
+          "version": "11.7.0"
+        }
+      ]
+    }
+  },
+  "serialNumber": "urn:uuid:6d5e4e7f-60bd-40a3-aacb-6bc07af6c067",
+  "services": [],
+  "specVersion": "1.6",
+  "version": 1
+}

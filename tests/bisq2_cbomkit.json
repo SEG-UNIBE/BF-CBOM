@@ -1,0 +1,590 @@
+{
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "bom-ref": "949e8205-3dfa-4686-ae1c-35184f9ac20e",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "primitive": "key-agree"
+        },
+        "assetType": "algorithm",
+        "oid": "1.3.132.1.12"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.KeyAgreement#getInstance(Ljava/lang/String;Ljava/lang/String;)Ljavax/crypto/KeyAgreement;",
+            "line": 55,
+            "location": "security/src/main/java/bisq/security/AesGcm.java",
+            "offset": 36
+          },
+          {
+            "additionalContext": "java.security.KeyPairGenerator#getInstance(Ljava/lang/String;Ljava/lang/String;)Ljava/security/KeyPairGenerator;",
+            "line": 56,
+            "location": "security/src/main/java/bisq/security/keys/KeyGeneration.java",
+            "offset": 41
+          },
+          {
+            "line": 66,
+            "location": "security/src/main/java/bisq/security/keys/KeyGeneration.java",
+            "offset": 42
+          },
+          {
+            "line": 86,
+            "location": "security/src/main/java/bisq/security/keys/KeyGeneration.java",
+            "offset": 43
+          }
+        ]
+      },
+      "name": "ECDH",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "aa242ae6-a7cc-4556-bbe5-ccdadab0b5f6",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "public-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "line": 66,
+            "location": "security/src/main/java/bisq/security/keys/KeyGeneration.java",
+            "offset": 42
+          }
+        ]
+      },
+      "name": "public-key@aa242ae6-a7cc-4556-bbe5-ccdadab0b5f6",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "9ffc2fec-a522-450b-8a05-d23fffabc4af",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "secret-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.KeyAgreement#generateSecret(Ljava/lang/String;)Ljavax/crypto/SecretKey;",
+            "line": 58,
+            "location": "security/src/main/java/bisq/security/AesGcm.java",
+            "offset": 15
+          }
+        ]
+      },
+      "name": "secret-key@9ffc2fec-a522-450b-8a05-d23fffabc4af",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "4108a242-459b-4138-8fb4-19407c5b6554",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "size": 128,
+          "type": "tag"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.spec.GCMParameterSpec#<init>(I[B)V",
+            "line": 42,
+            "location": "security/src/main/java/bisq/security/AesGcm.java",
+            "offset": 32
+          }
+        ]
+      },
+      "name": "tag@4108a242-459b-4138-8fb4-19407c5b6554",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "bd1fd563-df4e-4be3-b6a9-74b5776dc23c",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "tag"
+          ],
+          "primitive": "mac"
+        },
+        "assetType": "algorithm",
+        "oid": "1.2.840.113549.2.9"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.Mac#getInstance(Ljava/lang/String;)Ljavax/crypto/Mac;",
+            "line": 37,
+            "location": "security/src/main/java/bisq/security/HmacUtil.java",
+            "offset": 18
+          }
+        ]
+      },
+      "name": "HMAC-SHA256",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "533aa994-e5b7-44de-946e-3fbf958ee439",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "encrypt"
+          ],
+          "mode": "gcm",
+          "parameterSetIdentifier": "128",
+          "primitive": "ae"
+        },
+        "assetType": "algorithm",
+        "oid": "2.16.840.1.101.3.4.1"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.Cipher#getInstance(Ljava/lang/String;Ljava/lang/String;)Ljavax/crypto/Cipher;",
+            "line": 41,
+            "location": "security/src/main/java/bisq/security/AesGcm.java",
+            "offset": 24
+          },
+          {
+            "additionalContext": "javax.crypto.Cipher#getInstance(Ljava/lang/String;Ljava/lang/String;)Ljavax/crypto/Cipher;",
+            "line": 48,
+            "location": "security/src/main/java/bisq/security/AesGcm.java",
+            "offset": 24
+          }
+        ]
+      },
+      "name": "AES128-GCM",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "82792fe1-ac1b-4f5f-b53e-02aa793f9440",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "java.security.KeyFactory#getInstance(Ljava/lang/String;Ljava/lang/String;)Ljava/security/KeyFactory;",
+            "line": 69,
+            "location": "security/src/main/java/bisq/security/keys/KeyPairUtils.java",
+            "offset": 36
+          }
+        ]
+      },
+      "name": "private-key@82792fe1-ac1b-4f5f-b53e-02aa793f9440",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "ee0be8f5-593c-4221-a0ca-f5a92ef32b2e",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "private-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "line": 86,
+            "location": "security/src/main/java/bisq/security/keys/KeyGeneration.java",
+            "offset": 43
+          }
+        ]
+      },
+      "name": "private-key@ee0be8f5-593c-4221-a0ca-f5a92ef32b2e",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "41a8aa03-bd6c-4e6f-978b-0e6db1968820",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "digest"
+          ],
+          "parameterSetIdentifier": "256",
+          "primitive": "hash"
+        },
+        "assetType": "algorithm",
+        "oid": "2.16.840.1.101.3.4.2.1"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "line": 40,
+            "location": "security/src/main/java/bisq/security/SignatureUtil.java",
+            "offset": 41
+          },
+          {
+            "line": 51,
+            "location": "security/src/main/java/bisq/security/SignatureUtil.java",
+            "offset": 53
+          },
+          {
+            "additionalContext": "javax.crypto.Mac#getInstance(Ljava/lang/String;)Ljavax/crypto/Mac;",
+            "line": 37,
+            "location": "security/src/main/java/bisq/security/HmacUtil.java",
+            "offset": 18
+          },
+          {
+            "additionalContext": "java.security.MessageDigest#getInstance(Ljava/lang/String;)Ljava/security/MessageDigest;",
+            "line": 41,
+            "location": "security/src/main/java/bisq/security/DigestUtil.java",
+            "offset": 35
+          },
+          {
+            "additionalContext": "java.security.MessageDigest#getInstance(Ljava/lang/String;)Ljava/security/MessageDigest;",
+            "line": 54,
+            "location": "network/tor/tor/src/main/java/bisq/network/tor/TorSocksProxyFactory.java",
+            "offset": 42
+          }
+        ]
+      },
+      "name": "SHA256",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "9fb65b23-a3af-4d6c-b2ca-2a0891042363",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "size": 128,
+          "type": "tag"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.spec.GCMParameterSpec#<init>(I[B)V",
+            "line": 49,
+            "location": "security/src/main/java/bisq/security/AesGcm.java",
+            "offset": 32
+          }
+        ]
+      },
+      "name": "tag@9fb65b23-a3af-4d6c-b2ca-2a0891042363",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "e6cbc008-0637-464c-9380-75419aae4e62",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "sign"
+          ],
+          "primitive": "signature"
+        },
+        "assetType": "algorithm",
+        "oid": "1.2.840.10045.4.3.2"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "line": 40,
+            "location": "security/src/main/java/bisq/security/SignatureUtil.java",
+            "offset": 41
+          },
+          {
+            "line": 51,
+            "location": "security/src/main/java/bisq/security/SignatureUtil.java",
+            "offset": 53
+          }
+        ]
+      },
+      "name": "SHA256withECDSA",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "729e6188-8013-4047-b48d-d96335550eb3",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "parameterSetIdentifier": "128",
+          "primitive": "block-cipher"
+        },
+        "assetType": "algorithm",
+        "oid": "2.16.840.1.101.3.4.1"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "javax.crypto.KeyAgreement#generateSecret(Ljava/lang/String;)Ljavax/crypto/SecretKey;",
+            "line": 58,
+            "location": "security/src/main/java/bisq/security/AesGcm.java",
+            "offset": 15
+          }
+        ]
+      },
+      "name": "AES128",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "a53983ca-b375-4e13-b12a-57a973aa3823",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "sign"
+          ],
+          "curve": "Edwards25519",
+          "primitive": "signature"
+        },
+        "assetType": "algorithm",
+        "oid": "1.3.101.112"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "org.bouncycastle.crypto.signers.Ed25519Signer#<init>()V",
+            "line": 11,
+            "location": "security/src/main/java/bisq/security/TorSignatureUtil.java",
+            "offset": 24
+          },
+          {
+            "additionalContext": "org.bouncycastle.crypto.signers.Ed25519Signer#<init>()V",
+            "line": 18,
+            "location": "security/src/main/java/bisq/security/TorSignatureUtil.java",
+            "offset": 26
+          }
+        ]
+      },
+      "name": "Ed25519",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "75b42a1c-5fa3-4d4e-80d5-ee068ca4caf7",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "secret-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "java.security.KeyPairGenerator#getInstance(Ljava/lang/String;Ljava/lang/String;)Ljava/security/KeyPairGenerator;",
+            "line": 56,
+            "location": "security/src/main/java/bisq/security/keys/KeyGeneration.java",
+            "offset": 41
+          }
+        ]
+      },
+      "name": "key@75b42a1c-5fa3-4d4e-80d5-ee068ca4caf7",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "4a88c7f1-2e46-4ac2-b214-0e369e46fa2f",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "public-key"
+        }
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "java.security.KeyFactory#getInstance(Ljava/lang/String;Ljava/lang/String;)Ljava/security/KeyFactory;",
+            "line": 76,
+            "location": "security/src/main/java/bisq/security/keys/KeyGeneration.java",
+            "offset": 26
+          }
+        ]
+      },
+      "name": "public-key@4a88c7f1-2e46-4ac2-b214-0e369e46fa2f",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "2042094d-3c23-44d8-b11d-01c9c4fdae3b",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "digest"
+          ],
+          "parameterSetIdentifier": "512",
+          "primitive": "hash"
+        },
+        "assetType": "algorithm",
+        "oid": "2.16.840.1.101.3.4.2.3"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "org.bouncycastle.crypto.signers.Ed25519Signer#<init>()V",
+            "line": 11,
+            "location": "security/src/main/java/bisq/security/TorSignatureUtil.java",
+            "offset": 24
+          },
+          {
+            "additionalContext": "org.bouncycastle.crypto.signers.Ed25519Signer#<init>()V",
+            "line": 18,
+            "location": "security/src/main/java/bisq/security/TorSignatureUtil.java",
+            "offset": 26
+          },
+          {
+            "additionalContext": "java.security.MessageDigest#getInstance(Ljava/lang/String;)Ljava/security/MessageDigest;",
+            "line": 50,
+            "location": "security/src/main/java/bisq/security/DigestUtil.java",
+            "offset": 35
+          }
+        ]
+      },
+      "name": "SHA512",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "b153d73e-bcb2-41d4-82f0-010c5ccc8e02",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "primitive": "pke"
+        },
+        "assetType": "algorithm"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "java.security.KeyFactory#getInstance(Ljava/lang/String;Ljava/lang/String;)Ljava/security/KeyFactory;",
+            "line": 69,
+            "location": "security/src/main/java/bisq/security/keys/KeyPairUtils.java",
+            "offset": 36
+          }
+        ]
+      },
+      "name": "EC",
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "8e86659a-ab04-4751-a1ad-6ce66f358430",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "cryptoFunctions": [
+            "keygen"
+          ],
+          "primitive": "signature"
+        },
+        "assetType": "algorithm"
+      },
+      "evidence": {
+        "occurrences": [
+          {
+            "additionalContext": "java.security.KeyFactory#getInstance(Ljava/lang/String;Ljava/lang/String;)Ljava/security/KeyFactory;",
+            "line": 76,
+            "location": "security/src/main/java/bisq/security/keys/KeyGeneration.java",
+            "offset": 26
+          }
+        ]
+      },
+      "name": "ECDSA",
+      "type": "cryptographic-asset"
+    }
+  ],
+  "dependencies": [
+    {
+      "dependsOn": [
+        "2042094d-3c23-44d8-b11d-01c9c4fdae3b"
+      ],
+      "ref": "a53983ca-b375-4e13-b12a-57a973aa3823"
+    },
+    {
+      "dependsOn": [
+        "949e8205-3dfa-4686-ae1c-35184f9ac20e"
+      ],
+      "ref": "aa242ae6-a7cc-4556-bbe5-ccdadab0b5f6"
+    },
+    {
+      "dependsOn": [
+        "729e6188-8013-4047-b48d-d96335550eb3"
+      ],
+      "ref": "9ffc2fec-a522-450b-8a05-d23fffabc4af"
+    },
+    {
+      "dependsOn": [
+        "8e86659a-ab04-4751-a1ad-6ce66f358430"
+      ],
+      "ref": "4a88c7f1-2e46-4ac2-b214-0e369e46fa2f"
+    },
+    {
+      "dependsOn": [
+        "b153d73e-bcb2-41d4-82f0-010c5ccc8e02"
+      ],
+      "ref": "82792fe1-ac1b-4f5f-b53e-02aa793f9440"
+    },
+    {
+      "dependsOn": [
+        "9ffc2fec-a522-450b-8a05-d23fffabc4af"
+      ],
+      "ref": "949e8205-3dfa-4686-ae1c-35184f9ac20e"
+    },
+    {
+      "dependsOn": [
+        "949e8205-3dfa-4686-ae1c-35184f9ac20e"
+      ],
+      "ref": "ee0be8f5-593c-4221-a0ca-f5a92ef32b2e"
+    },
+    {
+      "dependsOn": [
+        "41a8aa03-bd6c-4e6f-978b-0e6db1968820"
+      ],
+      "ref": "bd1fd563-df4e-4be3-b6a9-74b5776dc23c"
+    },
+    {
+      "dependsOn": [
+        "4108a242-459b-4138-8fb4-19407c5b6554",
+        "9fb65b23-a3af-4d6c-b2ca-2a0891042363"
+      ],
+      "ref": "533aa994-e5b7-44de-946e-3fbf958ee439"
+    },
+    {
+      "dependsOn": [
+        "949e8205-3dfa-4686-ae1c-35184f9ac20e"
+      ],
+      "ref": "75b42a1c-5fa3-4d4e-80d5-ee068ca4caf7"
+    },
+    {
+      "dependsOn": [
+        "41a8aa03-bd6c-4e6f-978b-0e6db1968820"
+      ],
+      "ref": "e6cbc008-0637-464c-9380-75419aae4e62"
+    }
+  ],
+  "metadata": {
+    "properties": [
+      {
+        "name": "gitUrl",
+        "value": "https://github.com/bisq-network/bisq2"
+      },
+      {
+        "name": "revision",
+        "value": "Revision[value=main]"
+      },
+      {
+        "name": "commit",
+        "value": "d42ad23"
+      }
+    ],
+    "timestamp": "2025-09-10T14:11:50Z",
+    "tools": {
+      "components": [],
+      "services": [
+        {
+          "name": "CBOMkit",
+          "provider": {
+            "name": "PQCA"
+          }
+        }
+      ]
+    }
+  },
+  "serialNumber": "urn:uuid:7c545514-7183-4129-93bd-05432d3defd2",
+  "specVersion": "1.6",
+  "version": 1
+}

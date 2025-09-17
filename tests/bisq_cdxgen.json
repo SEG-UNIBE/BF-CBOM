@@ -1,0 +1,814 @@
+{
+  "annotations": [
+    {
+      "annotator": {
+        "component": {
+          "authors": [
+            {
+              "name": "OWASP Foundation"
+            }
+          ],
+          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@11.7.0",
+          "group": "@cyclonedx",
+          "name": "cdxgen",
+          "publisher": "OWASP Foundation",
+          "purl": "pkg:npm/%40cyclonedx/cdxgen@11.7.0",
+          "type": "application",
+          "version": "11.7.0"
+        }
+      },
+      "bom-ref": "metadata-annotations",
+      "subjects": [
+        "pkg:maven/repo@latest"
+      ],
+      "text": "This Cryptography Bill-of-Materials (CBOM) document was created on Wednesday, September 10, 2025 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'repo'. There are 27 cryptographic assets listed under components in this CBOM. There are 33 components. 2 package type(s) and 4 purl namespaces are described in the document under components.",
+      "timestamp": "2025-09-10T16:30:17Z"
+    }
+  ],
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "bom-ref": "pkg:github/actions/stale@v9.1.0",
+      "group": "actions",
+      "name": "stale",
+      "purl": "pkg:github/actions/stale@v9.1.0",
+      "type": "application",
+      "version": "v9.1.0"
+    },
+    {
+      "bom-ref": "pkg:github/actions/checkout@v4.2.2",
+      "group": "actions",
+      "name": "checkout",
+      "purl": "pkg:github/actions/checkout@v4.2.2",
+      "type": "application",
+      "version": "v4.2.2"
+    },
+    {
+      "bom-ref": "pkg:github/actions/setup-java@v4.7.1",
+      "group": "actions",
+      "name": "setup-java",
+      "purl": "pkg:github/actions/setup-java@v4.7.1",
+      "type": "application",
+      "version": "v4.7.1"
+    },
+    {
+      "bom-ref": "pkg:github/gradle/gradle-build-action@v3.5.0",
+      "group": "gradle",
+      "name": "gradle-build-action",
+      "purl": "pkg:github/gradle/gradle-build-action@v3.5.0",
+      "type": "library",
+      "version": "v3.5.0"
+    },
+    {
+      "bom-ref": "pkg:github/codacy/codacy-coverage-reporter-action@v1.3.0",
+      "group": "codacy",
+      "name": "codacy-coverage-reporter-action",
+      "purl": "pkg:github/codacy/codacy-coverage-reporter-action@v1.3.0",
+      "type": "library",
+      "version": "v1.3.0"
+    },
+    {
+      "bom-ref": "pkg:maven/gradle-wrapper/gradle-wrapper?type=jar",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "gradle-wrapper.jar",
+            "confidence": 0,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0,
+                "technique": "filename",
+                "value": "gradle-wrapper.jar"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "gradle-wrapper",
+      "name": "gradle-wrapper",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "jar-deps-UDTJmW/gradle-wrapper.jar"
+        },
+        {
+          "name": "Namespaces",
+          "value": "org.gradle.wrapper.GradleWrapperMain\norg.gradle.cli.AbstractCommandLineConverter\norg.gradle.cli.AbstractPropertiesCommandLineConverter\norg.gradle.cli.CommandLineArgumentException\norg.gradle.cli.CommandLineConverter\norg.gradle.cli.CommandLineOption\norg.gradle.cli.CommandLineParser$1\norg.gradle.cli.CommandLineParser$AfterFirstSubCommand\norg.gradle.cli.CommandLineParser$AfterOptions\norg.gradle.cli.CommandLineParser$BeforeFirstSubCommand\norg.gradle.cli.CommandLineParser$CaseInsensitiveStringComparator\norg.gradle.cli.CommandLineParser$KnownOptionParserState\norg.gradle.cli.CommandLineParser$MissingOptionArgState\norg.gradle.cli.CommandLineParser$OptionAwareParserState\norg.gradle.cli.CommandLineParser$OptionComparator\norg.gradle.cli.CommandLineParser$OptionParserState\norg.gradle.cli.CommandLineParser$OptionString\norg.gradle.cli.CommandLineParser$OptionStringComparator\norg.gradle.cli.CommandLineParser$ParserState\norg.gradle.cli.CommandLineParser$UnknownOptionParserState\norg.gradle.cli.CommandLineParser\norg.gradle.cli.ParsedCommandLine\norg.gradle.cli.ParsedCommandLineOption\norg.gradle.cli.ProjectPropertiesCommandLineConverter\norg.gradle.cli.SystemPropertiesCommandLineConverter\norg.gradle.util.internal.ZipSlip\norg.gradle.wrapper.BootstrapMainStarter$1\norg.gradle.wrapper.BootstrapMainStarter\norg.gradle.wrapper.Download$1\norg.gradle.wrapper.Download$DefaultDownloadProgressListener\norg.gradle.wrapper.Download$ProxyAuthenticator\norg.gradle.wrapper.Download\norg.gradle.wrapper.DownloadProgressListener\norg.gradle.wrapper.ExclusiveFileAccessManager\norg.gradle.wrapper.GradleUserHomeLookup\norg.gradle.wrapper.IDownload\norg.gradle.wrapper.Install$1\norg.gradle.wrapper.Install$InstallCheck\norg.gradle.wrapper.Install\norg.gradle.wrapper.Logger\norg.gradle.wrapper.PathAssembler$LocalDistribution\norg.gradle.wrapper.PathAssembler\norg.gradle.wrapper.SystemPropertiesHandler\norg.gradle.wrapper.WrapperConfiguration\norg.gradle.wrapper.WrapperExecutor"
+        }
+      ],
+      "purl": "pkg:maven/gradle-wrapper/gradle-wrapper?type=jar",
+      "type": "library",
+      "version": ""
+    },
+    {
+      "bom-ref": "crypto/certificate/willyko.gpg@sha256:30cdc743f5d480ad24a1a28fa3c4f306111f0e8a22ecd8eaad86596d96a5e57c",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "executionEnvironment": "unknown",
+          "implementationPlatform": "unknown"
+        },
+        "assetType": "certificate"
+      },
+      "name": "willyko.gpg",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "seednode/deployment_v2/docker/bitcoind/gpg_keys/willyko.gpg"
+        }
+      ],
+      "tags": [
+        "cryptographic-asset"
+      ],
+      "type": "cryptographic-asset",
+      "version": "30cdc743f5d480ad24a1a28fa3c4f306111f0e8a22ecd8eaad86596d96a5e57c"
+    },
+    {
+      "bom-ref": "crypto/certificate/willcl-ark.gpg@sha256:7472bf9ef2b5820d30421e17b4f8a6b289292f178de90e36061ceb0f0e7749be",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "executionEnvironment": "unknown",
+          "implementationPlatform": "unknown"
+        },
+        "assetType": "certificate"
+      },
+      "name": "willcl-ark.gpg",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "seednode/deployment_v2/docker/bitcoind/gpg_keys/willcl-ark.gpg"
+        }
+      ],
+      "tags": [
+        "cryptographic-asset"
+      ],
+      "type": "cryptographic-asset",
+      "version": "7472bf9ef2b5820d30421e17b4f8a6b289292f178de90e36061ceb0f0e7749be"
+    },
+    {
+      "bom-ref": "crypto/certificate/vertiond.gpg@sha256:3c749508c475fae198b9b2f0533886d8f4bb8ef36156c0bf91b17c906d99c2c6",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "executionEnvironment": "unknown",
+          "implementationPlatform": "unknown"
+        },
+        "assetType": "certificate"
+      },
+      "name": "vertiond.gpg",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "seednode/deployment_v2/docker/bitcoind/gpg_keys/vertiond.gpg"
+        }
+      ],
+      "tags": [
+        "cryptographic-asset"
+      ],
+      "type": "cryptographic-asset",
+      "version": "3c749508c475fae198b9b2f0533886d8f4bb8ef36156c0bf91b17c906d99c2c6"
+    },
+    {
+      "bom-ref": "crypto/certificate/theStack.gpg@sha256:5031c1425a7ad69a9f36e14324f1a68b38376e2d3ccb45794060f61b00af8a58",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "executionEnvironment": "unknown",
+          "implementationPlatform": "unknown"
+        },
+        "assetType": "certificate"
+      },
+      "name": "theStack.gpg",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "seednode/deployment_v2/docker/bitcoind/gpg_keys/theStack.gpg"
+        }
+      ],
+      "tags": [
+        "cryptographic-asset"
+      ],
+      "type": "cryptographic-asset",
+      "version": "5031c1425a7ad69a9f36e14324f1a68b38376e2d3ccb45794060f61b00af8a58"
+    },
+    {
+      "bom-ref": "crypto/certificate/svanstaa.gpg@sha256:d957af6c7f378a17c35b29f307829802264d28824817f8711db6221914c5cbcd",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "executionEnvironment": "unknown",
+          "implementationPlatform": "unknown"
+        },
+        "assetType": "certificate"
+      },
+      "name": "svanstaa.gpg",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "seednode/deployment_v2/docker/bitcoind/gpg_keys/svanstaa.gpg"
+        }
+      ],
+      "tags": [
+        "cryptographic-asset"
+      ],
+      "type": "cryptographic-asset",
+      "version": "d957af6c7f378a17c35b29f307829802264d28824817f8711db6221914c5cbcd"
+    },
+    {
+      "bom-ref": "crypto/certificate/sipa.gpg@sha256:b1d174391c2eca8cc637404e515a2a836c2d88ceeae2e462fa2406d1afef75c7",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "executionEnvironment": "unknown",
+          "implementationPlatform": "unknown"
+        },
+        "assetType": "certificate"
+      },
+      "name": "sipa.gpg",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "seednode/deployment_v2/docker/bitcoind/gpg_keys/sipa.gpg"
+        }
+      ],
+      "tags": [
+        "cryptographic-asset"
+      ],
+      "type": "cryptographic-asset",
+      "version": "b1d174391c2eca8cc637404e515a2a836c2d88ceeae2e462fa2406d1afef75c7"
+    },
+    {
+      "bom-ref": "crypto/certificate/satsie.gpg@sha256:905c2c1b14b43fbc6a0562884f2365e1728428141fccc365a83843db1d3b7f76",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "executionEnvironment": "unknown",
+          "implementationPlatform": "unknown"
+        },
+        "assetType": "certificate"
+      },
+      "name": "satsie.gpg",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "seednode/deployment_v2/docker/bitcoind/gpg_keys/satsie.gpg"
+        }
+      ],
+      "tags": [
+        "cryptographic-asset"
+      ],
+      "type": "cryptographic-asset",
+      "version": "905c2c1b14b43fbc6a0562884f2365e1728428141fccc365a83843db1d3b7f76"
+    },
+    {
+      "bom-ref": "crypto/certificate/laanwj.gpg@sha256:556c62caf73e85a56ac2d15ecd814cf733f2a425cf72edb89eb7bafad6178656",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "executionEnvironment": "unknown",
+          "implementationPlatform": "unknown"
+        },
+        "assetType": "certificate"
+      },
+      "name": "laanwj.gpg",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "seednode/deployment_v2/docker/bitcoind/gpg_keys/laanwj.gpg"
+        }
+      ],
+      "tags": [
+        "cryptographic-asset"
+      ],
+      "type": "cryptographic-asset",
+      "version": "556c62caf73e85a56ac2d15ecd814cf733f2a425cf72edb89eb7bafad6178656"
+    },
+    {
+      "bom-ref": "crypto/certificate/josibake.gpg@sha256:47d60a0490a93e3261347e73d5c94311bd77538d822e315f6d68b6be5746e887",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "executionEnvironment": "unknown",
+          "implementationPlatform": "unknown"
+        },
+        "assetType": "certificate"
+      },
+      "name": "josibake.gpg",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "seednode/deployment_v2/docker/bitcoind/gpg_keys/josibake.gpg"
+        }
+      ],
+      "tags": [
+        "cryptographic-asset"
+      ],
+      "type": "cryptographic-asset",
+      "version": "47d60a0490a93e3261347e73d5c94311bd77538d822e315f6d68b6be5746e887"
+    },
+    {
+      "bom-ref": "crypto/certificate/jackielove4u.gpg@sha256:50d7dbc07a6eedbb24700bd80c122094f6e24dbc0812781f5f3318658d47d9b6",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "executionEnvironment": "unknown",
+          "implementationPlatform": "unknown"
+        },
+        "assetType": "certificate"
+      },
+      "name": "jackielove4u.gpg",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "seednode/deployment_v2/docker/bitcoind/gpg_keys/jackielove4u.gpg"
+        }
+      ],
+      "tags": [
+        "cryptographic-asset"
+      ],
+      "type": "cryptographic-asset",
+      "version": "50d7dbc07a6eedbb24700bd80c122094f6e24dbc0812781f5f3318658d47d9b6"
+    },
+    {
+      "bom-ref": "crypto/certificate/hebasto.gpg@sha256:f305e90cb6b3cfe47beb71a51242395f1fc8d46840a1d2345283df2fefca021b",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "executionEnvironment": "unknown",
+          "implementationPlatform": "unknown"
+        },
+        "assetType": "certificate"
+      },
+      "name": "hebasto.gpg",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "seednode/deployment_v2/docker/bitcoind/gpg_keys/hebasto.gpg"
+        }
+      ],
+      "tags": [
+        "cryptographic-asset"
+      ],
+      "type": "cryptographic-asset",
+      "version": "f305e90cb6b3cfe47beb71a51242395f1fc8d46840a1d2345283df2fefca021b"
+    },
+    {
+      "bom-ref": "crypto/certificate/guggero.gpg@sha256:09d130b060d28e257a9e76773252d1ae35238e93425848b86bc67bd0f6b28675",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "executionEnvironment": "unknown",
+          "implementationPlatform": "unknown"
+        },
+        "assetType": "certificate"
+      },
+      "name": "guggero.gpg",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "seednode/deployment_v2/docker/bitcoind/gpg_keys/guggero.gpg"
+        }
+      ],
+      "tags": [
+        "cryptographic-asset"
+      ],
+      "type": "cryptographic-asset",
+      "version": "09d130b060d28e257a9e76773252d1ae35238e93425848b86bc67bd0f6b28675"
+    },
+    {
+      "bom-ref": "crypto/certificate/glozow.gpg@sha256:fe3e3107e04289f39e93e871f0d8fbd74ddaf2997c114a057a8b97d07ab801ec",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "executionEnvironment": "unknown",
+          "implementationPlatform": "unknown"
+        },
+        "assetType": "certificate"
+      },
+      "name": "glozow.gpg",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "seednode/deployment_v2/docker/bitcoind/gpg_keys/glozow.gpg"
+        }
+      ],
+      "tags": [
+        "cryptographic-asset"
+      ],
+      "type": "cryptographic-asset",
+      "version": "fe3e3107e04289f39e93e871f0d8fbd74ddaf2997c114a057a8b97d07ab801ec"
+    },
+    {
+      "bom-ref": "crypto/certificate/fanquake.gpg@sha256:d9d6d89f5d9da0811ed94469f790d5bd0e185b7ee678e7ca7b3121995ded3d26",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "executionEnvironment": "unknown",
+          "implementationPlatform": "unknown"
+        },
+        "assetType": "certificate"
+      },
+      "name": "fanquake.gpg",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "seednode/deployment_v2/docker/bitcoind/gpg_keys/fanquake.gpg"
+        }
+      ],
+      "tags": [
+        "cryptographic-asset"
+      ],
+      "type": "cryptographic-asset",
+      "version": "d9d6d89f5d9da0811ed94469f790d5bd0e185b7ee678e7ca7b3121995ded3d26"
+    },
+    {
+      "bom-ref": "crypto/certificate/dunxen.gpg@sha256:402901a80bc6eab5aa45eadc22407b23382c83e085955af6e94b9b5d0ba77a2f",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "executionEnvironment": "unknown",
+          "implementationPlatform": "unknown"
+        },
+        "assetType": "certificate"
+      },
+      "name": "dunxen.gpg",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "seednode/deployment_v2/docker/bitcoind/gpg_keys/dunxen.gpg"
+        }
+      ],
+      "tags": [
+        "cryptographic-asset"
+      ],
+      "type": "cryptographic-asset",
+      "version": "402901a80bc6eab5aa45eadc22407b23382c83e085955af6e94b9b5d0ba77a2f"
+    },
+    {
+      "bom-ref": "crypto/certificate/darosior.gpg@sha256:9ab192ac8fb23d2f562dd675fed22669f9622596a8982bfab98be6fdad1c9f42",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "executionEnvironment": "unknown",
+          "implementationPlatform": "unknown"
+        },
+        "assetType": "certificate"
+      },
+      "name": "darosior.gpg",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "seednode/deployment_v2/docker/bitcoind/gpg_keys/darosior.gpg"
+        }
+      ],
+      "tags": [
+        "cryptographic-asset"
+      ],
+      "type": "cryptographic-asset",
+      "version": "9ab192ac8fb23d2f562dd675fed22669f9622596a8982bfab98be6fdad1c9f42"
+    },
+    {
+      "bom-ref": "crypto/certificate/cfields.gpg@sha256:ade3096ffb3020eea7c30f7ef626b3d890387b782dde502b74f54044b4e9a502",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "executionEnvironment": "unknown",
+          "implementationPlatform": "unknown"
+        },
+        "assetType": "certificate"
+      },
+      "name": "cfields.gpg",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "seednode/deployment_v2/docker/bitcoind/gpg_keys/cfields.gpg"
+        }
+      ],
+      "tags": [
+        "cryptographic-asset"
+      ],
+      "type": "cryptographic-asset",
+      "version": "ade3096ffb3020eea7c30f7ef626b3d890387b782dde502b74f54044b4e9a502"
+    },
+    {
+      "bom-ref": "crypto/certificate/benthecarman.gpg@sha256:b600d892b5d5ed138ceb15b6feb66ac1c4db854f3ea3219243f9302257a1919d",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "executionEnvironment": "unknown",
+          "implementationPlatform": "unknown"
+        },
+        "assetType": "certificate"
+      },
+      "name": "benthecarman.gpg",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "seednode/deployment_v2/docker/bitcoind/gpg_keys/benthecarman.gpg"
+        }
+      ],
+      "tags": [
+        "cryptographic-asset"
+      ],
+      "type": "cryptographic-asset",
+      "version": "b600d892b5d5ed138ceb15b6feb66ac1c4db854f3ea3219243f9302257a1919d"
+    },
+    {
+      "bom-ref": "crypto/certificate/achow101.gpg@sha256:98d22246c00ce3a6833938db967aeaf9581c786a91c409cf89f70d0f0c57caf2",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "executionEnvironment": "unknown",
+          "implementationPlatform": "unknown"
+        },
+        "assetType": "certificate"
+      },
+      "name": "achow101.gpg",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "seednode/deployment_v2/docker/bitcoind/gpg_keys/achow101.gpg"
+        }
+      ],
+      "tags": [
+        "cryptographic-asset"
+      ],
+      "type": "cryptographic-asset",
+      "version": "98d22246c00ce3a6833938db967aeaf9581c786a91c409cf89f70d0f0c57caf2"
+    },
+    {
+      "bom-ref": "crypto/certificate/TheCharlatan.gpg@sha256:12918014a7d0951b5470baed2d0f313b5107b66f3df5af4c804f88a16c941a3d",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "executionEnvironment": "unknown",
+          "implementationPlatform": "unknown"
+        },
+        "assetType": "certificate"
+      },
+      "name": "TheCharlatan.gpg",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "seednode/deployment_v2/docker/bitcoind/gpg_keys/TheCharlatan.gpg"
+        }
+      ],
+      "tags": [
+        "cryptographic-asset"
+      ],
+      "type": "cryptographic-asset",
+      "version": "12918014a7d0951b5470baed2d0f313b5107b66f3df5af4c804f88a16c941a3d"
+    },
+    {
+      "bom-ref": "crypto/certificate/Sjors.gpg@sha256:5c7b89b09f69e8812f4865ab4787402ca23f6f4135439900d438f36baad4c439",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "executionEnvironment": "unknown",
+          "implementationPlatform": "unknown"
+        },
+        "assetType": "certificate"
+      },
+      "name": "Sjors.gpg",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "seednode/deployment_v2/docker/bitcoind/gpg_keys/Sjors.gpg"
+        }
+      ],
+      "tags": [
+        "cryptographic-asset"
+      ],
+      "type": "cryptographic-asset",
+      "version": "5c7b89b09f69e8812f4865ab4787402ca23f6f4135439900d438f36baad4c439"
+    },
+    {
+      "bom-ref": "crypto/certificate/Emzy.gpg@sha256:406d1c33a00a95228569c56585cb28ff1beba2851d17ba2aa29a727b3b748631",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "executionEnvironment": "unknown",
+          "implementationPlatform": "unknown"
+        },
+        "assetType": "certificate"
+      },
+      "name": "Emzy.gpg",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "seednode/deployment_v2/docker/bitcoind/gpg_keys/Emzy.gpg"
+        }
+      ],
+      "tags": [
+        "cryptographic-asset"
+      ],
+      "type": "cryptographic-asset",
+      "version": "406d1c33a00a95228569c56585cb28ff1beba2851d17ba2aa29a727b3b748631"
+    },
+    {
+      "bom-ref": "crypto/certificate/CoinForensics.gpg@sha256:3e1dff163c3a4a6f3dd50e18bed497888b18a7bc1c0745ef1f97def8b71735a4",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "executionEnvironment": "unknown",
+          "implementationPlatform": "unknown"
+        },
+        "assetType": "certificate"
+      },
+      "name": "CoinForensics.gpg",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "seednode/deployment_v2/docker/bitcoind/gpg_keys/CoinForensics.gpg"
+        }
+      ],
+      "tags": [
+        "cryptographic-asset"
+      ],
+      "type": "cryptographic-asset",
+      "version": "3e1dff163c3a4a6f3dd50e18bed497888b18a7bc1c0745ef1f97def8b71735a4"
+    },
+    {
+      "bom-ref": "crypto/certificate/0xb10c.gpg@sha256:9852322a8ebc3828c732d3e379f0b13c1d3a55817fe103c90c98fa070ab058b9",
+      "cryptoProperties": {
+        "algorithmProperties": {
+          "executionEnvironment": "unknown",
+          "implementationPlatform": "unknown"
+        },
+        "assetType": "certificate"
+      },
+      "name": "0xb10c.gpg",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "seednode/deployment_v2/docker/bitcoind/gpg_keys/0xb10c.gpg"
+        }
+      ],
+      "tags": [
+        "cryptographic-asset"
+      ],
+      "type": "cryptographic-asset",
+      "version": "9852322a8ebc3828c732d3e379f0b13c1d3a55817fe103c90c98fa070ab058b9"
+    },
+    {
+      "bom-ref": "crypto/algorithm/hmacSHA@1.3.6.1.5.5.8.1.2",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "oid": "1.3.6.1.5.5.8.1.2"
+      },
+      "description": "ISAKMP HMAC algorithm",
+      "name": "hmacSHA",
+      "tags": [
+        "cryptographic-asset"
+      ],
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "crypto/algorithm/sha-256@2.16.840.1.101.3.4.2.1",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "oid": "2.16.840.1.101.3.4.2.1"
+      },
+      "description": "NIST Algorithm",
+      "name": "sha-256",
+      "tags": [
+        "cryptographic-asset"
+      ],
+      "type": "cryptographic-asset"
+    },
+    {
+      "bom-ref": "crypto/algorithm/aes@2.16.840.1.101.3.4.1",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "oid": "2.16.840.1.101.3.4.1"
+      },
+      "description": "NIST Algorithm",
+      "name": "aes",
+      "tags": [
+        "cryptographic-asset"
+      ],
+      "type": "cryptographic-asset"
+    }
+  ],
+  "dependencies": [
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/repo@latest"
+    }
+  ],
+  "metadata": {
+    "authors": [
+      {
+        "name": "OWASP Foundation"
+      }
+    ],
+    "component": {
+      "bom-ref": "pkg:maven/repo@latest",
+      "group": "",
+      "name": "repo",
+      "purl": "pkg:maven/repo@latest",
+      "type": "application",
+      "version": "latest"
+    },
+    "lifecycles": [
+      {
+        "phase": "build"
+      }
+    ],
+    "properties": [
+      {
+        "name": "cdx:bom:componentTypes",
+        "value": "github\\nmaven"
+      },
+      {
+        "name": "cdx:bom:componentNamespaces",
+        "value": "actions\\ncodacy\\ngradle\\ngradle-wrapper"
+      },
+      {
+        "name": "cdx:bom:componentSrcFiles",
+        "value": "gradle-wrapper.jar\\njar-deps-UDTJmW/gradle-wrapper.jar\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/0xb10c.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/CoinForensics.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/Emzy.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/Sjors.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/TheCharlatan.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/achow101.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/benthecarman.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/cfields.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/darosior.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/dunxen.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/fanquake.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/glozow.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/guggero.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/hebasto.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/jackielove4u.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/josibake.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/laanwj.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/satsie.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/sipa.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/svanstaa.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/theStack.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/vertiond.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/willcl-ark.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/willyko.gpg"
+      },
+      {
+        "name": "cdx:bom:componentTypes",
+        "value": "github\\nmaven"
+      },
+      {
+        "name": "cdx:bom:componentNamespaces",
+        "value": "actions\\ncodacy\\ngradle\\ngradle-wrapper"
+      },
+      {
+        "name": "cdx:bom:componentSrcFiles",
+        "value": "gradle-wrapper.jar\\njar-deps-UDTJmW/gradle-wrapper.jar\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/0xb10c.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/CoinForensics.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/Emzy.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/Sjors.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/TheCharlatan.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/achow101.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/benthecarman.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/cfields.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/darosior.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/dunxen.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/fanquake.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/glozow.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/guggero.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/hebasto.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/jackielove4u.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/josibake.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/laanwj.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/satsie.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/sipa.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/svanstaa.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/theStack.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/vertiond.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/willcl-ark.gpg\\nseednode/deployment_v2/docker/bitcoind/gpg_keys/willyko.gpg"
+      }
+    ],
+    "timestamp": "2025-09-10T16:30:17Z",
+    "tools": {
+      "components": [
+        {
+          "authors": [
+            {
+              "name": "OWASP Foundation"
+            }
+          ],
+          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@11.7.0",
+          "group": "@cyclonedx",
+          "name": "cdxgen",
+          "publisher": "OWASP Foundation",
+          "purl": "pkg:npm/%40cyclonedx/cdxgen@11.7.0",
+          "type": "application",
+          "version": "11.7.0"
+        }
+      ]
+    }
+  },
+  "serialNumber": "urn:uuid:e778ff01-d2a6-4401-afc2-73400e006221",
+  "services": [
+    {
+      "endpoints": [
+        "get-date/{hash}"
+      ],
+      "name": "bisq-restapi-endpoints-AccountAgeApi-getDate-service"
+    },
+    {
+      "endpoints": [
+        "get-bonded-reputation/{block-height}"
+      ],
+      "name": "bisq-restapi-endpoints-BondedReputationApi-getBondedReputation-service"
+    },
+    {
+      "endpoints": [
+        "get-bonded-role-verification/{bond-user-name}/{role-type}/{profile-id}/{signature}"
+      ],
+      "name": "bisq-restapi-endpoints-BondedRoleVerificationApi-getBondedRoleVerification-service"
+    },
+    {
+      "endpoints": [
+        "get-bsq-block-by-hash/{block-hash}"
+      ],
+      "name": "bisq-restapi-endpoints-ExplorerBlocksApi-getBsqBlockByHash-service"
+    },
+    {
+      "endpoints": [
+        "get-bsq-block-by-height/{block-height}"
+      ],
+      "name": "bisq-restapi-endpoints-ExplorerBlocksApi-getBsqBlockByHeight-service"
+    },
+    {
+      "endpoints": [
+        "get-trades/{newestTimestamp}/{oldestTimestamp}"
+      ],
+      "name": "bisq-restapi-endpoints-ExplorerMarketsApi-getBisqTrades-service"
+    },
+    {
+      "endpoints": [
+        "get-bsq-tx-for-addr/{addr}"
+      ],
+      "name": "bisq-restapi-endpoints-ExplorerTransactionsApi-getBisqTxForAddr-service"
+    },
+    {
+      "endpoints": [
+        "get-bsq-tx/{txid}"
+      ],
+      "name": "bisq-restapi-endpoints-ExplorerTransactionsApi-getTx-service"
+    },
+    {
+      "endpoints": [
+        "query-txs-paginated/{start}/{count}/{filters}"
+      ],
+      "name": "bisq-restapi-endpoints-ExplorerTransactionsApi-queryTxsPaginated-service"
+    },
+    {
+      "endpoints": [
+        "get-proof-of-burn/{block-height}"
+      ],
+      "name": "bisq-restapi-endpoints-ProofOfBurnApi-getProofOfBurn-service"
+    },
+    {
+      "endpoints": [
+        "get-date/{hash}"
+      ],
+      "name": "bisq-restapi-endpoints-SignedWitnessApi-getDate-service"
+    }
+  ],
+  "specVersion": "1.6",
+  "version": 2
+}

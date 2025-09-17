@@ -1,0 +1,160 @@
+{
+  "annotations": [
+    {
+      "annotator": {
+        "component": {
+          "authors": [
+            {
+              "name": "OWASP Foundation"
+            }
+          ],
+          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@11.7.0",
+          "group": "@cyclonedx",
+          "name": "cdxgen",
+          "publisher": "OWASP Foundation",
+          "purl": "pkg:npm/%40cyclonedx/cdxgen@11.7.0",
+          "type": "application",
+          "version": "11.7.0"
+        }
+      },
+      "bom-ref": "metadata-annotations",
+      "subjects": [
+        "pkg:maven/repo@latest"
+      ],
+      "text": "This Software Bill-of-Materials (SBOM) document was created on Wednesday, September 10, 2025 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'repo'. There are 5 components. 2 package type(s) and 4 purl namespaces are described in the document under components.",
+      "timestamp": "2025-09-10T14:29:25Z"
+    }
+  ],
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "bom-ref": "pkg:github/actions/checkout@v5",
+      "group": "actions",
+      "name": "checkout",
+      "purl": "pkg:github/actions/checkout@v5",
+      "type": "application",
+      "version": "v5"
+    },
+    {
+      "bom-ref": "pkg:github/transifex/cli-action@v2",
+      "group": "transifex",
+      "name": "cli-action",
+      "purl": "pkg:github/transifex/cli-action@v2",
+      "type": "library",
+      "version": "v2"
+    },
+    {
+      "bom-ref": "pkg:github/actions/setup-java@v5.0.0",
+      "group": "actions",
+      "name": "setup-java",
+      "purl": "pkg:github/actions/setup-java@v5.0.0",
+      "type": "application",
+      "version": "v5.0.0"
+    },
+    {
+      "bom-ref": "pkg:github/gradle/gradle-build-action@v3.5.0",
+      "group": "gradle",
+      "name": "gradle-build-action",
+      "purl": "pkg:github/gradle/gradle-build-action@v3.5.0",
+      "type": "library",
+      "version": "v3.5.0"
+    },
+    {
+      "bom-ref": "pkg:maven/gradle-wrapper/gradle-wrapper?type=jar",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "gradle-wrapper.jar",
+            "confidence": 0,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0,
+                "technique": "filename",
+                "value": "gradle-wrapper.jar"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "gradle-wrapper",
+      "name": "gradle-wrapper",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "jar-deps-iugFEr/gradle-wrapper.jar"
+        },
+        {
+          "name": "Namespaces",
+          "value": "org.gradle.wrapper.GradleWrapperMain\norg.gradle.cli.AbstractCommandLineConverter\norg.gradle.cli.AbstractPropertiesCommandLineConverter\norg.gradle.cli.CommandLineArgumentException\norg.gradle.cli.CommandLineConverter\norg.gradle.cli.CommandLineOption\norg.gradle.cli.CommandLineParser$1\norg.gradle.cli.CommandLineParser$AfterFirstSubCommand\norg.gradle.cli.CommandLineParser$AfterOptions\norg.gradle.cli.CommandLineParser$BeforeFirstSubCommand\norg.gradle.cli.CommandLineParser$CaseInsensitiveStringComparator\norg.gradle.cli.CommandLineParser$KnownOptionParserState\norg.gradle.cli.CommandLineParser$MissingOptionArgState\norg.gradle.cli.CommandLineParser$OptionAwareParserState\norg.gradle.cli.CommandLineParser$OptionComparator\norg.gradle.cli.CommandLineParser$OptionParserState\norg.gradle.cli.CommandLineParser$OptionString\norg.gradle.cli.CommandLineParser$OptionStringComparator\norg.gradle.cli.CommandLineParser$ParserState\norg.gradle.cli.CommandLineParser$UnknownOptionParserState\norg.gradle.cli.CommandLineParser\norg.gradle.cli.ParsedCommandLine\norg.gradle.cli.ParsedCommandLineOption\norg.gradle.cli.ProjectPropertiesCommandLineConverter\norg.gradle.cli.SystemPropertiesCommandLineConverter\norg.gradle.util.internal.ZipSlip\norg.gradle.wrapper.BootstrapMainStarter$1\norg.gradle.wrapper.BootstrapMainStarter\norg.gradle.wrapper.Download$1\norg.gradle.wrapper.Download$DefaultDownloadProgressListener\norg.gradle.wrapper.Download$ProxyAuthenticator\norg.gradle.wrapper.Download\norg.gradle.wrapper.DownloadProgressListener\norg.gradle.wrapper.ExclusiveFileAccessManager\norg.gradle.wrapper.GradleUserHomeLookup\norg.gradle.wrapper.IDownload\norg.gradle.wrapper.Install$1\norg.gradle.wrapper.Install$InstallCheck\norg.gradle.wrapper.Install\norg.gradle.wrapper.Logger\norg.gradle.wrapper.PathAssembler$LocalDistribution\norg.gradle.wrapper.PathAssembler\norg.gradle.wrapper.SystemPropertiesHandler\norg.gradle.wrapper.WrapperConfiguration\norg.gradle.wrapper.WrapperExecutor"
+        }
+      ],
+      "purl": "pkg:maven/gradle-wrapper/gradle-wrapper?type=jar",
+      "type": "library",
+      "version": ""
+    }
+  ],
+  "dependencies": [
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/repo@latest"
+    }
+  ],
+  "metadata": {
+    "authors": [
+      {
+        "name": "OWASP Foundation"
+      }
+    ],
+    "component": {
+      "bom-ref": "pkg:maven/repo@latest",
+      "group": "",
+      "name": "repo",
+      "purl": "pkg:maven/repo@latest",
+      "type": "application",
+      "version": "latest"
+    },
+    "lifecycles": [
+      {
+        "phase": "build"
+      }
+    ],
+    "properties": [
+      {
+        "name": "cdx:bom:componentTypes",
+        "value": "github\\nmaven"
+      },
+      {
+        "name": "cdx:bom:componentNamespaces",
+        "value": "actions\\ngradle\\ngradle-wrapper\\ntransifex"
+      },
+      {
+        "name": "cdx:bom:componentSrcFiles",
+        "value": "gradle-wrapper.jar\\njar-deps-iugFEr/gradle-wrapper.jar"
+      }
+    ],
+    "timestamp": "2025-09-10T14:29:25Z",
+    "tools": {
+      "components": [
+        {
+          "authors": [
+            {
+              "name": "OWASP Foundation"
+            }
+          ],
+          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@11.7.0",
+          "group": "@cyclonedx",
+          "name": "cdxgen",
+          "publisher": "OWASP Foundation",
+          "purl": "pkg:npm/%40cyclonedx/cdxgen@11.7.0",
+          "type": "application",
+          "version": "11.7.0"
+        }
+      ]
+    }
+  },
+  "serialNumber": "urn:uuid:e967bfc6-b2ca-4980-9ec6-1bfec7535e77",
+  "services": [],
+  "specVersion": "1.6",
+  "version": 1
+}

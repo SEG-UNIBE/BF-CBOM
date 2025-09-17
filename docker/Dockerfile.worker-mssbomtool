@@ -1,0 +1,50 @@
+# docker/Dockerfile.worker-mssbomtool
+
+# --- Stage 1: build the sbom-tool as a local .NET tool
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS sbom_build
+ENV DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1 \
+    DOTNET_CLI_TELEMETRY_OPTOUT=1 \
+    NUGET_XMLDOC_MODE=skip
+RUN dotnet tool install --tool-path /tools Microsoft.Sbom.DotNetTool
+
+# --- Stage 2: runtime (Python + .NET runtime)
+FROM python:3.12-slim AS runtime
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install tini + prerequisites and .NET 8 runtime (arch-agnostic)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates wget gnupg git tini tar xz-utils libc6 libgcc-s1 libstdc++6 zlib1g libkrb5-3 libssl3 libicu-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && wget -q https://dot.net/v1/dotnet-install.sh -O /tmp/dotnet-install.sh \
+    && bash /tmp/dotnet-install.sh --runtime dotnet --channel 8.0 --install-dir /usr/share/dotnet \
+    && rm -f /tmp/dotnet-install.sh
+ENV DOTNET_ROOT=/usr/share/dotnet
+ENV PATH="/usr/share/dotnet:${PATH}"
+
+# Create non-root user used by the project
+RUN groupadd -g 1000 appuser && useradd -m -u 1000 -g appuser appuser
+
+# Copy the sbom-tool shim and payload from the build stage
+RUN mkdir -p /opt/sbom-tool
+COPY --from=sbom_build /tools/ /opt/sbom-tool/
+RUN chown -R appuser:appuser /opt/sbom-tool && chmod -R a+rx /opt/sbom-tool
+ENV PATH="/opt/sbom-tool:${PATH}"
+
+# Python/UV setup
+WORKDIR /app
+ENV PYTHONPATH=/app \
+    UV_PROJECT_ENVIRONMENT=/home/appuser/.venvs/mssbomtool
+RUN pip install --no-cache-dir --upgrade pip uv
+
+# Copy dependency manifests first for better caching
+COPY --chown=appuser:appuser pyproject.toml uv.lock ./
+COPY --chown=appuser:appuser common/ ./common/
+
+# Create the venv and sync as appuser
+USER appuser
+RUN uv sync --frozen --no-dev
+
+# Worker code
+COPY --chown=appuser:appuser workers/mssbomtool/ ./workers/mssbomtool/
+
+ENTRYPOINT ["tini","-g","--","uv","run","workers/mssbomtool/main.py"]

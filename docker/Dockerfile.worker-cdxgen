@@ -1,0 +1,25 @@
+# docker/Dockerfile.worker-cdxgen  (root-run)
+
+ARG CDXGEN_IMAGE=ghcr.io/cyclonedx/cdxgen
+ARG CDXGEN_TAG=v11.7.0
+FROM ${CDXGEN_IMAGE}:${CDXGEN_TAG}
+
+# Stay root on purpose for this one worker
+USER root
+WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONPATH=/app
+
+# Keep venv out of /app just to avoid lock/perm weirdness
+ENV UV_PROJECT_ENVIRONMENT=/root/.venvs/cdxgen \
+    UV_NO_LOCK=1
+
+# Deps first
+COPY pyproject.toml uv.lock ./
+COPY common/ ./common/
+RUN python3 -m pip install --no-cache-dir --upgrade pip uv \
+ && uv sync --frozen --no-dev
+
+# Worker code last
+COPY workers/cdxgen/ ./workers/cdxgen/
+
+ENTRYPOINT ["uv","run","workers/cdxgen/main.py"]

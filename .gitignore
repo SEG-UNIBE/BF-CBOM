@@ -135,7 +135,7 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
+*.env
 .envrc
 .venv
 env/
@@ -143,6 +143,17 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Make docker/env visible again
+!docker/
+!docker/env/
+
+# Allow template envs anywhere
+!*.env.template
+
+# Still ignore real env files inside docker/env/, allow templates
+docker/env/*.env
+!docker/env/*.env.template
 
 # Spyder project settings
 .spyderproject
@@ -205,3 +216,18 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# --- OS/editor detritus ---
+.DS_Store
+Thumbs.db
+
+# Black
+.black/
+.black_cache/
+
+# Ruff
+.ruff_cache/
+ruff.log
+.ruff.toml
+ruff.toml
+.pyproject-black.toml

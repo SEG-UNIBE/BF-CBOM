@@ -1,0 +1,196 @@
+name: bf-cbom
+services:
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    restart: on-failure:3
+    healthcheck:
+        test: ["CMD", "redis-cli", "ping"]
+        interval: 2s
+        timeout: 2s
+        retries: 5
+        start_period: 1s
+
+  coordinator:
+    image: bf-cbom/coordinator:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.coordinator
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+    ports:
+      - "8501:8501"
+    depends_on:
+      - redis
+    environment:
+      - AVAILABLE_WORKERS=${AVAILABLE_WORKERS:-skeleton,testing,cdxgen,cbomkit,deepseek}
+      - AVAILABLE_LANGUAGES=python,java
+      - GITHUB_CACHE_TTL_SEC=86400
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    env_file: docker/env/coordinator.env
+    restart: on-failure:3
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8501/_stcore/health"]
+      interval: 2s
+      timeout: 2s
+      retries: 5
+      start_period: 1s
+
+  worker-skeleton:
+    image: bf-cbom/worker-skeleton:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-skeleton
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=6
+    env_file: docker/env/worker-skeleton.env
+    restart: on-failure:3
+    profiles: [dev, all]
+
+
+  worker-testing:
+    image: bf-cbom/worker-testing:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-testing
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=6
+      - TESTING_MIN_CBOM_KB=50
+      - TESTING_MAX_CBOM_KB=1000
+    env_file: docker/env/worker-testing.env
+    restart: on-failure:3
+    profiles: [dev, all]
+
+  worker-cbomkit:
+    image: bf-cbom/worker-cbomkit:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-cbomkit
+      args:
+        BASE_IMAGE: ${BASE_IMAGE}
+        BASE_TAG: ${VERSION}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=300
+    env_file: docker/env/worker-cbomkit.env
+    restart: on-failure:3
+    profiles: [prod, all]
+
+  worker-cdxgen:
+    image: bf-cbom/worker-cdxgen:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-cdxgen
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG:   ${VERSION:-latest}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=600
+      - CDXGEN_DEBUG_MODE=debug
+    env_file: docker/env/worker-cdxgen.env
+    restart: on-failure:3
+    profiles: [prod, all]
+
+
+  worker-deepseek:
+    image: bf-cbom/worker-deepseek:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-deepseek
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=90
+    env_file: docker/env/worker-deepseek.env
+    restart: on-failure:3
+    profiles: [prod, all]
+
+  worker-mssbomtool:
+    image: bf-cbom/worker-mssbomtool:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-mssbomtool
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=120
+    env_file: docker/env/worker-mssbomtool.env
+    restart: on-failure:3
+    profiles: [prod, all]
+
+  worker-cryptobomforge:
+    image: bf-cbom/worker-cryptobomforge:${VERSION:-latest}
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-cryptobomforge
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=600
+      - AVAILABLE_LANGUAGES=python,java
+      - CODEQL_RAM_MB=4000
+    env_file: docker/env/worker-cryptobomforge.env
+    restart: on-failure:3
+    profiles: [prod, all]
