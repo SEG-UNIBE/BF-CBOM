@@ -1,14 +1,13 @@
-# BF-CBOM: Benchmarking Framework for Cryptographic Bill of Materials
+# `BF-CBOM`: Benchmarking Framework for Cryptographic Bill of Materials
 
-> *(your **b**est **f**riend for generating and analyzing CBOMs)*
+> Benchmarking Cryptographic Bill of Material (CBOM) generators end-to: coordinating containerized jobs, normalizing outputs, and scoring results across ecosystems.
+> In short, your **b**est **f**riend for generating and analyzing CBOMs.
 
+[![DOI](https://zenodo.org/badge/1058056469.svg)](https://doi.org/10.5281/zenodo.17140610)
 [![Python](https://img.shields.io/badge/python-v3.12%2B-blue.svg)](#)
 [![Docker Compose](https://img.shields.io/badge/Docker-Compose-success.svg)](#)
 [![Streamlit](https://img.shields.io/badge/Streamlit-app-red.svg)](#)
-[![uv](https://img.shields.io/badge/uv-managed-informational.svg)](#)
 [![License](https://img.shields.io/badge/License-GPL--3.0--only-blue.svg)](./LICENSE)
-
-**Benchmarking and comparing Cryptographic Bills of Materials (CBOM) generators. Orchestrates workers, normalizes outputs, and scores results across ecosystems.**
 
 <div align="center">
   <!-- Replace the src below with your actual logo path if/when available -->
