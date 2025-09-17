@@ -76,7 +76,7 @@ Use this when you want to keep tooling off your host.
     docker build -f docker/Dockerfile.builder -t bf-cbom/builder .
     ```
 
-2. Run the builder container. It clones the repo inside the container, reuses your local `.env` templates, and brings the stack up:
+6. Run the builder container. It clones the repo inside the container, reuses your local `.env` templates, and brings the stack up:
 
    ```bash
    docker build -f docker/Dockerfile.builder -t bf-cbom/builder . && \
@@ -92,7 +92,7 @@ Use this when you want to keep tooling off your host.
       "
    ```
 
-3. Exit with `Ctrl+C` when you are done benchmarking. The session is ephemeral; all tooling lives inside the container.
+7. Exit with `Ctrl+C` when you are done benchmarking. The session is ephemeral; all tooling lives inside the container.
 
 > [!NOTE]
 > **Windows** users need backticks for line continuations in PowerShell, so this variant keeps the disposable builder flow copy/paste-friendly.
@@ -113,29 +113,29 @@ Bring the stack up on your host using GNU Make and Docker Compose.
 
 #### macOS / Linux
 
-1. Confirm Docker Desktop/Engine (Compose v2) is running on this machine with the resource limits noted above.
-2. Ensure Python 3.12 and `uv` are available on `PATH` (e.g., `brew install uv` or `pipx install uv`).
-3. Generate `.env` files from templates: `./scripts/ensure_env.sh`.
-4. Start the services with the worker profile of choice:
+5. Confirm Docker Desktop/Engine (Compose v2) is running on this machine with the resource limits noted above.
+6. Ensure Python 3.12 and `uv` are available on `PATH` (e.g., `brew install uv` or `pipx install uv`).
+7. Generate `.env` files from templates: `./scripts/ensure_env.sh`.
+8. Start the services with the worker profile of choice:
    - `make up-all` – run every worker
    - `make up-dev` – only the lightweight development workers
 
    These commands attach logs; stop them with `Ctrl+C`.
-5. *(Optional)* If you want local CLI usage, sync dependencies once: `uv sync --frozen --no-dev`.
+9. *(Optional)* If you want local CLI usage, sync dependencies once: `uv sync --frozen --no-dev`.
 
 #### Windows
 
-1. Confirm Docker Desktop is running with the WSL 2 backend enabled and the resource limits noted above.
-2. Install Git for Windows and always use **Git Bash** (or WSL) for the commands below.
-3. Install GNU Make (`choco install make` or via MSYS2) and verify `make --version` inside Git Bash.
-4. Install Python 3.12 and `pipx`, then `pipx install uv` so `uv --version` succeeds.
-5. From the repo root, create the `.env` files: `pwsh ./scripts/ensure_env.ps1` (PowerShell) **or** `./scripts/ensure_env.sh` (Git Bash/WSL).
-6. Launch the stack from Git Bash:
+5. Confirm Docker Desktop is running with the WSL 2 backend enabled and the resource limits noted above.
+6. Install Git for Windows and always use **Git Bash** (or WSL) for the commands below.
+7. Install GNU Make (`choco install make` or via MSYS2) and verify `make --version` inside Git Bash.
+8. Install Python 3.12 and `pipx`, then `pipx install uv` so `uv --version` succeeds.
+9. From the repo root, create the `.env` files: `pwsh ./scripts/ensure_env.ps1` (PowerShell) **or** `./scripts/ensure_env.sh` (Git Bash/WSL).
+10. Launch the stack from Git Bash:
    - `make up-all`
    - `make up-dev`
 
    Stop the foreground logs with `Ctrl+C`.
-7. *(Optional)* Enable the CLI by running `uv sync --frozen --no-dev` inside Git Bash.
+11. *(Optional)* Enable the CLI by running `uv sync --frozen --no-dev` inside Git Bash.
 
 ## Tools Under Scrutinize
 
