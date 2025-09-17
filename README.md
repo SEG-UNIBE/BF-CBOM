@@ -73,7 +73,7 @@ If you want to avoid installing Git, Make, and Python tooling locally, you can r
     bf-cbom/builder -lc "\
       git clone --branch dev --single-branch https://github.com/SEG-UNIBE/BF-CBOM.git repo && \
        cd repo && \
-       make up-dev \
+       make up-prod \
      "
    ```
 3. When you're done, stop everything with `make down` (either within the running builder session or by re-running the container with `make down`).
