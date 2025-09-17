@@ -36,22 +36,48 @@ BF-CBOM is a research-grade harness for comparing heterogeneous CBOM generators 
 
 ## Setup
 
-BF-CBOM is a multi-container environment: Redis, the coordinator UI, and one container per CBOM worker. Every install starts the same way—clone the repo and choose one of two setup options.
+BF-CBOM is a multi-container environment (Redis, the coordinator UI, and one container per CBOM generation tool), so Docker must be installed locally.
 
-```bash
-git clone https://github.com/SEG-UNIBE/BF-CBOM.git
-cd BF-CBOM
-```
+1. Install **Docker Desktop** using the official guide for [macOS](https://docs.docker.com/desktop/setup/install/mac-install/) or [Windows](https://docs.docker.com/desktop/setup/install/windows-install/).
+
+2. Clone the repository and navigate into it:
+
+    ```bash
+    git clone https://github.com/SEG-UNIBE/BF-CBOM.git
+    cd BF-CBOM
+    ```
+
+3. Prepare the environment files under `docker/env/`. Each service ships with a `*.env.template` describing the secrets it requires. Duplicate every template, drop the `.template` suffix, and keep the resulting `.env` files local (they are git-ignored). After this step the directory should resemble:
+
+    ```text
+    ├── docker
+    │   └── env
+    │       ├── coordinator.env
+    │       ├── coordinator.env.template
+    │       ├── worker-cbomkit.env
+    │       ├── worker-cbomkit.env.template
+    │       └── …
+    ```
+
+    > [!NOTE]
+    > Run `make ensure-env` on macOS/Linux or `pwsh ./scripts/ensure_env.ps1` on Windows to create the `.env` files automatically.
+
+4. Provide credentials. At minimum set `GITHUB_TOKEN` inside `docker/env/coordinator.env`. In case you do not have one already, see [how to create a personal access token (classic)](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-personal-access-token-classic).
+
+From here on, there are two options on how to continue with the setup as described below.
 
 ### Option 1 – Disposable Builder Container
 
-Use this when you want to keep tooling off your host. Docker must already be installed.
+Use this when you want to keep tooling off your host.
 
-1. Build the helper image:
-   ```bash
-   docker build -f docker/Dockerfile.builder -t bf-cbom/builder .
-   ```
+5. Build the helper image that bundles all required tooling:
+
+    ```bash
+    docker build -f docker/Dockerfile.builder -t bf-cbom/builder .
+    ```
+
 2. Run the builder container. It clones the repo inside the container, reuses your local `.env` templates, and brings the stack up:
+
    ```bash
    docker build -f docker/Dockerfile.builder -t bf-cbom/builder . && \
    docker run --rm -it \
@@ -65,31 +91,29 @@ Use this when you want to keep tooling off your host. Docker must already be ins
         make up-prod \
       "
    ```
+
 3. Exit with `Ctrl+C` when you are done benchmarking. The session is ephemeral; all tooling lives inside the container.
 
-<details>
-<summary>Windows PowerShell variant</summary>
+> [!NOTE]
+> **Windows** users need backticks for line continuations in PowerShell, so this variant keeps the disposable builder flow copy/paste-friendly.
+> ```powershell
+> docker build -f docker/Dockerfile.builder -t bf-cbom/builder .
+> 
+> $pwdPath = (Get-Location).Path
+> docker run --rm -it `
+>   -v /var/run/docker.sock:/var/run/docker.sock `
+>   -v "$pwdPath/docker/env:/workspace/secrets/env:ro" `
+>   --name bf-cbom-builder `
+>   bf-cbom/builder -lc "git clone --branch main https://github.com/SEG-UNIBE/BF-CBOM.git repo && cp -vf /workspace/secrets/env/*.env repo/docker/env/ && cd repo && make up-prod"
+> ```
 
-```powershell
-docker build -f docker/Dockerfile.builder -t bf-cbom/builder .
-
-$pwdPath = (Get-Location).Path
-docker run --rm -it `
-  -v /var/run/docker.sock:/var/run/docker.sock `
-  -v "$pwdPath/docker/env:/workspace/secrets/env:ro" `
-  --name bf-cbom-builder `
-  bf-cbom/builder -lc "git clone --branch main https://github.com/SEG-UNIBE/BF-CBOM.git repo && cp -vf /workspace/secrets/env/*.env repo/docker/env/ && cd repo && make up-prod"
-```
-
-</details>
-
-### Option 2 – Direct Make-Based Setup
+### Option 2 – Makefile
 
 Bring the stack up on your host using GNU Make and Docker Compose.
 
 #### macOS / Linux
 
-1. Install Docker Desktop/Engine (Compose v2) and allocate ≥6 GB RAM.
+1. Confirm Docker Desktop/Engine (Compose v2) is running on this machine with the resource limits noted above.
 2. Ensure Python 3.12 and `uv` are available on `PATH` (e.g., `brew install uv` or `pipx install uv`).
 3. Generate `.env` files from templates: `./scripts/ensure_env.sh`.
 4. Start the services with the worker profile of choice:
@@ -101,7 +125,7 @@ Bring the stack up on your host using GNU Make and Docker Compose.
 
 #### Windows
 
-1. Install Docker Desktop with WSL 2 integration enabled.
+1. Confirm Docker Desktop is running with the WSL 2 backend enabled and the resource limits noted above.
 2. Install Git for Windows and always use **Git Bash** (or WSL) for the commands below.
 3. Install GNU Make (`choco install make` or via MSYS2) and verify `make --version` inside Git Bash.
 4. Install Python 3.12 and `pipx`, then `pipx install uv` so `uv --version` succeeds.
@@ -140,4 +164,3 @@ Bring the stack up on your host using GNU Make and Docker Compose.
 - Environment helpers:
   - macOS/Linux: `./scripts/ensure_env.sh`
   - Windows PowerShell: `pwsh ./scripts/ensure_env.ps1`
-
