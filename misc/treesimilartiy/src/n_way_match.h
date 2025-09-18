@@ -23,3 +23,9 @@ std::vector<Match> n_way_match(std::string& json_directory);
 std::vector<Match> n_way_match(std::vector<std::string>& json_documents);
 
 std::vector<Match> n_way_match(std::vector<std::pair<std::string, std::string>>& json_documents);
+
+std::vector<Match> n_way_match_all(std::string& json_directory);
+
+std::vector<Match> n_way_match_all(std::vector<std::string>& json_documents);
+
+std::vector<Match> n_way_match_all(std::vector<std::pair<std::string, std::string>>& json_documents);
