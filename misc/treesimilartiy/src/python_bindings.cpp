@@ -17,16 +17,30 @@ PYBIND11_MODULE(json_matching, m) {
         .def_readonly("cost", &Match::cost);
 
     // simple wrapper: accept a Python list of strings, pass it to n_way_match
-    m.def("n_way_match",
+    m.def("n_way_match_from_directory",
           [](std::string json_directory) {
               return n_way_match(json_directory);
           },
           py::arg("json_directory"),
           "Compute best matches and return a list of Match");
 
-    m.def("n_way_match",
+    m.def("n_way_match_from_strings",
           [](std::vector<std::string> json_documents) {
               return n_way_match(json_documents);
+          },
+          py::arg("json_documents"),
+          "Compute best matches from list of JSON strings");
+
+    m.def("n_way_match_all_from_directory",
+          [](std::string json_directory) {
+              return n_way_match_all(json_directory);
+          },
+          py::arg("json_directory"),
+          "Compute best matches and return a list of Match");
+
+    m.def("n_way_match_all_from_strings",
+          [](std::vector<std::string> json_documents) {
+              return n_way_match_all(json_documents);
           },
           py::arg("json_documents"),
           "Compute best matches from list of JSON strings");
