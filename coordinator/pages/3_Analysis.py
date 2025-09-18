@@ -1,21 +1,26 @@
 import json
+import time
 
 import altair as alt
 import pandas as pd
+import redis
 import streamlit as st
 
 from common.cbom_analysis import analyze_cbom_json, summarize_component_types
 from common.utils import get_status_emoji, get_status_keys_order, status_text
 from coordinator.redis_io import (
+    enqueue_component_match_instruction,
     get_bench_meta,
     get_bench_repos,
     get_bench_workers,
     get_redis,
     list_benchmarks,
     pair_key,
+    prepare_component_match_instruction,
 )
 from coordinator.utils import (
     build_repo_info_url_map,
+    estimate_similarity_runtime,
     format_benchmark_header,
     get_query_bench_id,
     safe_int,
@@ -30,6 +35,45 @@ st.set_page_config(
 
 r = get_redis()
 st.title("Analysis")
+
+if "component_similarity_jobs" not in st.session_state:
+    st.session_state["component_similarity_jobs"] = {}
+
+TREESIM_WORKER = "treesimilartiy"
+TREESIM_QUEUE = f"jobs:{TREESIM_WORKER}"
+TREESIM_RESULTS_LIST = f"results:{TREESIM_WORKER}"
+
+
+def _latest_similarity_result(r: redis.Redis, repo_name: str, *, job_id: str | None = None) -> dict | None:
+    """Return the newest similarity result for repo (optionally matching job_id)."""
+
+    entries = r.lrange(TREESIM_RESULTS_LIST, 0, -1)
+    if not entries:
+        return None
+
+    repo_name = (repo_name or "").strip()
+    target_job = job_id
+
+    for raw in reversed(entries):
+        try:
+            payload = json.loads(raw)
+        except Exception:
+            continue
+
+        if target_job and payload.get("job_id") != target_job:
+            continue
+
+        if (payload.get("repo_full_name") or "").strip() != repo_name:
+            continue
+
+        return payload
+
+    if target_job:
+        return None
+
+    # No repo match when scanning entire list
+    return None
+
 
 bench_id_hint = get_query_bench_id() or st.session_state.get("created_bench_id")
 benches = list_benchmarks(r)
@@ -322,6 +366,7 @@ if summary_rows:
 
 # Components insights
 st.subheader("Components Summary")
+
 if comp_rows:
     comp_df = pd.DataFrame(comp_rows)
     # Pivot: rows=repo, cols=workers, values=total_components
@@ -357,6 +402,12 @@ if comp_rows:
     if not component_tables:
         st.caption("No component type information available yet.")
     else:
+        bench_jobs_state = st.session_state["component_similarity_jobs"].setdefault(bench_id, {})
+        if any(key in bench_jobs_state for key in ("job_ids", "repo_map", "total")):
+            bench_jobs_state.clear()
+        repos_by_name = {
+            (repo.get("full_name") or "").strip(): repo for repo in repos or []
+        }
         for repo_name in sorted(component_tables.keys()):
             with st.expander(f"{repo_name}"):
                 rows = component_tables.get(repo_name) or []
@@ -383,3 +434,82 @@ if comp_rows:
                     hide_index=True,
                     width="stretch",
                 )
+
+                repo_state = bench_jobs_state.setdefault(repo_name, {})
+                repo_obj = repos_by_name.get(repo_name) or {}
+
+                job_id = repo_state.get("job_id")
+                result_payload = repo_state.get("result")
+
+                component_counts = {
+                    row.get("worker"): int(row.get("total_components") or 0)
+                    for row in comp_rows
+                    if row.get("repo") == repo_name and row.get("worker") in workers
+                }
+                estimate_seconds = estimate_similarity_runtime(component_counts)
+                if component_counts and estimate_seconds and not result_payload:
+                    st.caption(f"Estimated runtime: {estimate_seconds:.1f}s")
+
+                if not result_payload:
+                    result_payload = _latest_similarity_result(r, repo_name, job_id=job_id)
+                    if result_payload:
+                        repo_state["result"] = result_payload
+                        repo_state.setdefault("job_id", result_payload.get("job_id"))
+                        job_id = repo_state.get("job_id")
+
+                waiting_for_result = bool(job_id) and not result_payload
+                button_disabled = waiting_for_result or bool(result_payload)
+                if st.button(
+                    "Find similar components among workers",
+                    key=f"treesimilarity_{bench_id}_{repo_name}",
+                    disabled=button_disabled,
+                ):
+                    instruction = prepare_component_match_instruction(r, bench_id, repo_obj)
+                    if not instruction:
+                        st.info("Need at least two completed CBOMs for this repository.")
+                    else:
+                        enqueue_component_match_instruction(r, instruction, TREESIM_QUEUE)
+                        repo_state["job_id"] = instruction.job_id
+                        repo_state.pop("result", None)
+                        st.session_state["component_similarity_jobs"][bench_id] = bench_jobs_state
+                        # st.success("Queued component similarity job.")
+                        st.rerun()
+
+                if waiting_for_result and not result_payload:
+                    result_payload = _latest_similarity_result(r, repo_name, job_id=job_id)
+                    if result_payload:
+                        repo_state["result"] = result_payload
+                        st.session_state["component_similarity_jobs"][bench_id] = bench_jobs_state
+
+                if bool(repo_state.get("job_id")) and not repo_state.get("result"):
+                    poll_interval = 2.0
+                    with st.spinner("Waiting for similarity result…", show_time=True):
+                        while not repo_state.get("result"):
+                            result_payload = _latest_similarity_result(
+                                r,
+                                repo_name,
+                                job_id=repo_state.get("job_id"),
+                            )
+                            if result_payload:
+                                repo_state["result"] = result_payload
+                                st.session_state["component_similarity_jobs"][bench_id] = bench_jobs_state
+                                break
+                            time.sleep(poll_interval)
+
+                if repo_state.get("result"):
+                    result_payload = repo_state["result"]
+                    match_count = result_payload.get("match_count", 0)
+                    tools = result_payload.get("tools") or []
+                    duration = result_payload.get("duration_sec")
+                    status_label = result_payload.get("status", "ok")
+                    header = f"Status: {status_label}"
+                    if duration is not None:
+                        header += f" · {duration:.2f}s"
+                    header += f" · Matches: {match_count}"
+                    if tools:
+                        header += f" · Tools: {', '.join(sorted(tools))}"
+                    st.caption(header)
+                    if status_label != "ok":
+                        st.error(result_payload.get("error") or "Unknown error")
+                    else:
+                        st.json(result_payload.get("matches") or [])

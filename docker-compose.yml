@@ -209,6 +209,7 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - CALC_TIMEOUT_SEC=100
     env_file: docker/env/misc-treesimilarity.env
     restart: no
     profiles: [dev, prod, all]

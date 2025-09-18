@@ -14,9 +14,6 @@ RUN uv sync --frozen --no-dev
 # Now copy the actual service code
 COPY --chown=appuser:appuser coordinator/ ./coordinator/
 
-# TODO: Remove this after workers are no longer discovered using parent folder lookups
-COPY --chown=appuser:appuser workers/ ./workers/
-
 ENV PYTHONPATH=/app
 ENV STREAMLIT_CONFIG=coordinator/.streamlit/config.toml
 

@@ -1,6 +1,7 @@
 import datetime as dt
 import io
 import json
+import math
 import zipfile
 
 import pandas as pd  # local import to avoid hard dependency at module import
@@ -289,6 +290,17 @@ def build_repo_info_url_map(repos: list[dict]) -> dict[str, dict[str, str]]:
             continue
         out[full] = {"info": format_repo_info(r), "url": repo_html_url(r)}
     return out
+
+
+def estimate_similarity_runtime(component_counts: dict[str, int]) -> float:
+    """Return a rough runtime estimate based on component totals per worker."""
+
+    if not component_counts:
+        return 0.0
+    scale = 350.0
+    base_seconds = 1.5
+    weights = [math.exp(max(count, 0) / scale) for count in component_counts.values()]
+    return base_seconds * sum(weights)
 
 
 def safe_int(value, default: int = 0) -> int:
