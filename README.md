@@ -143,7 +143,7 @@ In this option, you will build and compose the docker compose environment direct
 #### MacOS / Linux
 
 
-**🚩 5. Build using Makefile**
+**🚩 4. Build using Makefile**
 
 The project uses [GNU Make](https://www.gnu.org/software/make/) to simplify container orchestration.
 Most Linux distributions include `make` by default.
@@ -157,7 +157,7 @@ make up-prod
 
 Docker Compose will launch and manage all containers. Stop the stack anytime with `Ctrl+C`.
 
-**🚩 6. Local CLI (optional)**
+**🚩 5. Local CLI (optional)**
 
 If `make up-prod` completed successfully and the containers are running, you can also interact with BF-CBOM through its command-line interface (CLI).
 From the repository's root folder, run:
