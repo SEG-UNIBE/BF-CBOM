@@ -297,8 +297,8 @@ def estimate_similarity_runtime(component_counts: dict[str, int]) -> float:
 
     if not component_counts:
         return 0.0
-    scale = 350.0
-    base_seconds = 1.5
+    scale = 250.0
+    base_seconds = 2.5
     weights = [math.exp(max(count, 0) / scale) for count in component_counts.values()]
     return base_seconds * sum(weights)
 
