@@ -661,4 +661,35 @@ def delete_benchmark(r: redis.Redis, bench_id: str) -> int:
     pipe.delete(f"bench:{bench_id}")
     pipe.srem("benches", bench_id)
     pipe.execute()
+
+    _purge_component_match_data(r, bench_id)
     return deleted_jobs
+
+
+def _purge_component_match_data(r: redis.Redis, bench_id: str) -> None:
+    worker = "treesimilartiy"
+    queue_key = f"jobs:{worker}"
+    results_key = f"results:{worker}"
+
+    def _filter_list(key: str):
+        items = r.lrange(key, 0, -1) or []
+        if not items:
+            return
+        filtered: list[str] = []
+        for item in items:
+            try:
+                payload = json.loads(item)
+            except Exception:
+                filtered.append(item)
+                continue
+            if payload.get("benchmark_id") != bench_id:
+                filtered.append(item)
+        if len(filtered) != len(items):
+            pipe = r.pipeline()
+            pipe.delete(key)
+            if filtered:
+                pipe.rpush(key, *filtered)
+            pipe.execute()
+
+    _filter_list(queue_key)
+    _filter_list(results_key)
