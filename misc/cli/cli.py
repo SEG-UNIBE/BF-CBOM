@@ -38,6 +38,9 @@ export_app = typer.Typer(
 app.add_typer(export_app, name="export")
 
 
+EXPORT_DEST_OPTION = typer.Option(..., "--dest", "-d", help="Directory to write the ZIP")
+
+
 _STATUS_COLORS = {
     "completed": typer.colors.GREEN,
     "running": typer.colors.CYAN,
@@ -115,7 +118,8 @@ def _resolve_bench_id(r: redis.Redis, bench_id: str) -> str:
     if len(matches) > 1:
         sample = ", ".join(sorted(matches)[:5])
         raise ValueError(
-            f"Benchmark prefix '{bench_id}' is ambiguous ({len(matches)} matches: {sample}{'…' if len(matches) > 5 else ''})"
+            f"Benchmark prefix '{bench_id}' is ambiguous "
+            f"({len(matches)} matches: {sample}{'…' if len(matches) > 5 else ''})"
         )
 
     return matches[0]
@@ -220,7 +224,8 @@ def watch(
                 cancelled = _style_count(c["cancelled"], typer.colors.YELLOW)
                 pending = _style_count(c["pending"], typer.colors.BLUE)
                 lines.append(
-                    f"done {done}/{total} · completed={completed} failed={failed} cancelled={cancelled} pending={pending}"
+                    f"done {done}/{total} · "
+                    f"completed={completed} failed={failed} cancelled={cancelled} pending={pending}"
                 )
             else:
                 benches = list_benchmarks(r)
@@ -315,7 +320,8 @@ def run(
         done, total = collect_results_once(r, bench_id)
         summary = _summarize_bench(r, bench_id)
         typer.secho(
-            f"Progress: {summary['done']}/{summary['total']} (completed={summary['counts']['completed']} failed={summary['counts']['failed']})",
+            f"Progress: {summary['done']}/{summary['total']} "
+            f"(completed={summary['counts']['completed']} failed={summary['counts']['failed']})",
             fg=typer.colors.BLUE,
             err=True,
         )
@@ -355,8 +361,10 @@ def status(
     else:
         typer.echo(
             f"{summary['name']} · {bench_id[:8]} · status={summary['status']} · "
-            f"completed={summary['counts']['completed']} failed={summary['counts']['failed']} "
-            f"cancelled={summary['counts']['cancelled']} total={summary['total']}"
+            f"completed={summary['counts']['completed']} "
+            f"failed={summary['counts']['failed']} "
+            f"cancelled={summary['counts']['cancelled']} "
+            f"total={summary['total']}"
         )
 
 
@@ -438,7 +446,7 @@ def export_config(
         resolved_id = _resolve_bench_id(r, bench_id)
     except ValueError as err:
         typer.echo(str(err), err=True)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from err
 
     if resolved_id != bench_id:
         typer.echo(f"Resolved benchmark ID '{bench_id}' -> '{resolved_id}'", err=True)
@@ -478,7 +486,7 @@ def export_config(
 @export_app.command("cboms")
 def export_cboms(
     bench_id: str = typer.Argument(..., help="Benchmark ID"),
-    dest: Path = typer.Option(..., "--dest", "-d", help="Directory to write the ZIP"),
+    dest: Path = EXPORT_DEST_OPTION,
     filename: str | None = typer.Option(
         None,
         "--filename",
@@ -495,7 +503,7 @@ def export_cboms(
         resolved_id = _resolve_bench_id(r, bench_id)
     except ValueError as err:
         typer.echo(str(err), err=True)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from err
 
     if resolved_id != bench_id:
         typer.echo(f"Resolved benchmark ID '{bench_id}' -> '{resolved_id}'", err=True)

@@ -58,7 +58,8 @@ st.markdown(
     <div style='display:flex;align-items:center;justify-content:space-between;'>
       <div style='display:flex;align-items:center;'>
         <h1 style='color:#FF4B4B;font-size:68px;margin:0;'>BF-CBOM</h1>
-        <span style='color:#888;font-size:1.3rem;font-family:monospace;font-weight:400;margin-left:0.8rem;margin-top:1.5em;'>v{version}</span>
+        <span style='color:#888;font-size:1.3rem;font-family:monospace;
+                font-weight:400;margin-left:0.8rem;margin-top:1.5em;'>v{version}</span>
       </div>
     </div>
     """,

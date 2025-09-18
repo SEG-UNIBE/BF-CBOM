@@ -1,6 +1,9 @@
 import logging
 import os
 import sys
+from glob import glob
+
+import json_matching  # type: ignore  # pylint: disable=import-error,wrong-import-position
 
 NAME = os.path.basename(os.path.dirname(__file__))
 
@@ -8,9 +11,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(NAME)
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "build"))
-from glob import glob
 
-import json_matching  # type: ignore  # pylint: disable=import-error,wrong-import-position
 
 
 def main():
@@ -30,7 +31,8 @@ def main():
         print(f"Found {len(matches)} matches:")
         for match in matches:
             print(
-                f"  Doc {match.query_file.split('/')[-1]} comp {match.query_comp} -> Doc {match.target_file.split('/')[-1]} comp {match.target_comp}, cost: {match.cost}"
+                f"  Doc {match.query_file.split('/')[-1]} comp {match.query_comp} "
+                f"-> Doc {match.target_file.split('/')[-1]} comp {match.target_comp}, cost: {match.cost}"
             )
     except Exception as e:
         print(f"Error: {e}")
