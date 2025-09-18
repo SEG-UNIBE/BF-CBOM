@@ -26,7 +26,7 @@ services:
     depends_on:
       - redis
     environment:
-      - AVAILABLE_WORKERS=${AVAILABLE_WORKERS:-skeleton,testing,cdxgen,cbomkit,deepseek}
+      - AVAILABLE_WORKERS=${AVAILABLE_WORKERS:-skeleton,testing,cdxgen,cbomkit,deepseek,mssbomtool,cryptobomforge}
       - AVAILABLE_LANGUAGES=python,java
       - GITHUB_CACHE_TTL_SEC=86400
       - REDIS_HOST=redis
@@ -194,3 +194,21 @@ services:
     env_file: docker/env/worker-cryptobomforge.env
     restart: on-failure:3
     profiles: [prod, all]
+
+  misc-treesimilarity:
+    image: bf-cbom/misc-treesimilarity:${VERSION:-latest}
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.misc-treesimilarity
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    env_file: docker/env/misc-treesimilarity.env
+    restart: no
+    profiles: [dev, prod, all]

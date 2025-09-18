@@ -1,26 +1,44 @@
 import sys
 import os
+import logging
+
+NAME = os.path.basename(os.path.dirname(__file__))
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logger = logging.getLogger(NAME)
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "build"))
 from glob import glob
 
 import json_matching  # type: ignore  # pylint: disable=import-error,wrong-import-position
 
-try:
-    json_directory = "assets"
 
-    files = []
 
-    for jf in glob(f"{json_directory}/*.json"):
-        with open(jf) as file:
-            files.append(file.read())
 
-    matches = json_matching.n_way_match(files)
+def main():
+    
+    # TODO: implement proper Redis messaging interface to get diffing orders from coordinator
+    
+    try:
+        json_directory = "assets"
 
-    print(f"Found {len(matches)} matches:")
-    for match in matches:
-        print(
-            f"  Doc {match.query_file.split('/')[-1]} comp {match.query_comp} -> Doc {match.target_file.split('/')[-1]} comp {match.target_comp}, cost: {match.cost}"
-        )
-except Exception as e:
-    print(f"Error: {e}")
+        files = []
+
+        for jf in glob(f"{json_directory}/*.json"):
+            with open(jf) as file:
+                files.append(file.read())
+
+        matches = json_matching.n_way_match(files)
+
+        print(f"Found {len(matches)} matches:")
+        for match in matches:
+            print(
+                f"  Doc {match.query_file.split('/')[-1]} comp {match.query_comp} -> Doc {match.target_file.split('/')[-1]} comp {match.target_comp}, cost: {match.cost}"
+            )
+    except Exception as e:
+        print(f"Error: {e}")
+
+
+if __name__ == "__main__":
+    logger.info("starting up...")
+    main()

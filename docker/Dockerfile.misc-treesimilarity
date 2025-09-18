@@ -1,7 +1,8 @@
-# docker/Dockerfile.treesimilarity
+# docker/Dockerfile.misc-treesimilarity
 # Dedicated container for the tree similarity worker that builds the
 # native pybind11 extension linking against OR-Tools.
 
+# Allow the target architecture to be overridden while defaulting to amd64.
 FROM --platform=linux/amd64 ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
