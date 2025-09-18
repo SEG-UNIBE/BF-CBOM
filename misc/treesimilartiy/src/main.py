@@ -1,6 +1,6 @@
-import sys
-import os
 import logging
+import os
+import sys
 
 NAME = os.path.basename(os.path.dirname(__file__))
 
@@ -13,12 +13,9 @@ from glob import glob
 import json_matching  # type: ignore  # pylint: disable=import-error,wrong-import-position
 
 
-
-
 def main():
-    
     # TODO: implement proper Redis messaging interface to get diffing orders from coordinator
-    
+
     try:
         json_directory = "assets"
 

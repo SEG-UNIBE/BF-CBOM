@@ -23,9 +23,8 @@
 
 """json-to-bracket.py: Transforms a given JSON document into bracket notation."""
 
-import sys
-from argparse import ArgumentParser
 import json
+from argparse import ArgumentParser
 
 # JSON         | Python
 # -------------+--------
