@@ -405,9 +405,7 @@ if comp_rows:
         bench_jobs_state = st.session_state["component_similarity_jobs"].setdefault(bench_id, {})
         if any(key in bench_jobs_state for key in ("job_ids", "repo_map", "total")):
             bench_jobs_state.clear()
-        repos_by_name = {
-            (repo.get("full_name") or "").strip(): repo for repo in repos or []
-        }
+        repos_by_name = {(repo.get("full_name") or "").strip(): repo for repo in repos or []}
         for repo_name in sorted(component_tables.keys()):
             with st.expander(f"{repo_name}"):
                 rows = component_tables.get(repo_name) or []

@@ -82,6 +82,7 @@ class Benchmark(DataClassJsonMixin):
     expected_jobs: int | None = None
     issued_jobs: int | None = None
 
+
 @dataclass
 class CbomJson(DataClassJsonMixin):
     tool: str

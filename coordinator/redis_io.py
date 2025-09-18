@@ -52,11 +52,7 @@ def _coerce_int(value, default: int = 0) -> int:
 
 def _repo_dict_to_info(repo: dict) -> RepoInfo:
     full = (repo.get("full_name") or "").strip()
-    git_url = (
-        repo.get("clone_url")
-        or repo.get("git_url")
-        or (f"https://github.com/{full}.git" if full else "")
-    )
+    git_url = repo.get("clone_url") or repo.get("git_url") or (f"https://github.com/{full}.git" if full else "")
     branch = repo.get("default_branch") or repo.get("branch") or "main"
     size_val = repo.get("size")
     if size_val in (None, ""):

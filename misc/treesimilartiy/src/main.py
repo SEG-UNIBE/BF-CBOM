@@ -1,13 +1,12 @@
 import logging
 import os
+import queue
 import time
 from multiprocessing import get_context
 from pathlib import Path
-import queue
-
-import redis
 
 import json_matching  # type: ignore  # pylint: disable=import-error,wrong-import-position
+import redis
 
 from common.config import REDIS_HOST, REDIS_PORT
 from common.models import ComponentMatchJobInstruction, ComponentMatchJobResult
@@ -68,10 +67,10 @@ def _run_match_with_timeout(json_payloads: list[str]) -> list[dict]:
         process.start()
         try:
             status, payload = result_queue.get(timeout=timeout)
-        except queue.Empty:
+        except queue.Empty as err:
             process.terminate()
             process.join(timeout=1)
-            raise TimeoutError(f"component similarity timed out after {timeout} seconds")
+            raise TimeoutError(f"component similarity timed out after {timeout} seconds") from err
         finally:
             if process.is_alive():
                 process.join()
@@ -91,7 +90,9 @@ def _handle_instruction(raw_payload: str) -> None:
         logger.error("Failed to decode ComponentMatchJobInstruction: %s", err, exc_info=True)
         return
 
-    logger.info("📨 Received job instruction for job %s (repo: %s)",  instruction.job_id, instruction.repo_info.full_name)
+    logger.info(
+        "📨 Received job instruction for job %s (repo: %s)", instruction.job_id, instruction.repo_info.full_name
+    )
     cbom_strings = [entry.json for entry in instruction.CbomJsons if entry.json]
     tools = [entry.tool for entry in instruction.CbomJsons if entry.json]
     if len(cbom_strings) < 2:
@@ -169,7 +170,9 @@ def _handle_instruction(raw_payload: str) -> None:
     try:
         if redis_client is not None:
             redis_client.rpush(RESULT_LIST, result_payload.to_json())
-            logger.info("📤 Sent job result for job %s (repo: %s)", result_payload.job_id, result_payload.repo_full_name)
+            logger.info(
+                "📤 Sent job result for job %s (repo: %s)", result_payload.job_id, result_payload.repo_full_name
+            )
     except Exception as err:  # pragma: no cover - best-effort persistence
         logger.warning("Failed to persist result for job %s: %s", instruction.job_id, err)
 
