@@ -86,7 +86,8 @@ def _handle_instruction(raw_payload: str) -> None:
     logger.info(
         "📨 Received job instruction for job %s (repo: %s)", instruction.job_id, instruction.repo_info.full_name
     )
-    cbom_strings = [entry.json for entry in instruction.CbomJsons if entry.json]
+    cbom_strings = [entry.components_as_json for entry in instruction.CbomJsons if entry.components_as_json]
+    # TODO: instruction.CbomJsons holds now a list of strings in its attribute 'components_as_json' (used to be only a single string 'json')
     tools = [entry.tool for entry in instruction.CbomJsons if entry.json]
     if len(cbom_strings) < 2:
         logger.warning(
