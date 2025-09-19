@@ -1,6 +1,20 @@
+#pragma once
+
 #include <iostream>
 #include <fstream>
 #include <unistd.h>
+#include <vector>
+#include <string>
+#include <filesystem>
+#include <unistd.h>
+#include <cJSON.h> 
+#include <Eigen/Dense>
+#include <string>
+#include <algorithm>
+#include <cmath>
+#include <unordered_set>
+#include <unordered_map>
+#include <unordered_set>
 #include "node.h"
 #include "json_label.h"
 #include "unit_cost_model.h"
@@ -17,26 +31,69 @@
 #include "label_set_converter.h"
 #include "label_set_element.h"
 #include "lookup_result_element.h"
-#include <vector>
-#include <string>
-#include <filesystem>
-#include <unistd.h>
-#include <cJSON.h> 
-#include "json_to_bracket.h"
-#include <Eigen/Dense>
 #include "ortools/graph/assignment.h"
-
+#include "label_dictionary.h"
+#include "json_to_bracket.h"
+#include "json_label.h"
 #include "n_way_match.h"
 
 namespace fs = std::filesystem;
 
-#pragma once
-#include "json_label.h"
-#include "label_dictionary.h"
-#include <string>
-#include <algorithm>
-#include <cmath>
-#include <unordered_set>
+
+ComponentId UnionFind::find(const ComponentId& x) 
+{
+    if (parent.find(x) == parent.end()) {
+        parent[x] = x; // Initialize parent to itself
+        return x;
+    }
+    
+    if (parent[x] == x) {
+        return x;
+    }
+    
+    // Path compression
+    parent[x] = find(parent[x]);
+    return parent[x];
+}
+    
+void UnionFind::unite(const ComponentId& x, const ComponentId& y) {
+    ComponentId px = find(x);
+    ComponentId py = find(y);
+    
+    if (px == py) return;
+    
+    parent[px] = py;
+}
+    
+std::vector<std::vector<ComponentId>> UnionFind::getConnectedComponents() {
+    std::unordered_map<ComponentId, std::vector<ComponentId>, ComponentIdHash> groups;
+    
+    for (const auto& [comp, _] : parent) {
+        ComponentId root = find(comp);
+        groups[root].push_back(comp);
+    }
+    
+    std::vector<std::vector<ComponentId>> result;
+    for (const auto& [_, group] : groups) {
+        result.push_back(group);
+    }
+    
+    return result;
+}
+
+std::vector<std::vector<ComponentId>> buildComponentChains(const std::vector<Match>& matches) {
+    UnionFind uf;
+    
+    // Build union-find structure from matches
+    for (const Match& match : matches) {
+        ComponentId comp1{match.query_doc, match.query_comp, match.cost};
+        ComponentId comp2{match.target_doc, match.target_comp, match.cost};
+        uf.unite(comp1, comp2);
+    }
+    
+    return uf.getConnectedComponents();
+}
+
 
 template <typename Label>
 class CustomCostModelJSON {
@@ -47,9 +104,6 @@ private:
     
 public:
     explicit CustomCostModelJSON(const label::LabelDictionary<Label>& ld) : ld_(ld) {
-        important_labels_ = {
-            "type", "name", "assetType", "primitive", 
-        };
     }
 
     double ren(const int label_id_1, const int label_id_2) const {
@@ -64,11 +118,6 @@ public:
         std::string s1 = ld_.get(label_id_1).get_label();
         std::string s2 = ld_.get(label_id_2).get_label();
         
-        // Prevent renaming of important labels
-        if (important_labels_.count(s1) || important_labels_.count(s2)) {
-            return MAX_COST;
-        }
-
         // Normal rename cost for non-important labels
         return 0.5 + normalized_levenshtein(s1, s2);
     }
@@ -145,13 +194,13 @@ std::vector<std::pair<std::string, std::string>> get_json_files(const std::strin
     return json_files;
 }
 
-std::vector<std::vector<std::string>> prepare_json_documents(std::vector<std::pair<std::string, std::string>>& json_files)
+std::vector<std::vector<std::string>> prepare_json_documents(std::vector<std::string>& json_files)
 {
     std::vector<std::vector<std::string>> prepared_documents;
     
-    for (const std::pair<std::string, std::string>& json_string : json_files) {
+    for (const std::string& json_string : json_files) {
         // first is file path, second is json as string
-        cJSON* root = cJSON_Parse(json_string.second.c_str());
+        cJSON* root = cJSON_Parse(json_string.c_str());
         if (!root) {
             const char* error_ptr = cJSON_GetErrorPtr();
             if (error_ptr != NULL) {
@@ -183,37 +232,18 @@ std::vector<std::vector<std::string>> prepare_json_documents(std::vector<std::pa
     return prepared_documents;
 }
 
-
-std::vector<Match> n_way_match(std::string& json_directory)
-{
-    std::vector<std::pair<std::string, std::string>> json_files = get_json_files(json_directory);
-    
-    if (json_files.empty()) {
-        std::cout << "No JSON files found in " << json_directory << std::endl;
-        return std::vector<Match>();
-    }
-
-    return n_way_match(json_files);
-}
-
-std::vector<Match> n_way_match(std::vector<std::string>& json_documents)
-{
-    std::vector<std::pair<std::string, std::string>> input_adated;
-
-    for (int i = 0; i < json_documents.size(); i++)
-    {
-        input_adated.push_back({"", json_documents[i]});
-    }
-    return n_way_match(input_adated);
-}
-
-std::vector<Match> n_way_match(std::vector<std::pair<std::string, std::string>>& json_documents)
+std::vector<std::vector<ComponentId>> n_way_match_pivot(std::vector<std::vector<std::string>>& documents, double cost_thresh)
+/*
+    Matches components with a pivot document to all other components from the other documents
+        args: List of documents, where each document is represented as a list of components
+        returns: List of connected components (list of componentId)
+*/
 {
     // Definitions
     using Label = label::JSONLabel;
     using LabelSetElem = label_set_converter_index::LabelSetElement;
-    // using CostModel = CustomCostModelJSON<Label>;
-    using CostModel = cost_model::UnitCostModelJSON<Label>;
+    using CostModel = CustomCostModelJSON<Label>;
+    // using CostModel = cost_model::UnitCostModelJSON<Label>;
     using LabelDictionary = label::LabelDictionary<Label>;
     using TreeIndexer = node::TreeIndexJSON;
     using JEDIBASE = json::JEDIBaselineTreeIndex<CostModel, TreeIndexer>;
@@ -230,9 +260,6 @@ std::vector<Match> n_way_match(std::vector<std::pair<std::string, std::string>>&
 
     parser::BracketNotationParser<Label> bnp;
     double distance_threshold = 100000;
-    
-    // Export components from json and process documents to bracket style -> list of list of bracket strings 
-    std::vector<std::vector<std::string>> documents = prepare_json_documents(json_documents);
     
     int pivot_index = 0;
     int pivot_size = 0;
@@ -312,51 +339,28 @@ std::vector<Match> n_way_match(std::vector<std::pair<std::string, std::string>>&
             for (int i = 0; i < pivot_size; i++) {
                 int j = solver.RightMate(i);
                 if (j >= 0 && j < target_size) {
-                    Match m{
-                        pivot_index, 
-                        k, 
-                        json_documents[pivot_index].first,
-                        json_documents[k].first,
-                        i, 
-                        j, 
-                        Cost(i, j)};
+                    if (Cost(i, j) > cost_thresh) {
+                        continue;
+                    }
+                    Match m{pivot_index, k, i, j, Cost(i, j)};
                     matching.push_back(m);
                 }
             }
         }
     }
 
-    return matching;
+    std::vector<std::vector<ComponentId>> united_matches = buildComponentChains(matching);
+
+    return united_matches;
 }
 
-
-std::vector<Match> n_way_match_all(std::string& json_directory)
-{
-    std::vector<std::pair<std::string, std::string>> json_files = get_json_files(json_directory);
-    
-    if (json_files.empty()) {
-        std::cout << "No JSON files found in " << json_directory << std::endl;
-        return std::vector<Match>();
-    }
-
-    return n_way_match_all(json_files);
-}
-
-
-std::vector<Match> n_way_match_all(std::vector<std::string>& json_documents)
-{
-    std::vector<std::pair<std::string, std::string>> input_adated;
-
-    for (int i = 0; i < json_documents.size(); i++)
-    {
-        input_adated.push_back({"", json_documents[i]});
-    }
-    return n_way_match_all(input_adated);
-}
-
-
-std::vector<Match> n_way_match_all(std::vector<std::pair<std::string, std::string>>& json_documents)
-{
+std::vector<std::vector<ComponentId>> n_way_match_all(std::vector<std::vector<std::string>>& documents, double cost_thresh)
+/*
+    Matches components from all documents to all other components from the other documents
+        args: List of documents, where each document is represented as a list of components
+        returns: List of connected components (list of componentId)
+*/
+{ 
     // Definitions
     using Label = label::JSONLabel;
     using LabelSetElem = label_set_converter_index::LabelSetElement;
@@ -379,11 +383,7 @@ std::vector<Match> n_way_match_all(std::vector<std::pair<std::string, std::strin
     parser::BracketNotationParser<Label> bnp;
     double distance_threshold = 100000;
     
-    // Export components from json and process documents to bracket style -> list of list of bracket strings 
-    std::vector<std::vector<std::string>> documents = prepare_json_documents(json_documents);
-    
     int nr_documents = documents.size();
-    
     
     // p : pivot document index
     // k : document index
@@ -457,14 +457,10 @@ std::vector<Match> n_way_match_all(std::vector<std::pair<std::string, std::strin
                     int j = solver.RightMate(i);
                     if (j >= 0 && j < target_size) {
                         if (Cost(i, j) < MaxCost) {
-                            Match m{
-                                pivot_index, 
-                                k, 
-                                json_documents[pivot_index].first,
-                                json_documents[k].first,
-                                i, 
-                                j, 
-                                Cost(i, j)};
+                            if (Cost(i, j) > cost_thresh) {
+                                continue;
+                            }
+                            Match m{p, k, i, j, Cost(i, j)};
                             matching.push_back(m);
                         }
                     }
@@ -473,5 +469,7 @@ std::vector<Match> n_way_match_all(std::vector<std::pair<std::string, std::strin
         }
     }
 
-    return matching;
+    std::vector<std::vector<ComponentId>> united_matches = buildComponentChains(matching);
+
+    return united_matches;
 }

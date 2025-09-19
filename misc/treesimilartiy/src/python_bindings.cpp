@@ -7,41 +7,32 @@ namespace py = pybind11;
 PYBIND11_MODULE(json_matching, m) {
     m.doc() = "Python bindings for tree-similarity";
 
-    py::class_<Match>(m, "Match")
-        .def_readonly("query_doc", &Match::query_doc)
-        .def_readonly("target_doc", &Match::target_doc)
-        .def_readonly("query_comp", &Match::query_comp)
-        .def_readonly("query_file", &Match::query_file)
-        .def_readonly("target_file", &Match::target_file)
-        .def_readonly("target_comp", &Match::target_comp)
-        .def_readonly("cost", &Match::cost);
+    py::class_<ComponentId>(m, "ComponentId")
+        .def_readonly("doc_id", &ComponentId::doc_id)
+        .def_readonly("comp_id", &ComponentId::comp_id)
+        .def_readonly("cost", &ComponentId::cost);
 
-    // simple wrapper: accept a Python list of strings, pass it to n_way_match
-    m.def("n_way_match_from_directory",
-          [](std::string json_directory) {
-              return n_way_match(json_directory);
-          },
-          py::arg("json_directory"),
-          "Compute best matches and return a list of Match");
-
-    m.def("n_way_match_from_strings",
-          [](std::vector<std::string> json_documents) {
-              return n_way_match(json_documents);
+        
+    m.def("n_way_match_pivot",
+        [](std::vector<std::vector<std::string>>& documents, double cost_thresh) {
+            return n_way_match_pivot(documents, cost_thresh);
+        },
+        py::arg("documents"), 
+        py::arg("cost_thresh") = 25.0,
+        "Match components using pivot strategy");
+        
+    m.def("n_way_match_all",
+          [](std::vector<std::vector<std::string>> json_documents, double cost_thresh) {
+              return n_way_match_all(json_documents, cost_thresh);
           },
           py::arg("json_documents"),
-          "Compute best matches from list of JSON strings");
+          py::arg("cost_thresh") = 25.0,
+          "Match components using all-to-all strategy");
 
-    m.def("n_way_match_all_from_directory",
-          [](std::string json_directory) {
-              return n_way_match_all(json_directory);
+    m.def("prepare_json_documents",
+          [](std::vector<std::string> json_files) {
+              return prepare_json_documents(json_files);
           },
-          py::arg("json_directory"),
-          "Compute best matches and return a list of Match");
-
-    m.def("n_way_match_all_from_strings",
-          [](std::vector<std::string> json_documents) {
-              return n_way_match_all(json_documents);
-          },
-          py::arg("json_documents"),
-          "Compute best matches from list of JSON strings");
+          py::arg("json_files"),
+          "Extracts all components from the cbom json files and returns a list of lists containing all components");
 }

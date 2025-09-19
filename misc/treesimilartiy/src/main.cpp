@@ -2,7 +2,6 @@
 #include <fstream>
 #include <unistd.h>
 #include <vector>
-#include <filesystem>
 #include "n_way_match.h"
 
 namespace fs = std::filesystem;
@@ -35,9 +34,16 @@ int main(int argc, char* argv[]) {
     }
     
     std::cout << "Found " << json_files.size() << " JSON files" << std::endl;
+    
+    std::vector<std::string> json_file_name_removed = std::vector<std::string>();
+    for (const auto& json : json_files) {
+        json_file_name_removed.push_back(json.second);
+    }
+
+    std::vector<std::vector<std::string>> prepared_json = prepare_json_documents(json_file_name_removed);
 
     // Process the JSON files
-    n_way_match(json_files);
+    n_way_match_all(prepared_json);
 
     return 0;
 }
