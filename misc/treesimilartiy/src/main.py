@@ -34,7 +34,6 @@ def _match_worker(payloads: list[str], result_queue) -> None:
 def _serialize_match(match: object) -> dict:
     def _get(attr: str):
         return getattr(match, attr, None)
-
     return {
         "query_file": _get("query_file"),
         "query_comp": _get("query_comp"),
@@ -47,13 +46,17 @@ def _serialize_match(match: object) -> dict:
 def _match_components(json_payloads: list[str]) -> list[dict]:
     matches = json_matching.n_way_match_from_strings(json_payloads)
     serialized = [_serialize_match(match) for match in matches]
-    print(f"Found {len(serialized)} matches:")
+    logger.info("Found %d component match(es)", len(serialized))
     for entry in serialized:
         query_name = Path(entry.get("query_file") or "").name or "?"
         target_name = Path(entry.get("target_file") or "").name or "?"
-        print(
-            f"  Doc {query_name} comp {entry.get('query_comp', '?')} "
-            f"-> Doc {target_name} comp {entry.get('target_comp', '?')}, cost: {entry.get('cost', '?')}"
+        logger.debug(
+            "Match: query doc %s component %s -> target doc %s component %s (cost=%s)",
+            query_name,
+            entry.get("query_comp", "?"),
+            target_name,
+            entry.get("target_comp", "?"),
+            entry.get("cost", "?"),
         )
     return serialized
 
