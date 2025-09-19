@@ -1,12 +1,21 @@
 import json
 import time
+from types import SimpleNamespace
 
 import altair as alt
 import pandas as pd
 import redis
 import streamlit as st
 
-from common.cbom_analysis import analyze_cbom_json, summarize_component_types
+from common.cbom_analysis import (
+    DEFAULT_EXCLUDED_COMPONENT_TYPES,
+    analyze_cbom_json,
+    component_counts_for_repo,
+    filter_cbom_components,
+    render_similarity_matches,
+    summarize_component_types,
+    summarize_runtime_estimate,
+)
 from common.utils import get_status_emoji, get_status_keys_order, status_text
 from coordinator.redis_io import (
     enqueue_component_match_instruction,
@@ -17,6 +26,7 @@ from coordinator.redis_io import (
     list_benchmarks,
     pair_key,
     prepare_component_match_instruction,
+    collect_repo_cboms
 )
 from coordinator.utils import (
     build_repo_info_url_map,
@@ -25,6 +35,7 @@ from coordinator.utils import (
     get_query_bench_id,
     safe_int,
 )
+from coordinator.logger_config import logger
 
 st.set_page_config(
     page_title="Analysis",
@@ -439,39 +450,90 @@ if comp_rows:
                 job_id = repo_state.get("job_id")
                 result_payload = repo_state.get("result")
 
-                component_counts = {
-                    row.get("worker"): int(row.get("total_components") or 0)
-                    for row in comp_rows
-                    if row.get("repo") == repo_name and row.get("worker") in workers
-                }
+                toggle_key = f"exclude_libs_{bench_id}_{repo_name}"
+                if toggle_key not in st.session_state:
+                    st.session_state[toggle_key] = bool(
+                        repo_state.get("exclude_libraries", False)
+                    )
+
+                button_col, toggle_col = st.columns([3, 2])
+                with toggle_col:
+                    exclude_libraries = st.toggle(
+                        "Exclude types «libraries», «frameworks», «applications»",
+                        key=toggle_key,
+                    )
+
+                repo_state["exclude_libraries"] = exclude_libraries
+                excluded_types = (
+                    DEFAULT_EXCLUDED_COMPONENT_TYPES if exclude_libraries else None
+                )
+
+                component_counts = component_counts_for_repo(
+                    comp_rows,
+                    repo_name,
+                    workers,
+                    excluded_types=excluded_types,
+                )
                 estimate_seconds = estimate_similarity_runtime(component_counts)
-                if component_counts and estimate_seconds and not result_payload:
-                    st.caption(f"Estimated runtime: {estimate_seconds:.1f}s")
+                if (
+                    component_counts
+                    and any(component_counts.values())
+                    and estimate_seconds
+                    and not result_payload
+                ):
+                    toggle_col.caption(
+                        "Estimated runtime: "
+                        f"{summarize_runtime_estimate(estimate_seconds)}"
+                    )
 
                 if not result_payload:
                     result_payload = _latest_similarity_result(r, repo_name, job_id=job_id)
                     if result_payload:
                         repo_state["result"] = result_payload
                         repo_state.setdefault("job_id", result_payload.get("job_id"))
+                        result_exclude_flag = repo_state.get(
+                            "job_exclude_libraries",
+                            repo_state.get("result_exclude_libraries", False),
+                        )
+                        repo_state["result_exclude_libraries"] = bool(result_exclude_flag)
                         job_id = repo_state.get("job_id")
 
                 waiting_for_result = bool(job_id) and not result_payload
-                button_disabled = waiting_for_result or bool(result_payload)
-                if st.button(
-                    "Find similar components among workers",
-                    key=f"treesimilarity_{bench_id}_{repo_name}",
-                    disabled=button_disabled,
-                ):
-                    instruction = prepare_component_match_instruction(r, bench_id, repo_obj)
-                    if not instruction:
-                        st.info("Need at least two completed CBOMs for this repository.")
-                    else:
-                        enqueue_component_match_instruction(r, instruction, TREESIM_QUEUE)
-                        repo_state["job_id"] = instruction.job_id
-                        repo_state.pop("result", None)
-                        st.session_state["component_similarity_jobs"][bench_id] = bench_jobs_state
-                        # st.success("Queued component similarity job.")
-                        st.rerun()
+                button_disabled = waiting_for_result
+                with button_col:
+                    if st.button(
+                        "Find similar components among workers",
+                        key=f"treesimilarity_{bench_id}_{repo_name}",
+                        disabled=button_disabled,
+                    ):
+                        instruction = prepare_component_match_instruction(
+                            r, bench_id, repo_obj, exclude_types=exclude_libraries
+                        )
+                        if not instruction:
+                            st.info("Need at least two completed CBOMs for this repository.")
+                        else:
+ 
+                            # Aggregate tool names and component counts from all CbomJsons, per tool
+                            tool_stats = [
+                                (cbom.tool, len(cbom.components_as_json))
+                                for cbom in instruction.CbomJsons
+                            ]
+                            num_components = sum(count for _, count in tool_stats)
+                            stats_str = ", ".join(f"({tool}, {count})" for tool, count in tool_stats)
+                            logger.info(
+                                "Sending match instruction for repo «%s», comparing %d cbomjsons: %s; total_components=%d",
+                                instruction.repo_info.full_name,
+                                len(instruction.CbomJsons), stats_str, num_components
+                            )
+                            enqueue_component_match_instruction(r, instruction, TREESIM_QUEUE)
+                            repo_state["job_id"] = instruction.job_id
+                            repo_state.pop("result", None)
+                            repo_state.pop("result_exclude_libraries", None)
+                            repo_state.pop("cboms", None)
+                            repo_state.pop("filtered_cboms", None)
+                            repo_state["job_exclude_libraries"] = exclude_libraries
+                            st.session_state["component_similarity_jobs"][bench_id] = bench_jobs_state
+                            st.rerun()
 
                 if waiting_for_result and not result_payload:
                     result_payload = _latest_similarity_result(r, repo_name, job_id=job_id)
@@ -490,6 +552,11 @@ if comp_rows:
                             )
                             if result_payload:
                                 repo_state["result"] = result_payload
+                                result_exclude_flag = repo_state.get(
+                                    "job_exclude_libraries",
+                                    repo_state.get("result_exclude_libraries", False),
+                                )
+                                repo_state["result_exclude_libraries"] = bool(result_exclude_flag)
                                 st.session_state["component_similarity_jobs"][bench_id] = bench_jobs_state
                                 break
                             time.sleep(poll_interval)
@@ -510,4 +577,62 @@ if comp_rows:
                     if status_label != "ok":
                         st.error(result_payload.get("error") or "Unknown error")
                     else:
-                        st.json(result_payload.get("matches") or [])
+                        matches = result_payload.get("matches") or []
+                        if not matches:
+                            st.info("No component matches were returned.")
+                        else:
+                            result_filter_enabled = bool(
+                                repo_state.get("result_exclude_libraries", False)
+                            )
+                            if result_filter_enabled:
+                                st.caption("Libraries/frameworks were excluded for this run.")
+                            elif exclude_libraries:
+                                st.caption(
+                                    "Toggle is set to exclude libraries/frameworks. "
+                                    "Re-run similarity to apply."
+                                )
+
+                            cbom_map_raw = repo_state.get("cboms")
+                            if cbom_map_raw is None:
+                                cbom_map_raw = collect_repo_cboms(
+                                    r, bench_id, repo_name, workers
+                                ) or {}
+                                repo_state.pop("filtered_cboms", None)
+                                repo_state["cboms"] = cbom_map_raw
+                            else:
+                                cbom_map_raw = cbom_map_raw or {}
+
+                            filtered_cache = repo_state.setdefault("filtered_cboms", {})
+                            if result_filter_enabled:
+                                cbom_map_for_render = filtered_cache.get(True)
+                                if cbom_map_for_render is None:
+                                    cbom_map_for_render = {
+                                        tool: filter_cbom_components(
+                                            payload, DEFAULT_EXCLUDED_COMPONENT_TYPES
+                                        )
+                                        for tool, payload in cbom_map_raw.items()
+                                    }
+                                    filtered_cache[True] = cbom_map_for_render
+                            else:
+                                cbom_map_for_render = filtered_cache.get(False)
+                                if cbom_map_for_render is None:
+                                    filtered_cache[False] = cbom_map_raw
+                                    cbom_map_for_render = cbom_map_raw
+
+                            renderer = SimpleNamespace(
+                                info=st.info,
+                                json=st.json,
+                                caption=st.caption,
+                                expander=st.expander,
+                                columns=st.columns,
+                            )
+
+                            render_similarity_matches(
+                                matches=matches,
+                                tools=tools,
+                                cboms_by_tool=cbom_map_for_render,
+                                renderer=renderer,
+                                safe_int_func=safe_int,
+                            )
+
+                            st.session_state["component_similarity_jobs"][bench_id] = bench_jobs_state

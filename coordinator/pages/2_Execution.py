@@ -24,6 +24,7 @@ from coordinator.utils import (
     set_query_bench_id,
     summarize_result_cell,
 )
+from coordinator.logger_config import logger
 
 st.set_page_config(
     page_title="Execution",
@@ -79,6 +80,7 @@ with left:
         st.button("Start benchmark", type="primary", disabled=True)
     elif status == "created":
         if st.button("Start benchmark", type="primary"):
+            logger.info("Starting benchmark: %s", bench_id)
             issued = start_benchmark(r, bench_id)
             set_query_bench_id(bench_id)
             st.rerun()
@@ -88,9 +90,11 @@ with left:
             if st.button("Start benchmark", type="primary"):
                 only_nc = st.session_state.get("only_nc_toggle", False)
                 if only_nc:
+                    logger.info("Retrying non-completed jobs for benchmark: %s", bench_id)
                     issued = retry_non_completed_benchmark(r, bench_id)
                     st.toast(f"Retried {issued} jobs (non-completed)")
                 else:
+                    logger.info("Re-executing all jobs for benchmark: %s", bench_id)
                     issued = reexecute_benchmark(r, bench_id)
                     st.toast(f"Re-executed {issued} jobs")
                 set_query_bench_id(bench_id)

@@ -86,7 +86,15 @@ class Benchmark(DataClassJsonMixin):
 @dataclass
 class CbomJson(DataClassJsonMixin):
     tool: str
-    json: str
+    components_as_json: list[str]
+
+
+@dataclass
+class ComponentMatchJobInstruction(DataClassJsonMixin):
+    job_id: str
+    benchmark_id: str
+    repo_info: RepoInfo
+    CbomJsons: list[CbomJson]
 
 
 @dataclass
@@ -100,15 +108,6 @@ class ComponentMatchJobResult(DataClassJsonMixin):
     duration_sec: float | None = None
     status: str = "ok"
     error: str | None = None
-
-
-@dataclass
-class ComponentMatchJobInstruction(DataClassJsonMixin):
-    job_id: str
-    benchmark_id: str
-    repo_info: RepoInfo
-    CbomJsons: list[CbomJson]
-
 
 # ----- Minimal CLI config schema -----
 

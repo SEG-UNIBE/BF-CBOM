@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 
 import streamlit as st
@@ -15,18 +14,9 @@ from coordinator.utils import (
     human_duration,
     set_query_bench_id,
 )
+from coordinator.logger_config import logger
 
 
-def _init_logging():
-    # Configure root logger for container logs
-    level = os.getenv("LOG_LEVEL", "INFO").upper()
-    logging.basicConfig(level=level, format="%(asctime)s %(levelname)s %(message)s")
-    logger = logging.getLogger("coordinator")
-    logger.setLevel(level)
-    return logger
-
-
-logger = _init_logging()
 print("[coordinator] Starting Streamlit app…")
 logger.info("Coordinator: starting Streamlit app (version=%s)", getattr(st, "__version__", "?"))
 

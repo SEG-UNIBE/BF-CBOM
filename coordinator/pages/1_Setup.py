@@ -12,6 +12,7 @@ from coordinator.utils import (
     parse_repo_urls,
     set_query_bench_id,
 )
+from coordinator.logger_config import logger
 
 # ---------- Streamlit Page ----------
 
@@ -240,6 +241,13 @@ with col1:
             st.warning("No repositories found for the given input.")
             st.stop()
 
+        logger.info(
+            "Creating benchmark '%s' with %d repos and %d workers (source=%s)",
+            bench_name,
+            len(repos),
+            len(workers),
+            source,
+        )
         bench_id = create_benchmark(r, name=bench_name, params=params, repos=repos, workers=workers)
 
         # Persist deep-link and offer navigation

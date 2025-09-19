@@ -7,27 +7,22 @@ import redis
 import requests
 import streamlit as st
 
+from common.cbom_analysis import (
+    create_component_match_instruction,
+)
 from common.config import GITHUB_CACHE_TTL_SEC, GITHUB_TOKEN
-from common.models import Benchmark, CbomJson, ComponentMatchJobInstruction, RepoInfo
+from common.models import Benchmark, CbomJson, ComponentMatchJobInstruction
+from common.utils import repo_dict_to_info
+from coordinator.logger_config import logger
 
 
 # ----- Job instruction helper -----
 def create_job_instruction(repo: dict, worker: str, job_id: str):
     """Construct a JobInstruction object using RepoInfo."""
-    import logging
 
     from common.models import JobInstruction, RepoInfo
 
-    logger = logging.getLogger("create_job_instruction")
-    full = repo.get("full_name")
-    repo_info = RepoInfo(
-        full_name=full,
-        git_url=repo.get("clone_url") or repo.get("git_url") or (f"https://github.com/{full}.git" if full else ""),
-        branch=repo.get("default_branch") or repo.get("branch") or "main",
-        size_kb=int(repo.get("size", 0) or 0),
-        main_language=repo.get("language"),
-        stars=repo.get("stargazers_count"),
-    )
+    repo_info = repo_dict_to_info(repo)
     job_instr = JobInstruction(job_id=job_id, tool=worker, repo_info=repo_info)
     logger.info(
         "New JobInstruction created: %r \t (%r on %r)",
@@ -38,68 +33,7 @@ def create_job_instruction(repo: dict, worker: str, job_id: str):
     return job_instr
 
 
-def _coerce_int(value, default: int = 0) -> int:
-    try:
-        if value is None or value == "":
-            return default
-        return int(value)
-    except Exception:
-        try:
-            return int(float(value))
-        except Exception:
-            return default
-
-
-def _repo_dict_to_info(repo: dict) -> RepoInfo:
-    full = (repo.get("full_name") or "").strip()
-    git_url = repo.get("clone_url") or repo.get("git_url") or (f"https://github.com/{full}.git" if full else "")
-    branch = repo.get("default_branch") or repo.get("branch") or "main"
-    size_val = repo.get("size")
-    if size_val in (None, ""):
-        size_val = repo.get("size_kb")
-    size_kb = _coerce_int(size_val, default=0)
-    stars_raw = repo.get("stargazers_count")
-    stars = _coerce_int(stars_raw, default=0) if stars_raw is not None else None
-    return RepoInfo(
-        full_name=full,
-        git_url=git_url,
-        branch=branch,
-        size_kb=size_kb,
-        main_language=repo.get("language"),
-        stars=stars,
-    )
-
-
-def create_component_match_instruction(
-    repo: dict,
-    bench_id: str,
-    cboms_by_worker: dict[str, str],
-) -> ComponentMatchJobInstruction | None:
-    """Construct a ComponentMatchJobInstruction from repo snapshot and worker CBOMs.
-
-    Returns None if fewer than two CBOM payloads are available.
-    """
-
-    entries: list[CbomJson] = []
-    for worker, payload in cboms_by_worker.items():
-        if not payload:
-            continue
-        entries.append(CbomJson(tool=worker, json=payload))
-
-    if len(entries) < 2:
-        return None
-
-    repo_info = _repo_dict_to_info(repo)
-    job_id = str(uuid.uuid4())
-    return ComponentMatchJobInstruction(
-        job_id=job_id,
-        benchmark_id=bench_id,
-        repo_info=repo_info,
-        CbomJsons=entries,
-    )
-
-
-def _collect_repo_cboms(
+def collect_repo_cboms(
     r: redis.Redis,
     bench_id: str,
     repo_full_name: str,
@@ -134,13 +68,19 @@ def prepare_component_match_instruction(
     r: redis.Redis,
     bench_id: str,
     repo: dict,
+    exclude_types: bool = True,
 ) -> ComponentMatchJobInstruction | None:
     workers = get_bench_workers(r, bench_id)
     full_name = (repo.get("full_name") or "").strip()
     if not full_name:
         return None
-    cbom_map = _collect_repo_cboms(r, bench_id, full_name, workers)
-    return create_component_match_instruction(repo, bench_id, cbom_map)
+    cbom_map = collect_repo_cboms(r, bench_id, full_name, workers)
+    return create_component_match_instruction(
+        repo,
+        bench_id,
+        cbom_map,
+        exclude_types=exclude_types,
+    )
 
 
 def enqueue_component_match_instruction(
@@ -156,6 +96,7 @@ def enqueue_component_match_instruction(
 def build_component_match_jobs(
     r: redis.Redis,
     bench_id: str,
+    exclude_types: bool = True,
 ) -> tuple[list[ComponentMatchJobInstruction], dict[str, str]]:
     """Return component match instructions + repo mapping for a benchmark."""
 
@@ -165,7 +106,12 @@ def build_component_match_jobs(
     repo_map: dict[str, str] = {}
 
     for repo in repos:
-        instruction = prepare_component_match_instruction(r, bench_id, repo)
+        instruction = prepare_component_match_instruction(
+            r,
+            bench_id,
+            repo,
+            exclude_types=exclude_types,
+        )
         if not instruction:
             continue
 
