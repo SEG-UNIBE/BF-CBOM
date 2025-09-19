@@ -31,33 +31,23 @@ def _match_worker(payloads: list[str], result_queue) -> None:
         result_queue.put(("error", str(err)))
 
 
-def _serialize_match(match: object) -> dict:
-    def _get(attr: str):
-        return getattr(match, attr, None)
-    return {
-        "query_file": _get("query_file"),
-        "query_comp": _get("query_comp"),
-        "target_file": _get("target_file"),
-        "target_comp": _get("target_comp"),
-        "cost": _get("cost"),
-    }
+def _serialize_match(match_group: list) -> list:
+    return [
+        {
+            "file": component.doc_id,
+            "component": component.comp_id,
+            "cost": component.cost
+        } for component in match_group
+    ]
 
 
 def _match_components(json_payloads: list[str]) -> list[dict]:
-    matches = json_matching.n_way_match_from_strings(json_payloads)
+    component_docs = json_matching.prepare_json_documents(json_payloads)
+    matches = json_matching.n_way_match_pivot(component_docs, cost_thresh=10000.0)
+
     serialized = [_serialize_match(match) for match in matches]
     logger.info("Found %d component match(es)", len(serialized))
-    for entry in serialized:
-        query_name = Path(entry.get("query_file") or "").name or "?"
-        target_name = Path(entry.get("target_file") or "").name or "?"
-        logger.debug(
-            "Match: query doc %s component %s -> target doc %s component %s (cost=%s)",
-            query_name,
-            entry.get("query_comp", "?"),
-            target_name,
-            entry.get("target_comp", "?"),
-            entry.get("cost", "?"),
-        )
+    
     return serialized
 
 
