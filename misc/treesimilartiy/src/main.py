@@ -41,7 +41,7 @@ def _serialize_match(match_group: list) -> list:
     ]
 
 
-def _match_components(documents: list[list[str]]) -> list[list[str]]:
+def _match_components(documents: list[list[str]]) ->  list[dict]:
     logger.info("Starting n-way component matching for %d documents...", len(documents))
     # The C++ function expects a list of documents, where each document is a list of component JSON strings.
     # It returns a list of chains, where each chain is a list of component IDs.
