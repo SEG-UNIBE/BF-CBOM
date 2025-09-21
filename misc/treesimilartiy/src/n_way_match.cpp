@@ -39,6 +39,13 @@
 
 namespace fs = std::filesystem;
 
+void simple_bar(int i, int total) {
+    double f = double(i)/total;
+    int w = 40, filled = int(f*w);
+    std::cout << '\r' << '[' << std::string(filled,'=') << std::string(w-filled,' ')
+              << "] " << int(f*100) << "% (" << i << '/' << total << ')' << std::flush;
+    if (i == total) std::cout << '\n';
+}
 
 ComponentId UnionFind::find(const ComponentId& x) 
 {
@@ -279,6 +286,8 @@ std::vector<std::vector<ComponentId>> n_way_match_pivot(std::vector<std::vector<
 
     std::vector<std::string>& pivot_document = documents[pivot_index];
     for (int k = 0; k < nr_documents; k++) {
+        simple_bar(k, nr_documents);
+
         if (k == pivot_index) {
             continue;
         }
@@ -392,6 +401,8 @@ std::vector<std::vector<ComponentId>> n_way_match_all(std::vector<std::vector<st
     std::vector<Match> matching;
     
     for (int p = 0; p < nr_documents; p++) {
+        simple_bar(p, nr_documents);
+
         int pivot_index = p;
         std::vector<std::string>& pivot_document = documents[p];
         int pivot_size = pivot_document.size();
