@@ -34,11 +34,11 @@ https://github.com/dromara/Sa-Token
 https://github.com/airbnb/lottie-android
 
 # Demo
-https://github.com/khoj-ai/khoj
-https://github.com/CodePhiliaX/Chat2DB
-https://github.com/paperless-ngx/paperless-ngx
-https://github.com/opendatalab/MinerU
 https://github.com/AutoGPTQ/AutoGPTQ
+https://github.com/opendatalab/MinerU
+https://github.com/CodePhiliaX/Chat2DB
+https://github.com/khoj-ai/khoj
+https://github.com/paperless-ngx/paperless-ngx
 https://github.com/docling-project/docling
 https://github.com/coqui-ai/TTS
 https://github.com/binary-husky/gpt_academic

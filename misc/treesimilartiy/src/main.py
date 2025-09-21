@@ -2,7 +2,7 @@ import logging
 import os
 import queue
 import time
-from multiprocessing import get_context
+import multiprocessing
 from pathlib import Path
 
 import json_matching  # type: ignore  # pylint: disable=import-error,wrong-import-position
@@ -41,37 +41,32 @@ def _serialize_match(match_group: list) -> list:
     ]
 
 
-def _match_components(json_payloads: list[str]) -> list[dict]:
-    component_docs = json_matching.prepare_json_documents(json_payloads)
-    matches = json_matching.n_way_match_pivot(component_docs, cost_thresh=10000.0)
+def _match_components(documents: list[list[str]]) -> list[list[str]]:
+    logger.info("Starting n-way component matching for %d documents...", len(documents))
+    # The C++ function expects a list of documents, where each document is a list of component JSON strings.
+    # It returns a list of chains, where each chain is a list of component IDs.
+    # A component ID is a pair [document_index, component_index_in_document].
+    logger.info("Documents:\n%s", documents)
+    matches = json_matching.n_way_match_pivot(documents, cost_thresh=10000.0)
 
     serialized = [_serialize_match(match) for match in matches]
     logger.info("Found %d component match(es)", len(serialized))
-    
+    logger.info("Matches:\n%s", serialized)
     return serialized
 
 
-def _run_match_with_timeout(json_payloads: list[str]) -> list[dict]:
-    timeout = TIMEOUT_SEC
-    if timeout and timeout > 0:
-        ctx = get_context("spawn")
-        result_queue = ctx.Queue()
-        process = ctx.Process(target=_match_worker, args=(json_payloads, result_queue))
-        process.start()
+def _run_match_with_timeout(func, args, timeout_seconds):
+    """
+    Run a function in a separate process with a timeout.
+    """
+    with multiprocessing.Pool(processes=1) as pool:
+        result = pool.apply_async(func, args=(args,))
         try:
-            status, payload = result_queue.get(timeout=timeout)
-        except queue.Empty as err:
-            process.terminate()
-            process.join(timeout=1)
-            raise TimeoutError(f"component similarity timed out after {timeout} seconds") from err
-        finally:
-            if process.is_alive():
-                process.join()
-
-        if status == "error":
-            raise RuntimeError(payload)
-        return payload
-    return _match_components(json_payloads)
+            return result.get(timeout=timeout_seconds)
+        except multiprocessing.TimeoutError:
+            logger.error("Component matching timed out after %d seconds.", timeout_seconds)
+            # The pool is automatically terminated, which should kill the child process
+            return None
 
 
 def _handle_instruction(raw_payload: str) -> None:
@@ -86,15 +81,19 @@ def _handle_instruction(raw_payload: str) -> None:
     logger.info(
         "📨 Received job instruction for job %s (repo: %s)", instruction.job_id, instruction.repo_info.full_name
     )
-    cbom_strings = [entry.components_as_json for entry in instruction.CbomJsons if entry.components_as_json]
-    # TODO: instruction.CbomJsons holds now a list of strings in its attribute 'components_as_json' (used to be only a single string 'json')
-    tools = [entry.tool for entry in instruction.CbomJsons if entry.json]
-    if len(cbom_strings) < 2:
-        logger.warning(
-            "Received job %s but only %d CBOM(s); cannot compute similarity",
-            instruction.job_id,
-            len(cbom_strings),
-        )
+    
+    
+    # Transform the list of CbomJson objects into a list of documents (list[list[str]])
+    # as expected by the C++ matching function.
+    documents = [
+        entry.components_as_json
+        for entry in instruction.CbomJsons
+        if entry.components_as_json
+    ]
+    
+    tools = [entry.tool for entry in instruction.CbomJsons if entry.components_as_json]
+    if len(documents) < 2:
+        logger.warning("Need at least two documents with components to match. Aborting.")
         insufficient_result = ComponentMatchJobResult(
             job_id=instruction.job_id,
             benchmark_id=instruction.benchmark_id,
@@ -121,19 +120,23 @@ def _handle_instruction(raw_payload: str) -> None:
         "Processing job %s from benchmark %s with %d CBOM payload(s)",
         instruction.job_id,
         instruction.benchmark_id,
-        len(cbom_strings),
+        len(documents),
     )
 
     status = "ok"
     error_msg: str | None = None
-    matches: list[dict] = []
+    matches: list = []
 
     start_time = time.perf_counter()
 
+    match_results = None
+
     try:
-        matches = _run_match_with_timeout(cbom_strings)
+        match_results = _run_match_with_timeout(
+            _match_components, documents, timeout_seconds=TIMEOUT_SEC
+        )
     except TimeoutError as err:
-        status = "timedout"
+        status = "timeout"
         error_msg = str(err)
         logger.warning("Job %s timed out after %ss", instruction.job_id, TIMEOUT_SEC)
     except Exception as err:
@@ -141,13 +144,19 @@ def _handle_instruction(raw_payload: str) -> None:
         error_msg = str(err)
         logger.error("json_matching failed for job %s: %s", instruction.job_id, err, exc_info=True)
 
-    if status != "ok":
+    if status == "ok":
+        if match_results is None:
+            status = "timeout"
+            error_msg = (
+                f"Component matching timed out after {TIMEOUT_SEC} seconds"
+            )
+            matches = []
+        else:
+            matches = match_results
+    else:
         matches = []
 
     duration = time.perf_counter() - start_time
-
-    if status != "ok":
-        matches = []
 
     result_payload = ComponentMatchJobResult(
         job_id=instruction.job_id,
