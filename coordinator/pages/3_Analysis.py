@@ -568,14 +568,6 @@ if comp_rows:
                     duration = result_payload.get("duration_sec")
                     status_label = result_payload.get("status", "ok")
                     header = f"Status: {status_label}"
-                    logger.info(
-                        "Similarity result for repo «%s»: status=%s, duration=%.2fs, matches=%d, tools=%s",
-                        repo_name,
-                        status_label,
-                        duration if duration is not None else -1,
-                        match_count,
-                        ", ".join(tools),
-                    )
                     if duration is not None:
                         header += f" · {duration:.2f}s"
                     header += f" · Matches: {match_count}"
