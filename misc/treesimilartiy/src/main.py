@@ -41,9 +41,8 @@ def _serialize_match(match_group: list) -> list:
     ]
 
 
-def _match_components(json_payloads: list[str]) -> list[dict]:
-    component_docs = json_matching.prepare_json_documents(json_payloads)
-    matches = json_matching.n_way_match_pivot(component_docs, cost_thresh=10000.0)
+def _match_components(json_payloads: list[list[str]]) -> list[dict]:
+    matches = json_matching.n_way_match_pivot(json_payloads, cost_thresh=10000.0)
 
     serialized = [_serialize_match(match) for match in matches]
     logger.info("Found %d component match(es)", len(serialized))
