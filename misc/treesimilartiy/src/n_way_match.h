@@ -46,6 +46,9 @@ public:
     std::vector<std::vector<ComponentId>> getConnectedComponents();
 };
 
+
+void simple_bar(int i, int total);
+
 std::vector<std::vector<ComponentId>> buildComponentChains(const std::vector<Match>& matches);
 std::string read_file(const std::string& filename);
 std::vector<std::pair<std::string, std::string>> get_json_files(const std::string& directory_path);
