@@ -87,6 +87,7 @@ class Benchmark(DataClassJsonMixin):
 class CbomJson(DataClassJsonMixin):
     tool: str
     components_as_json: list[str]
+    entire_json_raw: str
 
 
 @dataclass

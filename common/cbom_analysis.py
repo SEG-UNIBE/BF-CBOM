@@ -65,7 +65,7 @@ def create_component_match_instruction(
             if minimized_components_dicts:
                 harmonized_list = harmonize_value(minimized_components_dicts)
                 minimized_components = [json.dumps(comp) for comp in harmonized_list]
-                entries.append(CbomJson(tool=worker, components_as_json=minimized_components))
+                entries.append(CbomJson(tool=worker, components_as_json=minimized_components, entire_json_raw=payload))
 
         except json.JSONDecodeError as e:
             logger.error("Invalid CBOM JSON for worker '%s': %s", worker, e)
@@ -600,8 +600,8 @@ def harmonize_value(value: Any) -> Any:
     if isinstance(value, str):
         # Harmonize string values
         harmonized = value.lower()
-        harmonized = re.sub(r"@.*", "", harmonized)
-        harmonized = re.sub(r"[^a-z0-9]", "", harmonized)
+        # harmonized = re.sub(r"@.*", "", harmonized)
+        # harmonized = re.sub(r"[^a-z0-9]", "", harmonized)
         return harmonized
     if isinstance(value, dict):
         # Recursively harmonize dictionary values

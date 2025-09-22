@@ -459,7 +459,7 @@ if comp_rows:
                 button_col, toggle_col = st.columns([3, 2])
                 with toggle_col:
                     exclude_libraries = st.toggle(
-                        "Exclude types «libraries», «frameworks», «applications»",
+                        f"Exclude types {", ".join(f"«{t}»" for t in DEFAULT_EXCLUDED_COMPONENT_TYPES)}",
                         key=toggle_key,
                     )
 
@@ -585,10 +585,10 @@ if comp_rows:
                                 repo_state.get("result_exclude_libraries", False)
                             )
                             if result_filter_enabled:
-                                st.caption("Libraries/frameworks were excluded for this run.")
+                                st.caption(f"{', '.join(f'«{t}»' for t in DEFAULT_EXCLUDED_COMPONENT_TYPES)} were excluded for this run.")
                             elif exclude_libraries:
                                 st.caption(
-                                    "Toggle is set to exclude libraries/frameworks. "
+                                    f"Toggle is set to exclude {', '.join(f'«{t}»' for t in DEFAULT_EXCLUDED_COMPONENT_TYPES)}."
                                     "Re-run similarity to apply."
                                 )
 
