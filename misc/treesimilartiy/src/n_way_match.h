@@ -6,6 +6,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <cJSON.h>
 
 struct Match {
     int query_doc;
@@ -47,7 +48,10 @@ public:
 };
 
 
-void simple_bar(int i, int total);
+std::string to_lowercase(const std::string& str);
+cJSON* filter_and_normalize_component(cJSON* component);
+cJSON* filter_and_normalize_json_recursive(cJSON* json_obj);
+cJSON* filter_and_normalize_array(cJSON* json_array);
 
 std::vector<std::vector<ComponentId>> buildComponentChains(const std::vector<Match>& matches);
 std::string read_file(const std::string& filename);

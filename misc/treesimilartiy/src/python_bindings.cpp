@@ -29,10 +29,4 @@ PYBIND11_MODULE(json_matching, m) {
           py::arg("cost_thresh") = 25.0,
           "Match components using all-to-all strategy");
 
-    m.def("prepare_json_documents",
-          [](std::vector<std::string> json_files) {
-              return prepare_json_documents(json_files);
-          },
-          py::arg("json_files"),
-          "Extracts all components from the cbom json files and returns a list of lists containing all components");
 }
