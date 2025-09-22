@@ -47,3 +47,4 @@ https://github.com/katanaml/sparrow
 https://github.com/alibaba/Sentinel
 https://github.com/authlib/authlib
 https://github.com/asLody/VirtualApp
+https://github.com/xtekky/gpt4free

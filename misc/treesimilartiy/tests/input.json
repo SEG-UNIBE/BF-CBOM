@@ -1,0 +1,277 @@
+[
+    [ //cdxgen (0), sha256 (1)
+        {
+            "type": "cryptographicasset",
+            "name": "hmacsha",
+            "cryptoProperties": {
+                "assetType": "algorithm",
+                "oid": "136155812"
+            }
+        },
+        {
+            "type": "cryptographicasset",
+            "name": "sha256",
+            "cryptoProperties": {
+                "assetType": "algorithm",
+                "oid": "21684011013421"
+            }
+        },
+        {
+            "type": "cryptographicasset",
+            "name": "des",
+            "cryptoProperties": {
+                "assetType": "algorithm",
+                "oid": "1336311"
+            }
+        },
+        {
+            "type": "cryptographicasset",
+            "name": "aes",
+            "cryptoProperties": {
+                "assetType": "algorithm",
+                "oid": "2168401101341"
+            }
+        },
+        {
+            "type": "cryptographicasset",
+            "name": "blowfishecb",
+            "cryptoProperties": {
+                "assetType": "algorithm",
+                "oid": "1361413029111"
+            }
+        }
+    ],
+    [ //cbomkit (1), sha256 (8)
+        {
+            "type": "cryptographicasset",
+            "name": "des56cfbpkcs5",
+            "cryptoProperties": {
+                "assetType": "algorithm",
+                "algorithmProperties": {
+                    "mode": "cfb",
+                    "padding": "pkcs5",
+                    "primitive": "blockcipher",
+                    "parameterSetIdentifier": "56"
+                }
+            }
+        },
+        {
+            "type": "cryptographicasset",
+            "name": "des56cbcpkcs5",
+            "cryptoProperties": {
+                "assetType": "algorithm",
+                "algorithmProperties": {
+                    "mode": "cbc",
+                    "padding": "pkcs5",
+                    "primitive": "blockcipher",
+                    "cryptoFunctions": [
+                        "decrypt",
+                        "encrypt"
+                    ],
+                    "parameterSetIdentifier": "56"
+                }
+            }
+        },
+        {
+            "type": "cryptographicasset",
+            "name": "sha1",
+            "cryptoProperties": {
+                "oid": "13143226",
+                "assetType": "algorithm",
+                "algorithmProperties": {
+                    "primitive": "hash",
+                    "cryptoFunctions": [
+                        "digest"
+                    ],
+                    "parameterSetIdentifier": "160"
+                }
+            }
+        },
+        {
+            "type": "cryptographicasset",
+            "name": "aes128cbcpkcs5",
+            "cryptoProperties": {
+                "oid": "2168401101341",
+                "assetType": "algorithm",
+                "algorithmProperties": {
+                    "mode": "cbc",
+                    "padding": "pkcs5",
+                    "primitive": "blockcipher",
+                    "cryptoFunctions": [
+                        "encrypt"
+                    ],
+                    "parameterSetIdentifier": "128"
+                }
+            }
+        },
+        {
+            "type": "cryptographicasset",
+            "name": "secretkey",
+            "cryptoProperties": {
+                "assetType": "relatedcryptomaterial",
+                "relatedCryptoMaterialProperties": {
+                    "type": "secretkey"
+                }
+            }
+        },
+        {
+            "type": "cryptographicasset",
+            "name": "secretkey",
+            "cryptoProperties": {
+                "assetType": "relatedcryptomaterial",
+                "relatedCryptoMaterialProperties": {
+                    "size": 128,
+                    "type": "secretkey"
+                }
+            }
+        },
+        {
+            "type": "cryptographicasset",
+            "name": "hmacsha256",
+            "cryptoProperties": {
+                "oid": "1284011354929",
+                "assetType": "algorithm",
+                "algorithmProperties": {
+                    "primitive": "mac",
+                    "cryptoFunctions": [
+                        "tag"
+                    ]
+                }
+            }
+        },
+        {
+            "type": "cryptographicasset",
+            "name": "des56",
+            "cryptoProperties": {
+                "assetType": "algorithm",
+                "algorithmProperties": {
+                    "primitive": "blockcipher",
+                    "cryptoFunctions": [
+                        "keygen"
+                    ],
+                    "parameterSetIdentifier": "56"
+                }
+            }
+        },
+        {
+            "type": "cryptographicasset",
+            "name": "sha256",
+            "cryptoProperties": {
+                "oid": "21684011013421",
+                "assetType": "algorithm",
+                "algorithmProperties": {
+                    "primitive": "hash",
+                    "cryptoFunctions": [
+                        "digest"
+                    ],
+                    "parameterSetIdentifier": "256"
+                }
+            }
+        },
+        {
+            "type": "cryptographicasset",
+            "name": "secretkey",
+            "cryptoProperties": {
+                "assetType": "relatedcryptomaterial",
+                "relatedCryptoMaterialProperties": {
+                    "type": "secretkey"
+                }
+            }
+        },
+        {
+            "type": "cryptographicasset",
+            "name": "aes128",
+            "cryptoProperties": {
+                "oid": "2168401101341",
+                "assetType": "algorithm",
+                "algorithmProperties": {
+                    "primitive": "blockcipher",
+                    "cryptoFunctions": [
+                        "keygen"
+                    ],
+                    "parameterSetIdentifier": "128"
+                }
+            }
+        },
+        {
+            "type": "cryptographicasset",
+            "name": "secretkey",
+            "cryptoProperties": {
+                "assetType": "relatedcryptomaterial",
+                "relatedCryptoMaterialProperties": {
+                    "type": "secretkey"
+                }
+            }
+        },
+        {
+            "type": "cryptographicasset",
+            "name": "secretkey",
+            "cryptoProperties": {
+                "assetType": "relatedcryptomaterial",
+                "relatedCryptoMaterialProperties": {
+                    "type": "secretkey"
+                }
+            }
+        },
+        {
+            "type": "cryptographicasset",
+            "name": "des56ofbpkcs5",
+            "cryptoProperties": {
+                "assetType": "algorithm",
+                "algorithmProperties": {
+                    "mode": "ofb",
+                    "padding": "pkcs5",
+                    "primitive": "blockcipher",
+                    "parameterSetIdentifier": "56"
+                }
+            }
+        },
+        {
+            "type": "cryptographicasset",
+            "name": "secretkey",
+            "cryptoProperties": {
+                "assetType": "relatedcryptomaterial",
+                "relatedCryptoMaterialProperties": {
+                    "type": "secretkey"
+                }
+            }
+        },
+        {
+            "type": "cryptographicasset",
+            "name": "blowfish",
+            "cryptoProperties": {
+                "assetType": "algorithm",
+                "algorithmProperties": {
+                    "primitive": "blockcipher",
+                    "cryptoFunctions": [
+                        "keygen"
+                    ]
+                }
+            }
+        },
+        {
+            "type": "cryptographicasset",
+            "name": "secretkey",
+            "cryptoProperties": {
+                "assetType": "relatedcryptomaterial",
+                "relatedCryptoMaterialProperties": {
+                    "type": "secretkey"
+                }
+            }
+        },
+        {
+            "type": "cryptographicasset",
+            "name": "md5",
+            "cryptoProperties": {
+                "assetType": "algorithm",
+                "algorithmProperties": {
+                    "primitive": "hash",
+                    "cryptoFunctions": [
+                        "digest"
+                    ],
+                    "parameterSetIdentifier": "128"
+                }
+            }
+        }
+    ]
+]
