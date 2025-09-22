@@ -47,6 +47,7 @@ def _match_components(documents: list[list[str]]) ->  list[dict]:
     # It returns a list of chains, where each chain is a list of component IDs.
     # A component ID is a pair [document_index, component_index_in_document].
     logger.info("Documents:\n%s", documents)
+    # TODO: transform format
     matches = json_matching.n_way_match_pivot(documents, cost_thresh=10000.0)
 
     serialized = [_serialize_match(match) for match in matches]
