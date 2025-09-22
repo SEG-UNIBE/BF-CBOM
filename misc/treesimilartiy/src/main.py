@@ -43,12 +43,14 @@ def _serialize_match(match_group: list) -> list:
 
 def _match_components_legacy(documents: list[str]) ->  list[dict]:
     logger.info("Starting n-way component matching for %d documents...", len(documents))
-    logger.info("Documents:\n%s", documents)
-    # TODO: transform format
-    logger.info("\t🔥 preparing...")
+    for i, doc in enumerate(documents):
+        logger.info("Document %d first 300 chars: %s", i, doc[:300])
+    logger.info("\tpreparing...")
     documents = json_matching.prepare_json_documents(documents)
-    logger.info("\t🧊 matching...")
-    matches = json_matching.n_way_match_pivot(documents, cost_thresh=10.0)
+    logger.info("\tpreparing DONE... (%d documents)", len(documents))
+    
+    logger.info("\tmatching...")
+    matches = json_matching.n_way_match_pivot(documents, cost_thresh=10000.0)
 
     serialized = [_serialize_match(match) for match in matches]
     logger.info("Found %d component match(es)", len(serialized))
@@ -61,8 +63,6 @@ def _match_components(documents: list[list[str]]) ->  list[dict]:
     # The C++ function expects a list of documents, where each document is a list of component JSON strings.
     # It returns a list of chains, where each chain is a list of component IDs.
     # A component ID is a pair [document_index, component_index_in_document].
-    logger.info("Documents:\n%s", documents)
-    # TODO: transform format
     matches = json_matching.n_way_match_pivot(documents, cost_thresh=10000.0)
 
     serialized = [_serialize_match(match) for match in matches]
@@ -157,7 +157,7 @@ def _handle_instruction(raw_payload: str) -> None:
         #     _match_components, documents, timeout_seconds=TIMEOUT_SEC
         # )
          match_results = _run_match_with_timeout(
-            _match_components_legacy, documents_raw, timeout_seconds=TIMEOUT_SEC
+            _match_components, documents, timeout_seconds=TIMEOUT_SEC
         )
     except TimeoutError as err:
         status = "timeout"

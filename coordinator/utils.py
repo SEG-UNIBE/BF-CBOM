@@ -1,7 +1,6 @@
 import datetime as dt
 import io
 import json
-import math
 import zipfile
 
 import pandas as pd  # local import to avoid hard dependency at module import
@@ -293,14 +292,34 @@ def build_repo_info_url_map(repos: list[dict]) -> dict[str, dict[str, str]]:
 
 
 def estimate_similarity_runtime(component_counts: dict[str, int]) -> float:
-    """Return a rough runtime estimate based on component totals per worker."""
+    """Return a conservative runtime estimate for n-way component matching.
+
+    Model: base + linear * total_components + pair_coef * sum_{i<j} (c_i * c_j)
+    - base: fixed overhead (queueing, setup)
+    - linear: per-component processing
+    - pairwise: cross-comparisons across tools (dominant factor), but with a small coefficient
+
+    This intentionally under-promises compared to the prior exponential model.
+    """
 
     if not component_counts:
         return 0.0
-    scale = 250.0
-    base_seconds = 2.5
-    weights = [math.exp(max(count, 0) / scale) for count in component_counts.values()]
-    return base_seconds * sum(weights)
+
+    counts = [max(0, int(v or 0)) for v in component_counts.values()]
+    total = sum(counts)
+    if total <= 0:
+        return 0.0
+
+    # Efficient computation of sum_{i<j} c_i*c_j = ( (sum c)^2 - sum(c^2) ) / 2
+    sum_sq = sum(c * c for c in counts)
+    pair_sum = max(0.0, (total * total - sum_sq) / 2.0)
+
+    base = 1.5
+    linear_coef = 0.01       # seconds per component
+    pair_coef = 0.00002      # seconds per cross-tool pair
+
+    estimate = base + linear_coef * total + pair_coef * pair_sum
+    return float(max(0.0, estimate))
 
 
 def safe_int(value, default: int = 0) -> int:

@@ -12,6 +12,7 @@ from common.cbom_analysis import (
     analyze_cbom_json,
     component_counts_for_repo,
     filter_cbom_components,
+    load_components,
     render_similarity_matches,
     summarize_component_types,
     summarize_runtime_estimate,
@@ -55,29 +56,29 @@ TREESIM_QUEUE = f"jobs:{TREESIM_WORKER}"
 TREESIM_RESULTS_LIST = f"results:{TREESIM_WORKER}"
 
 
-def _latest_similarity_result(r: redis.Redis, repo_name: str, *, job_id: str | None = None) -> dict | None:
+def _latest_similarity_result(redis_conn: redis.Redis, repo_full_name: str, *, target_job_id: str | None = None) -> dict | None:
     """Return the newest similarity result for repo (optionally matching job_id)."""
 
-    entries = r.lrange(TREESIM_RESULTS_LIST, 0, -1)
+    entries = redis_conn.lrange(TREESIM_RESULTS_LIST, 0, -1)
     if not entries:
         return None
 
-    repo_name = (repo_name or "").strip()
-    target_job = job_id
+    target_repo = (repo_full_name or "").strip()
+    target_job = target_job_id
 
-    for raw in reversed(entries):
+    for entry_text in reversed(entries):
         try:
-            payload = json.loads(raw)
-        except Exception:
+            entry_payload = json.loads(entry_text)
+        except json.JSONDecodeError:
             continue
 
-        if target_job and payload.get("job_id") != target_job:
+        if target_job and entry_payload.get("job_id") != target_job:
             continue
 
-        if (payload.get("repo_full_name") or "").strip() != repo_name:
+        if (entry_payload.get("repo_full_name") or "").strip() != target_repo:
             continue
 
-        return payload
+        return entry_payload
 
     if target_job:
         return None
@@ -164,7 +165,7 @@ for repo in repos:
                     payload = json.loads(raw)
                     if payload.get("status") == "timeout":
                         is_timeout = True
-                except Exception:
+                except json.JSONDecodeError:
                     pass
             status_key = "timeout" if is_timeout else "failed"
         elif stt == "cancelled":
@@ -196,7 +197,7 @@ for repo in repos:
                     if duration is not None:
                         try:
                             duration = float(duration)
-                        except Exception:
+                        except (TypeError, ValueError):
                             duration = None
                     if duration is not None:
                         size_val = repo_sizes.get(full)
@@ -215,7 +216,7 @@ for repo in repos:
                                 "components": total,
                             }
                         )
-                except Exception:
+                except json.JSONDecodeError:
                     pass
 
 # Charts: status distribution per worker (fixed set of labels)
@@ -449,6 +450,9 @@ if comp_rows:
 
                 job_id = repo_state.get("job_id")
                 result_payload = repo_state.get("result")
+                # Ensure a stable default for waiting flag per repo
+                if "waiting_for_similarity" not in repo_state:
+                    repo_state["waiting_for_similarity"] = False
 
                 toggle_key = f"exclude_libs_{bench_id}_{repo_name}"
                 if toggle_key not in st.session_state:
@@ -458,10 +462,8 @@ if comp_rows:
 
                 button_col, toggle_col = st.columns([3, 2])
                 with toggle_col:
-                    exclude_libraries = st.toggle(
-                        f"Exclude types {", ".join(f"«{t}»" for t in DEFAULT_EXCLUDED_COMPONENT_TYPES)}",
-                        key=toggle_key,
-                    )
+                    label = "Exclude types " + ", ".join(f"«{t}»" for t in DEFAULT_EXCLUDED_COMPONENT_TYPES)
+                    exclude_libraries = st.toggle(label, key=toggle_key)
 
                 repo_state["exclude_libraries"] = exclude_libraries
                 excluded_types = (
@@ -486,19 +488,10 @@ if comp_rows:
                         f"{summarize_runtime_estimate(estimate_seconds)}"
                     )
 
-                if not result_payload:
-                    result_payload = _latest_similarity_result(r, repo_name, job_id=job_id)
-                    if result_payload:
-                        repo_state["result"] = result_payload
-                        repo_state.setdefault("job_id", result_payload.get("job_id"))
-                        result_exclude_flag = repo_state.get(
-                            "job_exclude_libraries",
-                            repo_state.get("result_exclude_libraries", False),
-                        )
-                        repo_state["result_exclude_libraries"] = bool(result_exclude_flag)
-                        job_id = repo_state.get("job_id")
+                # Do not eagerly fetch results on reruns (e.g., toggle changes).
+                # Result fetching is driven only when a job is actively waiting.
 
-                waiting_for_result = bool(job_id) and not result_payload
+                waiting_for_result = bool(repo_state.get("waiting_for_similarity")) and bool(job_id) and not result_payload
                 button_disabled = waiting_for_result
                 with button_col:
                     if st.button(
@@ -525,6 +518,26 @@ if comp_rows:
                                 instruction.repo_info.full_name,
                                 len(instruction.CbomJsons), stats_str, num_components
                             )
+                            # Persist issued tool order and counts for later verification
+                            repo_state["issued_tools"] = [t for t, _ in tool_stats]
+                            repo_state["issued_counts"] = [c for _, c in tool_stats]
+                            # Persist the full filtered component dicts used for this run to render real data later
+                            # Build from the raw CBOMs so indices match the minimized list exactly
+                            cbom_map_raw_at_issue = collect_repo_cboms(r, bench_id, repo_name, workers) or {}
+                            issued_full_components = {}
+                            issued_min_docs = {}
+                            for cbom in instruction.CbomJsons:
+                                raw_json = cbom_map_raw_at_issue.get(cbom.tool)
+                                full_list = load_components(raw_json) if raw_json else []
+                                if exclude_libraries:
+                                    full_list = [
+                                        c for c in full_list
+                                        if not (isinstance(c, dict) and c.get("type") in DEFAULT_EXCLUDED_COMPONENT_TYPES)
+                                    ]
+                                issued_full_components[cbom.tool] = full_list
+                                issued_min_docs[cbom.tool] = list(cbom.components_as_json or [])
+                            repo_state["issued_full_components"] = issued_full_components
+                            repo_state["issued_minimized_documents"] = issued_min_docs
                             enqueue_component_match_instruction(r, instruction, TREESIM_QUEUE)
                             repo_state["job_id"] = instruction.job_id
                             repo_state.pop("result", None)
@@ -532,23 +545,27 @@ if comp_rows:
                             repo_state.pop("cboms", None)
                             repo_state.pop("filtered_cboms", None)
                             repo_state["job_exclude_libraries"] = exclude_libraries
+                            # Enter active waiting only on explicit user action
+                            repo_state["waiting_for_similarity"] = True
                             st.session_state["component_similarity_jobs"][bench_id] = bench_jobs_state
                             st.rerun()
 
                 if waiting_for_result and not result_payload:
-                    result_payload = _latest_similarity_result(r, repo_name, job_id=job_id)
+                    result_payload = _latest_similarity_result(r, repo_name, target_job_id=job_id)
                     if result_payload:
                         repo_state["result"] = result_payload
+                        # Clear waiting state now that we have a result
+                        repo_state["waiting_for_similarity"] = False
                         st.session_state["component_similarity_jobs"][bench_id] = bench_jobs_state
 
-                if bool(repo_state.get("job_id")) and not repo_state.get("result"):
+                if waiting_for_result and not repo_state.get("result"):
                     poll_interval = 2.0
                     with st.spinner("Waiting for similarity result…", show_time=True):
                         while not repo_state.get("result"):
                             result_payload = _latest_similarity_result(
                                 r,
                                 repo_name,
-                                job_id=repo_state.get("job_id"),
+                                target_job_id=repo_state.get("job_id"),
                             )
                             if result_payload:
                                 repo_state["result"] = result_payload
@@ -557,6 +574,7 @@ if comp_rows:
                                     repo_state.get("result_exclude_libraries", False),
                                 )
                                 repo_state["result_exclude_libraries"] = bool(result_exclude_flag)
+                                repo_state["waiting_for_similarity"] = False
                                 st.session_state["component_similarity_jobs"][bench_id] = bench_jobs_state
                                 break
                             time.sleep(poll_interval)
@@ -603,21 +621,52 @@ if comp_rows:
                                 cbom_map_raw = cbom_map_raw or {}
 
                             filtered_cache = repo_state.setdefault("filtered_cboms", {})
-                            if result_filter_enabled:
-                                cbom_map_for_render = filtered_cache.get(True)
-                                if cbom_map_for_render is None:
-                                    cbom_map_for_render = {
-                                        tool: filter_cbom_components(
-                                            payload, DEFAULT_EXCLUDED_COMPONENT_TYPES
-                                        )
-                                        for tool, payload in cbom_map_raw.items()
-                                    }
-                                    filtered_cache[True] = cbom_map_for_render
+                            issued_tools = repo_state.get("issued_tools") or []
+                            tools_for_render = tools or issued_tools
+                            use_issued_full = bool(repo_state.get("issued_full_components")) and bool(tools_for_render)
+                            use_issued_min = bool(repo_state.get("issued_minimized_documents")) and bool(tools_for_render)
+                            if use_issued_full:
+                                # Build synthetic CBOMs from the stored full components to ensure exact index mapping
+                                issued_full = repo_state.get("issued_full_components") or {}
+                                cbom_map_full = {}
+                                for t in tools_for_render:
+                                    comp_list = issued_full.get(t) or []
+                                    cbom_map_full[t] = json.dumps({"components": comp_list}, ensure_ascii=False)
+                                # Optionally build minimized map (used by the view switch)
+                                cbom_map_min = None
+                                if use_issued_min:
+                                    issued_min = repo_state.get("issued_minimized_documents") or {}
+                                    cbom_map_min = {}
+                                    for t in tools_for_render:
+                                        doc_list = issued_min.get(t) or []
+                                        comps = []
+                                        for s in doc_list:
+                                            try:
+                                                comps.append(json.loads(s))
+                                            except json.JSONDecodeError:
+                                                continue
+                                        cbom_map_min[t] = json.dumps({"components": comps}, ensure_ascii=False)
+                                # View mode selector (default Real)
+                                view_key = f"view_mode_{bench_id}_{repo_name}"
+                                options = ["Real (full)"] + (["Minimized (matched)"] if cbom_map_min else [])
+                                choice = st.radio("View", options=options, index=0, key=view_key, horizontal=True)
+                                cbom_map_for_render = cbom_map_min if (cbom_map_min and choice.startswith("Minimized")) else cbom_map_full
                             else:
-                                cbom_map_for_render = filtered_cache.get(False)
-                                if cbom_map_for_render is None:
-                                    filtered_cache[False] = cbom_map_raw
-                                    cbom_map_for_render = cbom_map_raw
+                                if result_filter_enabled:
+                                    cbom_map_for_render = filtered_cache.get(True)
+                                    if cbom_map_for_render is None:
+                                        cbom_map_for_render = {
+                                            tool: filter_cbom_components(
+                                                payload, DEFAULT_EXCLUDED_COMPONENT_TYPES
+                                            )
+                                            for tool, payload in cbom_map_raw.items()
+                                        }
+                                        filtered_cache[True] = cbom_map_for_render
+                                else:
+                                    cbom_map_for_render = filtered_cache.get(False)
+                                    if cbom_map_for_render is None:
+                                        filtered_cache[False] = cbom_map_raw
+                                        cbom_map_for_render = cbom_map_raw
 
                             renderer = SimpleNamespace(
                                 info=st.info,
@@ -627,9 +676,26 @@ if comp_rows:
                                 columns=st.columns,
                             )
 
+                            # Optional sanity check: issued counts vs reconstructed counts
+                            issued_tools = repo_state.get("issued_tools") or []
+                            issued_counts = repo_state.get("issued_counts") or []
+                            effective_tools = tools_for_render
+                            if effective_tools and issued_tools and issued_counts and len(issued_tools) == len(issued_counts):
+                                # Build current counts based on the CBOMs used for rendering
+                                current_counts = []
+                                for t in effective_tools:
+                                    raw_json = cbom_map_for_render.get(t)
+                                    comps = load_components(raw_json) if raw_json else []
+                                    current_counts.append(len(comps))
+                                if current_counts != issued_counts:
+                                    st.warning(
+                                        "Component counts differ between issued job and current view. "
+                                        "Indices may not align perfectly."
+                                    )
+
                             render_similarity_matches(
                                 matches=matches,
-                                tools=tools,
+                                tools=tools_for_render,
                                 cboms_by_tool=cbom_map_for_render,
                                 renderer=renderer,
                                 safe_int_func=safe_int,

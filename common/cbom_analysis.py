@@ -22,6 +22,40 @@ DEFAULT_EXCLUDED_COMPONENT_TYPES = {"library", "framework", "application"}
 logger = logging.getLogger(__name__)
 
 
+def _find_value_path(obj: Any, target_key_lc: str) -> tuple[list[str] | None, Any]:
+    """Return (path, value) for the first occurrence of key (case-insensitive).
+
+    Path is a list of dict keys leading to the key found. Lists are traversed,
+    but not represented in the path; the first matching branch is returned.
+    """
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if isinstance(k, str) and k.lower() == target_key_lc:
+                return [k], v
+            sub_path, sub_val = _find_value_path(v, target_key_lc)
+            if sub_path is not None:
+                return [k] + sub_path, sub_val
+    elif isinstance(obj, list):
+        for item in obj:
+            sub_path, sub_val = _find_value_path(item, target_key_lc)
+            if sub_path is not None:
+                return sub_path, sub_val
+    return None, None
+
+
+def _set_nested(target: dict, path: list[str], value: Any) -> None:
+    cur = target
+    for i, key in enumerate(path):
+        if i == len(path) - 1:
+            cur[key] = value
+        else:
+            nxt = cur.get(key)
+            if not isinstance(nxt, dict):
+                nxt = {}
+                cur[key] = nxt
+            cur = nxt
+
+
 def create_component_match_instruction(
     repo: dict,
     bench_id: str,
@@ -58,8 +92,14 @@ def create_component_match_instruction(
                     "type": component.get("type"),
                     "name": component.get("name"),
                 }
-                if "cryptoProperties" in component:
-                    min_comp["cryptoProperties"] = component.get("cryptoProperties")
+
+                # Preserve assetType and primitive in their original nested locations
+                at_path, at_val = _find_value_path(component, "assettype")
+                if at_path is not None:
+                    _set_nested(min_comp, at_path, at_val)
+                prim_path, prim_val = _find_value_path(component, "primitive")
+                if prim_path is not None:
+                    _set_nested(min_comp, prim_path, prim_val)
                 minimized_components_dicts.append(min_comp)
 
             if minimized_components_dicts:
@@ -70,7 +110,8 @@ def create_component_match_instruction(
         except json.JSONDecodeError as e:
             logger.error("Invalid CBOM JSON for worker '%s': %s", worker, e)
             continue
-        except Exception as e:
+        except (TypeError, ValueError, KeyError, AttributeError) as e:
+            # Non-JSON errors can occur due to unexpected structures; log and continue.
             logger.error("Error processing CBOM for worker '%s': %s", worker, e)
             continue
 
@@ -95,7 +136,7 @@ def get_crypto_asset_types() -> list[str]:
 def _safe_json_loads(text: str) -> Any | None:
     try:
         return json.loads(text)
-    except Exception:
+    except json.JSONDecodeError:
         return None
 
 
@@ -601,7 +642,7 @@ def harmonize_value(value: Any) -> Any:
         # Harmonize string values
         harmonized = value.lower()
         # harmonized = re.sub(r"@.*", "", harmonized)
-        # harmonized = re.sub(r"[^a-z0-9]", "", harmonized)
+        harmonized = re.sub(r"[^a-z0-9]", "", harmonized)
         return harmonized
     if isinstance(value, dict):
         # Recursively harmonize dictionary values
