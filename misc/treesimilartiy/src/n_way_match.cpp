@@ -1,5 +1,3 @@
-#pragma once
-
 #include <iostream>
 #include <fstream>
 #include <unistd.h>
@@ -38,6 +36,7 @@
 #include "n_way_match.h"
 
 namespace fs = std::filesystem;
+
 
 void simple_bar(int i, int total) {
     double f = double(i)/total;
@@ -106,11 +105,12 @@ template <typename Label>
 class CustomCostModelJSON {
 private:
     const label::LabelDictionary<Label>& ld_;
-    static constexpr double MAX_COST = 1e9;
+    double MAX_COST;
     std::unordered_set<std::string> important_labels_; 
     
 public:
     explicit CustomCostModelJSON(const label::LabelDictionary<Label>& ld) : ld_(ld) {
+        MAX_COST = 1e9;
     }
 
     double ren(const int label_id_1, const int label_id_2) const {
@@ -201,12 +201,105 @@ std::vector<std::pair<std::string, std::string>> get_json_files(const std::strin
     return json_files;
 }
 
+// Helper function to convert string to lowercase
+std::string to_lowercase(const std::string& str) {
+    std::string result = str;
+    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    return result;
+}
+
+// Helper function to recursively filter and normalize JSON
+cJSON* filter_and_normalize_component(cJSON* component) {
+    if (!component) return nullptr;
+    
+    cJSON* filtered = cJSON_CreateObject();
+    
+    // Define the fields we want to keep
+    const std::vector<std::string> allowed_fields = {"type", "name", "cryptoProperties"};
+    
+    for (const std::string& field : allowed_fields) {
+        cJSON* field_item = cJSON_GetObjectItem(component, field.c_str());
+        if (field_item) {
+            if (cJSON_IsString(field_item)) {
+                // Convert string values to lowercase
+                std::string value = cJSON_GetStringValue(field_item);
+                std::string lowercase_value = to_lowercase(value);
+                cJSON_AddStringToObject(filtered, field.c_str(), lowercase_value.c_str());
+            } else if (cJSON_IsObject(field_item)) {
+                // Recursively process nested objects
+                cJSON* filtered_nested = filter_and_normalize_json_recursive(field_item);
+                cJSON_AddItemToObject(filtered, field.c_str(), filtered_nested);
+            } else if (cJSON_IsArray(field_item)) {
+                // Process arrays
+                cJSON* filtered_array = filter_and_normalize_array(field_item);
+                cJSON_AddItemToObject(filtered, field.c_str(), filtered_array);
+            } else {
+                // For other types (numbers, booleans), copy as-is
+                cJSON* copied_item = cJSON_Duplicate(field_item, 1);
+                cJSON_AddItemToObject(filtered, field.c_str(), copied_item);
+            }
+        }
+    }
+    
+    return filtered;
+}
+
+// Helper function to recursively process nested JSON objects
+cJSON* filter_and_normalize_json_recursive(cJSON* json_obj) {
+    if (!cJSON_IsObject(json_obj)) return nullptr;
+    
+    cJSON* filtered = cJSON_CreateObject();
+    
+    cJSON* item = nullptr;
+    cJSON_ArrayForEach(item, json_obj) {
+        if (cJSON_IsString(item)) {
+            std::string value = cJSON_GetStringValue(item);
+            std::string lowercase_value = to_lowercase(value);
+            cJSON_AddStringToObject(filtered, item->string, lowercase_value.c_str());
+        } else if (cJSON_IsObject(item)) {
+            cJSON* filtered_nested = filter_and_normalize_json_recursive(item);
+            cJSON_AddItemToObject(filtered, item->string, filtered_nested);
+        } else if (cJSON_IsArray(item)) {
+            cJSON* filtered_array = filter_and_normalize_array(item);
+            cJSON_AddItemToObject(filtered, item->string, filtered_array);
+        } else {
+            cJSON* copied_item = cJSON_Duplicate(item, 1);
+            cJSON_AddItemToObject(filtered, item->string, copied_item);
+        }
+    }
+    
+    return filtered;
+}
+
+// Helper function to process arrays
+cJSON* filter_and_normalize_array(cJSON* json_array) {
+    if (!cJSON_IsArray(json_array)) return nullptr;
+    
+    cJSON* filtered_array = cJSON_CreateArray();
+    
+    cJSON* item = nullptr;
+    cJSON_ArrayForEach(item, json_array) {
+        if (cJSON_IsString(item)) {
+            std::string value = cJSON_GetStringValue(item);
+            std::string lowercase_value = to_lowercase(value);
+            cJSON_AddItemToArray(filtered_array, cJSON_CreateString(lowercase_value.c_str()));
+        } else if (cJSON_IsObject(item)) {
+            cJSON* filtered_obj = filter_and_normalize_json_recursive(item);
+            cJSON_AddItemToArray(filtered_array, filtered_obj);
+        } else {
+            cJSON* copied_item = cJSON_Duplicate(item, 1);
+            cJSON_AddItemToArray(filtered_array, copied_item);
+        }
+    }
+    
+    return filtered_array;
+}
+
 std::vector<std::vector<std::string>> prepare_json_documents(std::vector<std::string>& json_files)
 {
     std::vector<std::vector<std::string>> prepared_documents;
     
     for (const std::string& json_string : json_files) {
-        // first is file path, second is json as string
         cJSON* root = cJSON_Parse(json_string.c_str());
         if (!root) {
             const char* error_ptr = cJSON_GetErrorPtr();
@@ -224,11 +317,15 @@ std::vector<std::vector<std::string>> prepare_json_documents(std::vector<std::st
             for (int i = 0; i < array_size; i++) {
                 cJSON* component = cJSON_GetArrayItem(components_array, i);
                 if (component) {
-                    char* component_string = cJSON_Print(component);
+                    // Filter and normalize the component
+                    cJSON* filtered_component = filter_and_normalize_component(component);
+                    
+                    char* component_string = cJSON_Print(filtered_component);
                     if (component_string) {
-                        components.push_back(json_to_bracket(std::string(component_string)));
+                        components.push_back(std::string(component_string));
                         free(component_string); 
                     }
+                    cJSON_Delete(filtered_component);
                 }
             }
         }
@@ -279,15 +376,18 @@ std::vector<std::vector<ComponentId>> n_way_match_pivot(std::vector<std::vector<
         }
     }
 
+    // tqdm::tqdm bar;
+    // bar.set_theme_basic();
+    // bar.set_label("Processing documents");
+
     // k : document index
     // i : pivot components entry index
     // j : current document components entry index
     std::vector<Match> matching;
 
     std::vector<std::string>& pivot_document = documents[pivot_index];
+    simple_bar(0, nr_documents);
     for (int k = 0; k < nr_documents; k++) {
-        simple_bar(k, nr_documents);
-
         if (k == pivot_index) {
             continue;
         }
@@ -298,13 +398,13 @@ std::vector<std::vector<ComponentId>> n_way_match_pivot(std::vector<std::vector<
 
         for (int i = 0; i < pivot_size; i++) {
             std::vector<node::Node<Label>> trees_collection;
-            std::string pivot_bracket_string = pivot_document[i];
+            std::string pivot_bracket_string = json_to_bracket(pivot_document[i]);
             trees_collection.push_back(bnp.parse_single(pivot_bracket_string));
 
             // adding all queries to the trees_collection
             for (int j = 0; j < target_size; j++) {
                 // distance via jedi
-                std::string target_bracket_string = target_document[j];
+                std::string target_bracket_string = json_to_bracket(target_document[j]);
                 trees_collection.push_back(bnp.parse_single(target_bracket_string));
             }
 
@@ -332,6 +432,7 @@ std::vector<std::vector<ComponentId>> n_way_match_pivot(std::vector<std::vector<
                 }
             }
         }
+        // bar.finish();
 
         // output matrix is pivot_size x target_size matrix
         operations_research::SimpleLinearSumAssignment solver;
@@ -356,6 +457,7 @@ std::vector<std::vector<ComponentId>> n_way_match_pivot(std::vector<std::vector<
                 }
             }
         }
+        simple_bar((k+1), nr_documents);
     }
 
     std::vector<std::vector<ComponentId>> united_matches = buildComponentChains(matching);
@@ -373,8 +475,8 @@ std::vector<std::vector<ComponentId>> n_way_match_all(std::vector<std::vector<st
     // Definitions
     using Label = label::JSONLabel;
     using LabelSetElem = label_set_converter_index::LabelSetElement;
-    // using CostModel = CustomCostModelJSON<Label>;
-    using CostModel = cost_model::UnitCostModelJSON<Label>;
+    using CostModel = CustomCostModelJSON<Label>;
+    // using CostModel = cost_model::UnitCostModelJSON<Label>;
     using LabelDictionary = label::LabelDictionary<Label>;
     using TreeIndexer = node::TreeIndexJSON;
     using JEDIBASE = json::JEDIBaselineTreeIndex<CostModel, TreeIndexer>;
@@ -400,9 +502,8 @@ std::vector<std::vector<ComponentId>> n_way_match_all(std::vector<std::vector<st
     // j : current document components entry index
     std::vector<Match> matching;
     
-    for (int p = 0; p < nr_documents; p++) {
-        simple_bar(p, nr_documents);
-
+    simple_bar(0, nr_documents);
+    for (int p = 0; p < nr_documents; p++)  {
         int pivot_index = p;
         std::vector<std::string>& pivot_document = documents[p];
         int pivot_size = pivot_document.size();
@@ -417,13 +518,13 @@ std::vector<std::vector<ComponentId>> n_way_match_all(std::vector<std::vector<st
     
             for (int i = 0; i < pivot_size; i++) {
                 std::vector<node::Node<Label>> trees_collection;
-                std::string pivot_bracket_string = pivot_document[i];
+                std::string pivot_bracket_string = json_to_bracket(pivot_document[i]);
                 trees_collection.push_back(bnp.parse_single(pivot_bracket_string));
     
                 // adding all queries to the trees_collection
                 for (int j = 0; j < target_size; j++) {
                     // distance via jedi
-                    std::string target_bracket_string = target_document[j];
+                    std::string target_bracket_string = json_to_bracket(target_document[j]);
                     trees_collection.push_back(bnp.parse_single(target_bracket_string));
                 }
     
@@ -478,6 +579,7 @@ std::vector<std::vector<ComponentId>> n_way_match_all(std::vector<std::vector<st
                 }
             }
         }
+        simple_bar((p+1), nr_documents);
     }
 
     std::vector<std::vector<ComponentId>> united_matches = buildComponentChains(matching);
