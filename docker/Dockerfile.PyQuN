@@ -1,0 +1,25 @@
+FROM python:3.10-slim
+
+RUN apt-get update && apt-get install -y git
+
+RUN git clone https://github.com/JohansonB/PyQuN.git /opt/RaQuN_Lab
+
+WORKDIR /opt/RaQuN_Lab
+
+RUN python3 -m venv /opt/RaQuN_Lab/.venv
+ENV VIRTUAL_ENV=/opt/RaQuN_Lab/.venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+ENV PYTHONPATH="/opt:${PYTHONPATH}"
+RUN find /opt/RaQuN_Lab -type d -exec touch {}/__init__.py \;
+RUN touch /opt/RaQuN_Lab/__init__.py
+
+RUN python3 -m pip install -U \ 
+numpy \
+scikit-learn \
+psutil 
+
+COPY misc/PyQun/cbom_test.py /opt/RaQuN_Lab/cbom_test.py
+COPY misc/PyQun/Stopwatch.py /opt/RaQuN_Lab/utils/Stopwatch.py
+COPY misc/PyQun/*.json /opt/RaQuN_Lab/
+
+CMD ["python", "cbom_test.py"]
