@@ -216,5 +216,23 @@ services:
     restart: no
     profiles: [dev, prod, all]
 
+  misc-pyqun:
+    image: bf-cbom/misc-pyqun:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.misc-pyqun
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CALC_TIMEOUT_SEC=600
+    env_file: docker/env/misc-pyqun.env
+    restart: no
+    profiles: [dev, prod, all]
+
 volumes:
   redis-data:

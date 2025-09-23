@@ -13,13 +13,18 @@ ENV PYTHONPATH="/opt:${PYTHONPATH}"
 RUN find /opt/RaQuN_Lab -type d -exec touch {}/__init__.py \;
 RUN touch /opt/RaQuN_Lab/__init__.py
 
+COPY common/ ./common/
+RUN pip install --no-cache-dir --upgrade pip --timeout 120
+
 RUN python3 -m pip install -U \ 
 numpy \
+redis \
 scikit-learn \
 psutil 
 
-COPY misc/PyQun/cbom_test.py /opt/RaQuN_Lab/cbom_test.py
-COPY misc/PyQun/Stopwatch.py /opt/RaQuN_Lab/utils/Stopwatch.py
-COPY misc/PyQun/*.json /opt/RaQuN_Lab/
+COPY misc/pyqun/main.py /opt/RaQuN_Lab/main.py
+COPY misc/pyqun/Stopwatch.py /opt/RaQuN_Lab/utils/Stopwatch.py
+# COPY misc/pyqun/*.json /opt/RaQuN_Lab/
 
-CMD ["python", "cbom_test.py"]
+CMD ["python", "main.py"]
+# ENTRYPOINT ["tini","-g","--","uv","run","--no-dev","workers/skeleton/main.py"]
