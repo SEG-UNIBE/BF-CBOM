@@ -24,6 +24,7 @@ logger = logging.getLogger(NAME)
 redis_client: redis.Redis | None = None
 
 import sys
+import string
 import json
 from pathlib import Path
 
@@ -36,6 +37,32 @@ from RaQuN_Lab.datamodel.modelset.Model import Model
 from RaQuN_Lab.strategies.RaQuN.candidatesearch.NNCandidateSearch.NNCandidateSearch import NNCandidateSearch
 from RaQuN_Lab.strategies.RaQuN.candidatesearch.NNCandidateSearch.vectorization.ZeroOneVectorization import ZeroOneVectorizer
 from RaQuN_Lab.strategies.RaQuN.RaQuN import VanillaRaQuN
+from RaQuN_Lab.strategies.RaQuN.candidatesearch.NNCandidateSearch.vectorization.Vectorizer import Vectorizer
+
+class LetterHistogramVectorizer(Vectorizer):
+    def __init__(self):
+        # Use lowercase English letters
+        self.letters = string.ascii_lowercase
+        self.letter_indices = {c: i for i, c in enumerate(self.letters)}
+        self.vec_dim = len(self.letters)
+
+    def innit(self, m_s: 'ModelSet') -> None:
+        # No need to build a global attribute map, just set vector dimension
+        pass
+
+    def vectorize(self, element: 'Element'):
+        vec = np.zeros(self.vec_dim)
+        for attr in getattr(element, 'attributes', []):
+            val = str(getattr(attr, 'value', attr)).lower()
+            for c in val:
+                if c in self.letter_indices:
+                    vec[self.letter_indices[c]] += 1
+        return vec
+
+    def dim(self):
+        return self.vec_dim
+
+
 
 def DFS(sub_dict, prefix: list, results: list):
     """
@@ -92,19 +119,25 @@ def load_model(json_files: list[str]):
         for comp_i, comp in enumerate(json_file["components"]):
             elements += 1
 
+            attr_list = []
             try:
                 name = comp["name"]
-                type = comp["type"]
-                attr_list = [type]
-            except:
-                pass
+                attr_list.append(name)
 
-            try:
-                res = []
-                DFS(comp["cryptoProperties"], [], res)
-                for p in res:
-                    attr = "_".join(p)
-                    attr_list.append(attr)
+                type = comp["type"]
+                attr_list.append(type)
+
+                assetType = comp["cryptoProperties"]["assetType"]
+                attr_list.append(assetType)
+
+                primitive = comp["cryptoProperties"]["algorithmProperties"]["primitive"]
+                attr_list.append(primitive)
+                
+                # res = []
+                # DFS(comp["cryptoProperties"], [], res)
+                # for p in res:
+                #     attr = "_".join(p)
+                #     attr_list.append(attr)
             except:
                 pass
 
@@ -131,8 +164,7 @@ def match_from_json_list(json_files: list[str]):
 
     model_set = load_model(json_files)
 
-    algo = VanillaRaQuN("high_dim_raqun", candidate_search=NNCandidateSearch(vectorizer=ZeroOneVectorizer()))
-    algo = VanillaRaQuN("PyQuN", candidate_search=NNCandidateSearch(neighbourhood_size=300))
+    algo = VanillaRaQuN("high_dim_raqun", candidate_search=NNCandidateSearch(vectorizer=LetterHistogramVectorizer()))
 
     matches, stopwatch = algo.match(model_set)
     matches_list = list(matches)
@@ -161,22 +193,10 @@ def match_from_json_list(json_files: list[str]):
     return grouped_elements
 
 
-def _serialize_match(match_group: list) -> list:
-    return [
-        {
-            "file": component.doc_id,
-            "component": component.comp_id,
-            "cost": component.cost
-        } for component in match_group
-    ]
-
 def _match_components(documents: list[str]) ->  list[dict]:
     
     logger.info("Starting n-way component matching for %d documents...", len(documents))
-    # The C++ function expects a list of documents, where each document is a list of component JSON strings.
-    # It returns a list of chains, where each chain is a list of component IDs.
-    # A component ID is a pair [document_index, component_index_in_document].
-    serialized, _ = match_from_json_list(documents)
+    serialized = match_from_json_list(documents)
 
     logger.info("Found %d component match(es)", len(serialized))
     logger.info("Matches:\n%s", serialized)
