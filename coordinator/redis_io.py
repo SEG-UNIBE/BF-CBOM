@@ -89,7 +89,7 @@ def enqueue_component_match_instruction(
     queue_name: str,
 ) -> None:
     """Push a component match instruction onto the worker queue."""
-
+    logger.info(f"enqueue, job id: {instruction.job_id} to {queue_name}")
     r.rpush(queue_name, instruction.to_json())
 
 

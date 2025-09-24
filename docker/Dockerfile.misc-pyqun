@@ -20,7 +20,10 @@ RUN python3 -m pip install -U \
 numpy \
 redis \
 scikit-learn \
-psutil 
+psutil \
+dataclasses-json \
+requests \
+tqdm
 
 COPY misc/pyqun/main.py /opt/RaQuN_Lab/main.py
 COPY misc/pyqun/Stopwatch.py /opt/RaQuN_Lab/utils/Stopwatch.py

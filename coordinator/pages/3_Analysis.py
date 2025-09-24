@@ -55,11 +55,14 @@ TREESIM_WORKER = "treesimilartiy"
 TREESIM_QUEUE = f"jobs:{TREESIM_WORKER}"
 TREESIM_RESULTS_LIST = f"results:{TREESIM_WORKER}"
 
+PYQUN_WORKER = "pyqun"
+PYQUN_QUEUE = f"jobs:{PYQUN_WORKER}"
+PYQUN_RESULTS_LIST = f"results:{PYQUN_WORKER}"
 
-def _latest_similarity_result(redis_conn: redis.Redis, repo_full_name: str, *, target_job_id: str | None = None) -> dict | None:
+def _latest_similarity_result(redis_conn: redis.Redis, repo_full_name: str, *, target_job_id: str | None = None, result_list = TREESIM_RESULTS_LIST) -> dict | None:
     """Return the newest similarity result for repo (optionally matching job_id)."""
 
-    entries = redis_conn.lrange(TREESIM_RESULTS_LIST, 0, -1)
+    entries = redis_conn.lrange(result_list, 0, -1)
     if not entries:
         return None
 
@@ -493,6 +496,17 @@ if comp_rows:
 
                 waiting_for_result = bool(repo_state.get("waiting_for_similarity")) and bool(job_id) and not result_payload
                 button_disabled = waiting_for_result
+                algorithm_choice = st.radio(
+                    "Select matching algorithm",
+                    ["Tree Similarity", "RaQuN (PyQuN)"],
+                    key=f"algorithm_choice_{bench_id}_{repo_name}"
+                )
+                if algorithm_choice == "Tree Similarity":
+                    match_queue = TREESIM_QUEUE
+                    result_list = TREESIM_RESULTS_LIST
+                else:
+                    match_queue = PYQUN_QUEUE
+                    result_list = PYQUN_RESULTS_LIST
                 with button_col:
                     if st.button(
                         "Find similar components among workers",
@@ -538,7 +552,8 @@ if comp_rows:
                                 issued_min_docs[cbom.tool] = list(cbom.components_as_json or [])
                             repo_state["issued_full_components"] = issued_full_components
                             repo_state["issued_minimized_documents"] = issued_min_docs
-                            enqueue_component_match_instruction(r, instruction, TREESIM_QUEUE)
+                            enqueue_component_match_instruction(r, instruction, match_queue)
+                            # enqueue_component_match_instruction(r, instruction, TREESIM_QUEUE)
                             repo_state["job_id"] = instruction.job_id
                             repo_state.pop("result", None)
                             repo_state.pop("result_exclude_libraries", None)
@@ -551,7 +566,7 @@ if comp_rows:
                             st.rerun()
 
                 if waiting_for_result and not result_payload:
-                    result_payload = _latest_similarity_result(r, repo_name, target_job_id=job_id)
+                    result_payload = _latest_similarity_result(r, repo_name, target_job_id=job_id, result_list=result_list)
                     if result_payload:
                         repo_state["result"] = result_payload
                         # Clear waiting state now that we have a result
@@ -565,7 +580,8 @@ if comp_rows:
                             result_payload = _latest_similarity_result(
                                 r,
                                 repo_name,
-                                target_job_id=repo_state.get("job_id"),
+                                target_job_id=repo_state.get("job_id"), 
+                                result_list=result_list,
                             )
                             if result_payload:
                                 repo_state["result"] = result_payload

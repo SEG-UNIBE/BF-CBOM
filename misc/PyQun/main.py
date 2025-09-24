@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 import logging
 import os
-import queue
 import time
 import multiprocessing
 from pathlib import Path
-
-import json_matching  # type: ignore  # pylint: disable=import-error,wrong-import-position
+import numpy as np
 import redis
 
 from common.config import REDIS_HOST, REDIS_PORT
 from common.models import ComponentMatchJobInstruction, ComponentMatchJobResult
+from common.cbom_analysis import find_components_list
 
-NAME = Path(__file__).resolve().parents[1].name
+NAME = "pyqun"
 JOB_QUEUE = f"jobs:{NAME}"
 RESULT_LIST = f"results:{NAME}"
 TIMEOUT_SEC = int(os.getenv("CALC_TIMEOUT_SEC", "120"))
@@ -115,38 +114,40 @@ def load_model(json_files: list[str]):
     models = {}
 
     for e_id, json_file in enumerate(json_files):
-        models[e_id] = []
-        for comp_i, comp in enumerate(json_file["components"]):
-            elements += 1
+        comps = find_components_list(json_file)
+        if (comps and len(comps)>0):
+            models[e_id] = []
+            for comp_i, comp in enumerate(comps):
+                elements += 1
 
-            attr_list = []
-            try:
+                attr_list = []
                 name = comp["name"]
                 attr_list.append(name)
 
                 type = comp["type"]
                 attr_list.append(type)
+                try:
 
-                assetType = comp["cryptoProperties"]["assetType"]
-                attr_list.append(assetType)
+                    assetType = comp["cryptoProperties"]["assetType"]
+                    attr_list.append(assetType)
 
-                primitive = comp["cryptoProperties"]["algorithmProperties"]["primitive"]
-                attr_list.append(primitive)
-                
-                # res = []
-                # DFS(comp["cryptoProperties"], [], res)
-                # for p in res:
-                #     attr = "_".join(p)
-                #     attr_list.append(attr)
-            except:
-                pass
+                    primitive = comp["cryptoProperties"]["algorithmProperties"]["primitive"]
+                    attr_list.append(primitive)
 
-            attributes = set(DefaultAttribute(attr) for attr in attr_list)
+                    # res = []
+                    # DFS(comp["cryptoProperties"], [], res)
+                    # for p in res:
+                    #     attr = "_".join(p)
+                    #     attr_list.append(attr)
+                except:
+                    pass
 
-            element = Element(name=name, ze_id=comp_i, attributes=attributes) # -> corresponds to a cbom component
-            element.set_model_id(e_id)
-            element.set_element_id(comp_i)
-            models[e_id].append(element)
+                attributes = set(DefaultAttribute(attr) for attr in attr_list)
+
+                element = Element(name=name, ze_id=comp_i, attributes=attributes) # -> corresponds to a cbom component
+                element.set_model_id(e_id)
+                element.set_element_id(comp_i)
+                models[e_id].append(element)
         
     model_list = []
 
@@ -164,6 +165,9 @@ def match_from_json_list(json_files: list[str]):
 
     model_set = load_model(json_files)
 
+    logger.info(f"model_set: {model_set}")
+
+    # algo = VanillaRaQuN("high_dim_raqun", candidate_search=NNCandidateSearch(vectorizer=LetterHistogramVectorizer()))
     algo = VanillaRaQuN("high_dim_raqun", candidate_search=NNCandidateSearch(vectorizer=LetterHistogramVectorizer()))
 
     matches, stopwatch = algo.match(model_set)
@@ -175,6 +179,7 @@ def match_from_json_list(json_files: list[str]):
         if hasattr(match, 'get_elements'):
             elements = match.get_elements()
             if elements and len(elements) > 1:
+                logger.info(elements)
                 group = []
                 for e in elements:
                     file_id = e.model_id  
@@ -187,7 +192,7 @@ def match_from_json_list(json_files: list[str]):
                             "cost": 0.0
                         })
                     except:
-                        print(f"Error during extraction of component: {comp_id} from file: {file_id}")
+                        logger.error(f"Error during extraction of component: {comp_id} from file: {file_id}")
                 grouped_elements.append(group)
 
     return grouped_elements
@@ -230,7 +235,7 @@ def _handle_instruction(raw_payload: str) -> None:
     )
     
     
-    # Transform the list of CbomJson objects into a list of documents (list[list[str]])
+    # Transform the list of CbomJson objects into a list of documents (list[str])
     documents = [
         entry.entire_json_raw
         for entry in instruction.CbomJsons
@@ -278,9 +283,6 @@ def _handle_instruction(raw_payload: str) -> None:
     match_results = None
 
     try:
-        # match_results = _run_match_with_timeout(
-        #     _match_components, documents, timeout_seconds=TIMEOUT_SEC
-        # )
          match_results = _run_match_with_timeout(
             _match_components, documents, timeout_seconds=TIMEOUT_SEC
         )
