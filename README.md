@@ -92,7 +92,8 @@ Prepare the environment files under `docker/env/`. Each service ships with a `*.
 
 At minimum set `GITHUB_TOKEN` inside `docker/env/coordinator.env`. In case you do not have one already, see [how to create a personal access token (classic)](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-personal-access-token-classic).
 
-From here on, there are two options on how to continue with the setup as described below.
+From this point, you can continue with the setup using one of the two options described below.
+Either way, the build takes about 5–15 minutes for the first time (depending on hardware and internet speed) and requires roughly 20 GB of disk space for the images.
 
 ### Option 1 – Disposable Builder Container
 
@@ -156,6 +157,8 @@ From the repository's root folder, start the full stack of services with:
 ```bash
 make up-prod
 ```
+
+Note that it can take up to 20 minutes, depending on your hardware and internet speed.
 
 Docker Compose will launch and manage all containers. Stop the stack anytime with `Ctrl+C`.
 
