@@ -1,6 +1,6 @@
 # `BF-CBOM`: Benchmarking Framework for CBOM Generator Tools
 
-*Benchmarking Cryptographic Bill of Material (CBOM) generators end-to-end: coordinating containerized jobs, normalizing outputs, and scoring results across ecosystems. In short, your **b**est **f**riend for generating and analyzing CBOMs.*
+*Benchmarking Cryptography Bill of Material (CBOM) generators end-to-end: coordinating containerized jobs, normalizing outputs, and scoring results across ecosystems. In short, your **b**est **f**riend for generating and analyzing CBOMs.*
 
 <div align="center">
   <img width="50%" src="logo.png" alt="BF-CBOM logo" />
