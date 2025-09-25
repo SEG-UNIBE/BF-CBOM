@@ -2,7 +2,7 @@
 # Visit https://bit.ly/cffinit to generate yours today!
 
 cff-version: 1.2.0
-title: BF-CBOM: Benchmarking Framework for Cryptography Bill of Material Generator Tools
+title: "BF-CBOM: Benchmarking Framework for Cryptographic Bill of Materials Generator Tools"
 message: >-
   If you use this software, please cite it using the
   metadata from this file.
@@ -33,4 +33,4 @@ keywords:
   - benchmark
   - docker-compose
   - cryptography
-license: GNU General Public License v3.0
+license: GPL-3.0-only
