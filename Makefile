@@ -2,7 +2,7 @@
 VERSION := $(shell cat VERSION 2>/dev/null || echo "0.0.0")
 BASE_IMAGE := bf-cbom/base
 # Comma-separated list of all workers available in the repo
-AVAILABLE_WORKERS := skeleton,testing,cbomkit,cdxgen,deepseek,mssbomtool,cryptobomforge
+AVAILABLE_WORKERS := skeleton,testing,mssbomtool,cbomkit,cdxgen,cryptobomforge,deepseek
 # Comma-separated list of dev-only workers
 DEV_WORKERS := skeleton,testing,mssbomtool
 # Export everything defined above to downstream commands for cross-shell support
