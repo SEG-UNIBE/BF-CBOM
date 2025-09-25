@@ -2,7 +2,7 @@ FROM python:3.10-slim
 
 RUN apt-get update && apt-get install -y git
 
-RUN git clone https://github.com/JohansonB/PyQuN.git /opt/RaQuN_Lab
+RUN git clone https://github.com/RomanBoegli/PyQuN.git /opt/RaQuN_Lab
 
 WORKDIR /opt/RaQuN_Lab
 
