@@ -31,7 +31,7 @@ class DeepSeekClient:
             system_prompt = (
                 "You are a cryptographic component analyzer. "
                 "Your task is to analyze a GitHub project and generate a "
-                "Cryptographic Bill of Materials (CBOM) following the official CycloneDX standard.\n\n"
+                "Cryptography Bill of Material (CBOM) following the official CycloneDX standard.\n\n"
                 "Identify all cryptographic components including:\n"
                 "- Cryptographic algorithms (AES, RSA, SHA256, etc.)\n"
                 "- Key management functions\n"

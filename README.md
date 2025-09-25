@@ -1,6 +1,6 @@
 # `BF-CBOM`: Benchmarking Framework for CBOM Generator Tools
 
-*Benchmarking Cryptographic Bill of Material (CBOM) generators end-to-end: coordinating containerized jobs, normalizing outputs, and scoring results across ecosystems. In short, your **b**est **f**riend for generating and analyzing CBOMs.*
+*Benchmarking Cryptography Bill of Material (CBOM) generators end-to-end: coordinating containerized jobs, normalizing outputs, and scoring results across ecosystems. In short, your **b**est **f**riend for generating and analyzing CBOMs.*
 
 <div align="center">
   <img width="50%" src="logo.png" alt="BF-CBOM logo" />
@@ -16,6 +16,8 @@
 
 <div align="center">
   <a href="https://doi.org/10.5281/zenodo.17140610"><img src="https://zenodo.org/badge/1058056469.svg" alt="DOI" /></a>
+  <a href="https://github.com/SEG-UNIBE/BF-CBOM/releases"><img src="https://img.shields.io/github/v/release/SEG-UNIBE/BF-CBOM?include_prereleases" alt="Changelog" /></a>
+  </br>
   <a href="#"><img src="https://img.shields.io/badge/python-v3.12%2B-blue.svg" alt="Python 3.12+" /></a>
   <a href="#"><img src="https://img.shields.io/badge/Docker-Compose-success.svg" alt="Docker Compose" /></a>
   <a href="#"><img src="https://img.shields.io/badge/Streamlit-app-red.svg" alt="Streamlit" /></a>
@@ -90,7 +92,8 @@ Prepare the environment files under `docker/env/`. Each service ships with a `*.
 
 At minimum set `GITHUB_TOKEN` inside `docker/env/coordinator.env`. In case you do not have one already, see [how to create a personal access token (classic)](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-personal-access-token-classic).
 
-From here on, there are two options on how to continue with the setup as described below.
+From this point, you can continue with the setup using one of the two options described below.
+Either way, the build takes about 5–15 minutes for the first time (depending on hardware and internet speed) and requires roughly 20 GB of disk space for the images.
 
 ### Option 1 – Disposable Builder Container
 
@@ -154,6 +157,8 @@ From the repository's root folder, start the full stack of services with:
 ```bash
 make up-prod
 ```
+
+Note that it can take up to 20 minutes, depending on your hardware and internet speed.
 
 Docker Compose will launch and manage all containers. Stop the stack anytime with `Ctrl+C`.
 

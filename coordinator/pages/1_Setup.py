@@ -270,7 +270,5 @@ with col2:
     st.subheader("Notes")
     st.markdown(
         "- Benchmarks are persisted in Redis.\n"
-        "- The repo snapshot is stored and will not be re-queried when running.\n"
-        "- Workers are auto-discovered from subfolders in `workers/` (with a `main.py`).\n"
-        "- GitHub API uses `GITHUB_TOKEN` if set."
+        "- The repo snapshot is stored and will not be re-queried.\n"
     )

@@ -55,7 +55,7 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
-st.caption("Benchmarking Framework for Cryptographic Bill of Material (CBOM) Generator Tools")
+st.caption("Benchmarking Framework for Cryptography Bill of Material (CBOM) Generator Tools")
 
 # Top action: create new benchmark
 if st.button("➕ Create New Benchmark", type="primary"):
