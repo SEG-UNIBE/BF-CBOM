@@ -7,6 +7,10 @@ from typing import Any
 
 from common.models import CbomJson, ComponentMatchJobInstruction
 from common.utils import repo_dict_to_info
+from common.cbom_filters import (
+    INCLUDE_COMPONENT_TYPE_ONLY,
+    is_included_component_type,
+)
 
 # Common crypto asset types used across tools/tests
 COMMON_CRYPTO_ASSET_TYPES = [
@@ -16,8 +20,6 @@ COMMON_CRYPTO_ASSET_TYPES = [
     "digest",
     "related-crypto-material",
 ]
-
-DEFAULT_EXCLUDED_COMPONENT_TYPES = {"library", "framework", "application"}
 
 logger = logging.getLogger(__name__)
 
@@ -84,8 +86,8 @@ def create_component_match_instruction(
                 if not isinstance(component, dict):
                     continue
 
-                # Exclude components of certain types if requested
-                if exclude_types and component.get("type") in DEFAULT_EXCLUDED_COMPONENT_TYPES:
+                # When filtering is requested, include only cryptographic asset types
+                if exclude_types and not is_included_component_type(component.get("type")):
                     continue
 
                 min_comp = {
@@ -463,11 +465,23 @@ def render_similarity_matches(
         for display_idx, (original_idx, match_block) in enumerate(indexed_matches, start=1):
             cost_value = _extract_cost(match_block)
             cost_label = "n/a" if cost_value == float("inf") else _format_cost(cost_value)
+            # Build badges for involved tools in this match block
+            tool_names_seq: list[str] = []
+            for entry in match_block:
+                if not isinstance(entry, dict):
+                    continue
+                file_idx = safe_int_func(entry.get("file"), default=-1)
+                if 0 <= file_idx < len(tools_list):
+                    tool_names_seq.append(tools_list[file_idx])
+            # De-duplicate preserving order
+            seen = set()
+            tool_badges_list = [t for t in tool_names_seq if not (t in seen or seen.add(t))]
+            badges = " ".join(f"[{t}]" for t in tool_badges_list)
+            header_label = f"Match {display_idx} · Cost: {cost_label}"
+            if badges:
+                header_label += f" · {badges}"
 
-            with renderer.expander(
-                f"Match {display_idx} · Cost: {cost_label}",
-                expanded=(display_idx == 1),
-            ):
+            with renderer.expander(header_label, expanded=(display_idx == 1)):
                 if original_idx != display_idx:
                     renderer.caption(f"Original order: {original_idx}")
                 if not match_block:
@@ -488,15 +502,32 @@ def render_similarity_matches(
 
     elif matches and isinstance(matches[0], dict):
         for idx, match in enumerate(matches, start=1):
-            query_tool = str(match.get("query_file") or match.get("query_tool") or "?")
-            target_tool = str(match.get("target_file") or match.get("target_tool") or "?")
+            # Derive tool names from indices or explicit fields
+            q_file_idx = safe_int_func(match.get("query_file"), default=-1)
+            t_file_idx = safe_int_func(match.get("target_file"), default=-1)
+            q_name = tools_list[q_file_idx] if 0 <= q_file_idx < len(tools_list) else (match.get("query_tool") or "?")
+            t_name = tools_list[t_file_idx] if 0 <= t_file_idx < len(tools_list) else (match.get("target_tool") or "?")
+            query_tool = str(q_name)
+            target_tool = str(t_name)
             query_idx = safe_int_func(match.get("query_comp"), default=-1)
             target_idx = safe_int_func(match.get("target_comp"), default=-1)
             cost = match.get("cost")
 
+            # Build badges for involved tools
+            tool_names_seq = []
+            if isinstance(query_tool, str) and query_tool and query_tool != "?":
+                tool_names_seq.append(query_tool)
+            if isinstance(target_tool, str) and target_tool and target_tool != "?":
+                tool_names_seq.append(target_tool)
+            seen = set()
+            tool_badges_list = [t for t in tool_names_seq if not (t in seen or seen.add(t))]
+            badges = " ".join(f"[{t}]" for t in tool_badges_list)
+
             header = f"Match {idx}"
             if cost is not None:
                 header += f" · Cost: {_format_cost(cost)}"
+            if badges:
+                header += f" · {badges}"
 
             with renderer.expander(header, expanded=(idx == 1)):
                 col_query, col_target = renderer.columns(2)
@@ -505,58 +536,6 @@ def render_similarity_matches(
 
     else:
         renderer.json(matches)
-
-
-def filter_cbom_components(
-    raw_json: str,
-    excluded_types: set[str] | tuple[str, ...] | list[str] | None = None,
-) -> str:
-    """Return JSON text with components of the given types removed."""
-
-    excludes = {str(t).lower() for t in (excluded_types or []) if str(t).strip()}
-    if not excludes:
-        return raw_json
-
-    obj = _safe_json_loads(raw_json or "")
-    if obj is None:
-        return raw_json
-
-    changed = False
-
-    def _filter_list(items: list) -> list:
-        nonlocal changed
-        if not isinstance(items, list):
-            return items
-        filtered = []
-        for comp in items:
-            comp_type = _component_type(comp).lower()
-            if comp_type in excludes:
-                changed = True
-                continue
-            filtered.append(comp)
-        return filtered
-
-    def _apply(node: Any) -> None:
-        if isinstance(node, dict):
-            comps = node.get("components")
-            if isinstance(comps, list):
-                node["components"] = _filter_list(comps)
-            bom = node.get("bom")
-            if isinstance(bom, dict):
-                _apply(bom)
-        elif isinstance(node, list):
-            for entry in node:
-                _apply(entry)
-
-    _apply(obj)
-
-    if not changed:
-        return raw_json
-
-    try:
-        return json.dumps(obj, ensure_ascii=False)
-    except TypeError:
-        return raw_json
 
 
 def component_counts_for_repo(

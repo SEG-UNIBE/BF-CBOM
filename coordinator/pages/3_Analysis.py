@@ -2,16 +2,20 @@ import json
 import time
 from types import SimpleNamespace
 
+import numpy as _np
 import altair as alt
 import pandas as pd
 import redis
 import streamlit as st
 
+from common.cbom_filters import (
+    INCLUDE_COMPONENT_TYPE_ONLY,
+    is_included_component_type,
+    filter_cbom_components_include_only,
+)
 from common.cbom_analysis import (
-    DEFAULT_EXCLUDED_COMPONENT_TYPES,
     analyze_cbom_json,
     component_counts_for_repo,
-    filter_cbom_components,
     load_components,
     render_similarity_matches,
     summarize_component_types,
@@ -229,7 +233,7 @@ for w, cdict in worker_status_counts.items():
     for lbl in order:
         chart_data.append({"worker": w, "status": lbl, "count": int(cdict.get(lbl, 0))})
 if chart_data:
-    st.subheader("Job Status Distribution")
+    st.subheader("Job Status Summary")
     df_status = pd.DataFrame(chart_data)
     # Build color scale using centralized status meta and order
     from common.utils import get_status_meta
@@ -257,8 +261,40 @@ if chart_data:
     )
     st.altair_chart(chart, use_container_width=True)
 
+    summary_rows = []
+    for w in workers:
+        job_count = len(repos)
+        completed = int(worker_status_counts[w].get(status_text("completed", "label"), 0))
+        failed = int(worker_status_counts[w].get(status_text("failed", "label"), 0))
+        timeout = int(worker_status_counts[w].get(status_text("timeout", "label"), 0))
+        empty_cboms = 0
+        for row in comp_rows:
+            if row.get("worker") == w and int(row.get("total_components") or 0) == 0:
+                empty_cboms += 1
+        summary_rows.append(
+            {
+                "worker": w,
+                "jobs": job_count,
+                "failed": failed,
+                "timeout": timeout,
+                "completed": completed,
+                "empty cboms": empty_cboms,
+            }
+        )
+    if summary_rows:
+        df_sum = pd.DataFrame(summary_rows)
+        # Add emojis to status columns
+        df_sum = df_sum.rename(
+            columns={
+                "completed": f"{get_status_emoji('completed')} completed",
+                "failed": f"{get_status_emoji('failed')} failed",
+                "timeout": f"{get_status_emoji('timeout')} timeout",
+            }
+        )
+        st.dataframe(df_sum, hide_index=True, width="stretch")
+
 if scatter_rows:
-    st.subheader("Runtime Scatter")
+    st.subheader("Job Runtime Summary")
     df_scatter = pd.DataFrame(scatter_rows)
     worker_options = sorted(df_scatter["worker"].unique())
     col_filter, _, col_radio = st.columns([2, 0.3, 1])
@@ -345,39 +381,6 @@ if scatter_rows:
         )
         st.altair_chart((scatter_layer + trend_layer).interactive(), use_container_width=True)
 
-# Worker-level summary table
-st.subheader("Worker Summary")
-summary_rows = []
-for w in workers:
-    job_count = len(repos)
-    completed = int(worker_status_counts[w].get(status_text("completed", "label"), 0))
-    failed = int(worker_status_counts[w].get(status_text("failed", "label"), 0))
-    timeout = int(worker_status_counts[w].get(status_text("timeout", "label"), 0))
-    empty_cboms = 0
-    for row in comp_rows:
-        if row.get("worker") == w and int(row.get("total_components") or 0) == 0:
-            empty_cboms += 1
-    summary_rows.append(
-        {
-            "worker": w,
-            "jobs": job_count,
-            "failed": failed,
-            "timeout": timeout,
-            "completed": completed,
-            "empty cboms": empty_cboms,
-        }
-    )
-if summary_rows:
-    df_sum = pd.DataFrame(summary_rows)
-    # Add emojis to status columns
-    df_sum = df_sum.rename(
-        columns={
-            "completed": f"{get_status_emoji('completed')} completed",
-            "failed": f"{get_status_emoji('failed')} failed",
-            "timeout": f"{get_status_emoji('timeout')} timeout",
-        }
-    )
-    st.dataframe(df_sum, hide_index=True, width="stretch")
 
 # Components insights
 st.subheader("Components Summary")
@@ -428,6 +431,12 @@ if comp_rows:
                     st.caption("No component type information available yet.")
                     continue
                 df_counts = pd.DataFrame(rows)
+                # Read toggle state before rendering the table so it updates immediately on toggle
+                repo_state_pre = bench_jobs_state.setdefault(repo_name, {})
+                toggle_key = f"exclude_libs_{bench_id}_{repo_name}"
+                exclude_non_crypto = bool(st.session_state.get(toggle_key, repo_state_pre.get("exclude_libraries", False)))
+                if exclude_non_crypto and "component.type" in df_counts.columns:
+                    df_counts = df_counts[df_counts["component.type"].apply(is_included_component_type)]
                 status_map = repo_worker_status.get(repo_name, {})
                 rename_map = {
                     "component.type": "Component type",
@@ -435,10 +444,29 @@ if comp_rows:
                     "asset.type": "Asset type",
                 }
                 ordered_cols = ["component.type", "name", "asset.type"]
+                # Compute per-worker totals after filtering so headers reflect current view
+                worker_totals: dict[str, int] = {}
+                for w in workers:
+                    if w in df_counts.columns:
+                        try:
+                            col_values = pd.to_numeric(df_counts[w], errors="coerce").fillna(0).astype(int)
+                            worker_totals[w] = int(col_values.sum())
+                        except Exception:
+                            # Fallback: best-effort integer coercion
+                            total = 0
+                            for v in list(df_counts[w] or []):
+                                try:
+                                    total += int(v)
+                                except Exception:
+                                    continue
+                            worker_totals[w] = total
+                    else:
+                        worker_totals[w] = 0
                 for w in workers:
                     status_key = status_map.get(w, "pending")
                     emoji = get_status_emoji(status_key)
-                    rename_map[w] = f"{emoji} {w}" if emoji else w
+                    total = worker_totals.get(w, 0)
+                    rename_map[w] = (f"{emoji} {w} ({total})" if emoji else f"{w} ({total})")
                     ordered_cols.append(w)
                 df_counts = df_counts[ordered_cols]
                 view_types = df_counts.rename(columns=rename_map)
@@ -457,7 +485,6 @@ if comp_rows:
                 if "waiting_for_similarity" not in repo_state:
                     repo_state["waiting_for_similarity"] = False
 
-                toggle_key = f"exclude_libs_{bench_id}_{repo_name}"
                 if toggle_key not in st.session_state:
                     st.session_state[toggle_key] = bool(
                         repo_state.get("exclude_libraries", False)
@@ -465,13 +492,20 @@ if comp_rows:
 
                 button_col, toggle_col = st.columns([3, 2])
                 with toggle_col:
-                    label = "Exclude types " + ", ".join(f"«{t}»" for t in DEFAULT_EXCLUDED_COMPONENT_TYPES)
+                    # More thorough: focus analysis on cryptographic assets only
+                    label = "Include cryptographic-assets only"
                     exclude_libraries = st.toggle(label, key=toggle_key)
 
                 repo_state["exclude_libraries"] = exclude_libraries
-                excluded_types = (
-                    DEFAULT_EXCLUDED_COMPONENT_TYPES if exclude_libraries else None
-                )
+                # For estimates, when enabled, exclude all types except cryptographic-asset
+                if exclude_libraries:
+                    observed_types: set[str] = set()
+                    for row in (comp_rows or []):
+                        if row.get("repo") == repo_name and isinstance(row.get("types"), dict):
+                            observed_types.update(str(t).lower() for t in row.get("types").keys())
+                    excluded_types = {t for t in observed_types if not is_included_component_type(t)}
+                else:
+                    excluded_types = None
 
                 component_counts = component_counts_for_repo(
                     comp_rows,
@@ -546,7 +580,7 @@ if comp_rows:
                                 if exclude_libraries:
                                     full_list = [
                                         c for c in full_list
-                                        if not (isinstance(c, dict) and c.get("type") in DEFAULT_EXCLUDED_COMPONENT_TYPES)
+                                        if isinstance(c, dict) and is_included_component_type(c.get("type"))
                                     ]
                                 issued_full_components[cbom.tool] = full_list
                                 issued_min_docs[cbom.tool] = list(cbom.components_as_json or [])
@@ -619,10 +653,10 @@ if comp_rows:
                                 repo_state.get("result_exclude_libraries", False)
                             )
                             if result_filter_enabled:
-                                st.caption(f"{', '.join(f'«{t}»' for t in DEFAULT_EXCLUDED_COMPONENT_TYPES)} were excluded for this run.")
+                                st.caption("Non ‘cryptographic-asset’ components were excluded for this run.")
                             elif exclude_libraries:
                                 st.caption(
-                                    f"Toggle is set to exclude {', '.join(f'«{t}»' for t in DEFAULT_EXCLUDED_COMPONENT_TYPES)}."
+                                    "Toggle is set to exclude non ‘cryptographic-asset’. "
                                     "Re-run similarity to apply."
                                 )
 
@@ -672,8 +706,8 @@ if comp_rows:
                                     cbom_map_for_render = filtered_cache.get(True)
                                     if cbom_map_for_render is None:
                                         cbom_map_for_render = {
-                                            tool: filter_cbom_components(
-                                                payload, DEFAULT_EXCLUDED_COMPONENT_TYPES
+                                            tool: filter_cbom_components_include_only(
+                                                payload, set(INCLUDE_COMPONENT_TYPE_ONLY)
                                             )
                                             for tool, payload in cbom_map_raw.items()
                                         }
