@@ -7,27 +7,22 @@ import redis
 import requests
 import streamlit as st
 
+from common.cbom_analysis import (
+    create_component_match_instruction,
+)
 from common.config import GITHUB_CACHE_TTL_SEC, GITHUB_TOKEN
-from common.models import Benchmark
+from common.models import Benchmark, CbomJson, ComponentMatchJobInstruction
+from common.utils import repo_dict_to_info
+from coordinator.logger_config import logger
 
 
 # ----- Job instruction helper -----
 def create_job_instruction(repo: dict, worker: str, job_id: str):
     """Construct a JobInstruction object using RepoInfo."""
-    import logging
 
     from common.models import JobInstruction, RepoInfo
 
-    logger = logging.getLogger("create_job_instruction")
-    full = repo.get("full_name")
-    repo_info = RepoInfo(
-        full_name=full,
-        git_url=repo.get("clone_url") or repo.get("git_url") or (f"https://github.com/{full}.git" if full else ""),
-        branch=repo.get("default_branch") or repo.get("branch") or "main",
-        size_kb=int(repo.get("size", 0) or 0),
-        main_language=repo.get("language"),
-        stars=repo.get("stargazers_count"),
-    )
+    repo_info = repo_dict_to_info(repo)
     job_instr = JobInstruction(job_id=job_id, tool=worker, repo_info=repo_info)
     logger.info(
         "New JobInstruction created: %r \t (%r on %r)",
@@ -36,6 +31,94 @@ def create_job_instruction(repo: dict, worker: str, job_id: str):
         job_instr.repo_info.full_name,
     )
     return job_instr
+
+
+def collect_repo_cboms(
+    r: redis.Redis,
+    bench_id: str,
+    repo_full_name: str,
+    workers: list[str],
+) -> dict[str, str]:
+    job_idx = r.hgetall(f"bench:{bench_id}:job_index") or {}
+    cboms: dict[str, str] = {}
+
+    for worker in workers:
+        job_id = job_idx.get(pair_key(repo_full_name, worker))
+        if not job_id:
+            continue
+        job_meta = r.hgetall(f"bench:{bench_id}:job:{job_id}") or {}
+        if job_meta.get("status") != "completed":
+            continue
+        raw = job_meta.get("result_json")
+        if not raw:
+            continue
+        try:
+            payload = json.loads(raw)
+        except Exception:
+            continue
+        cbom_text = payload.get("json")
+        if not cbom_text:
+            continue
+        cboms[worker] = cbom_text
+
+    return cboms
+
+
+def prepare_component_match_instruction(
+    r: redis.Redis,
+    bench_id: str,
+    repo: dict,
+    exclude_types: bool = True,
+) -> ComponentMatchJobInstruction | None:
+    workers = get_bench_workers(r, bench_id)
+    full_name = (repo.get("full_name") or "").strip()
+    if not full_name:
+        return None
+    cbom_map = collect_repo_cboms(r, bench_id, full_name, workers)
+    return create_component_match_instruction(
+        repo,
+        bench_id,
+        cbom_map,
+        exclude_types=exclude_types,
+    )
+
+
+def enqueue_component_match_instruction(
+    r: redis.Redis,
+    instruction: ComponentMatchJobInstruction,
+    queue_name: str,
+) -> None:
+    """Push a component match instruction onto the worker queue."""
+    logger.info(f"enqueue, job id: {instruction.job_id} to {queue_name}")
+    r.rpush(queue_name, instruction.to_json())
+
+
+def build_component_match_jobs(
+    r: redis.Redis,
+    bench_id: str,
+    exclude_types: bool = True,
+) -> tuple[list[ComponentMatchJobInstruction], dict[str, str]]:
+    """Return component match instructions + repo mapping for a benchmark."""
+
+    repos = get_bench_repos(r, bench_id)
+
+    instructions: list[ComponentMatchJobInstruction] = []
+    repo_map: dict[str, str] = {}
+
+    for repo in repos:
+        instruction = prepare_component_match_instruction(
+            r,
+            bench_id,
+            repo,
+            exclude_types=exclude_types,
+        )
+        if not instruction:
+            continue
+
+        instructions.append(instruction)
+        repo_map[instruction.job_id] = instruction.repo_info.full_name or (repo.get("full_name") or "")
+
+    return instructions, repo_map
 
 
 # ----- GitHub enrichment helpers (module-level, cache-aware) -----
@@ -524,4 +607,35 @@ def delete_benchmark(r: redis.Redis, bench_id: str) -> int:
     pipe.delete(f"bench:{bench_id}")
     pipe.srem("benches", bench_id)
     pipe.execute()
+
+    _purge_component_match_data(r, bench_id)
     return deleted_jobs
+
+
+def _purge_component_match_data(r: redis.Redis, bench_id: str) -> None:
+    worker = "treesimilartiy"
+    queue_key = f"jobs:{worker}"
+    results_key = f"results:{worker}"
+
+    def _filter_list(key: str):
+        items = r.lrange(key, 0, -1) or []
+        if not items:
+            return
+        filtered: list[str] = []
+        for item in items:
+            try:
+                payload = json.loads(item)
+            except Exception:
+                filtered.append(item)
+                continue
+            if payload.get("benchmark_id") != bench_id:
+                filtered.append(item)
+        if len(filtered) != len(items):
+            pipe = r.pipeline()
+            pipe.delete(key)
+            if filtered:
+                pipe.rpush(key, *filtered)
+            pipe.execute()
+
+    _filter_list(queue_key)
+    _filter_list(results_key)

@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 
 import streamlit as st
@@ -15,18 +14,9 @@ from coordinator.utils import (
     human_duration,
     set_query_bench_id,
 )
+from coordinator.logger_config import logger
 
 
-def _init_logging():
-    # Configure root logger for container logs
-    level = os.getenv("LOG_LEVEL", "INFO").upper()
-    logging.basicConfig(level=level, format="%(asctime)s %(levelname)s %(message)s")
-    logger = logging.getLogger("coordinator")
-    logger.setLevel(level)
-    return logger
-
-
-logger = _init_logging()
 print("[coordinator] Starting Streamlit app…")
 logger.info("Coordinator: starting Streamlit app (version=%s)", getattr(st, "__version__", "?"))
 
@@ -58,13 +48,14 @@ st.markdown(
     <div style='display:flex;align-items:center;justify-content:space-between;'>
       <div style='display:flex;align-items:center;'>
         <h1 style='color:#FF4B4B;font-size:68px;margin:0;'>BF-CBOM</h1>
-        <span style='color:#888;font-size:1.3rem;font-family:monospace;font-weight:400;margin-left:0.8rem;margin-top:1.5em;'>v{version}</span>
+        <span style='color:#888;font-size:1.3rem;font-family:monospace;
+                font-weight:400;margin-left:0.8rem;margin-top:1.5em;'>v{version}</span>
       </div>
     </div>
     """,
     unsafe_allow_html=True,
 )
-st.caption("Benchmarking Framework for Cryptographic Bill of Material (CBOM) Generator Tools")
+st.caption("Benchmarking Framework for Cryptography Bill of Material (CBOM) Generator Tools")
 
 # Top action: create new benchmark
 if st.button("➕ Create New Benchmark", type="primary"):

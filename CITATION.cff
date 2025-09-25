@@ -1,0 +1,40 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: "BF-CBOM: Benchmarking Framework for Cryptography Bill of Material Generator Tools"
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Roman
+    family-names: Bögli
+    email: roman.boegli@unibe.ch
+    affiliation: University of Bern
+    orcid: "https://orcid.org/0009-0004-8745-7800"
+  - given-names: Jonas
+    family-names: Spieler
+    email: jonas.spieler@unibe.ch
+    affiliation: University of Bern
+    orcid: "https://orcid.org/0009-0009-1735-0617"
+  - given-names: Simon
+    family-names: Egli
+    affiliation: University of Bern
+  - given-names: Timo
+    family-names: Kehrer
+    email: timo.kehrer@unibe.ch
+    affiliation: University of Bern
+    orcid: "https://orcid.org/0000-0002-2582-5557"
+repository-code: "https://github.com/SEG-UNIBE/BF-CBOM"
+identifiers:
+  - description: "The versioned DOI of this work."
+    type: doi
+    value: 10.5281/zenodo.17148405
+abstract: Benchmarking Cryptography Bill of Material (CBOM) generators end-to-end; coordinating containerized jobs, normalizing outputs, and scoring results across ecosystems. In short, your best friend for generating and analyzing CBOMs.
+keywords:
+  - cbom
+  - benchmark
+  - docker-compose
+  - cryptography
+license: GPL-3.0-only

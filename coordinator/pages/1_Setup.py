@@ -12,6 +12,7 @@ from coordinator.utils import (
     parse_repo_urls,
     set_query_bench_id,
 )
+from coordinator.logger_config import logger
 
 # ---------- Streamlit Page ----------
 
@@ -134,7 +135,8 @@ with col1:
                     st.session_state[CONFIG_SESSION_KEY] = config_data
                     st.session_state[CONFIG_TEXT_KEY] = config_text
                     st.caption(
-                        f"Config contains {len(config_data.get('repos') or [])} repos and {{len(config_data.get('workers') or [])}} workers."
+                        f"Config contains {len(config_data.get('repos') or [])} "
+                        f"repos and {{len(config_data.get('workers') or [])}} workers."
                     )
                 except Exception as exc:
                     st.error(f"Invalid config JSON: {exc}")
@@ -142,7 +144,8 @@ with col1:
                     st.session_state.pop(CONFIG_TEXT_KEY, None)
             elif cached_config:
                 st.caption(
-                    f"Loaded config with {len(cached_config.get('repos') or [])} repos and {len(cached_config.get('workers') or [])} workers."
+                    f"Loaded config with {len(cached_config.get('repos') or [])} "
+                    f"repos and {len(cached_config.get('workers') or [])} workers."
                 )
             else:
                 st.caption("Uploaded a config.")
@@ -238,6 +241,13 @@ with col1:
             st.warning("No repositories found for the given input.")
             st.stop()
 
+        logger.info(
+            "Creating benchmark '%s' with %d repos and %d workers (source=%s)",
+            bench_name,
+            len(repos),
+            len(workers),
+            source,
+        )
         bench_id = create_benchmark(r, name=bench_name, params=params, repos=repos, workers=workers)
 
         # Persist deep-link and offer navigation

@@ -33,7 +33,7 @@ build-base:
 	docker build -f docker/Dockerfile.base \
 		-t $(BASE_IMAGE):$(VERSION) \
 		-t $(BASE_IMAGE):latest \
-		-t base:latest .
+		-t bf-cbom/base:latest .
 
 release:
 	bash ./scripts/bump_version.sh $(VERSION)

@@ -1,0 +1,33 @@
+FROM python:3.10-slim
+
+RUN apt-get update && apt-get install -y git
+
+RUN git clone https://github.com/RomanBoegli/PyQuN.git /opt/RaQuN_Lab
+
+WORKDIR /opt/RaQuN_Lab
+
+RUN python3 -m venv /opt/RaQuN_Lab/.venv
+ENV VIRTUAL_ENV=/opt/RaQuN_Lab/.venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+ENV PYTHONPATH="/opt:${PYTHONPATH}"
+RUN find /opt/RaQuN_Lab -type d -exec touch {}/__init__.py \;
+RUN touch /opt/RaQuN_Lab/__init__.py
+
+COPY common/ ./common/
+RUN pip install --no-cache-dir --upgrade pip --timeout 120
+
+RUN python3 -m pip install -U \ 
+numpy \
+redis \
+scikit-learn \
+psutil \
+dataclasses-json \
+requests \
+tqdm
+
+COPY misc/pyqun/main.py /opt/RaQuN_Lab/main.py
+COPY misc/pyqun/Stopwatch.py /opt/RaQuN_Lab/utils/Stopwatch.py
+# COPY misc/pyqun/*.json /opt/RaQuN_Lab/
+
+CMD ["python", "main.py"]
+# ENTRYPOINT ["tini","-g","--","uv","run","--no-dev","workers/skeleton/main.py"]

@@ -8,13 +8,47 @@ import sys
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import requests
 from tqdm import tqdm
 
 from .config import AVAILABLE_WORKERS
+from .models import RepoInfo
 
 logger = logging.getLogger(__name__)
+
+
+def _coerce_int(value: Any, default: int = 0) -> int:
+    try:
+        if value is None or value == "":
+            return default
+        return int(value)
+    except Exception:
+        try:
+            return int(float(value))
+        except Exception:
+            return default
+
+
+def repo_dict_to_info(repo: dict) -> RepoInfo:
+    full = (repo.get("full_name") or "").strip()
+    git_url = repo.get("clone_url") or repo.get("git_url") or (f"https://github.com/{full}.git" if full else "")
+    branch = repo.get("default_branch") or repo.get("branch") or "main"
+    size_val = repo.get("size")
+    if size_val in (None, ""):
+        size_val = repo.get("size_kb")
+    size_kb = _coerce_int(size_val, default=0)
+    stars_raw = repo.get("stargazers_count")
+    stars = _coerce_int(stars_raw, default=0) if stars_raw is not None else None
+    return RepoInfo(
+        full_name=full,
+        git_url=git_url,
+        branch=branch,
+        size_kb=size_kb,
+        main_language=repo.get("language"),
+        stars=stars,
+    )
 
 
 def get_project_version_from_toml(toml_path="pyproject.toml") -> str:

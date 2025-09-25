@@ -283,7 +283,8 @@ bench_id = st.selectbox(
     "Select benchmark",
     options=bench_order,
     index=bench_order.index(initial_id),
-    format_func=lambda bid: f"{bench_map.get(bid, {}).get('name', '(unnamed)')} · {bid[:8]} · {bench_map.get(bid, {}).get('status', '?')}",
+    format_func=lambda bid: f"{bench_map.get(bid, {}).get('name', '(unnamed)')} · "
+    f"{bid[:8]} · {bench_map.get(bid, {}).get('status', '?')}",
 )
 set_query_bench_id(bench_id)
 

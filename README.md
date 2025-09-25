@@ -1,6 +1,6 @@
 # `BF-CBOM`: Benchmarking Framework for CBOM Generator Tools
 
-*Benchmarking Cryptographic Bill of Material (CBOM) generators end-to-end: coordinating containerized jobs, normalizing outputs, and scoring results across ecosystems. In short, your **b**est **f**riend for generating and analyzing CBOMs.*
+*Benchmarking Cryptography Bill of Material (CBOM) generators end-to-end: coordinating containerized jobs, normalizing outputs, and scoring results across ecosystems. In short, your **b**est **f**riend for generating and analyzing CBOMs.*
 
 <div align="center">
   <img width="50%" src="logo.png" alt="BF-CBOM logo" />
@@ -143,7 +143,7 @@ In this option, you will build and compose the docker compose environment direct
 #### MacOS / Linux
 
 
-**🚩 5. Build using Makefile**
+**🚩 4. Build using Makefile**
 
 The project uses [GNU Make](https://www.gnu.org/software/make/) to simplify container orchestration.
 Most Linux distributions include `make` by default.
@@ -157,7 +157,7 @@ make up-prod
 
 Docker Compose will launch and manage all containers. Stop the stack anytime with `Ctrl+C`.
 
-**🚩 6. Local CLI (optional)**
+**🚩 5. Local CLI (optional)**
 
 If `make up-prod` completed successfully and the containers are running, you can also interact with BF-CBOM through its command-line interface (CLI).
 From the repository's root folder, run:
