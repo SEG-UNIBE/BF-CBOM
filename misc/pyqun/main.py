@@ -6,6 +6,8 @@ import multiprocessing
 from pathlib import Path
 import numpy as np
 import redis
+import random
+import itertools
 
 from common.config import REDIS_HOST, REDIS_PORT
 from common.models import ComponentMatchJobInstruction, ComponentMatchJobResult
@@ -37,7 +39,8 @@ from RaQuN_Lab.strategies.RaQuN.candidatesearch.NNCandidateSearch.NNCandidateSea
 from RaQuN_Lab.strategies.RaQuN.candidatesearch.NNCandidateSearch.vectorization.ZeroOneVectorization import ZeroOneVectorizer
 from RaQuN_Lab.strategies.RaQuN.RaQuN import VanillaRaQuN
 from RaQuN_Lab.strategies.RaQuN.candidatesearch.NNCandidateSearch.vectorization.Vectorizer import Vectorizer
-
+from RaQuN_Lab.strategies.RaQuN.candidatesearch.NNCandidateSearch.vectorization.DimensionalityReduction.SVDReduction import SVDReduction
+    
 class LetterHistogramVectorizer(Vectorizer):
     def __init__(self):
         # Use lowercase English letters
@@ -109,8 +112,15 @@ def load_jsons_from_files_as_strings(json_files: list[str]):
 
     return out
 
-def load_model(json_files: list[str]):
-    elements = 0
+def run_raqun_with_order(json_files, order=None):
+    if order is None:
+        order = list(range(len(json_files)))
+    shuffled_json_files = [json_files[i] for i in order]
+    matches = run_raqun(shuffled_json_files)
+
+    return matches, order
+
+def run_raqun(json_files: list[str]):
     models = {}
 
     for e_id, json_file in enumerate(json_files):
@@ -118,10 +128,13 @@ def load_model(json_files: list[str]):
         if (comps and len(comps)>0):
             models[e_id] = []
             for comp_i, comp in enumerate(comps):
-                elements += 1
 
                 attr_list = []
                 name = comp["name"]
+
+                # if name in ["library", "framework"]:
+                #     continue
+                
                 attr_list.append(name)
 
                 type = comp["type"]
@@ -141,7 +154,6 @@ def load_model(json_files: list[str]):
                     #     attr_list.append(attr)
                 except:
                     pass
-
                 attributes = set(DefaultAttribute(attr) for attr in attr_list)
 
                 element = Element(name=name, ze_id=comp_i, attributes=attributes) # -> corresponds to a cbom component
@@ -156,38 +168,50 @@ def load_model(json_files: list[str]):
         model_list.append(model)
 
     model_set = ModelSet(set(model_list))
-    
-    return model_set
+    algo = VanillaRaQuN("high_dim_raqun", candidate_search=NNCandidateSearch(vectorizer=LetterHistogramVectorizer()))
+
+    matches, _ = algo.match(model_set)
+
+    return list(matches)
 
 
 def match_from_json_list(json_files: list[str]):
     json_files = convert_json_string_to_dict(json_files)
 
-    model_set = load_model(json_files)
+    best_nr_matches = 0
+    best_match = None
+    best_order = None
 
-    logger.info(f"model_set: {model_set}")
+    # only works for few documents (exponential cost for iteration)
+    n = len(json_files)
+    
+    for curr_round, order in enumerate(itertools.permutations(range(n))):
+        # order = list(range(len(json_files)))
+        # random.shuffle(order)
+        logger.info(f"Running RaQuN permutation round: {curr_round}")
+        
+        matches_list, used_order = run_raqun_with_order(json_files, order)
+        curr_nr_matches = sum([len(e) for match in matches_list for e in match.get_elements()])
 
-    # algo = VanillaRaQuN("high_dim_raqun", candidate_search=NNCandidateSearch(vectorizer=LetterHistogramVectorizer()))
-    algo = VanillaRaQuN("high_dim_raqun", candidate_search=NNCandidateSearch(vectorizer=LetterHistogramVectorizer()))
-
-    matches, stopwatch = algo.match(model_set)
-    matches_list = list(matches)
+        if best_nr_matches < curr_nr_matches:
+            best_nr_matches = curr_nr_matches
+            best_match = matches_list
+            best_order = used_order
 
     grouped_elements = []
 
-    for match in matches_list:
+    for match in best_match:
         if hasattr(match, 'get_elements'):
             elements = match.get_elements()
             if elements and len(elements) > 1:
-                logger.info(elements)
                 group = []
                 for e in elements:
                     file_id = e.model_id  
+                    original_idx = best_order[file_id]
                     comp_id = e.ele_id 
                     try:
-                        # group.append(json_files[file_id]["components"][comp_id])
                         group.append({
-                            "file": file_id,
+                            "file": original_idx,
                             "component": comp_id,
                             "cost": 0.0
                         })
