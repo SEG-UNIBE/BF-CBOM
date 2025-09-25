@@ -13,6 +13,7 @@ import typer
 from common.models import BenchmarkConfig, RepoRef
 from coordinator.redis_io import (
     collect_results_once,
+    cancel_benchmark,
     create_benchmark,
     get_bench_meta,
     get_bench_repos,
@@ -47,7 +48,6 @@ _STATUS_COLORS = {
     "pending": typer.colors.BLUE,
     "failed": typer.colors.RED,
     "cancelled": typer.colors.YELLOW,
-    "canceling": typer.colors.YELLOW,
 }
 
 
@@ -345,27 +345,59 @@ def run(
 
 @app.command()
 def status(
-    bench_id: str = typer.Argument(..., help="Benchmark ID"),
+    bench_id: str = typer.Argument(..., help="Benchmark ID (supports unique prefix)"),
     redis_host: str = typer.Option("localhost", envvar="REDIS_HOST", help="Redis host"),
     redis_port: int = typer.Option(6379, envvar="REDIS_PORT", help="Redis port"),
     json_out: bool = typer.Option(False, "--json", help="Emit JSON summary"),
 ):
     """Show current status of a benchmark."""
     r = _connect_redis(redis_host, redis_port)
-    if not r.exists(f"bench:{bench_id}"):
-        typer.echo(f"No such benchmark: {bench_id}")
-        raise typer.Exit(1)
-    summary = _summarize_bench(r, bench_id)
+    try:
+        resolved_id = _resolve_bench_id(r, bench_id)
+    except ValueError as err:
+        typer.echo(str(err), err=True)
+        raise typer.Exit(1) from err
+
+    if resolved_id != bench_id:
+        typer.echo(f"Resolved benchmark ID '{bench_id}' -> '{resolved_id}'", err=True)
+
+    summary = _summarize_bench(r, resolved_id)
     if json_out:
         typer.echo(json.dumps(summary, ensure_ascii=False))
     else:
         typer.echo(
-            f"{summary['name']} · {bench_id[:8]} · status={summary['status']} · "
+            f"{summary['name']} · {resolved_id[:8]} · status={summary['status']} · "
             f"completed={summary['counts']['completed']} "
             f"failed={summary['counts']['failed']} "
             f"cancelled={summary['counts']['cancelled']} "
             f"total={summary['total']}"
         )
+
+
+@app.command()
+def cancel(
+    bench_id: str = typer.Argument(..., help="Benchmark ID (supports unique prefix)"),
+    redis_host: str = typer.Option("localhost", envvar="REDIS_HOST", help="Redis host"),
+    redis_port: int = typer.Option(6379, envvar="REDIS_PORT", help="Redis port"),
+):
+    """Cancel a running benchmark by removing queued jobs and marking them cancelled."""
+
+    r = _connect_redis(redis_host, redis_port)
+    try:
+        resolved_id = _resolve_bench_id(r, bench_id)
+    except ValueError as err:
+        typer.echo(str(err), err=True)
+        raise typer.Exit(1) from err
+
+    if resolved_id != bench_id:
+        typer.echo(f"Resolved benchmark ID '{bench_id}' -> '{resolved_id}'", err=True)
+
+    if not get_bench_meta(r, resolved_id):
+        typer.echo(f"No such benchmark: {bench_id}", err=True)
+        raise typer.Exit(1)
+
+    cancelled = cancel_benchmark(r, resolved_id)
+    typer.echo(f"Cancelled {cancelled} pending job(s) for {resolved_id[:8]}")
 
 
 @export_app.callback(invoke_without_command=True)
@@ -600,6 +632,9 @@ def banner(
     typer.echo("")
     typer.echo(typer.style("  # Check status", fg=typer.colors.CYAN))
     typer.echo("  uv run misc/cli/cli.py status <BENCH_ID> --json")
+    typer.echo("")
+    typer.echo(typer.style("  # Cancel a running benchmark", fg=typer.colors.CYAN))
+    typer.echo("  uv run misc/cli/cli.py cancel <BENCH_ID>")
 
 
 if __name__ == "__main__":
