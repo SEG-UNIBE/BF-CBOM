@@ -110,6 +110,7 @@ class ComponentMatchJobResult(DataClassJsonMixin):
     status: str = "ok"
     error: str | None = None
 
+
 # ----- Minimal CLI config schema -----
 
 

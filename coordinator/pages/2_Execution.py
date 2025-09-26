@@ -3,6 +3,7 @@ import time
 import streamlit as st
 
 from common.utils import get_status_emoji
+from coordinator.logger_config import logger
 from coordinator.redis_io import (
     cancel_benchmark,
     collect_results_once,
@@ -24,7 +25,6 @@ from coordinator.utils import (
     set_query_bench_id,
     summarize_result_cell,
 )
-from coordinator.logger_config import logger
 
 st.set_page_config(
     page_title="Execution",

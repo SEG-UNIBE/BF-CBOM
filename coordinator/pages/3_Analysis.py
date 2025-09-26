@@ -2,17 +2,11 @@ import json
 import time
 from types import SimpleNamespace
 
-import numpy as _np
 import altair as alt
 import pandas as pd
 import redis
 import streamlit as st
 
-from common.cbom_filters import (
-    INCLUDE_COMPONENT_TYPE_ONLY,
-    is_included_component_type,
-    filter_cbom_components_include_only,
-)
 from common.cbom_analysis import (
     analyze_cbom_json,
     component_counts_for_repo,
@@ -21,8 +15,15 @@ from common.cbom_analysis import (
     summarize_component_types,
     summarize_runtime_estimate,
 )
+from common.cbom_filters import (
+    INCLUDE_COMPONENT_TYPE_ONLY,
+    filter_cbom_components_include_only,
+    is_included_component_type,
+)
 from common.utils import get_status_emoji, get_status_keys_order, status_text
+from coordinator.logger_config import logger
 from coordinator.redis_io import (
+    collect_repo_cboms,
     enqueue_component_match_instruction,
     get_bench_meta,
     get_bench_repos,
@@ -31,7 +32,6 @@ from coordinator.redis_io import (
     list_benchmarks,
     pair_key,
     prepare_component_match_instruction,
-    collect_repo_cboms
 )
 from coordinator.utils import (
     build_repo_info_url_map,
@@ -40,7 +40,6 @@ from coordinator.utils import (
     get_query_bench_id,
     safe_int,
 )
-from coordinator.logger_config import logger
 
 st.set_page_config(
     page_title="Analysis",
@@ -63,7 +62,10 @@ PYQUN_WORKER = "pyqun"
 PYQUN_QUEUE = f"jobs:{PYQUN_WORKER}"
 PYQUN_RESULTS_LIST = f"results:{PYQUN_WORKER}"
 
-def _latest_similarity_result(redis_conn: redis.Redis, repo_full_name: str, *, target_job_id: str | None = None, result_list = TREESIM_RESULTS_LIST) -> dict | None:
+
+def _latest_similarity_result(
+    redis_conn: redis.Redis, repo_full_name: str, *, target_job_id: str | None = None, result_list=TREESIM_RESULTS_LIST
+) -> dict | None:
     """Return the newest similarity result for repo (optionally matching job_id)."""
 
     entries = redis_conn.lrange(result_list, 0, -1)
@@ -434,7 +436,9 @@ if comp_rows:
                 # Read toggle state before rendering the table so it updates immediately on toggle
                 repo_state_pre = bench_jobs_state.setdefault(repo_name, {})
                 toggle_key = f"exclude_libs_{bench_id}_{repo_name}"
-                exclude_non_crypto = bool(st.session_state.get(toggle_key, repo_state_pre.get("exclude_libraries", False)))
+                exclude_non_crypto = bool(
+                    st.session_state.get(toggle_key, repo_state_pre.get("exclude_libraries", False))
+                )
                 if exclude_non_crypto and "component.type" in df_counts.columns:
                     df_counts = df_counts[df_counts["component.type"].apply(is_included_component_type)]
                 status_map = repo_worker_status.get(repo_name, {})
@@ -466,7 +470,7 @@ if comp_rows:
                     status_key = status_map.get(w, "pending")
                     emoji = get_status_emoji(status_key)
                     total = worker_totals.get(w, 0)
-                    rename_map[w] = (f"{emoji} {w} ({total})" if emoji else f"{w} ({total})")
+                    rename_map[w] = f"{emoji} {w} ({total})" if emoji else f"{w} ({total})"
                     ordered_cols.append(w)
                 df_counts = df_counts[ordered_cols]
                 view_types = df_counts.rename(columns=rename_map)
@@ -486,9 +490,7 @@ if comp_rows:
                     repo_state["waiting_for_similarity"] = False
 
                 if toggle_key not in st.session_state:
-                    st.session_state[toggle_key] = bool(
-                        repo_state.get("exclude_libraries", False)
-                    )
+                    st.session_state[toggle_key] = bool(repo_state.get("exclude_libraries", False))
 
                 button_col, toggle_col = st.columns([3, 2])
                 with toggle_col:
@@ -500,7 +502,7 @@ if comp_rows:
                 # For estimates, when enabled, exclude all types except cryptographic-asset
                 if exclude_libraries:
                     observed_types: set[str] = set()
-                    for row in (comp_rows or []):
+                    for row in comp_rows or []:
                         if row.get("repo") == repo_name and isinstance(row.get("types"), dict):
                             observed_types.update(str(t).lower() for t in row.get("types").keys())
                     excluded_types = {t for t in observed_types if not is_included_component_type(t)}
@@ -514,26 +516,20 @@ if comp_rows:
                     excluded_types=excluded_types,
                 )
                 estimate_seconds = estimate_similarity_runtime(component_counts)
-                if (
-                    component_counts
-                    and any(component_counts.values())
-                    and estimate_seconds
-                    and not result_payload
-                ):
-                    toggle_col.caption(
-                        "Estimated runtime: "
-                        f"{summarize_runtime_estimate(estimate_seconds)}"
-                    )
+                if component_counts and any(component_counts.values()) and estimate_seconds and not result_payload:
+                    toggle_col.caption(f"Estimated runtime: {summarize_runtime_estimate(estimate_seconds)}")
 
                 # Do not eagerly fetch results on reruns (e.g., toggle changes).
                 # Result fetching is driven only when a job is actively waiting.
 
-                waiting_for_result = bool(repo_state.get("waiting_for_similarity")) and bool(job_id) and not result_payload
+                waiting_for_result = (
+                    bool(repo_state.get("waiting_for_similarity")) and bool(job_id) and not result_payload
+                )
                 button_disabled = waiting_for_result
                 algorithm_choice = st.radio(
                     "Select matching algorithm",
                     ["Tree Similarity", "RaQuN (PyQuN)"],
-                    key=f"algorithm_choice_{bench_id}_{repo_name}"
+                    key=f"algorithm_choice_{bench_id}_{repo_name}",
                 )
                 if algorithm_choice == "Tree Similarity":
                     match_queue = TREESIM_QUEUE
@@ -553,18 +549,17 @@ if comp_rows:
                         if not instruction:
                             st.info("Need at least two completed CBOMs for this repository.")
                         else:
- 
                             # Aggregate tool names and component counts from all CbomJsons, per tool
-                            tool_stats = [
-                                (cbom.tool, len(cbom.components_as_json))
-                                for cbom in instruction.CbomJsons
-                            ]
+                            tool_stats = [(cbom.tool, len(cbom.components_as_json)) for cbom in instruction.CbomJsons]
                             num_components = sum(count for _, count in tool_stats)
                             stats_str = ", ".join(f"({tool}, {count})" for tool, count in tool_stats)
                             logger.info(
-                                "Sending match instruction for repo «%s», comparing %d cbomjsons: %s; total_components=%d",
+                                "Sending match instruction for repo «%s», "
+                                "comparing %d cbomjsons: %s; total_components=%d",
                                 instruction.repo_info.full_name,
-                                len(instruction.CbomJsons), stats_str, num_components
+                                len(instruction.CbomJsons),
+                                stats_str,
+                                num_components,
                             )
                             # Persist issued tool order and counts for later verification
                             repo_state["issued_tools"] = [t for t, _ in tool_stats]
@@ -579,7 +574,8 @@ if comp_rows:
                                 full_list = load_components(raw_json) if raw_json else []
                                 if exclude_libraries:
                                     full_list = [
-                                        c for c in full_list
+                                        c
+                                        for c in full_list
                                         if isinstance(c, dict) and is_included_component_type(c.get("type"))
                                     ]
                                 issued_full_components[cbom.tool] = full_list
@@ -600,7 +596,9 @@ if comp_rows:
                             st.rerun()
 
                 if waiting_for_result and not result_payload:
-                    result_payload = _latest_similarity_result(r, repo_name, target_job_id=job_id, result_list=result_list)
+                    result_payload = _latest_similarity_result(
+                        r, repo_name, target_job_id=job_id, result_list=result_list
+                    )
                     if result_payload:
                         repo_state["result"] = result_payload
                         # Clear waiting state now that we have a result
@@ -614,7 +612,7 @@ if comp_rows:
                             result_payload = _latest_similarity_result(
                                 r,
                                 repo_name,
-                                target_job_id=repo_state.get("job_id"), 
+                                target_job_id=repo_state.get("job_id"),
                                 result_list=result_list,
                             )
                             if result_payload:
@@ -649,22 +647,17 @@ if comp_rows:
                         if not matches:
                             st.info("No component matches were returned.")
                         else:
-                            result_filter_enabled = bool(
-                                repo_state.get("result_exclude_libraries", False)
-                            )
+                            result_filter_enabled = bool(repo_state.get("result_exclude_libraries", False))
                             if result_filter_enabled:
                                 st.caption("Non ‘cryptographic-asset’ components were excluded for this run.")
                             elif exclude_libraries:
                                 st.caption(
-                                    "Toggle is set to exclude non ‘cryptographic-asset’. "
-                                    "Re-run similarity to apply."
+                                    "Toggle is set to exclude non ‘cryptographic-asset’. Re-run similarity to apply."
                                 )
 
                             cbom_map_raw = repo_state.get("cboms")
                             if cbom_map_raw is None:
-                                cbom_map_raw = collect_repo_cboms(
-                                    r, bench_id, repo_name, workers
-                                ) or {}
+                                cbom_map_raw = collect_repo_cboms(r, bench_id, repo_name, workers) or {}
                                 repo_state.pop("filtered_cboms", None)
                                 repo_state["cboms"] = cbom_map_raw
                             else:
@@ -674,7 +667,9 @@ if comp_rows:
                             issued_tools = repo_state.get("issued_tools") or []
                             tools_for_render = tools or issued_tools
                             use_issued_full = bool(repo_state.get("issued_full_components")) and bool(tools_for_render)
-                            use_issued_min = bool(repo_state.get("issued_minimized_documents")) and bool(tools_for_render)
+                            use_issued_min = bool(repo_state.get("issued_minimized_documents")) and bool(
+                                tools_for_render
+                            )
                             if use_issued_full:
                                 # Build synthetic CBOMs from the stored full components to ensure exact index mapping
                                 issued_full = repo_state.get("issued_full_components") or {}
@@ -700,7 +695,9 @@ if comp_rows:
                                 view_key = f"view_mode_{bench_id}_{repo_name}"
                                 options = ["Real (full)"] + (["Minimized (matched)"] if cbom_map_min else [])
                                 choice = st.radio("View", options=options, index=0, key=view_key, horizontal=True)
-                                cbom_map_for_render = cbom_map_min if (cbom_map_min and choice.startswith("Minimized")) else cbom_map_full
+                                cbom_map_for_render = (
+                                    cbom_map_min if (cbom_map_min and choice.startswith("Minimized")) else cbom_map_full
+                                )
                             else:
                                 if result_filter_enabled:
                                     cbom_map_for_render = filtered_cache.get(True)
@@ -730,7 +727,12 @@ if comp_rows:
                             issued_tools = repo_state.get("issued_tools") or []
                             issued_counts = repo_state.get("issued_counts") or []
                             effective_tools = tools_for_render
-                            if effective_tools and issued_tools and issued_counts and len(issued_tools) == len(issued_counts):
+                            if (
+                                effective_tools
+                                and issued_tools
+                                and issued_counts
+                                and len(issued_tools) == len(issued_counts)
+                            ):
                                 # Build current counts based on the CBOMs used for rendering
                                 current_counts = []
                                 for t in effective_tools:

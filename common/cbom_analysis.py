@@ -5,12 +5,11 @@ import uuid
 from collections import Counter, defaultdict
 from typing import Any
 
-from common.models import CbomJson, ComponentMatchJobInstruction
-from common.utils import repo_dict_to_info
 from common.cbom_filters import (
-    INCLUDE_COMPONENT_TYPE_ONLY,
     is_included_component_type,
 )
+from common.models import CbomJson, ComponentMatchJobInstruction
+from common.utils import repo_dict_to_info
 
 # Common crypto asset types used across tools/tests
 COMMON_CRYPTO_ASSET_TYPES = [
@@ -430,13 +429,13 @@ def render_similarity_matches(
         return []
 
     def _format_cost(value) -> str:
-        if isinstance(value, (int, float)):
+        if isinstance(value, int | float):
             return f"{value:.4f}"
         return str(value)
 
     def _extract_cost(match_block: list) -> float:
         costs = [entry.get("cost") for entry in match_block if isinstance(entry, dict)]
-        numeric = [c for c in costs if isinstance(c, (int, float))]
+        numeric = [c for c in costs if isinstance(c, int | float)]
         if numeric:
             return float(numeric[0])
         return float("inf")
@@ -489,7 +488,7 @@ def render_similarity_matches(
                     continue
 
                 columns = renderer.columns(len(match_block))
-                for col, entry in zip(columns, match_block):
+                for col, entry in zip(columns, match_block, strict=False):
                     if not isinstance(entry, dict):
                         col.json(entry)
                         continue

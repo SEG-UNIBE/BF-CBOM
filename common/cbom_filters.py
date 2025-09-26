@@ -1,7 +1,6 @@
 import json
 from typing import Any
 
-
 # Allowed component.type labels for cryptographic assets (case-insensitive)
 INCLUDE_COMPONENT_TYPE_ONLY: list[str] = [
     "cryptographic-asset",

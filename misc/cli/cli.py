@@ -12,8 +12,8 @@ import typer
 
 from common.models import BenchmarkConfig, RepoRef
 from coordinator.redis_io import (
-    collect_results_once,
     cancel_benchmark,
+    collect_results_once,
     create_benchmark,
     get_bench_meta,
     get_bench_repos,

@@ -5,6 +5,7 @@ import streamlit as st
 
 from common.config import GITHUB_TOKEN
 from common.utils import get_available_workers
+from coordinator.logger_config import logger
 from coordinator.redis_io import create_benchmark, get_redis
 from coordinator.utils import (
     enrich_repos_with_github,
@@ -12,7 +13,6 @@ from coordinator.utils import (
     parse_repo_urls,
     set_query_bench_id,
 )
-from coordinator.logger_config import logger
 
 # ---------- Streamlit Page ----------
 
