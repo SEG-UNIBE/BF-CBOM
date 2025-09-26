@@ -530,11 +530,11 @@ if comp_rows:
                 with algo_col:
                     algorithm_choice = st.radio(
                         "Select matching algorithm",
-                        ["Tree Similarity", "RaQuN (PyQuN)"],
+                        ["Clustering Algorithm (RaQuN)", "Optimization Algorithm"],
                         key=f"algorithm_choice_{bench_id}_{repo_name}",
                         horizontal=True,
                     )
-                if algorithm_choice == "Tree Similarity":
+                if algorithm_choice == "Optimization Algorithm":
                     match_queue = TREESIM_QUEUE
                     result_list = TREESIM_RESULTS_LIST
                 else:

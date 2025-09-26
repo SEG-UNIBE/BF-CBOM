@@ -8,6 +8,7 @@ import numpy as np
 import redis
 import random
 import itertools
+from sentence_transformers import SentenceTransformer
 
 from common.config import REDIS_HOST, REDIS_PORT
 from common.models import ComponentMatchJobInstruction, ComponentMatchJobResult
@@ -41,6 +42,25 @@ from RaQuN_Lab.strategies.RaQuN.RaQuN import VanillaRaQuN
 from RaQuN_Lab.strategies.RaQuN.candidatesearch.NNCandidateSearch.vectorization.Vectorizer import Vectorizer
 from RaQuN_Lab.strategies.RaQuN.candidatesearch.NNCandidateSearch.vectorization.DimensionalityReduction.SVDReduction import SVDReduction
     
+
+class BERTEmbedding(Vectorizer):
+    def __init__(self):
+        self.model = SentenceTransformer('all-MiniLM-L6-v2')  # Fast, small, good for most tasks
+        self.vec_dim = self.model.get_sentence_embedding_dimension()
+
+    def innit(self, m_s: 'ModelSet') -> None:
+        pass
+
+    def vectorize(self, element: 'Element'):
+        # Combine all attribute values into a single string
+        attr_texts = [str(getattr(attr, 'value', attr)).lower() for attr in getattr(element, 'attributes', [])]
+        text = " ".join(attr_texts)
+        vec = self.model.encode(text, show_progress_bar=False)
+        return vec
+
+    def dim(self):
+        return self.vec_dim
+    
 class LetterHistogramVectorizer(Vectorizer):
     def __init__(self):
         # Use lowercase English letters
@@ -64,6 +84,14 @@ class LetterHistogramVectorizer(Vectorizer):
     def dim(self):
         return self.vec_dim
 
+
+PyQuN_algo = VanillaRaQuN(
+    "high_dim_raqun", 
+    candidate_search=NNCandidateSearch(
+        vectorizer=BERTEmbedding(),
+        neighbourhood_size=3
+    )
+)
 
 
 def DFS(sub_dict, prefix: list, results: list):
@@ -117,6 +145,7 @@ def _run_raqun_with_order(json_files, order=None):
     return matches, order
 
 def _run_raqun(json_files: list[str]):
+    global PyQuN_algo
     models = {}
 
     # extract and convert to Model/Element/Attribute for RaQuN
@@ -155,12 +184,8 @@ def _run_raqun(json_files: list[str]):
         model_list.append(model)
 
     model_set = ModelSet(set(model_list))
-    algo = VanillaRaQuN(
-        "high_dim_raqun", 
-        candidate_search=NNCandidateSearch(vectorizer=LetterHistogramVectorizer())
-    )
 
-    matches, _ = algo.match(model_set)
+    matches, _ = PyQuN_algo.match(model_set)
 
     return list(matches)
 
