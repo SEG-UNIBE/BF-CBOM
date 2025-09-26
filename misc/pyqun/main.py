@@ -95,46 +95,38 @@ def DFS(sub_dict, prefix: list, results: list):
         results.append(prefix)
 
 
-def convert_json_string_to_dict(json_string_list: list[str]):
+def _convert_json_string_to_dict(documents: list[list[str]]) -> list[list[dict]]:
     out = []
 
-    for f in json_string_list:
-        json_dict = json.loads(f)
-        out.append(json_dict)
+    for doc in documents:
+        doc_list = []
+        for json_file in doc:
+            json_dict = json.loads(json_file)
+            doc_list.append(json_dict)
+    
+        out.append(doc_list)
 
     return out
 
-def load_jsons_from_files_as_strings(json_files: list[str]):
-    out = []
-    for path in json_files:
-        with open(path, "r+") as f:
-            out.append(f.read())
-
-    return out
-
-def run_raqun_with_order(json_files, order=None):
+def _run_raqun_with_order(json_files, order=None):
     if order is None:
         order = list(range(len(json_files)))
     shuffled_json_files = [json_files[i] for i in order]
-    matches = run_raqun(shuffled_json_files)
+    matches = _run_raqun(shuffled_json_files)
 
     return matches, order
 
-def run_raqun(json_files: list[str]):
+def _run_raqun(json_files: list[str]):
     models = {}
 
+    # extract and convert to Model/Element/Attribute for RaQuN
     for e_id, json_file in enumerate(json_files):
-        comps = find_components_list(json_file)
-        if (comps and len(comps)>0):
+        if len(json_file)>0:
             models[e_id] = []
-            for comp_i, comp in enumerate(comps):
-
+            for comp_i, comp in enumerate(json_file):
                 attr_list = []
                 name = comp["name"]
 
-                # if name in ["library", "framework"]:
-                #     continue
-                
                 attr_list.append(name)
 
                 type = comp["type"]
@@ -147,11 +139,6 @@ def run_raqun(json_files: list[str]):
                     primitive = comp["cryptoProperties"]["algorithmProperties"]["primitive"]
                     attr_list.append(primitive)
 
-                    # res = []
-                    # DFS(comp["cryptoProperties"], [], res)
-                    # for p in res:
-                    #     attr = "_".join(p)
-                    #     attr_list.append(attr)
                 except:
                     pass
                 attributes = set(DefaultAttribute(attr) for attr in attr_list)
@@ -168,15 +155,18 @@ def run_raqun(json_files: list[str]):
         model_list.append(model)
 
     model_set = ModelSet(set(model_list))
-    algo = VanillaRaQuN("high_dim_raqun", candidate_search=NNCandidateSearch(vectorizer=LetterHistogramVectorizer()))
+    algo = VanillaRaQuN(
+        "high_dim_raqun", 
+        candidate_search=NNCandidateSearch(vectorizer=LetterHistogramVectorizer())
+    )
 
     matches, _ = algo.match(model_set)
 
     return list(matches)
 
 
-def match_from_json_list(json_files: list[str]):
-    json_files = convert_json_string_to_dict(json_files)
+def _match_from_json_list(json_files: list[str]):
+    json_files = _convert_json_string_to_dict(json_files)
 
     best_nr_matches = 0
     best_match = None
@@ -190,7 +180,7 @@ def match_from_json_list(json_files: list[str]):
         # random.shuffle(order)
         logger.info(f"Running RaQuN permutation round: {curr_round}")
         
-        matches_list, used_order = run_raqun_with_order(json_files, order)
+        matches_list, used_order = _run_raqun_with_order(json_files, order)
         curr_nr_matches = sum([len(e) for match in matches_list for e in match.get_elements()])
 
         if best_nr_matches < curr_nr_matches:
@@ -222,10 +212,10 @@ def match_from_json_list(json_files: list[str]):
     return grouped_elements
 
 
-def _match_components(documents: list[str]) ->  list[dict]:
+def _match_components(documents: list[list[str]]) ->  list[dict]:
     
     logger.info("Starting n-way component matching for %d documents...", len(documents))
-    serialized = match_from_json_list(documents)
+    serialized = _match_from_json_list(documents)
 
     logger.info("Found %d component match(es)", len(serialized))
     logger.info("Matches:\n%s", serialized)
@@ -261,10 +251,16 @@ def _handle_instruction(raw_payload: str) -> None:
     
     # Transform the list of CbomJson objects into a list of documents (list[str])
     documents = [
-        entry.entire_json_raw
+        entry.components_as_json
         for entry in instruction.CbomJsons
-        if entry.entire_json_raw
+        if entry.components_as_json
     ]
+
+    # documents_raw = [
+    #     entry.entire_json_raw
+    #     for entry in instruction.CbomJsons
+    #     if entry.entire_json_raw
+    # ]
     
     tools = [entry.tool for entry in instruction.CbomJsons if entry.components_as_json]
     if len(documents) < 2:
