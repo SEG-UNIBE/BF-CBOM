@@ -492,7 +492,8 @@ if comp_rows:
                 if toggle_key not in st.session_state:
                     st.session_state[toggle_key] = bool(repo_state.get("exclude_libraries", False))
 
-                button_col, toggle_col = st.columns([3, 2])
+                # Controls row: [Find button] [Algorithm radio] [Toggle]
+                button_col, algo_col, toggle_col = st.columns([3, 3, 2])
                 with toggle_col:
                     # More thorough: focus analysis on cryptographic assets only
                     label = "Include cryptographic-assets only"
@@ -526,11 +527,13 @@ if comp_rows:
                     bool(repo_state.get("waiting_for_similarity")) and bool(job_id) and not result_payload
                 )
                 button_disabled = waiting_for_result
-                algorithm_choice = st.radio(
-                    "Select matching algorithm",
-                    ["Tree Similarity", "RaQuN (PyQuN)"],
-                    key=f"algorithm_choice_{bench_id}_{repo_name}",
-                )
+                with algo_col:
+                    algorithm_choice = st.radio(
+                        "Select matching algorithm",
+                        ["Tree Similarity", "RaQuN (PyQuN)"],
+                        key=f"algorithm_choice_{bench_id}_{repo_name}",
+                        horizontal=True,
+                    )
                 if algorithm_choice == "Tree Similarity":
                     match_queue = TREESIM_QUEUE
                     result_list = TREESIM_RESULTS_LIST
