@@ -306,21 +306,21 @@ if scatter_rows:
         default=worker_options,
     )
 
-    y_choice = col_radio.radio(
-        "Y-axis",
+    x_choice = col_radio.radio(
+        "X-axis",
         options=("Repository size (KB)", "Reported components"),
         index=0,
         horizontal=True,
-        key="scatter_y_axis",
+        key="scatter_x_axis",
     )
-    if y_choice == "Repository size (KB)":
-        y_field = "size_kb"
-        y_title = "Repository size (KB)"
-        y_scale = alt.Scale(zero=False)
+    if x_choice == "Repository size (KB)":
+        x_field = "size_kb"
+        x_title = "Repository size (KB)"
+        x_scale = alt.Scale(zero=False)
     else:
-        y_field = "components"
-        y_title = "Reported components"
-        y_scale = alt.Scale(zero=True)
+        x_field = "components"
+        x_title = "Reported components"
+        x_scale = alt.Scale(zero=True)
 
     filtered = df_scatter[df_scatter["worker"].isin(selected_workers)]
 
@@ -333,14 +333,14 @@ if scatter_rows:
             base.mark_circle(size=80, opacity=0.75)
             .encode(
                 x=alt.X(
+                    f"{x_field}:Q",
+                    title=x_title,
+                    scale=x_scale,
+                ),
+                y=alt.Y(
                     "duration_sec:Q",
                     title="Duration (s)",
                     scale=alt.Scale(zero=False),
-                ),
-                y=alt.Y(
-                    f"{y_field}:Q",
-                    title=y_title,
-                    scale=y_scale,
                 ),
                 color=alt.Color(
                     "worker:N",
@@ -359,18 +359,18 @@ if scatter_rows:
             .properties(height=500)
         )
         trend_layer = (
-            base.transform_regression("duration_sec", y_field, groupby=["worker"])
+            base.transform_regression(x_field, "duration_sec", groupby=["worker"])
             .mark_line(size=2)
             .encode(
                 x=alt.X(
+                    f"{x_field}:Q",
+                    title=x_title,
+                    scale=x_scale,
+                ),
+                y=alt.Y(
                     "duration_sec:Q",
                     title="Duration (s)",
                     scale=alt.Scale(zero=False),
-                ),
-                y=alt.Y(
-                    f"{y_field}:Q",
-                    title=y_title,
-                    scale=y_scale,
                 ),
                 color=alt.Color(
                     "worker:N",
