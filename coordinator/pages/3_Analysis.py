@@ -534,7 +534,7 @@ if comp_rows:
                         key=f"algorithm_choice_{bench_id}_{repo_name}",
                         horizontal=True,
                     )
-                if algorithm_choice == "Optimization Algorithm":
+                if ("Optimization" in algorithm_choice):
                     match_queue = TREESIM_QUEUE
                     result_list = TREESIM_RESULTS_LIST
                 else:
