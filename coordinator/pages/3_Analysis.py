@@ -530,7 +530,7 @@ if comp_rows:
                 with algo_col:
                     algorithm_choice = st.radio(
                         "Select matching algorithm",
-                        ["Clustering Algorithm (RaQuN)", "Optimization Algorithm"],
+                        ["Clustering Algorithm (RaQuN)", "Optimization Algorithm (JEDI)"],
                         key=f"algorithm_choice_{bench_id}_{repo_name}",
                         horizontal=True,
                     )
