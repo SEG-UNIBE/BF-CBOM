@@ -46,7 +46,6 @@ It orchestrates full container stacks, captures worker outputs, normalizes resul
 - **Scriptable CLI:** a Typer-based interface can launch benchmarks, export configs, or bundle CBOM artefacts for offline analysis.
 - **Reproducible runs:** checked-in `.env` templates, Dockerfiles, and `uv`-managed Python dependencies keep environments consistent across machines.
 
-### CBOM Generators Under Scrutinize
 
 ### CBOM Generators Under Scrutiny
 
