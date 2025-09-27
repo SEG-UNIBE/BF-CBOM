@@ -10,7 +10,11 @@
 </br>
 
 <div align="center">
-  <strong>🚀 <a href="#setup">Setup</a> | 🛠️ <a href="#developer-notes">Developer Notes</a> | 🔍 <a href="#tools-under-scrutinize">Tools</a></strong>
+  <strong>
+    👋 <a href="#introduction">Introduction</a> &nbsp;&nbsp;| &nbsp;&nbsp; 
+    🚀 <a href="#setup">Setup</a> &nbsp;&nbsp;|&nbsp;&nbsp; 
+    🛠️ <a href="#developer-notes">Developer Notes</a> 
+  </strong>
 </div>
 
 </br>
@@ -26,9 +30,7 @@
 </div>
 
 </br>
-
-
-https://github.com/user-attachments/assets/9926c193-6b1f-4e1e-9556-95ebcc3e0401
+</br>
 
 
 
@@ -44,12 +46,25 @@ It orchestrates full container stacks, captures worker outputs, normalizes resul
 - **Scriptable CLI:** a Typer-based interface can launch benchmarks, export configs, or bundle CBOM artefacts for offline analysis.
 - **Reproducible runs:** checked-in `.env` templates, Dockerfiles, and `uv`-managed Python dependencies keep environments consistent across machines.
 
-### Tools Under Scrutinize
 
-- [`CBOMKit`](https://github.com/PQCA/cbomkit): PQCA's reference backend that normalises requests, aggregates worker responses, and produces scored CBOM comparisons.
-- [`cdxgen`](https://github.com/CycloneDX/cdxgen): Open-source CycloneDX generator maintained by the OWASP CycloneDX project (OWASP Foundation); supports Node.js, Python, Java, Go, container images, and more.
-- [`DeepSeek`](https://www.deepseek.com/): Research prototype from DeepSeek Inc. (China) exploring large language models to infer cryptographic usage from documentation and source code.
-- [`sbom-tool`](https://github.com/microsoft/sbom-tool): Microsoft's official SPDX 2.2 generator designed for CI/CD pipelines and Azure DevOps release processes.
+### CBOM Generators Under Scrutiny
+
+BF-CBOM currently integrates four different CBOM generation approaches to enable side-by-side comparisons.
+Each generator brings a unique methodology for detecting and cataloging cryptographic assets:
+
+- **[`CBOMKit`](https://github.com/PQCA/cbomkit)**:
+IBM Research's dedicated CBOM generator for Python and Java, now maintained by the Post-Quantum Cryptography Alliance.
+Uses SonarQube for static analysis and supports compliance policy checks.
+
+- **[`cdxgen`](https://github.com/CycloneDX/cdxgen)**:
+CycloneDX's official generator, primarily for SBOMs but with CBOM extensions since April 2024.
+CBOM generation currently limited to Python and Java projects.
+
+- **[`CryptobomForge`](https://github.com/Santandersecurityresearch/cryptobom-forge)**:
+Santander Security Research's CLI tool that processes CodeQL SARIF outputs rather than source code directly, making it language-agnostic.
+
+- **[`DeepSeek`](https://www.deepseek.com/)**:
+Experimental LLM-based approach using DeepSeek's language model for zero-shot cryptographic asset detection via prompt-based code analysis.
 
 ## Setup
 
