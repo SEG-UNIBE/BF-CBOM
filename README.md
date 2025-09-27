@@ -3,7 +3,7 @@
 *Benchmarking Cryptography Bill of Material (CBOM) generators end-to-end: coordinating containerized jobs, normalizing outputs, and scoring results across ecosystems. In short, your **b**est **f**riend for generating and analyzing CBOMs.*
 
 <div align="center">
-  <img width="60%" src="logo.svg" alt="BF-CBOM logo" />
+  <img width="80%" src="logo.svg" alt="BF-CBOM logo" />
   
 </div>
 
@@ -26,9 +26,7 @@
 </div>
 
 </br>
-
-
-https://github.com/user-attachments/assets/9926c193-6b1f-4e1e-9556-95ebcc3e0401
+</br>
 
 
 
