@@ -28,7 +28,7 @@ services:
     depends_on:
       - redis
     environment:
-      - AVAILABLE_WORKERS=${AVAILABLE_WORKERS:-skeleton,testing,cdxgen,cbomkit,deepseek,mssbomtool,cryptobomforge}
+      - AVAILABLE_WORKERS=${AVAILABLE_WORKERS:-cdxgen,cbomkit,deepseek,cryptobomforge}
       - AVAILABLE_LANGUAGES=python,java
       - GITHUB_CACHE_TTL_SEC=86400
       - REDIS_HOST=redis
