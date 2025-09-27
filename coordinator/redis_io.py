@@ -11,16 +11,16 @@ from common.cbom_analysis import (
     create_component_match_instruction,
 )
 from common.config import GITHUB_CACHE_TTL_SEC, GITHUB_TOKEN
-from common.models import Benchmark, CbomJson, ComponentMatchJobInstruction
+from common.models import Benchmark, ComponentMatchJobInstruction
 from common.utils import repo_dict_to_info
 from coordinator.logger_config import logger
 
 
 # ----- Job instruction helper -----
 def create_job_instruction(repo: dict, worker: str, job_id: str):
-    """Construct a JobInstruction object using RepoInfo."""
+    """Construct a JobInstruction object."""
 
-    from common.models import JobInstruction, RepoInfo
+    from common.models import JobInstruction
 
     repo_info = repo_dict_to_info(repo)
     job_instr = JobInstruction(job_id=job_id, tool=worker, repo_info=repo_info)

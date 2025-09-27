@@ -2,6 +2,7 @@ import threading
 import time
 import psutil
 
+
 class TimingStruct:
     def __init__(self):
         self.start = None          # CPU start (float) or 0.0
@@ -52,7 +53,7 @@ class Stopwatch:
             ts.end = ts.start
             ts.elapsed = ts.wall_end - ts.wall_start
 
-    def merge(self, other: 'Stopwatch') -> None:
+    def merge(self, other: "Stopwatch") -> None:
         for name, ots in other.timers.items():
             if name in self.timers:
                 if self.timers[name].elapsed is None:

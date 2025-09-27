@@ -2,9 +2,9 @@
 VERSION := $(shell cat VERSION 2>/dev/null || echo "0.0.0")
 BASE_IMAGE := bf-cbom/base
 # Comma-separated list of all workers available in the repo
-AVAILABLE_WORKERS := skeleton,testing,cdxgen,cbomkit,deepseek,mssbomtool,cryptobomforge
+AVAILABLE_WORKERS := skeleton,testing,mssbomtool,cbomkit,cdxgen,cryptobomforge,deepseek
 # Comma-separated list of dev-only workers
-DEV_WORKERS := skeleton,testing
+DEV_WORKERS := skeleton,testing,mssbomtool
 # Export everything defined above to downstream commands for cross-shell support
 .EXPORT_ALL_VARIABLES:
 # ====================================================
@@ -31,9 +31,7 @@ PROD_WORKERS           := $(call to_comma_list,$(PROD_WORKERS_LIST))
 
 build-base:
 	docker build -f docker/Dockerfile.base \
-		-t $(BASE_IMAGE):$(VERSION) \
-		-t $(BASE_IMAGE):latest \
-		-t bf-cbom/base:latest .
+		-t $(BASE_IMAGE):$(VERSION) .
 
 release:
 	bash ./scripts/bump_version.sh $(VERSION)
@@ -41,23 +39,24 @@ release:
 # Helper to build all services with the correct base tag
 build-all: ensure-env build-base
 	docker compose build
+	docker image prune -f
 
 # Dev: only the explicitly listed dev workers
 up-dev: export COMPOSE_PROFILES := dev
 up-dev: export AVAILABLE_WORKERS := $(DEV_WORKERS)
 up-dev: build-all
-	docker compose up --build
+	docker compose up
 
 # Prod: all workers except the dev-only ones
 up-prod: export COMPOSE_PROFILES := prod
 up-prod: export AVAILABLE_WORKERS := $(PROD_WORKERS)
 up-prod: build-all
-	docker compose up --build
+	docker compose up
 
 # All: exactly what's in AVAILABLE_WORKERS
 up-all: export COMPOSE_PROFILES := all
 up-all: build-all
-	docker compose up --build
+	docker compose up
 
 down:
 	docker compose down
@@ -82,7 +81,7 @@ $(ENV_DIR)/%.env: $(ENV_DIR)/%.env.template
 .PHONY: prune prune-build clean-docker build-base build-all release up-dev up-prod up-all down logs ps show-workers
 
 prune:
-	docker system prune -af --volumes
+	docker system prune -af
 
 prune-build:
 	docker builder prune -af

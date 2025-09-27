@@ -8,14 +8,13 @@ from common.utils import (
     get_project_version_from_toml,
     get_status_emoji,
 )
+from coordinator.logger_config import logger
 from coordinator.redis_io import delete_benchmark, get_redis, list_benchmarks
 from coordinator.utils import (
     build_minimal_config_json,
     human_duration,
     set_query_bench_id,
 )
-from coordinator.logger_config import logger
-
 
 print("[coordinator] Starting Streamlit app…")
 logger.info("Coordinator: starting Streamlit app (version=%s)", getattr(st, "__version__", "?"))

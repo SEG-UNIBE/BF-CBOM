@@ -315,8 +315,8 @@ def estimate_similarity_runtime(component_counts: dict[str, int]) -> float:
     pair_sum = max(0.0, (total * total - sum_sq) / 2.0)
 
     base = 1.5
-    linear_coef = 0.01       # seconds per component
-    pair_coef = 0.00002      # seconds per cross-tool pair
+    linear_coef = 0.01  # seconds per component
+    pair_coef = 0.00002  # seconds per cross-tool pair
 
     estimate = base + linear_coef * total + pair_coef * pair_sum
     return float(max(0.0, estimate))
