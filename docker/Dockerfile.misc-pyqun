@@ -23,7 +23,8 @@ scikit-learn \
 psutil \
 dataclasses-json \
 requests \
-tqdm
+tqdm \
+sentence-transformers
 
 COPY misc/pyqun/main.py /opt/RaQuN_Lab/main.py
 COPY misc/pyqun/Stopwatch.py /opt/RaQuN_Lab/utils/Stopwatch.py
