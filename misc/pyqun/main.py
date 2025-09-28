@@ -128,6 +128,29 @@ def DFS(sub_dict, prefix: list, results: list):
         prefix.append(value)
         results.append(prefix)
 
+def _write_models_csv(models: dict, out_path: str) -> None:
+    """Write model elements to CSV for debugging.
+
+    Columns: model_id, element_id, element_name, attributes (semicolon-separated)
+    """
+    try:
+        out_dir = os.path.dirname(out_path)
+        if out_dir and not os.path.isdir(out_dir):
+            os.makedirs(out_dir, exist_ok=True)
+        with open(out_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            for mid, elements in sorted(models.items()):
+                for e in elements:
+                    name = getattr(e, "name", "")
+                    eid = getattr(e, "ele_id", getattr(e, "ze_id", None))
+                    attrs = []
+                    for attr in getattr(e, "attributes", []) or []:
+                        attrs.append(str(getattr(attr, "value", attr)))
+                    writer.writerow([mid, eid, name, ";".join(sorted(attrs))])
+        logger.info("Wrote PyQuN models CSV to %s", out_path)
+    except Exception as err:
+        logger.warning("Failed to write PyQuN models CSV to %s: %s", out_path, err)
+
 
 def _convert_json_string_to_dict(documents: list[list[str]]) -> list[list[dict]]:
     out = []
@@ -189,7 +212,7 @@ def _run_raqun(json_files: list[str]):
         model_list.append(model)
     logger.info("Loaded %d models with total %d elements", len(model_list), sum(len(m.get_elements()) for m in model_list))
     # Debug CSV output (comment out the following line to disable)
-    _write_models_csv(models, MODELS_CSV_PATH)
+    # _write_models_csv(models, MODELS_CSV_PATH)
     for i, model in enumerate(model_list):
         logger.info("Model %d:", i)
         for element in model.get_elements():
@@ -397,25 +420,3 @@ def main() -> None:
 if __name__ == "__main__":
     logger.info("starting up...")
     main()
-def _write_models_csv(models: dict, out_path: str) -> None:
-    """Write model elements to CSV for debugging.
-
-    Columns: model_id, element_id, element_name, attributes (semicolon-separated)
-    """
-    try:
-        out_dir = os.path.dirname(out_path)
-        if out_dir and not os.path.isdir(out_dir):
-            os.makedirs(out_dir, exist_ok=True)
-        with open(out_path, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            for mid, elements in sorted(models.items()):
-                for e in elements:
-                    name = getattr(e, "name", "")
-                    eid = getattr(e, "ele_id", getattr(e, "ze_id", None))
-                    attrs = []
-                    for attr in getattr(e, "attributes", []) or []:
-                        attrs.append(str(getattr(attr, "value", attr)))
-                    writer.writerow([mid, eid, name, ";".join(sorted(attrs))])
-        logger.info("Wrote PyQuN models CSV to %s", out_path)
-    except Exception as err:
-        logger.warning("Failed to write PyQuN models CSV to %s: %s", out_path, err)
