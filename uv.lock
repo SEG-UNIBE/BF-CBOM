@@ -52,7 +52,7 @@ wheels = [
 
 [[package]]
 name = "bf-cbom"
-version = "0.1.5"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "dataclasses-json" },

@@ -529,7 +529,7 @@ if comp_rows:
                 button_disabled = waiting_for_result
                 with algo_col:
                     algorithm_choice = st.radio(
-                        "Select matching algorithm",
+                        "Select matching strategy",
                         ["Clustering Algorithm (RaQuN)", "Optimization Algorithm (JEDI)"],
                         key=f"algorithm_choice_{bench_id}_{repo_name}",
                         horizontal=True,

@@ -3,7 +3,7 @@
 *Benchmarking Cryptography Bill of Material (CBOM) generators end-to-end: coordinating containerized jobs, normalizing outputs, and scoring results across ecosystems. In short, your **b**est **f**riend for generating and analyzing CBOMs.*
 
 <div align="center">
-  <img width="80%" src="logo.svg" alt="BF-CBOM logo" />
+  <img width="80%" src="./docs/logo.svg" alt="BF-CBOM logo" />
   
 </div>
 
@@ -237,6 +237,13 @@ uv run misc/cli/cli.py
 The command prints the CLI's commands and options in the terminal.
 
 ## Developer Notes
+
+BF-CBOM follows a deliberately modular design as illustrated in the figure below
+At its core, the `Coordinator` orchestrates all benchmarking activities through a message-driven architecture.
+Redis serves dual roles as both a persistence layer for intermediate results and a queue system enabling asynchronous, scalable communication between components.
+This design creates decoupled interactions that make the framework flexible for extension.
+
+![description](./docs/system_architecture.png)
 
 ### Adding Additional Workers
 
