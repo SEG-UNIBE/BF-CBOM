@@ -194,7 +194,7 @@ services:
       - REDIS_PORT=6379
       - WORKER_TIMEOUT_SEC=600
       - AVAILABLE_LANGUAGES=python,java
-      - CODEQL_RAM_MB=5000
+      - CODEQL_RAM_MB=4096
     env_file: docker/env/worker-cryptobomforge.env
     restart: on-failure:3
     profiles: [prod, all]

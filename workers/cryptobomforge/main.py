@@ -189,22 +189,23 @@ class CryptobomForgeClient:
             return False
 
     def _resolve_ram_flags(self, trace: Trace) -> list[str]:
-        ram_mb = int(os.getenv("CODEQL_RAM_MB", "6144"))
-        cmd = ["codeql", "resolve", "ram", f"--ram={ram_mb}", "--format=lines"]
-        logger.info("Resolving CodeQL RAM flags: %s", " ".join(cmd))
+        """Return safe RAM flags for CodeQL analyze.
+
+        Use a direct --ram budget to avoid mismatches between resolved
+        -J/--off-heap flags and the analyze command's default total RAM
+        (commonly 2048 MB). The budget can be overridden via CODEQL_RAM_MB.
+
+        Defaults to 2048 MB to play nicely with constrained runners.
+        """
         try:
-            result = subprocess.run(
-                cmd,
-                check=True,
-                capture_output=True,
-                timeout=10,
-            )
-            flags = [line.strip() for line in result.stdout.decode("utf-8", "replace").splitlines() if line.strip()]
-            logger.info("Resolved RAM flags: %s", flags)
-            return flags
-        except Exception as e:
-            logger.warning("RAM flags resolution failed; using --ram=%s: %s", ram_mb, e)
-            return [f"--ram={ram_mb}"]
+            ram_mb = int(os.getenv("CODEQL_RAM_MB", "4096"))
+        except Exception:
+            ram_mb = 4096
+        # Ensure a sensible lower bound and avoid zero/negative values
+        if ram_mb < 512:
+            ram_mb = 512
+        logger.info("Using CodeQL RAM budget: --ram=%s", ram_mb)
+        return [f"--ram={ram_mb}"]
 
     def _codeql_analyze_db(
         self,
