@@ -13,6 +13,7 @@ RUN uv sync --frozen --no-dev
 
 # Now copy the actual service code
 COPY --chown=appuser:appuser coordinator/ ./coordinator/
+COPY --chown=appuser:appuser docs/ ./docs/
 
 ENV PYTHONPATH=/app
 ENV STREAMLIT_CONFIG=coordinator/.streamlit/config.toml
