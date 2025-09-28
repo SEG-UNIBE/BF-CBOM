@@ -103,7 +103,9 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - WORKER_TIMEOUT_SEC=300
+      - WORKER_TIMEOUT_SEC=600
+      - CBOMKIT_HEALTH_WAIT_SEC=20
+      - JAVA_OPTS=-Xms1g -Xmx6g -XX:+ExitOnOutOfMemoryError
     env_file: docker/env/worker-cbomkit.env
     restart: on-failure:3
     profiles: [prod, all]
@@ -147,7 +149,7 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - WORKER_TIMEOUT_SEC=90
+      - WORKER_TIMEOUT_SEC=120
     env_file: docker/env/worker-deepseek.env
     restart: on-failure:3
     profiles: [prod, all]
@@ -192,7 +194,7 @@ services:
       - REDIS_PORT=6379
       - WORKER_TIMEOUT_SEC=600
       - AVAILABLE_LANGUAGES=python,java
-      - CODEQL_RAM_MB=4000
+      - CODEQL_RAM_MB=5000
     env_file: docker/env/worker-cryptobomforge.env
     restart: on-failure:3
     profiles: [prod, all]
@@ -211,7 +213,7 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - CALC_TIMEOUT_SEC=600
+      - CALC_TIMEOUT_SEC=300
     env_file: docker/env/misc-treesimilarity.env
     restart: no
     profiles: [dev, prod, all]
@@ -229,7 +231,7 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - CALC_TIMEOUT_SEC=600
+      - CALC_TIMEOUT_SEC=300
     env_file: docker/env/misc-pyqun.env
     restart: no
     profiles: [dev, prod, all]
