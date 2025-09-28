@@ -619,7 +619,7 @@ def harmonize_value(value: Any) -> Any:
     if isinstance(value, str):
         # Harmonize string values
         harmonized = value.lower()
-        # harmonized = re.sub(r"@.*", "", harmonized)
+        harmonized = re.sub(r"@.*", "", harmonized)
         harmonized = re.sub(r"[^a-z0-9]", "", harmonized)
         return harmonized
     if isinstance(value, dict):
