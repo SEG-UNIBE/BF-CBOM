@@ -4,6 +4,7 @@ import os
 import re
 import threading
 import time
+import uuid
 from urllib import error as urlerror, parse, request
 
 import websocket
@@ -14,7 +15,7 @@ from common.worker import build_handle_instruction, run_worker
 
 # Worker name and timeout settings
 NAME = os.path.basename(os.path.dirname(__file__))
-TIMEOUT_SEC = int(os.getenv("WORKER_TIMEOUT_SEC"))
+TIMEOUT_SEC = int(os.getenv("WORKER_TIMEOUT_SEC", "300"))
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -23,7 +24,7 @@ logger = logging.getLogger(NAME)
 
 def _base_url() -> str:
     # Default to local dev server if not provided
-    base = os.getenv("CBOMKIT_BASE_URL")
+    base = os.getenv("CBOMKIT_BASE_URL") or "http://127.0.0.1:8081"
     return base.strip().rstrip("/")
 
 
@@ -105,23 +106,28 @@ def _repo_host_path(git_url: str) -> str:
     return host_path.strip("/")
 
 
-def _repo_id_from_git_url(git_url: str) -> str:
-    # Percent-encoded project id for path param
-    return parse.quote(_repo_host_path(git_url), safe="")
-
-
 class CbomKitClient:
     def __init__(self, base_url: str | None = None):
         self.base = (base_url or _base_url()).rstrip("/")
         # Persistent WebSocket session configuration (fixed, no env needed)
         self.client_id = "cbomkitclient"
         # WebSocket endpoint template; supports {clientId} placeholder
-        self.ws_url_tmpl = "ws://127.0.0.1:8081/v1/scan/{clientId}"
+        self.ws_url_tmpl = self._derive_ws_url_tmpl()
         self.ws_url = self._make_ws_url(self.client_id)
         # Where to fetch the freshly generated CBOM (latest 1)
         self.last_url = f"{self.base}/api/v1/cbom/last/1"
         # Polling interval seconds
         self.poll_interval = 2.0
+        # Backend health wait settings and OOM sentinel (written by entrypoint on OOM)
+        self.state_dir = os.getenv("CBOMKIT_BACKEND_STATE_DIR") or os.path.expanduser("~/.cbomkit")
+        self.oom_file = os.getenv("CBOMKIT_BACKEND_OOM_FILE") or os.path.join(self.state_dir, "backend_oom")
+        # Max time to wait for backend to become healthy after a restart
+        try:
+            self.health_wait_sec = float(os.getenv("CBOMKIT_HEALTH_WAIT_SEC", "20"))
+            if self.health_wait_sec < 0:
+                self.health_wait_sec = 0.0
+        except Exception:
+            self.health_wait_sec = 20.0
         # Internal WS state
         self._ws_app: websocket.WebSocketApp | None = None
         self._ws_thread: threading.Thread | None = None
@@ -142,7 +148,32 @@ class CbomKitClient:
             return u.rstrip("/") + "/" + client_id
         return u
 
-    def _ensure_ws(self, timeout_sec: float = 3.0) -> bool:
+    def _derive_ws_url_tmpl(self) -> str:
+        try:
+            parts = parse.urlsplit(self.base)
+            scheme = "wss" if parts.scheme == "https" else "ws"
+            netloc = parts.netloc or parts.path
+            netloc = netloc.strip("/")
+            return f"{scheme}://{netloc}/v1/scan/{{clientId}}"
+        except Exception:
+            return "ws://127.0.0.1:8081/v1/scan/{clientId}"
+
+    def _teardown_ws(self, wait: float = 1.0):
+        try:
+            if self._ws_app is not None:
+                try:
+                    self._ws_app.close()
+                except Exception:
+                    pass
+            if self._ws_thread is not None and self._ws_thread.is_alive():
+                self._ws_thread.join(timeout=max(0.1, wait))
+        finally:
+            self._ws_app = None
+            self._ws_thread = None
+            self._ws_connected = False
+            self._ws_error = None
+
+    def _ensure_ws(self, timeout_sec: float = 3.0, *, force_new: bool = False) -> bool:
         # Reuse only if thread is alive and flags are healthy
         if (
             self._ws_app
@@ -150,6 +181,7 @@ class CbomKitClient:
             and self._ws_thread.is_alive()
             and self._ws_connected
             and not self._ws_error
+            and not force_new
         ):
             return True
 
@@ -157,6 +189,9 @@ class CbomKitClient:
         self._ws_error = None
         self._ws_connected = False
         self._finished_evt.clear()
+        # If explicitly requested, tear down any existing connection
+        if force_new:
+            self._teardown_ws()
 
         def on_open(ws):
             # Give server a brief moment to complete @OnOpen
@@ -203,17 +238,90 @@ class CbomKitClient:
             kwargs={"ping_interval": 30, "ping_timeout": 10},
             daemon=True,
         )
-        self._ws_thread.start()
+        start_deadline = time.monotonic() + timeout_sec
 
-        # Wait for connect or error
-        start = time.monotonic()
-        while time.monotonic() - start < timeout_sec:
+        # Attempt initial connect, and if we hit an immediate error (e.g., backend just restarted),
+        # retry by recreating the WebSocket until the timeout expires.
+        while time.monotonic() < start_deadline:
+            # Start the thread if not alive
+            if self._ws_thread is not None and not self._ws_thread.is_alive():
+                try:
+                    self._ws_thread.start()
+                except RuntimeError:
+                    # Already started, ignore
+                    pass
+
+            # Wait in short intervals, monitoring for success or transient errors
+            t_wait_deadline = time.monotonic() + 1.0
+            while time.monotonic() < t_wait_deadline:
+                if self._ws_connected:
+                    logger.debug("Websocket connected")
+                    return True
+                if self._ws_error:
+                    break
+                time.sleep(0.05)
+
             if self._ws_connected:
-                logger.info("Websocket connected")
                 return True
+
+            # If we hit an error, tear down and retry a fresh connection if time remains
             if self._ws_error:
-                break
-            time.sleep(0.05)
+                logger.warning("WS connect error: %s; retrying...", self._ws_error)
+                self._ws_error = None
+                self._ws_connected = False
+                try:
+                    self._teardown_ws()
+                except Exception:
+                    pass
+                # Recreate app and thread
+                self._ws_app = websocket.WebSocketApp(
+                    self.ws_url,
+                    on_open=on_open,
+                    on_message=on_message,
+                    on_error=on_error,
+                    on_close=on_close,
+                )
+                self._ws_thread = threading.Thread(
+                    target=self._ws_app.run_forever,
+                    kwargs={"ping_interval": 30, "ping_timeout": 10},
+                    daemon=True,
+                )
+                # Loop will try starting again
+                continue
+
+        return False
+
+    def _backend_oom_flagged(self) -> bool:
+        try:
+            return bool(self.oom_file and os.path.exists(self.oom_file))
+        except Exception:
+            return False
+
+    def _backend_health_ready(self, timeout: float = 0.8) -> bool:
+        # Prefer Quarkus health endpoint; fall back to OpenAPI if needed
+        try:
+            st, _, _ = _http_get_json(f"{self.base}/q/health", timeout=max(0.1, int(timeout)))
+            if st == 200:
+                return True
+        except Exception:
+            pass
+        try:
+            st, _, _ = _http_get_json(f"{self.base}/q/openapi", timeout=max(0.1, int(timeout)))
+            return st == 200
+        except Exception:
+            return False
+
+    def _wait_backend_ready(self, max_wait: float) -> bool:
+        if max_wait <= 0:
+            return self._backend_health_ready(timeout=1.0)
+        deadline = time.monotonic() + max_wait
+        # First quick check
+        if self._backend_health_ready(timeout=1.0):
+            return True
+        while time.monotonic() < deadline:
+            if self._backend_health_ready(timeout=1.0):
+                return True
+            time.sleep(0.25)
         return False
 
     def get_cbom(self, repo_id: str):
@@ -344,44 +452,59 @@ class CbomKitClient:
         cands.append(f"{base}{qs}")
         return cands
 
-    def _poll_by_candidates(self, git_url: str, deadline: float):
-        host_path = _repo_host_path(git_url)
-        # Try both repo id and purl id forms
-        candidates = []
-        if "/" in host_path:
-            org_repo = host_path.split("/", 1)[1]
-            # Prefer PURL form first; storage uses pkg:github/<org>/<repo>@<sha>
-            candidates.append(parse.quote(f"pkg:github/{org_repo}", safe=""))
-        # Also try host path form
-        candidates.append(parse.quote(host_path, safe=""))
-        for rid in candidates:
-            while time.monotonic() < deadline:
-                st, data, text = self.get_cbom(rid)
-                if st == 200 and (data is not None or text):
-                    return json.dumps(data) if data is not None else text
-                time.sleep(self.poll_interval)
-        return None
+    # (old candidate-polling helper removed; not used in current flow)
 
     def trigger_scan_ws(self, git_url: str, branch: str, budget_sec: float) -> tuple[bool, bool, str | None]:
-        """Send scan over persistent WS and wait for Finished within budget."""
-        if not self._ensure_ws():
-            return False, False, self._ws_error or "ws_not_connected"
-        self._finished_evt.clear()
-        # clear any previous captured PURL
-        self._last_purl = None
-        try:
-            with self._lock:
-                payload = {
-                    "scanUrl": git_url,
-                    "branch": branch or "main",
-                    "subfolder": None,
-                    "credentials": None,
-                }
-                self._ws_app.send(json.dumps(payload))
-        except Exception as e:
-            return False, False, f"ws_send_error:{e}"
-        finished = self._finished_evt.wait(timeout=max(1.0, budget_sec))
-        return True, bool(finished), None if finished else None
+        """Send scan using a fresh WS session per job and wait for Finished.
+
+        Returns (started, finished, error). If backend is unavailable, returns (True, False, "backend_unavailable").
+        Retries WS session on transient errors within the provided budget.
+        """
+        deadline = time.monotonic() + max(1.0, budget_sec)
+        wait_budget = min(self.health_wait_sec, max(0.0, budget_sec * 0.5))
+        while time.monotonic() < deadline:
+            # Use a unique client id per attempt to avoid sticky server state
+            job_client_id = f"{self.client_id}-{uuid.uuid4().hex[:8]}"
+            prev_url = self.ws_url
+            self.ws_url = self._make_ws_url(job_client_id)
+            try:
+                if not self._wait_backend_ready(max_wait=wait_budget):
+                    return True, False, "backend_unavailable"
+                if not self._ensure_ws(timeout_sec=10.0, force_new=True):
+                    time.sleep(0.3)
+                    continue
+                self._finished_evt.clear()
+                self._last_purl = None
+                try:
+                    with self._lock:
+                        payload = {
+                            "scanUrl": git_url,
+                            "branch": branch or "main",
+                            "subfolder": None,
+                            "credentials": None,
+                        }
+                        self._ws_app.send(json.dumps(payload))
+                except Exception:
+                    time.sleep(0.3)
+                    continue
+                # Wait for Finished or WS error; if error, retry until deadline
+                while time.monotonic() < deadline:
+                    if self._finished_evt.is_set():
+                        return True, True, None
+                    if self._backend_oom_flagged():
+                        return True, False, "backend_oom"
+                    if self._ws_error:
+                        break
+                    time.sleep(0.2)
+                if self._finished_evt.is_set():
+                    return True, True, None
+                # Otherwise fall through to retry
+            finally:
+                try:
+                    self._teardown_ws(wait=0.5)
+                finally:
+                    self.ws_url = prev_url
+        return True, False, None
 
     def delete_cbom_for_url(self, git_url: str):
         """Best-effort cleanup: delete stored CBOM for this repo by both id forms."""
@@ -434,6 +557,10 @@ class CbomKitClient:
 
         # Must not fetch before finish; if not finished within budget, bail out
         if not ws_finished:
+            if trig_err == "backend_unavailable":
+                return None, time.monotonic() - start, "backend_unavailable"
+            if trig_err == "backend_oom":
+                return None, time.monotonic() - start, "backend_oom"
             return None, time.monotonic() - start, "ws_not_finished"
 
         # 3) After finishing, allow a short grace for persistence
@@ -501,8 +628,25 @@ def _produce(instr: JobInstruction, trace: Trace) -> str | tuple[str, float]:
     if payload is not None:
         return payload, duration
     if err and str(err).startswith("ws_not_finished"):
-        trace.add("cbomkit websocket did not finish within budget")
+        trace.add(
+            f"cbomkit WebSocket did not signal 'Finished' within budget: "
+            f"repo={instr.repo_info.full_name} branch={instr.repo_info.branch} "
+            f"worker_timeout_sec={TIMEOUT_SEC}"
+        )
         raise TimeoutError(err)
+    if err == "backend_oom":
+        trace.add("cbomkit backend encountered OutOfMemoryError")
+        # Give the supervisor time to restart backend before we release the job,
+        # so the next job doesn't immediately fail due to backend_unavailable.
+        try:
+            client._wait_backend_ready(max_wait=getattr(client, "health_wait_sec", 20))  # type: ignore[attr-defined]
+        except Exception:
+            pass
+        raise RuntimeError(err)
+    if err == "backend_unavailable":
+        # Do not requeue; mark as error so the benchmark reflects the failure
+        trace.add("cbomkit backend not yet ready after restart")
+        raise RuntimeError(err)
     raise RuntimeError(err or "cbomkit_failed")
 
 

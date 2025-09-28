@@ -1,5 +1,6 @@
 import json
 import os
+from pathlib import Path
 
 import streamlit as st
 
@@ -14,14 +15,16 @@ from coordinator.utils import (
     build_minimal_config_json,
     human_duration,
     set_query_bench_id,
+    get_favicon_path,
 )
 
 print("[coordinator] Starting Streamlit app…")
 logger.info("Coordinator: starting Streamlit app (version=%s)", getattr(st, "__version__", "?"))
 
+ico_path = Path(get_favicon_path())
 st.set_page_config(
     page_title="Start",
-    page_icon="🎈",
+    page_icon=str(ico_path),
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -42,18 +45,25 @@ except Exception as e:
 
 version = get_project_version_from_toml()
 
-st.markdown(
-    f"""
-    <div style='display:flex;align-items:center;justify-content:space-between;'>
-      <div style='display:flex;align-items:center;'>
-        <h1 style='color:#FF4B4B;font-size:68px;margin:0;'>BF-CBOM</h1>
-        <span style='color:#888;font-size:1.3rem;font-family:monospace;
-                font-weight:400;margin-left:0.8rem;margin-top:1.5em;'>v{version}</span>
-      </div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+# Header with logo (left) and title + version (right) using columns
+logo_path = Path(__file__).resolve().parents[1] / "docs" / "logo.svg"
+col_logo, col_title = st.columns([5, 4], vertical_alignment="center")
+with col_logo:
+    try:
+        # Pass SVG as a string to st.image for crisp rendering
+        svg_text = logo_path.read_text(encoding="utf-8")
+        st.image(svg_text, width="stretch")
+    except Exception:
+        st.markdown("<div style='font-size:48px'>🎈</div>", unsafe_allow_html=True)
+with col_title:
+    st.markdown(
+        f"""
+        <div style='display:flex; align-items:flex-end; height:72px;'>
+            <span style='color:#888; font-size:1.3rem; font-family:monospace; font-weight:400; margin-left:0.8rem; align-self:flex-end; margin-bottom:1px;'>v{version}</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 st.caption("Benchmarking Framework for Cryptography Bill of Material (CBOM) Generator Tools")
 
 # Top action: create new benchmark
@@ -77,7 +87,7 @@ with left:
             status = meta.get("status", "?")
             expected = int(meta.get("expected_jobs", "0") or 0)
             created = meta.get("created_at") or meta.get("started_at") or "?"
-            cols = st.columns([4, 2, 3], vertical_alignment="top")
+            cols = st.columns([4, 1, 3], vertical_alignment="top")
             with cols[0]:
                 st.markdown(
                     (

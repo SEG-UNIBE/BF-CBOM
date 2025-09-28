@@ -9,6 +9,7 @@ import streamlit as st
 
 from common.utils import format_repo_info, repo_html_url
 from coordinator.redis_io import get_bench_repos, get_bench_workers, pair_key
+from pathlib import Path
 
 # ----- Query param helpers -----
 
@@ -27,6 +28,21 @@ def hide_streamlit_status() -> None:
         """,
         unsafe_allow_html=True,
     )
+
+
+def get_favicon_path() -> str:
+    """Return absolute path to the SVG favicon bundled with the coordinator image.
+
+    Assumes the repo layout has docs/favicon.svg at the project root and that
+    docker/Dockerfile.coordinator copies it to /app/docs/.
+    """
+    try:
+        here = Path(__file__).resolve()
+        root = here.parents[1]  # /app
+        icon = root / "docs" / "favicon.svg"
+        return str(icon)
+    except Exception:
+        return "favicon.svg"
 
 
 def get_query_bench_id() -> str | None:

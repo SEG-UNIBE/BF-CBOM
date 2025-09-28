@@ -575,7 +575,7 @@ def banner(
 
     status = "ok" if ok else "unreachable"
     try:
-        with open("logo.txt", encoding="utf-8") as art_file:
+        with open("./docs/logo.txt", encoding="utf-8") as art_file:
             art_lines = [line.rstrip("\n") for line in art_file.readlines()]
     except OSError:
         art_lines = []

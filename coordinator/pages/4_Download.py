@@ -1,6 +1,8 @@
 import json
 
 import streamlit as st
+from pathlib import Path
+from coordinator.utils import get_favicon_path
 
 from common.utils import get_status_emoji
 from coordinator.redis_io import (
@@ -19,9 +21,10 @@ from coordinator.utils import (
     set_query_bench_id,
 )
 
+ico_path = Path(get_favicon_path())
 st.set_page_config(
     page_title="Downloads",
-    page_icon="🎈",
+    page_icon=str(ico_path),
     layout="wide",
     initial_sidebar_state="expanded",
 )

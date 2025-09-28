@@ -41,9 +41,12 @@ from coordinator.utils import (
     safe_int,
 )
 
+from coordinator.utils import get_favicon_path
+from pathlib import Path
+ico_path = Path(get_favicon_path())
 st.set_page_config(
     page_title="Analysis",
-    page_icon="🎈",
+    page_icon=str(ico_path),
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -529,12 +532,12 @@ if comp_rows:
                 button_disabled = waiting_for_result
                 with algo_col:
                     algorithm_choice = st.radio(
-                        "Select matching algorithm",
+                        "Select matching strategy",
                         ["Clustering Algorithm (RaQuN)", "Optimization Algorithm (JEDI)"],
                         key=f"algorithm_choice_{bench_id}_{repo_name}",
                         horizontal=True,
                     )
-                if algorithm_choice == "Optimization Algorithm":
+                if ("Optimization" in algorithm_choice):
                     match_queue = TREESIM_QUEUE
                     result_list = TREESIM_RESULTS_LIST
                 else:

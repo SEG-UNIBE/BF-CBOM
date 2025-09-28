@@ -26,9 +26,12 @@ from coordinator.utils import (
     summarize_result_cell,
 )
 
+from coordinator.utils import get_favicon_path
+from pathlib import Path
+ico_path = Path(get_favicon_path())
 st.set_page_config(
     page_title="Execution",
-    page_icon="🎈",
+    page_icon=str(ico_path),
     layout="wide",
     initial_sidebar_state="expanded",
 )

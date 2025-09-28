@@ -35,3 +35,17 @@ keywords:
   - docker-compose
   - cryptography
 license: GPL-3.0-only
+
+preferred-citation:
+  type: software
+  title: "BF-CBOM: Benchmarking Framework for Cryptography Bill of Material Generator Tools"
+  authors:
+    - given-names: Roman
+      family-names: Bögli
+    - given-names: Jonas
+      family-names: Spieler
+    - given-names: Timo
+      family-names: Kehrer
+  identifiers:
+    - type: doi
+      value: 10.5281/zenodo.17148405

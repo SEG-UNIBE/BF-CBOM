@@ -4,10 +4,9 @@ import os
 import time
 import multiprocessing
 from pathlib import Path
+import csv
 import numpy as np
 import redis
-import random
-import itertools
 from sentence_transformers import SentenceTransformer
 
 from common.config import REDIS_HOST, REDIS_PORT
@@ -18,6 +17,7 @@ NAME = "pyqun"
 JOB_QUEUE = f"jobs:{NAME}"
 RESULT_LIST = f"results:{NAME}"
 TIMEOUT_SEC = int(os.getenv("CALC_TIMEOUT_SEC", "120"))
+MODELS_CSV_PATH = os.getenv("PYQUN_MODELS_CSV", "/opt/RaQuN_Lab/pyqun_models.csv")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(NAME)
@@ -52,8 +52,12 @@ class BERTEmbedding(Vectorizer):
         pass
 
     def vectorize(self, element: 'Element'):
-        # Combine all attribute values into a single string
-        attr_texts = [str(getattr(attr, 'value', attr)).lower() for attr in getattr(element, 'attributes', [])]
+        # Combine all attribute values into a single, deterministically ordered string
+        vals = (
+            str(getattr(attr, 'value', attr)).lower()
+            for attr in (getattr(element, 'attributes', []) or [])
+        )
+        attr_texts = sorted(vals)
         text = " ".join(attr_texts)
         vec = self.model.encode(text, show_progress_bar=False)
         return vec
@@ -74,8 +78,10 @@ class LetterHistogramVectorizer(Vectorizer):
 
     def vectorize(self, element: 'Element'):
         vec = np.zeros(self.vec_dim)
-        for attr in getattr(element, 'attributes', []):
-            val = str(getattr(attr, 'value', attr)).lower()
+        # Iterate attribute values in a deterministic order
+        for val in sorted(
+            (str(getattr(attr, 'value', attr)).lower() for attr in (getattr(element, 'attributes', []) or []))
+        ):
             for c in val:
                 if c in self.letter_indices:
                     vec[self.letter_indices[c]] += 1
@@ -122,6 +128,29 @@ def DFS(sub_dict, prefix: list, results: list):
         prefix.append(value)
         results.append(prefix)
 
+def _write_models_csv(models: dict, out_path: str) -> None:
+    """Write model elements to CSV for debugging.
+
+    Columns: model_id, element_id, element_name, attributes (semicolon-separated)
+    """
+    try:
+        out_dir = os.path.dirname(out_path)
+        if out_dir and not os.path.isdir(out_dir):
+            os.makedirs(out_dir, exist_ok=True)
+        with open(out_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            for mid, elements in sorted(models.items()):
+                for e in elements:
+                    name = getattr(e, "name", "")
+                    eid = getattr(e, "ele_id", getattr(e, "ze_id", None))
+                    attrs = []
+                    for attr in getattr(e, "attributes", []) or []:
+                        attrs.append(str(getattr(attr, "value", attr)))
+                    writer.writerow([mid, eid, name, ";".join(sorted(attrs))])
+        logger.info("Wrote PyQuN models CSV to %s", out_path)
+    except Exception as err:
+        logger.warning("Failed to write PyQuN models CSV to %s: %s", out_path, err)
+
 
 def _convert_json_string_to_dict(documents: list[list[str]]) -> list[list[dict]]:
     out = []
@@ -147,19 +176,19 @@ def _run_raqun_with_order(json_files, order=None):
 def _run_raqun(json_files: list[str]):
     global PyQuN_algo
     models = {}
-
+    logger.info("Preparing %d models for RaQuN...", len(json_files))
     # extract and convert to Model/Element/Attribute for RaQuN
     for e_id, json_file in enumerate(json_files):
         if len(json_file)>0:
             models[e_id] = []
             for comp_i, comp in enumerate(json_file):
                 attr_list = []
+                type = comp["type"]
                 name = comp["name"]
 
-                attr_list.append(name)
-
-                type = comp["type"]
                 attr_list.append(type)
+                attr_list.append(name)
+                
                 try:
 
                     assetType = comp["cryptoProperties"]["assetType"]
@@ -171,7 +200,6 @@ def _run_raqun(json_files: list[str]):
                 except:
                     pass
                 attributes = set(DefaultAttribute(attr) for attr in attr_list)
-
                 element = Element(name=name, ze_id=comp_i, attributes=attributes) # -> corresponds to a cbom component
                 element.set_model_id(e_id)
                 element.set_element_id(comp_i)
@@ -182,7 +210,13 @@ def _run_raqun(json_files: list[str]):
     for model_id in models:
         model = Model(elements=set(models[model_id]), ze_id=model_id)
         model_list.append(model)
-
+    logger.info("Loaded %d models with total %d elements", len(model_list), sum(len(m.get_elements()) for m in model_list))
+    # Debug CSV output (comment out the following line to disable)
+    # _write_models_csv(models, MODELS_CSV_PATH)
+    for i, model in enumerate(model_list):
+        logger.info("Model %d:", i)
+        for element in model.get_elements():
+            logger.info("  Element: %s, Attributes: %s", element.name, [attr.value for attr in element.attributes])
     model_set = ModelSet(set(model_list))
 
     matches, _ = PyQuN_algo.match(model_set)
@@ -193,29 +227,15 @@ def _run_raqun(json_files: list[str]):
 def _match_from_json_list(json_files: list[str]):
     json_files = _convert_json_string_to_dict(json_files)
 
-    best_nr_matches = 0
-    best_match = None
-    best_order = None
-
-    # only works for few documents (exponential cost for iteration)
+    # Deterministic single pass using the given order
     n = len(json_files)
-    
-    for curr_round, order in enumerate(itertools.permutations(range(n))):
-        # order = list(range(len(json_files)))
-        # random.shuffle(order)
-        logger.info(f"Running RaQuN permutation round: {curr_round}")
-        
-        matches_list, used_order = _run_raqun_with_order(json_files, order)
-        curr_nr_matches = sum([len(e) for match in matches_list for e in match.get_elements()])
-
-        if best_nr_matches < curr_nr_matches:
-            best_nr_matches = curr_nr_matches
-            best_match = matches_list
-            best_order = used_order
+    order = list(range(n))
+    logger.info(f"🐁 Running RaQuN on {n} document(s) (deterministic order)")
+    matches_list, best_order = _run_raqun_with_order(json_files, order)
 
     grouped_elements = []
 
-    for match in best_match:
+    for match in matches_list:
         if hasattr(match, 'get_elements'):
             elements = match.get_elements()
             if elements and len(elements) > 1:
