@@ -39,7 +39,6 @@ https://github.com/xtekky/gpt4free
 https://github.com/AutoGPTQ/AutoGPTQ
 https://github.com/opendatalab/MinerU
 https://github.com/khoj-ai/khoj
-https://github.com/paperless-ngx/paperless-ngx
 https://github.com/docling-project/docling
 https://github.com/katanaml/sparrow
 https://github.com/alibaba/Sentinel
