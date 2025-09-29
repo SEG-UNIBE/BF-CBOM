@@ -574,30 +574,28 @@ def banner(
         ok = False
 
     status = "ok" if ok else "unreachable"
+    # Read ASCII art and print it verbatim, preserving any ANSI colors
+    # embedded in the file. If there are no ANSI escapes, it will use the
+    # terminal's default color.
     try:
-        with open("./docs/logo.txt", encoding="utf-8") as art_file:
-            art_lines = [line.rstrip("\n") for line in art_file.readlines()]
+        art_text = Path("./docs/logo.txt").read_text(encoding="utf-8")
     except OSError:
-        art_lines = []
+        art_text = ""
 
-    palette = [
-        typer.colors.CYAN,
-        typer.colors.BRIGHT_BLUE,
-        typer.colors.MAGENTA,
-        typer.colors.BRIGHT_MAGENTA,
-    ]
-    for idx, line in enumerate(art_lines):
-        if line.strip():
-            fg = palette[idx % len(palette)]
-            typer.secho(line, fg=fg, bold=True)
-        else:
-            typer.echo("")
+    if art_text:
+        # Always preserve colors exactly as encoded in the file.
+        # If the file has no ANSI codes, it will render with the terminal's default color.
+        sys.stdout.write(art_text)
+        if not art_text.endswith("\n"):
+            sys.stdout.write("\n")
+        sys.stdout.flush()
 
     typer.echo("")
-    typer.secho("BF-CBOM CLI", fg=typer.colors.BRIGHT_CYAN, bold=True)
+    theme_color = typer.colors.BRIGHT_RED
+    typer.secho("BF-CBOM CLI", fg=theme_color, bold=True)
     typer.echo(
         typer.style(
-            "Create benchmarks, orchestrate workers, and monitor progress.",
+            "Create benchmarks, monitor their progress, and export artifacts.",
             fg=typer.colors.WHITE,
         )
     )
@@ -613,28 +611,43 @@ def banner(
     typer.echo(typer.style(f"  {redis_host}:{redis_port}", fg=typer.colors.WHITE))
 
     typer.echo("")
-    typer.secho("Usage Highlights", fg=typer.colors.YELLOW, bold=True)
-    typer.echo(typer.style("  uv run misc/cli/cli.py [COMMAND] [OPTIONS]", fg=typer.colors.WHITE))
-    typer.echo("")
+    # Helper to emphasize the interesting part after the CLI path
+    def _echo_uv(args: str) -> None:
+        left = typer.style("uv run misc/cli/cli.py", fg=typer.colors.BRIGHT_BLACK)
+        right = typer.style(args, bold=True)
+        typer.echo(f"  {left} {right}")
 
-    typer.secho("Examples", fg=typer.colors.YELLOW, bold=True)
-    typer.echo(typer.style("  # Run with stdin (fire-and-forget with wait)", fg=typer.colors.CYAN))
-    typer.echo("  cat bench.json | uv run misc/cli/cli.py run -c - --wait")
+    def _echo_piped(prefix: str, args: str) -> None:
+        pre = typer.style(prefix, fg=typer.colors.BRIGHT_BLACK)
+        left = typer.style("uv run misc/cli/cli.py", fg=typer.colors.BRIGHT_BLACK)
+        right = typer.style(args, bold=True)
+        typer.echo(f"  {pre} {left} {right}")
+
+    typer.secho("Examples\n", fg=theme_color, bold=True)
+    # 1) Watch
+    typer.echo(typer.style("  # Watch live progress of existing benchmarks", fg=theme_color))
+    _echo_uv("watch --bench-id <BENCH_ID>")
     typer.echo("")
-    typer.echo(typer.style("  # Run with local config file", fg=typer.colors.CYAN))
-    typer.echo("  uv run misc/cli/cli.py run -c bench.json --wait")
+    # 2) Check status
+    typer.echo(typer.style("  # Check status of a distinct benchmark", fg=theme_color))
+    _echo_uv("status <BENCH_ID> --json")
     typer.echo("")
-    typer.echo(typer.style("  # Export a config for an existing benchmark", fg=typer.colors.CYAN))
-    typer.echo("  uv run misc/cli/cli.py export config <BENCH_ID> -o bench.json")
+    # 3) Download all CBOMs
+    typer.echo(typer.style("  # Download all CBOMs as zip", fg=theme_color))
+    _echo_uv("export cboms <BENCH_ID> --dest ./downloads")
     typer.echo("")
-    typer.echo(typer.style("  # Download all CBOMs", fg=typer.colors.CYAN))
-    typer.echo("  uv run misc/cli/cli.py export cboms <BENCH_ID> --dest ./downloads")
+    # 4) Export config
+    typer.echo(typer.style("  # Export a config for an existing benchmark", fg=theme_color))
+    _echo_uv("export config <BENCH_ID> -o bench.json")
     typer.echo("")
-    typer.echo(typer.style("  # Check status", fg=typer.colors.CYAN))
-    typer.echo("  uv run misc/cli/cli.py status <BENCH_ID> --json")
+    # 5) Run again with config (two styles)
+    typer.echo(typer.style("  # Run again with config", fg=theme_color))
+    _echo_uv("run -c bench.json --wait")
+    _echo_piped("cat bench.json |", "run -c - --wait")
     typer.echo("")
-    typer.echo(typer.style("  # Cancel a running benchmark", fg=typer.colors.CYAN))
-    typer.echo("  uv run misc/cli/cli.py cancel <BENCH_ID>")
+    # 6) Cancel running benchmark
+    typer.echo(typer.style("  # Cancel a running benchmark", fg=theme_color))
+    _echo_uv("cancel <BENCH_ID>")
 
 
 if __name__ == "__main__":
