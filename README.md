@@ -22,7 +22,7 @@
 <div align="center">
   <a href="https://doi.org/10.5281/zenodo.17140610"><img src="https://zenodo.org/badge/1058056469.svg" alt="DOI" /></a>
   <a href="https://github.com/SEG-UNIBE/BF-CBOM/releases"><img src="https://img.shields.io/github/v/release/SEG-UNIBE/BF-CBOM?include_prereleases" alt="Changelog" /></a>
-  <a href="https://youtu.be/fejTVduA5b8"><img src="https://img.shields.io/badge/Demo-Video-red.svg?logo=youtube&logoColor=white" alt="Demo Video" /></a>
+  <a href="https://youtu.be/xSKwUc7yDRw"><img src="https://img.shields.io/badge/Demo-Video-red.svg?logo=youtube&logoColor=white" alt="Demo Video" /></a>
   </br>
   <a href="#"><img src="https://img.shields.io/badge/python-v3.12%2B-blue.svg" alt="Python 3.12+" /></a>
   <a href="#"><img src="https://img.shields.io/badge/Docker-Compose-success.svg" alt="Docker Compose" /></a>
@@ -47,7 +47,7 @@ It orchestrates full container stacks, captures worker outputs, normalizes resul
 - **Scriptable CLI:** a Typer-based interface can launch benchmarks, export configs, or bundle CBOM artefacts for offline analysis.
 - **Reproducible runs:** checked-in `.env` templates, Dockerfiles, and `uv`-managed Python dependencies keep environments consistent across machines.
 
-**[▶️ Watch the Demo Video](https://youtu.be/fejTVduA5b8)** - See BF-CBOM's features in action with a walkthrough of the UI, benchmarking process, and analysis capabilities.
+**[▶️ Watch the Demo Video](https://youtu.be/xSKwUc7yDRw)** - See BF-CBOM's features in action with a walkthrough of the UI, benchmarking process, and analysis capabilities.
 
 
 ### CBOM Generators Under Scrutiny
