@@ -64,7 +64,11 @@ with col_title:
         """,
         unsafe_allow_html=True,
     )
-st.caption("Your <b><u>B</u></b>est <b><u>F</u></b>riend for Generating, Understanding, and Comparing Cryptography Bills of Materials (<b><u>CBOMs</u></b>)", unsafe_allow_html=True)
+st.markdown(
+    "<p style='font-size:1.3rem; color:#888;'>Your <b>B</b>est <b>F</b>riend for Generating, Understanding, and Comparing Cryptography Bills of Materials (<b>CBOMs</b>)</p>",
+    unsafe_allow_html=True,
+)
+
 
 # Top action: create new inspection
 if st.button("➕ Create New Inspection", type="primary"):
