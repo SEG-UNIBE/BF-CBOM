@@ -11,7 +11,7 @@ from coordinator.utils import (
     enrich_repos_with_github,
     github_search_multi_language,
     parse_repo_urls,
-    set_query_bench_id,
+    set_query_insp_id,
 )
 
 # ---------- Streamlit Page ----------
@@ -53,8 +53,8 @@ with col1:
 
     config_data = cached_config
 
-    with st.form("create_bench_form", clear_on_submit=False):
-        name = st.text_input("Benchmark name", placeholder="e.g. python-top1k-cdxgen-vs-syft")
+    with st.form("create_insp_form", clear_on_submit=False):
+        name = st.text_input("Inspection name", placeholder="e.g. python-top1k-cdxgen-vs-syft")
 
         available_workers = get_available_workers()
         workers: list[str] = []
@@ -126,7 +126,7 @@ with col1:
             params = {"source": "manual_list", "count": None}
         else:
             uploaded = st.file_uploader(
-                "Upload benchmark config (JSON)",
+                "Upload inspection config (JSON)",
                 type=["json"],
                 key="setup_config_uploader",
             )
@@ -153,14 +153,14 @@ with col1:
             else:
                 st.caption("Uploaded a config.")
 
-        submitted = st.form_submit_button("Create benchmark")
+        submitted = st.form_submit_button("Create Inspection")
 
     if submitted:
-        bench_name = name.strip()
+        insp_name = name.strip()
         try:
             if source == "Search GitHub":
-                if not bench_name:
-                    st.error("Please provide a benchmark name.")
+                if not insp_name:
+                    st.error("Please provide an inspection name.")
                     st.stop()
                 if not workers:
                     st.error("Select at least one worker.")
@@ -181,8 +181,8 @@ with col1:
                     )
                     params["pushed_date"] = pushed_date
             elif source == "Paste list":
-                if not bench_name:
-                    st.error("Please provide a benchmark name.")
+                if not insp_name:
+                    st.error("Please provide an inspection name.")
                     st.stop()
                 if not workers:
                     st.error("Select at least one worker.")
@@ -197,11 +197,11 @@ with col1:
             else:
                 config_data = st.session_state.get(CONFIG_SESSION_KEY)
                 if not config_data:
-                    st.error("Upload a benchmark config before creating the benchmark.")
+                    st.error("Upload an inspection config before creating the inspection.")
                     st.stop()
-                if not bench_name:
-                    bench_name = (config_data.get("name") or "").strip()
-                if not bench_name:
+                if not insp_name:
+                    insp_name = (config_data.get("name") or "").strip()
+                if not insp_name:
                     st.error("The config is missing a name; please provide one above.")
                     st.stop()
                 cfg_workers = config_data.get("workers") or []
@@ -245,33 +245,33 @@ with col1:
             st.stop()
 
         logger.info(
-            "Creating benchmark '%s' with %d repos and %d workers (source=%s)",
-            bench_name,
+            "Creating inspection '%s' with %d repos and %d workers (source=%s)",
+            insp_name,
             len(repos),
             len(workers),
             source,
         )
-        bench_id = create_benchmark(r, name=bench_name, params=params, repos=repos, workers=workers)
+        insp_id = create_benchmark(r, name=insp_name, params=params, repos=repos, workers=workers)
 
         # Persist deep-link and offer navigation
-        set_query_bench_id(bench_id)
+        set_query_insp_id(insp_id)
 
-        st.success(f"Benchmark created: {bench_name} · ID {bench_id}")
+        st.success(f"Inspection created: {insp_name} · ID {insp_id}")
         # Persist for next render so the Next button remains clickable after rerun
-        st.session_state["created_bench_id"] = bench_id
+        st.session_state["created_insp_id"] = insp_id
 
-    # Show Next button if a bench was just created (or is present in session)
-    created_bench_id = st.session_state.get("created_bench_id")
-    if created_bench_id:
+    # Show Next button if a insp was just created (or is present in session)
+    created_insp_id = st.session_state.get("created_insp_id")
+    if created_insp_id:
         if st.button("Next", type="primary"):
-            # Ensure the newly created bench is pre-selected on the next page
-            set_query_bench_id(created_bench_id)
+            # Ensure the newly created insp is pre-selected on the next page
+            set_query_insp_id(created_insp_id)
             st.switch_page("pages/2_Execution.py")
 with mid:
     st.write("")
 with col2:
     st.subheader("Notes")
     st.markdown(
-        "- Benchmarks are persisted in Redis.\n"
+        "- Inspections are persisted in Redis.\n"
         "- The repo snapshot is stored and will not be re-queried.\n"
     )

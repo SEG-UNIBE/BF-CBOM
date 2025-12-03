@@ -59,7 +59,7 @@ def _set_nested(target: dict, path: list[str], value: Any) -> None:
 
 def create_component_match_instruction(
     repo: dict,
-    bench_id: str,
+    insp_id: str,
     cboms_by_worker: dict[str, str],
     exclude_types: bool = True,
 ) -> ComponentMatchJobInstruction | None:
@@ -123,7 +123,7 @@ def create_component_match_instruction(
     job_id = str(uuid.uuid4())
     return ComponentMatchJobInstruction(
         job_id=job_id,
-        benchmark_id=bench_id,
+        inspection_id=insp_id,
         repo_info=repo_info,
         CbomJsons=entries,
     )

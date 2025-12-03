@@ -25,9 +25,9 @@ from coordinator.logger_config import logger
 from coordinator.redis_io import (
     collect_repo_cboms,
     enqueue_component_match_instruction,
-    get_bench_meta,
-    get_bench_repos,
-    get_bench_workers,
+    get_insp_meta,
+    get_insp_repos,
+    get_insp_workers,
     get_redis,
     list_benchmarks,
     pair_key,
@@ -37,7 +37,7 @@ from coordinator.utils import (
     build_repo_info_url_map,
     estimate_similarity_runtime,
     format_benchmark_header,
-    get_query_bench_id,
+    get_query_insp_id,
     safe_int,
 )
 
@@ -99,39 +99,39 @@ def _latest_similarity_result(
     return None
 
 
-bench_id_hint = get_query_bench_id() or st.session_state.get("created_bench_id")
+insp_id_hint = get_query_insp_id() or st.session_state.get("created_insp_id")
 benches = list_benchmarks(r)
 if not benches:
-    st.info("No benchmarks found. Please create one first.")
+    st.info("No inspections found. Please create one first.")
     st.stop()
 
 labels = [f"{m.get('name', '(unnamed)')} · {bid[:8]} · {m.get('status', '?')}" for bid, m in benches]
 default_idx = 0
-if bench_id_hint:
+if insp_id_hint:
     try:
-        default_idx = [bid for bid, _ in benches].index(bench_id_hint)
+        default_idx = [bid for bid, _ in benches].index(insp_id_hint)
     except ValueError:
         default_idx = 0
 idx = st.selectbox(
-    "Select benchmark",
+    "Select inspection",
     options=list(range(len(benches))),
     index=default_idx,
     format_func=lambda i: labels[i],
 )
-bench_id, _ = benches[idx]
+insp_id, _ = benches[idx]
 
-meta = get_bench_meta(r, bench_id)
-name = meta.get("name", bench_id)
+meta = get_insp_meta(r, insp_id)
+name = meta.get("name", insp_id)
 status = meta.get("status", "?")
-workers = get_bench_workers(r, bench_id)
-repos = get_bench_repos(r, bench_id)
+workers = get_insp_workers(r, insp_id)
+repos = get_insp_repos(r, insp_id)
 
 created = meta.get("created_at") or meta.get("started_at") or "?"
 expected = meta.get("expected_jobs") or "?"
 
-st.markdown(format_benchmark_header(name, bench_id, created, expected), unsafe_allow_html=True)
+st.markdown(format_benchmark_header(name, insp_id, created, expected), unsafe_allow_html=True)
 
-job_idx = r.hgetall(f"bench:{bench_id}:job_index") or {}
+job_idx = r.hgetall(f"insp:{insp_id}:job_index") or {}
 order_keys = get_status_keys_order()
 worker_status_counts = {w: {status_text(k, "label"): 0 for k in order_keys} for w in workers}
 comp_rows = []  # rows: repo, worker, total_components, types (Counter)
@@ -149,10 +149,10 @@ for repo in repos:
 
 scatter_rows: list[dict] = []
 
-jobs = r.lrange(f"bench:{bench_id}:jobs", 0, -1) or []
+jobs = r.lrange(f"insp:{insp_id}:jobs", 0, -1) or []
 job_meta_cache = {}
 for j_id in jobs:
-    job_meta_cache[j_id] = r.hgetall(f"bench:{bench_id}:job:{j_id}") or {}
+    job_meta_cache[j_id] = r.hgetall(f"insp:{insp_id}:job:{j_id}") or {}
 
 for repo in repos:
     full = repo.get("full_name")
@@ -425,9 +425,9 @@ if comp_rows:
     if not component_tables:
         st.caption("No component type information available yet.")
     else:
-        bench_jobs_state = st.session_state["component_similarity_jobs"].setdefault(bench_id, {})
-        if any(key in bench_jobs_state for key in ("job_ids", "repo_map", "total")):
-            bench_jobs_state.clear()
+        insp_jobs_state = st.session_state["component_similarity_jobs"].setdefault(insp_id, {})
+        if any(key in insp_jobs_state for key in ("job_ids", "repo_map", "total")):
+            insp_jobs_state.clear()
         repos_by_name = {(repo.get("full_name") or "").strip(): repo for repo in repos or []}
         for repo_name in sorted(component_tables.keys()):
             with st.expander(f"{repo_name}"):
@@ -437,8 +437,8 @@ if comp_rows:
                     continue
                 df_counts = pd.DataFrame(rows)
                 # Read toggle state before rendering the table so it updates immediately on toggle
-                repo_state_pre = bench_jobs_state.setdefault(repo_name, {})
-                toggle_key = f"exclude_libs_{bench_id}_{repo_name}"
+                repo_state_pre = insp_jobs_state.setdefault(repo_name, {})
+                toggle_key = f"exclude_libs_{insp_id}_{repo_name}"
                 exclude_non_crypto = bool(
                     st.session_state.get(toggle_key, repo_state_pre.get("exclude_libraries", False))
                 )
@@ -483,7 +483,7 @@ if comp_rows:
                     width="stretch",
                 )
 
-                repo_state = bench_jobs_state.setdefault(repo_name, {})
+                repo_state = insp_jobs_state.setdefault(repo_name, {})
                 repo_obj = repos_by_name.get(repo_name) or {}
 
                 job_id = repo_state.get("job_id")
@@ -534,7 +534,7 @@ if comp_rows:
                     algorithm_choice = st.radio(
                         "Select matching strategy",
                         ["Clustering Algorithm (RaQuN)", "Optimization Algorithm (JEDI)"],
-                        key=f"algorithm_choice_{bench_id}_{repo_name}",
+                        key=f"algorithm_choice_{insp_id}_{repo_name}",
                         horizontal=True,
                     )
                 if ("Optimization" in algorithm_choice):
@@ -545,12 +545,12 @@ if comp_rows:
                     result_list = PYQUN_RESULTS_LIST
                 with button_col:
                     if st.button(
-                        "Find similar components among workers",
-                        key=f"treesimilarity_{bench_id}_{repo_name}",
+                        "Find Similar Components Among Workers",
+                        key=f"treesimilarity_{insp_id}_{repo_name}",
                         disabled=button_disabled,
                     ):
                         instruction = prepare_component_match_instruction(
-                            r, bench_id, repo_obj, exclude_types=exclude_libraries
+                            r, insp_id, repo_obj, exclude_types=exclude_libraries
                         )
                         if not instruction:
                             st.info("Need at least two completed CBOMs for this repository.")
@@ -572,7 +572,7 @@ if comp_rows:
                             repo_state["issued_counts"] = [c for _, c in tool_stats]
                             # Persist the full filtered component dicts used for this run to render real data later
                             # Build from the raw CBOMs so indices match the minimized list exactly
-                            cbom_map_raw_at_issue = collect_repo_cboms(r, bench_id, repo_name, workers) or {}
+                            cbom_map_raw_at_issue = collect_repo_cboms(r, insp_id, repo_name, workers) or {}
                             issued_full_components = {}
                             issued_min_docs = {}
                             for cbom in instruction.CbomJsons:
@@ -598,7 +598,7 @@ if comp_rows:
                             repo_state["job_exclude_libraries"] = exclude_libraries
                             # Enter active waiting only on explicit user action
                             repo_state["waiting_for_similarity"] = True
-                            st.session_state["component_similarity_jobs"][bench_id] = bench_jobs_state
+                            st.session_state["component_similarity_jobs"][insp_id] = insp_jobs_state
                             st.rerun()
 
                 if waiting_for_result and not result_payload:
@@ -609,7 +609,7 @@ if comp_rows:
                         repo_state["result"] = result_payload
                         # Clear waiting state now that we have a result
                         repo_state["waiting_for_similarity"] = False
-                        st.session_state["component_similarity_jobs"][bench_id] = bench_jobs_state
+                        st.session_state["component_similarity_jobs"][insp_id] = insp_jobs_state
 
                 if waiting_for_result and not repo_state.get("result"):
                     poll_interval = 2.0
@@ -629,7 +629,7 @@ if comp_rows:
                                 )
                                 repo_state["result_exclude_libraries"] = bool(result_exclude_flag)
                                 repo_state["waiting_for_similarity"] = False
-                                st.session_state["component_similarity_jobs"][bench_id] = bench_jobs_state
+                                st.session_state["component_similarity_jobs"][insp_id] = insp_jobs_state
                                 break
                             time.sleep(poll_interval)
 
@@ -663,7 +663,7 @@ if comp_rows:
 
                             cbom_map_raw = repo_state.get("cboms")
                             if cbom_map_raw is None:
-                                cbom_map_raw = collect_repo_cboms(r, bench_id, repo_name, workers) or {}
+                                cbom_map_raw = collect_repo_cboms(r, insp_id, repo_name, workers) or {}
                                 repo_state.pop("filtered_cboms", None)
                                 repo_state["cboms"] = cbom_map_raw
                             else:
@@ -698,7 +698,7 @@ if comp_rows:
                                                 continue
                                         cbom_map_min[t] = json.dumps({"components": comps}, ensure_ascii=False)
                                 # View mode selector (default Real)
-                                view_key = f"view_mode_{bench_id}_{repo_name}"
+                                view_key = f"view_mode_{insp_id}_{repo_name}"
                                 options = ["Real (full)"] + (["Minimized (matched)"] if cbom_map_min else [])
                                 choice = st.radio("View", options=options, index=0, key=view_key, horizontal=True)
                                 cbom_map_for_render = (
@@ -759,4 +759,4 @@ if comp_rows:
                                 safe_int_func=safe_int,
                             )
 
-                            st.session_state["component_similarity_jobs"][bench_id] = bench_jobs_state
+                            st.session_state["component_similarity_jobs"][insp_id] = insp_jobs_state

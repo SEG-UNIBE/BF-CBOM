@@ -117,7 +117,7 @@ def _handle_instruction(raw_payload: str) -> None:
         logger.warning("Need at least two documents with components to match. Aborting.")
         insufficient_result = ComponentMatchJobResult(
             job_id=instruction.job_id,
-            benchmark_id=instruction.benchmark_id,
+            inspection_id=instruction.inspection_id,
             repo_full_name=instruction.repo_info.full_name,
             tools=tools,
             match_count=0,
@@ -138,9 +138,9 @@ def _handle_instruction(raw_payload: str) -> None:
         return
 
     logger.info(
-        "Processing job %s from benchmark %s with %d CBOM payload(s)",
+        "Processing job %s from inspection %s with %d CBOM payload(s)",
         instruction.job_id,
-        instruction.benchmark_id,
+        instruction.inspection_id,
         len(documents),
     )
 
@@ -184,7 +184,7 @@ def _handle_instruction(raw_payload: str) -> None:
 
     result_payload = ComponentMatchJobResult(
         job_id=instruction.job_id,
-        benchmark_id=instruction.benchmark_id,
+        inspection_id=instruction.inspection_id,
         repo_full_name=instruction.repo_info.full_name,
         tools=tools,
         match_count=len(matches),

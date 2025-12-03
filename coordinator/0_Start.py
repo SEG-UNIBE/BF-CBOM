@@ -14,7 +14,7 @@ from coordinator.redis_io import delete_benchmark, get_redis, list_benchmarks
 from coordinator.utils import (
     build_minimal_config_json,
     human_duration,
-    set_query_bench_id,
+    set_query_insp_id,
     get_favicon_path,
 )
 
@@ -66,21 +66,21 @@ with col_title:
     )
 st.caption("Your <b><u>B</u></b>est <b><u>F</u></b>riend for Generating, Understanding, and Comparing Cryptography Bills of Materials (<b><u>CBOMs</u></b>)", unsafe_allow_html=True)
 
-# Top action: create new benchmark
-if st.button("➕ Create New Benchmark", type="primary"):
+# Top action: create new inspection
+if st.button("➕ Create New Inspection", type="primary"):
     logger.info("UI: navigate to Setup page")
     st.switch_page("pages/1_Setup.py")
 
 st.divider()
 
-# Below: Existing benchmarks (left) and Redis stats (right) with a thin divider
+# Below: Existing inspections (left) and Redis stats (right) with a thin divider
 left, mid, right = st.columns([6, 0.02, 4])
 
 with left:
-    st.subheader("Existing Benchmarks")
+    st.subheader("Existing Inspections")
     benches = list_benchmarks(r)
     if not benches:
-        st.info("No benchmarks yet. Create one to get started.")
+        st.info("No inspections yet. Create one to get started.")
     else:
         for bid, meta in benches:
             name = meta.get("name", "(unnamed)")
@@ -108,28 +108,28 @@ with left:
                 b1, b2, b3 = st.columns([1, 1, 0.5], vertical_alignment="top")
                 with b1:
                     if st.button("Execution", key=f"run_{bid}"):
-                        # Preselect this benchmark on the next page via query param and session hint
-                        set_query_bench_id(bid)
-                        st.session_state["created_bench_id"] = bid
-                        logger.info("UI: open Execution for bench %s", bid)
+                        # Preselect this inspection on the next page via query param and session hint
+                        set_query_insp_id(bid)
+                        st.session_state["created_insp_id"] = bid
+                        logger.info("UI: open Execution for insp %s", bid)
                         st.switch_page("pages/2_Execution.py")
                 with b2:
                     if st.button("Analysis", key=f"ana_{bid}"):
-                        set_query_bench_id(bid)
-                        st.session_state["created_bench_id"] = bid
-                        logger.info("UI: open Analysis for bench %s", bid)
+                        set_query_insp_id(bid)
+                        st.session_state["created_insp_id"] = bid
+                        logger.info("UI: open Analysis for insp %s", bid)
                         st.switch_page("pages/3_Analysis.py")
                 with b3:
                     d1, d2 = st.columns([1, 1], vertical_alignment="top")
                     with d1:
                         try:
-                            # Build minimal config text for this benchmark row
+                            # Build minimal config text for this inspection row
                             workers = st.session_state.get("_tmp_workers", None)  # unused guard
                             # Defer to utility to keep shape consistent
-                            repos_key = f"bench:{bid}:repos"
+                            repos_key = f"insp:{bid}:repos"
                             repos = [__import__("json").loads(x) for x in r.lrange(repos_key, 0, -1) or []]
                             name_txt = meta.get("name", bid)
-                            # Workers list is stored in bench meta as JSON
+                            # Workers list is stored in insp meta as JSON
                             try:
                                 workers_list = __import__("json").loads(meta.get("workers_json", "[]"))
                             except Exception:
@@ -138,16 +138,16 @@ with left:
                             st.download_button(
                                 "⬇️",
                                 data=cfg_text,
-                                file_name=f"bench-{bid[:8]}.json",
+                                file_name=f"insp-{bid[:8]}.json",
                                 help="Download config (JSON)",
                                 key=f"dl_{bid}",
                             )
                         except Exception:
                             pass
                     with d2:
-                        if st.button("🗑️", key=f"del_{bid}", help="Delete benchmark"):
+                        if st.button("🗑️", key=f"del_{bid}", help="Delete inspection"):
                             deleted = delete_benchmark(r, bid)
-                            st.toast(f"Deleted benchmark {bid[:8]} (jobs removed: {deleted})")
+                            st.toast(f"Deleted inspection {bid[:8]} (jobs removed: {deleted})")
                             st.rerun()
 
 with mid:
@@ -174,7 +174,7 @@ with right:
     total_duration = 0.0
     duration_count = 0
     try:
-        for key in r.scan_iter("bench:*:job:*"):
+        for key in r.scan_iter("insp:*:job:*"):
             stt = (r.hget(key, "status") or "").lower()
             if stt == "completed":
                 status_counts["completed"] += 1
@@ -233,11 +233,11 @@ with right:
     with r2c3:
         st.metric("peak memory", str(peak_mem))
 
-    # Last row: benchmarks, total jobs, and per-status breakdown (as caption next to jobs)
+    # Last row: inspections, total jobs, and per-status breakdown (as caption next to jobs)
     total_jobs = sum(status_counts.values())
     left, right = st.columns([1, 3])
     with left:
-        st.metric("benchmarks", f"{total_benches:,}")
+        st.metric("inspections", f"{total_benches:,}")
     with right:
         j_left, j_right = st.columns([1, 3])
         with j_left:

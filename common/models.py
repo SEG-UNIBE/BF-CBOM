@@ -69,7 +69,7 @@ class JobInstruction(DataClassJsonMixin):
 
 @dataclass
 class Benchmark(DataClassJsonMixin):
-    bench_id: str
+    insp_id: str
     name: str
     status: str = "created"
     params: dict | None = None
@@ -93,7 +93,7 @@ class CbomJson(DataClassJsonMixin):
 @dataclass
 class ComponentMatchJobInstruction(DataClassJsonMixin):
     job_id: str
-    benchmark_id: str
+    inspection_id: str
     repo_info: RepoInfo
     CbomJsons: list[CbomJson]
 
@@ -101,7 +101,7 @@ class ComponentMatchJobInstruction(DataClassJsonMixin):
 @dataclass
 class ComponentMatchJobResult(DataClassJsonMixin):
     job_id: str
-    benchmark_id: str
+    inspection_id: str
     repo_full_name: str
     tools: list[str]
     match_count: int
