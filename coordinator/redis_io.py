@@ -11,7 +11,7 @@ from common.cbom_analysis import (
     create_component_match_instruction,
 )
 from common.config import GITHUB_CACHE_TTL_SEC, GITHUB_TOKEN
-from common.models import Benchmark, ComponentMatchJobInstruction
+from common.models import Inspection, ComponentMatchJobInstruction
 from common.utils import repo_dict_to_info
 from coordinator.logger_config import logger
 
@@ -222,7 +222,7 @@ def get_redis() -> redis.Redis:
 # ----- Inspection schema helpers -----
 
 
-def list_benchmarks(r: redis.Redis) -> list[tuple[str, dict[str, str]]]:
+def list_inspections(r: redis.Redis) -> list[tuple[str, dict[str, str]]]:
     """Return list of (insp_id, meta) sorted newest-first by created/started timestamp.
 
     Falls back to a minimal timestamp when parsing fails so newer items float to top.
@@ -276,11 +276,11 @@ def pair_key(repo_full_name: str, worker: str) -> str:
     return f"{repo_full_name}|{worker}"
 
 
-def create_benchmark(r: redis.Redis, name: str, params: dict, repos: list[dict], workers: list[str]) -> str:
+def create_inspection(r: redis.Redis, name: str, params: dict, repos: list[dict], workers: list[str]) -> str:
     """Create an inspection record with a snapshot of repos and selected workers."""
     insp_id = str(uuid.uuid4())
 
-    insp = Benchmark(
+    insp = Inspection(
         insp_id=insp_id,
         name=name,
         status="created",
@@ -315,7 +315,7 @@ def create_benchmark(r: redis.Redis, name: str, params: dict, repos: list[dict],
     return insp_id
 
 
-def start_benchmark(r: redis.Redis, insp_id: str) -> int:
+def start_inspection(r: redis.Redis, insp_id: str) -> int:
     """Queue jobs to workers for the inspection; return number of issued jobs."""
     meta = get_insp_meta(r, insp_id)
     status = meta.get("status", "created")
@@ -437,7 +437,7 @@ def collect_results_once(r: redis.Redis, insp_id: str) -> tuple[int, int]:
     return done, total
 
 
-def cancel_benchmark(r: redis.Redis, insp_id: str) -> int:
+def cancel_inspection(r: redis.Redis, insp_id: str) -> int:
     """Cancel a running inspection by removing queued jobs and marking them cancelled.
 
     Returns the number of jobs marked as cancelled.
@@ -478,7 +478,7 @@ def cancel_benchmark(r: redis.Redis, insp_id: str) -> int:
     return len(pending)
 
 
-def reset_benchmark_jobs(r: redis.Redis, insp_id: str) -> int:
+def reset_inspection_jobs(r: redis.Redis, insp_id: str) -> int:
     """Remove prior job records for an inspection so it can be re-executed cleanly.
 
     Returns the number of removed job records.
@@ -497,13 +497,13 @@ def reset_benchmark_jobs(r: redis.Redis, insp_id: str) -> int:
     return len(jobs)
 
 
-def reexecute_benchmark(r: redis.Redis, insp_id: str) -> int:
+def reexecute_inspection(r: redis.Redis, insp_id: str) -> int:
     """Reset previous jobs and start the inspection again; return issued count."""
-    reset_benchmark_jobs(r, insp_id)
-    return start_benchmark(r, insp_id)
+    reset_inspection_jobs(r, insp_id)
+    return start_inspection(r, insp_id)
 
 
-def retry_non_completed_benchmark(r: redis.Redis, insp_id: str) -> int:
+def retry_non_completed_inspection(r: redis.Redis, insp_id: str) -> int:
     """Queue jobs only for repo/worker pairs that did not complete.
 
     Leaves completed job records intact and updates the job index to point to
@@ -583,7 +583,7 @@ def retry_non_completed_benchmark(r: redis.Redis, insp_id: str) -> int:
     return issued
 
 
-def delete_benchmark(r: redis.Redis, insp_id: str) -> int:
+def delete_inspection(r: redis.Redis, insp_id: str) -> int:
     """Delete an inspection and all associated Redis keys.
 
     Removes:

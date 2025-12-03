@@ -234,3 +234,5 @@ ruff.log
 .ruff.toml
 ruff.toml
 .pyproject-black.toml
+
+.idea/

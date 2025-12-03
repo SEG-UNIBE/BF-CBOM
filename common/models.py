@@ -68,7 +68,7 @@ class JobInstruction(DataClassJsonMixin):
 
 
 @dataclass
-class Benchmark(DataClassJsonMixin):
+class Inspection(DataClassJsonMixin):
     insp_id: str
     name: str
     status: str = "created"
@@ -124,8 +124,8 @@ class RepoRef(DataClassJsonMixin):
 
 
 @dataclass
-class BenchmarkConfig(DataClassJsonMixin):
-    """Minimal, reproducible benchmark configuration for CLI/CI.
+class InspectionConfig(DataClassJsonMixin):
+    """Minimal, reproducible inspection configuration for CLI/CI.
 
     Fields are intentionally small to keep configs portable and tool-agnostic.
     """

@@ -7,7 +7,7 @@ import streamlit as st
 from common.config import GITHUB_TOKEN
 from common.utils import get_available_workers
 from coordinator.logger_config import logger
-from coordinator.redis_io import create_benchmark, get_redis
+from coordinator.redis_io import create_inspection, get_redis
 from coordinator.utils import (
     enrich_repos_with_github,
     github_search_multi_language,
@@ -155,7 +155,7 @@ with tab_individual:
                     insp_name,
                     len(shared_workers),
                 )
-                insp_id = create_benchmark(r, name=insp_name, params=params, repos=[repo_data], workers=shared_workers)
+                insp_id = create_inspection(r, name=insp_name, params=params, repos=[repo_data], workers=shared_workers)
                 
                 set_query_insp_id(insp_id)
                 st.success(f"Inspection created: {insp_name} · ID {insp_id}")
@@ -394,7 +394,7 @@ with tab_batch:
                 len(workers),
                 source,
             )
-            insp_id = create_benchmark(r, name=insp_name, params=params, repos=repos, workers=workers)
+            insp_id = create_inspection(r, name=insp_name, params=params, repos=repos, workers=workers)
 
             # Persist deep-link and offer navigation
             set_query_insp_id(insp_id)

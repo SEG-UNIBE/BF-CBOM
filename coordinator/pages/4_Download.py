@@ -10,13 +10,13 @@ from coordinator.redis_io import (
     get_insp_repos,
     get_insp_workers,
     get_redis,
-    list_benchmarks,
+    list_inspections,
     pair_key,
 )
 from coordinator.utils import (
     build_cboms_zip,
     derive_status_key_from_payload,
-    format_benchmark_header,
+    format_inspection_header,
     get_query_insp_id,
     set_query_insp_id,
 )
@@ -270,13 +270,13 @@ r = get_redis()
 st.title("Downloads")
 
 insp_id_hint = get_query_insp_id() or st.session_state.get("created_insp_id")
-benches = list_benchmarks(r)
-if not benches:
+inspections = list_inspections(r)
+if not inspections:
     st.info("No inspections found. Please create one first.")
     st.stop()
 
-insp_map = {bid: meta for bid, meta in benches}
-insp_order = [bid for bid, _ in benches]
+insp_map = {iid: meta for iid, meta in inspections}
+insp_order = [iid for iid, _ in inspections]
 
 initial_id = insp_order[0]
 if insp_id_hint and insp_id_hint in insp_map:
@@ -286,8 +286,8 @@ insp_id = st.selectbox(
     "Select inspection",
     options=insp_order,
     index=insp_order.index(initial_id),
-    format_func=lambda bid: f"{insp_map.get(bid, {}).get('name', '(unnamed)')} · "
-    f"{bid[:8]} · {insp_map.get(bid, {}).get('status', '?')}",
+    format_func=lambda iid: f"{insp_map.get(iid, {}).get('name', '(unnamed)')} · "
+    f"{iid[:8]} · {insp_map.get(iid, {}).get('status', '?')}",
 )
 set_query_insp_id(insp_id)
 
@@ -300,7 +300,7 @@ repos = get_insp_repos(r, insp_id)
 workers = get_insp_workers(r, insp_id)
 job_idx = r.hgetall(f"insp:{insp_id}:job_index") or {}
 
-st.markdown(format_benchmark_header(name, insp_id, created, expected), unsafe_allow_html=True)
+st.markdown(format_inspection_header(name, insp_id, created, expected), unsafe_allow_html=True)
 st.caption(f"Status: {status}")
 
 zip_bytes = build_cboms_zip(r, insp_id)

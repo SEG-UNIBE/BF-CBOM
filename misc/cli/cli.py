@@ -10,18 +10,18 @@ import click
 import redis
 import typer
 
-from common.models import BenchmarkConfig, RepoRef
+from common.models import InspectionConfig, RepoRef
 from coordinator.redis_io import (
-    cancel_benchmark,
+    cancel_inspection,
     collect_results_once,
-    create_benchmark,
+    create_inspection,
     get_insp_meta,
     get_insp_repos,
     get_insp_workers,
-    list_benchmarks,
+    list_inspections,
     now_iso,
     pair_key,
-    start_benchmark,
+    start_inspection,
 )
 
 app = typer.Typer(
@@ -79,7 +79,7 @@ def _read_config_text(path: str) -> str:
         return f.read()
 
 
-def _summarize_bench(r: redis.Redis, insp_id: str) -> dict:
+def _summarize_inspection(r: redis.Redis, insp_id: str) -> dict:
     meta = get_insp_meta(r, insp_id)
     jobs = r.lrange(f"insp:{insp_id}:jobs", 0, -1) or []
     total = len(jobs)
@@ -110,8 +110,8 @@ def _resolve_insp_id(r: redis.Redis, insp_id: str) -> str:
     if r.exists(f"insp:{insp_id}"):
         return insp_id
 
-    benches = r.smembers("inspecs") or []
-    matches = [bid for bid in benches if bid.startswith(insp_id)]
+    inspections = r.smembers("inspecs") or []
+    matches = [bid for bid in inspections if bid.startswith(insp_id)]
 
     if not matches:
         raise ValueError(f"No inspection found matching '{insp_id}'")
@@ -208,7 +208,7 @@ def watch(
             lines: list[str] = []
             now = time.strftime("%Y-%m-%d %H:%M:%S")
             if insp_id:
-                summary = _summarize_bench(r, insp_id)
+                summary = _summarize_inspection(r, insp_id)
                 title = typer.style("BF-CBOM Watch", fg=typer.colors.BRIGHT_BLUE, bold=True)
                 timestamp = typer.style(now, fg=typer.colors.BRIGHT_BLACK)
                 lines.append(f"{title} · {timestamp}")
@@ -228,7 +228,7 @@ def watch(
                     f"completed={completed} failed={failed} cancelled={cancelled} pending={pending}"
                 )
             else:
-                inspections = list_benchmarks(r)
+                inspections = list_inspections(r)
                 title = typer.style("BF-CBOM Watch", fg=typer.colors.BRIGHT_BLUE, bold=True)
                 timestamp = typer.style(now, fg=typer.colors.BRIGHT_BLACK)
                 insp_count = typer.style(str(len(inspections)), fg=typer.colors.BRIGHT_CYAN, bold=True)
@@ -239,7 +239,7 @@ def watch(
                 lines.append(typer.style(header_text, fg=typer.colors.WHITE, bold=True))
                 lines.append(typer.style("-" * 90, fg=typer.colors.BRIGHT_BLACK))
                 for bid, meta in inspections[:50]:
-                    s = _summarize_bench(r, bid)
+                    s = _summarize_inspection(r, bid)
                     nm = (meta.get("name", bid) or "").strip()
                     nm = (nm[:28] + "…") if len(nm) > 29 else nm.ljust(29)
                     nm_display = typer.style(nm, fg=typer.colors.WHITE)
@@ -281,7 +281,7 @@ def run(
 
     cfg_text = _read_config_text(config)
     try:
-        cfg = BenchmarkConfig.from_json(cfg_text)
+        cfg = InspectionConfig.from_json(cfg_text)
     except Exception as e:
         typer.echo(f"Error: invalid CLI config: {e}", err=True)
         raise typer.Exit(2) from e
@@ -307,9 +307,9 @@ def run(
         }
         for rr in repos_refs
     ]
-    insp_id = create_benchmark(r, name=insp_name, params=params, repos=repos_payload, workers=workers)
+    insp_id = create_inspection(r, name=insp_name, params=params, repos=repos_payload, workers=workers)
     typer.echo(insp_id)
-    issued = start_benchmark(r, insp_id)
+    issued = start_inspection(r, insp_id)
     typer.secho(f"Issued jobs: {issued}", fg=typer.colors.BLUE, err=True)
 
     if not wait:
@@ -318,7 +318,7 @@ def run(
     start_ts = time.time()
     while True:
         done, total = collect_results_once(r, insp_id)
-        summary = _summarize_bench(r, insp_id)
+        summary = _summarize_inspection(r, insp_id)
         typer.secho(
             f"Progress: {summary['done']}/{summary['total']} "
             f"(completed={summary['counts']['completed']} failed={summary['counts']['failed']})",
@@ -337,7 +337,7 @@ def run(
             raise typer.Exit(124)
         time.sleep(max(0.1, poll_interval))
 
-    final = _summarize_bench(r, insp_id)
+    final = _summarize_inspection(r, insp_id)
     failed = final["counts"]["failed"]
     typer.echo(json.dumps(final, ensure_ascii=False))
     raise typer.Exit(1 if failed else 0)
@@ -361,7 +361,7 @@ def status(
     if resolved_id != insp_id:
         typer.echo(f"Resolved inspection ID '{insp_id}' -> '{resolved_id}'", err=True)
 
-    summary = _summarize_bench(r, resolved_id)
+    summary = _summarize_inspection(r, resolved_id)
     if json_out:
         typer.echo(json.dumps(summary, ensure_ascii=False))
     else:
@@ -396,7 +396,7 @@ def cancel(
         typer.echo(f"No such inspection: {insp_id}", err=True)
         raise typer.Exit(1)
 
-    cancelled = cancel_benchmark(r, resolved_id)
+    cancelled = cancel_inspection(r, resolved_id)
     typer.echo(f"Cancelled {cancelled} pending job(s) for {resolved_id[:8]}")
 
 
@@ -498,7 +498,7 @@ def export_config(
         branch = data.get("default_branch") or data.get("branch")
         repo_refs.append(RepoRef(full_name=full or "", git_url=git_url or "", branch=branch))
 
-    cfg_obj = BenchmarkConfig(
+    cfg_obj = InspectionConfig(
         schema_version="1",
         name=meta.get("name", resolved_id) or "",
         workers=workers,

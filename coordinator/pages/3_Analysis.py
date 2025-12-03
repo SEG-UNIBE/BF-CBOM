@@ -29,14 +29,14 @@ from coordinator.redis_io import (
     get_insp_repos,
     get_insp_workers,
     get_redis,
-    list_benchmarks,
+    list_inspections,
     pair_key,
     prepare_component_match_instruction,
 )
 from coordinator.utils import (
     build_repo_info_url_map,
     estimate_similarity_runtime,
-    format_benchmark_header,
+    format_inspection_header,
     get_query_insp_id,
     safe_int,
 )
@@ -100,25 +100,25 @@ def _latest_similarity_result(
 
 
 insp_id_hint = get_query_insp_id() or st.session_state.get("created_insp_id")
-benches = list_benchmarks(r)
-if not benches:
+inspections = list_inspections(r)
+if not inspections:
     st.info("No inspections found. Please create one first.")
     st.stop()
 
-labels = [f"{m.get('name', '(unnamed)')} · {bid[:8]} · {m.get('status', '?')}" for bid, m in benches]
+labels = [f"{m.get('name', '(unnamed)')} · {bid[:8]} · {m.get('status', '?')}" for bid, m in inspections]
 default_idx = 0
 if insp_id_hint:
     try:
-        default_idx = [bid for bid, _ in benches].index(insp_id_hint)
+        default_idx = [bid for bid, _ in inspections].index(insp_id_hint)
     except ValueError:
         default_idx = 0
 idx = st.selectbox(
     "Select inspection",
-    options=list(range(len(benches))),
+    options=list(range(len(inspections))),
     index=default_idx,
     format_func=lambda i: labels[i],
 )
-insp_id, _ = benches[idx]
+insp_id, _ = inspections[idx]
 
 meta = get_insp_meta(r, insp_id)
 name = meta.get("name", insp_id)
@@ -129,7 +129,7 @@ repos = get_insp_repos(r, insp_id)
 created = meta.get("created_at") or meta.get("started_at") or "?"
 expected = meta.get("expected_jobs") or "?"
 
-st.markdown(format_benchmark_header(name, insp_id, created, expected), unsafe_allow_html=True)
+st.markdown(format_inspection_header(name, insp_id, created, expected), unsafe_allow_html=True)
 
 job_idx = r.hgetall(f"insp:{insp_id}:job_index") or {}
 order_keys = get_status_keys_order()

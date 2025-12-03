@@ -352,7 +352,7 @@ def safe_int(value, default: int = 0) -> int:
             return default
 
 
-def format_benchmark_header(name: str, insp_id: str, created: str, expected: str) -> str:
+def format_inspection_header(name: str, insp_id: str, created: str, expected: str) -> str:
     """Return HTML snippet for consistent inspection header formatting."""
 
     created = created or "?"

@@ -5,21 +5,21 @@ import streamlit as st
 from common.utils import get_status_emoji
 from coordinator.logger_config import logger
 from coordinator.redis_io import (
-    cancel_benchmark,
+    cancel_inspection,
     collect_results_once,
     get_insp_meta,
     get_insp_repos,
     get_insp_workers,
     get_redis,
-    list_benchmarks,
+    list_inspections,
     now_iso,
     pair_key,
-    reexecute_benchmark,
-    retry_non_completed_benchmark,
-    start_benchmark,
+    reexecute_inspection,
+    retry_non_completed_inspection,
+    start_inspection,
 )
 from coordinator.utils import (
-    format_benchmark_header,
+    format_inspection_header,
     get_query_insp_id,
     repos_to_table_df,
     set_query_insp_id,
@@ -41,27 +41,27 @@ st.title("Execution")
 
 # Resolve insp selection
 insp_id_hint = get_query_insp_id() or st.session_state.get("created_insp_id")
-benches = list_benchmarks(r)
-if not benches:
+inspections = list_inspections(r)
+if not inspections:
     st.info("No inspections found. Please create one first.")
     st.stop()
 
-labels = [f"{m.get('name', '(unnamed)')} · {bid[:8]} · {m.get('status', '?')}" for bid, m in benches]
+labels = [f"{m.get('name', '(unnamed)')} · {bid[:8]} · {m.get('status', '?')}" for bid, m in inspections]
 default_idx = 0
 if insp_id_hint:
     try:
-        default_idx = [bid for bid, _ in benches].index(insp_id_hint)
+        default_idx = [bid for bid, _ in inspections].index(insp_id_hint)
     except ValueError:
         default_idx = 0
 left, mid, right = st.columns([6, 0.5, 3])
 with left:
     idx = st.selectbox(
         "Select inspection",
-        options=list(range(len(benches))),
+        options=list(range(len(inspections))),
         index=default_idx,
         format_func=lambda i: labels[i],
     )
-    insp_id, _ = benches[idx]
+    insp_id, _ = inspections[idx]
 
     meta = get_insp_meta(r, insp_id)
     name = meta.get("name", insp_id)
@@ -73,7 +73,7 @@ with left:
     created = meta.get("created_at") or meta.get("started_at") or "?"
     expected = meta.get("expected_jobs") or "?"
     st.markdown(
-        format_benchmark_header(name, insp_id, created, expected),
+        format_inspection_header(name, insp_id, created, expected),
         unsafe_allow_html=True,
     )
     st.caption(f"Workers: {', '.join(workers) if workers else '(none)'} · Status: {status}")
@@ -84,7 +84,7 @@ with left:
     elif status == "created":
         if st.button("Start Inspection", type="primary"):
             logger.info("Starting inspection: %s", insp_id)
-            issued = start_benchmark(r, insp_id)
+            issued = start_inspection(r, insp_id)
             set_query_insp_id(insp_id)
             st.rerun()
     else:
@@ -94,11 +94,11 @@ with left:
                 only_nc = st.session_state.get("only_nc_toggle", False)
                 if only_nc:
                     logger.info("Retrying non-completed jobs for inspection: %s", insp_id)
-                    issued = retry_non_completed_benchmark(r, insp_id)
+                    issued = retry_non_completed_inspection(r, insp_id)
                     st.toast(f"Retried {issued} jobs (non-completed)")
                 else:
                     logger.info("Re-executing all jobs for inspection: %s", insp_id)
-                    issued = reexecute_benchmark(r, insp_id)
+                    issued = reexecute_inspection(r, insp_id)
                     st.toast(f"Re-executed {issued} jobs")
                 set_query_insp_id(insp_id)
                 st.rerun()
@@ -193,7 +193,7 @@ with col_a:
 with col_b:
     cancel_disabled = status != "running"
     if st.button("Cancel", type="primary", disabled=cancel_disabled):
-        cancelled = cancel_benchmark(r, insp_id)
+        cancelled = cancel_inspection(r, insp_id)
         st.toast(f"Cancelled {cancelled} pending jobs")
         set_query_insp_id(insp_id)
         st.rerun()

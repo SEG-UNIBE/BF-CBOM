@@ -10,7 +10,7 @@ from common.utils import (
     get_status_emoji,
 )
 from coordinator.logger_config import logger
-from coordinator.redis_io import delete_benchmark, get_redis, list_benchmarks
+from coordinator.redis_io import delete_inspection, get_redis, list_inspections
 from coordinator.utils import (
     build_minimal_config_json,
     human_duration,
@@ -82,11 +82,11 @@ left, mid, right = st.columns([6, 0.02, 4])
 
 with left:
     st.subheader("Existing Inspections")
-    benches = list_benchmarks(r)
-    if not benches:
+    inspections = list_inspections(r)
+    if not inspections:
         st.info("No inspections yet. Create one to get started.")
     else:
-        for bid, meta in benches:
+        for iid, meta in inspections:
             name = meta.get("name", "(unnamed)")
             status = meta.get("status", "?")
             expected = int(meta.get("expected_jobs", "0") or 0)
@@ -97,7 +97,7 @@ with left:
                     (
                         f"**{name}**<br/>"
                         f"<span style='opacity:0.75; font-size:0.9rem;'>"
-                        f"<b>ID:</b> {bid}<br/>"
+                        f"<b>ID:</b> {iid}<br/>"
                         f"<b>Created:</b> {created}  ·  <b>Jobs:</b> {expected}"
                         f"</span>"
                     ),
@@ -111,17 +111,17 @@ with left:
             with cols[2]:
                 b1, b2, b3 = st.columns([1, 1, 0.5], vertical_alignment="top")
                 with b1:
-                    if st.button("Execution", key=f"run_{bid}"):
+                    if st.button("Execution", key=f"run_{iid}"):
                         # Preselect this inspection on the next page via query param and session hint
-                        set_query_insp_id(bid)
-                        st.session_state["created_insp_id"] = bid
-                        logger.info("UI: open Execution for insp %s", bid)
+                        set_query_insp_id(iid)
+                        st.session_state["created_insp_id"] = iid
+                        logger.info("UI: open Execution for insp %s", iid)
                         st.switch_page("pages/2_Execution.py")
                 with b2:
-                    if st.button("Analysis", key=f"ana_{bid}"):
-                        set_query_insp_id(bid)
-                        st.session_state["created_insp_id"] = bid
-                        logger.info("UI: open Analysis for insp %s", bid)
+                    if st.button("Analysis", key=f"ana_{iid}"):
+                        set_query_insp_id(iid)
+                        st.session_state["created_insp_id"] = iid
+                        logger.info("UI: open Analysis for insp %s", iid)
                         st.switch_page("pages/3_Analysis.py")
                 with b3:
                     d1, d2 = st.columns([1, 1], vertical_alignment="top")
@@ -130,9 +130,9 @@ with left:
                             # Build minimal config text for this inspection row
                             workers = st.session_state.get("_tmp_workers", None)  # unused guard
                             # Defer to utility to keep shape consistent
-                            repos_key = f"insp:{bid}:repos"
+                            repos_key = f"insp:{iid}:repos"
                             repos = [__import__("json").loads(x) for x in r.lrange(repos_key, 0, -1) or []]
-                            name_txt = meta.get("name", bid)
+                            name_txt = meta.get("name", iid)
                             # Workers list is stored in insp meta as JSON
                             try:
                                 workers_list = __import__("json").loads(meta.get("workers_json", "[]"))
@@ -142,16 +142,16 @@ with left:
                             st.download_button(
                                 "⬇️",
                                 data=cfg_text,
-                                file_name=f"insp-{bid[:8]}.json",
+                                file_name=f"insp-{iid[:8]}.json",
                                 help="Download config (JSON)",
-                                key=f"dl_{bid}",
+                                key=f"dl_{iid}",
                             )
                         except Exception:
                             pass
                     with d2:
-                        if st.button("🗑️", key=f"del_{bid}", help="Delete inspection"):
-                            deleted = delete_benchmark(r, bid)
-                            st.toast(f"Deleted inspection {bid[:8]} (jobs removed: {deleted})")
+                        if st.button("🗑️", key=f"del_{iid}", help="Delete inspection"):
+                            deleted = delete_inspection(r, iid)
+                            st.toast(f"Deleted inspection {iid[:8]} (jobs removed: {deleted})")
                             st.rerun()
 
 with mid:
@@ -172,7 +172,7 @@ with right:
     peak_mem = info.get("used_memory_peak_human") or info.get("used_memory_peak") or "?"
     keys = r.dbsize()
 
-    # Global job stats across all benches
+    # Global job stats across all inspections
     status_counts = {k: 0 for k in ("completed", "failed", "cancelled", "pending", "timeout")}
     total_duration = 0.0
     duration_count = 0
@@ -240,7 +240,7 @@ with right:
     total_jobs = sum(status_counts.values())
     left, right = st.columns([1, 3])
     with left:
-        st.metric("inspections", f"{len(benches):,}")
+        st.metric("inspections", f"{len(inspections):,}")
     with right:
         j_left, j_right = st.columns([1, 3])
         with j_left:
