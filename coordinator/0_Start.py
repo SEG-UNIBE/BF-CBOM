@@ -171,7 +171,6 @@ with right:
     sys_mem = info.get("total_system_memory_human") or "?"
     peak_mem = info.get("used_memory_peak_human") or info.get("used_memory_peak") or "?"
     keys = r.dbsize()
-    total_benches = len(benches)
 
     # Global job stats across all benches
     status_counts = {k: 0 for k in ("completed", "failed", "cancelled", "pending", "timeout")}
@@ -241,7 +240,7 @@ with right:
     total_jobs = sum(status_counts.values())
     left, right = st.columns([1, 3])
     with left:
-        st.metric("inspections", f"{total_benches:,}")
+        st.metric("inspections", f"{len(benches):,}")
     with right:
         j_left, j_right = st.columns([1, 3])
         with j_left:

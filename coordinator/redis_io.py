@@ -202,7 +202,7 @@ def fetch_top_language(r: redis.Redis, fullname: str, token: str | None) -> str 
 
 def now_iso() -> str:
     """Return current UTC time in ISO-8601 format with Z suffix (no micros)."""
-    return dt.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+    return dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 @st.cache_resource(show_spinner=False)
@@ -234,14 +234,18 @@ def list_benchmarks(r: redis.Redis) -> list[tuple[str, dict[str, str]]]:
         created = meta.get("created_at") or meta.get("started_at") or ""
         items.append((bid, meta, created))
 
-    def _parse_iso(s: str):
+    def _parse_iso(s: str) -> dt.datetime:
+        """Parse ISO timestamp, always returning offset-aware datetime for consistent comparison."""
         if not s:
-            return dt.datetime.min.replace(tzinfo=None)
+            return dt.datetime.min.replace(tzinfo=dt.UTC)
         try:
-            s2 = s.replace("Z", "+00:00")
-            return dt.datetime.fromisoformat(s2)
+            parsed = dt.datetime.fromisoformat(s.replace("Z", "+00:00"))
+            # Ensure offset-aware for consistent comparison
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=dt.UTC)
+            return parsed
         except Exception:
-            return dt.datetime.min.replace(tzinfo=None)
+            return dt.datetime.min.replace(tzinfo=dt.UTC)
 
     items.sort(key=lambda t: _parse_iso(t[2]), reverse=True)
     return [(bid, meta) for (bid, meta, _) in items]
@@ -588,7 +592,7 @@ def delete_benchmark(r: redis.Redis, insp_id: str) -> int:
     - `insp:{id}:jobs` list
     - `insp:{id}:job_index` hash
     - `insp:{id}:job:{job_id}` hashes for all jobs
-    - membership in `benches` set
+    - membership in `inspects` set
 
     Returns count of deleted per-job hashes (for reference).
     """
@@ -605,7 +609,7 @@ def delete_benchmark(r: redis.Redis, insp_id: str) -> int:
     pipe.delete(f"insp:{insp_id}:job_index")
     pipe.delete(f"insp:{insp_id}:repos")
     pipe.delete(f"insp:{insp_id}")
-    pipe.srem("benches", insp_id)
+    pipe.srem("inspects", insp_id)
     pipe.execute()
 
     _purge_component_match_data(r, insp_id)
