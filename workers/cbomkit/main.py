@@ -652,7 +652,6 @@ def _produce(instr: JobInstruction, trace: Trace) -> str | tuple[str, float]:
 
 handle_instruction = build_handle_instruction(NAME, _produce)
 
-
 def main():
     # Delegate the queue/timeout loop to the shared runner
     run_worker(NAME, handle_instruction, default_timeout=TIMEOUT_SEC)
