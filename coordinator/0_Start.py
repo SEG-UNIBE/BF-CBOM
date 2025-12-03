@@ -64,7 +64,7 @@ with col_title:
         """,
         unsafe_allow_html=True,
     )
-st.caption("Benchmarking Framework for Cryptography Bill of Material (CBOM) Generator Tools")
+st.caption("Your <b><u>B</u></b>est <b><u>F</u></b>riend for Generating, Understanding, and Comparing Cryptography Bills of Materials (<b><u>CBOMs</u></b>)", unsafe_allow_html=True)
 
 # Top action: create new benchmark
 if st.button("➕ Create New Benchmark", type="primary"):
