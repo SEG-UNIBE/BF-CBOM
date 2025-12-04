@@ -68,8 +68,8 @@ class JobInstruction(DataClassJsonMixin):
 
 
 @dataclass
-class Benchmark(DataClassJsonMixin):
-    bench_id: str
+class Inspection(DataClassJsonMixin):
+    insp_id: str
     name: str
     status: str = "created"
     params: dict | None = None
@@ -93,7 +93,7 @@ class CbomJson(DataClassJsonMixin):
 @dataclass
 class ComponentMatchJobInstruction(DataClassJsonMixin):
     job_id: str
-    benchmark_id: str
+    inspection_id: str
     repo_info: RepoInfo
     CbomJsons: list[CbomJson]
 
@@ -101,7 +101,7 @@ class ComponentMatchJobInstruction(DataClassJsonMixin):
 @dataclass
 class ComponentMatchJobResult(DataClassJsonMixin):
     job_id: str
-    benchmark_id: str
+    inspection_id: str
     repo_full_name: str
     tools: list[str]
     match_count: int
@@ -124,8 +124,8 @@ class RepoRef(DataClassJsonMixin):
 
 
 @dataclass
-class BenchmarkConfig(DataClassJsonMixin):
-    """Minimal, reproducible benchmark configuration for CLI/CI.
+class InspectionConfig(DataClassJsonMixin):
+    """Minimal, reproducible inspection configuration for CLI/CI.
 
     Fields are intentionally small to keep configs portable and tool-agnostic.
     """

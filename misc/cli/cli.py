@@ -10,29 +10,29 @@ import click
 import redis
 import typer
 
-from common.models import BenchmarkConfig, RepoRef
+from common.models import InspectionConfig, RepoRef
 from coordinator.redis_io import (
-    cancel_benchmark,
+    cancel_inspection,
     collect_results_once,
-    create_benchmark,
-    get_bench_meta,
-    get_bench_repos,
-    get_bench_workers,
-    list_benchmarks,
+    create_inspection,
+    get_insp_meta,
+    get_insp_repos,
+    get_insp_workers,
+    list_inspections,
     now_iso,
     pair_key,
-    start_benchmark,
+    start_inspection,
 )
 
 app = typer.Typer(
     add_completion=False,
-    help="BF-CBOM CLI: create and run benchmarks",
+    help="BF-CBOM CLI: create and run inspections",
     no_args_is_help=True,
     context_settings={"help_option_names": ["-h", "--help"]},
 )
 
 export_app = typer.Typer(
-    help="Export benchmark artifacts",
+    help="Export inspection artifacts",
     add_completion=False,
     context_settings={"help_option_names": ["-h", "--help"]},
 )
@@ -79,21 +79,21 @@ def _read_config_text(path: str) -> str:
         return f.read()
 
 
-def _summarize_bench(r: redis.Redis, bench_id: str) -> dict:
-    meta = get_bench_meta(r, bench_id)
-    jobs = r.lrange(f"bench:{bench_id}:jobs", 0, -1) or []
+def _summarize_inspection(r: redis.Redis, insp_id: str) -> dict:
+    meta = get_insp_meta(r, insp_id)
+    jobs = r.lrange(f"insp:{insp_id}:jobs", 0, -1) or []
     total = len(jobs)
     counts = {"completed": 0, "failed": 0, "cancelled": 0, "pending": 0}
     for j in jobs:
-        st = r.hget(f"bench:{bench_id}:job:{j}", "status") or ""
+        st = r.hget(f"insp:{insp_id}:job:{j}", "status") or ""
         if st in counts:
             counts[st] += 1
         else:
             counts["pending"] += 1
     done = counts["completed"] + counts["failed"] + counts["cancelled"]
     return {
-        "bench_id": bench_id,
-        "name": meta.get("name", bench_id),
+        "insp_id": insp_id,
+        "name": meta.get("name", insp_id),
         "status": meta.get("status", ""),
         "counts": counts,
         "done": done,
@@ -101,24 +101,24 @@ def _summarize_bench(r: redis.Redis, bench_id: str) -> dict:
     }
 
 
-def _resolve_bench_id(r: redis.Redis, bench_id: str) -> str:
-    """Allow prefix matching for benchmark identifiers when unique."""
+def _resolve_insp_id(r: redis.Redis, insp_id: str) -> str:
+    """Allow prefix matching for inspection identifiers when unique."""
 
-    if not bench_id:
-        raise ValueError("Benchmark ID is required")
+    if not insp_id:
+        raise ValueError("Inspection ID is required")
 
-    if r.exists(f"bench:{bench_id}"):
-        return bench_id
+    if r.exists(f"insp:{insp_id}"):
+        return insp_id
 
-    benches = r.smembers("benches") or []
-    matches = [bid for bid in benches if bid.startswith(bench_id)]
+    inspections = r.smembers("inspecs") or []
+    matches = [bid for bid in inspections if bid.startswith(insp_id)]
 
     if not matches:
-        raise ValueError(f"No benchmark found matching '{bench_id}'")
+        raise ValueError(f"No inspection found matching '{insp_id}'")
     if len(matches) > 1:
         sample = ", ".join(sorted(matches)[:5])
         raise ValueError(
-            f"Benchmark prefix '{bench_id}' is ambiguous "
+            f"Inspection prefix '{insp_id}' is ambiguous "
             f"({len(matches)} matches: {sample}{'…' if len(matches) > 5 else ''})"
         )
 
@@ -149,11 +149,11 @@ def _render_lines(lines: list[str]) -> None:
     sys.stdout.flush()
 
 
-def _build_cboms_zip_bytes(r: redis.Redis, bench_id: str) -> tuple[bytes, int]:
-    """Collect successful CBOM payloads for a benchmark and package them into a ZIP."""
+def _build_cboms_zip_bytes(r: redis.Redis, insp_id: str) -> tuple[bytes, int]:
+    """Collect successful CBOM payloads for an inspection and package them into a ZIP."""
 
-    repos = get_bench_repos(r, bench_id) or []
-    workers = get_bench_workers(r, bench_id) or []
+    repos = get_insp_repos(r, insp_id) or []
+    workers = get_insp_workers(r, insp_id) or []
 
     mem = io.BytesIO()
     written = 0
@@ -163,10 +163,10 @@ def _build_cboms_zip_bytes(r: redis.Redis, bench_id: str) -> tuple[bytes, int]:
             safe_repo = (full or "").replace("/", "_")
             for worker in workers:
                 job_key = pair_key(full or "", worker)
-                job_id = r.hget(f"bench:{bench_id}:job_index", job_key)
+                job_id = r.hget(f"insp:{insp_id}:job_index", job_key)
                 if not job_id:
                     continue
-                raw = r.hget(f"bench:{bench_id}:job:{job_id}", "result_json")
+                raw = r.hget(f"insp:{insp_id}:job:{job_id}", "result_json")
                 if not raw:
                     continue
                 try:
@@ -184,7 +184,7 @@ def _build_cboms_zip_bytes(r: redis.Redis, bench_id: str) -> tuple[bytes, int]:
                 except Exception:
                     # Keep original content if it is not valid JSON
                     pass
-                archive_path = f"{bench_id}/{worker}/{safe_repo}_{worker}.json"
+                archive_path = f"{insp_id}/{worker}/{safe_repo}_{worker}.json"
                 zf.writestr(archive_path, content)
                 written += 1
     mem.seek(0)
@@ -193,7 +193,7 @@ def _build_cboms_zip_bytes(r: redis.Redis, bench_id: str) -> tuple[bytes, int]:
 
 @app.command()
 def watch(
-    bench_id: str | None = typer.Option(None, "--bench-id", "-b", help="Follow a specific benchmark"),
+    insp_id: str | None = typer.Option(None, "--insp-id", "-b", help="Follow a specific inspection"),
     redis_host: str = typer.Option("localhost", envvar="REDIS_HOST"),
     redis_port: int = typer.Option(6379, envvar="REDIS_PORT"),
     interval: float = typer.Option(2.0, help="Refresh interval seconds"),
@@ -207,15 +207,15 @@ def watch(
         while True:
             lines: list[str] = []
             now = time.strftime("%Y-%m-%d %H:%M:%S")
-            if bench_id:
-                summary = _summarize_bench(r, bench_id)
+            if insp_id:
+                summary = _summarize_inspection(r, insp_id)
                 title = typer.style("BF-CBOM Watch", fg=typer.colors.BRIGHT_BLUE, bold=True)
                 timestamp = typer.style(now, fg=typer.colors.BRIGHT_BLACK)
                 lines.append(f"{title} · {timestamp}")
                 name = typer.style(summary["name"], fg=typer.colors.WHITE, bold=True)
-                bench_short = typer.style(bench_id[:8], fg=typer.colors.BRIGHT_CYAN, bold=True)
+                insp_short = typer.style(insp_id[:8], fg=typer.colors.BRIGHT_CYAN, bold=True)
                 status = _style_status(summary["status"])
-                lines.append(f"{name} · {bench_short} · status={status}")
+                lines.append(f"{name} · {insp_short} · status={status}")
                 c = summary["counts"]
                 done = typer.style(str(summary["done"]), fg=typer.colors.BRIGHT_GREEN, bold=True)
                 total = typer.style(str(summary["total"]), fg=typer.colors.BRIGHT_BLACK, bold=True)
@@ -228,18 +228,18 @@ def watch(
                     f"completed={completed} failed={failed} cancelled={cancelled} pending={pending}"
                 )
             else:
-                benches = list_benchmarks(r)
+                inspections = list_inspections(r)
                 title = typer.style("BF-CBOM Watch", fg=typer.colors.BRIGHT_BLUE, bold=True)
                 timestamp = typer.style(now, fg=typer.colors.BRIGHT_BLACK)
-                bench_count = typer.style(str(len(benches)), fg=typer.colors.BRIGHT_CYAN, bold=True)
-                lines.append(f"{title} · {timestamp} · {bench_count} benchmarks")
+                insp_count = typer.style(str(len(inspections)), fg=typer.colors.BRIGHT_CYAN, bold=True)
+                lines.append(f"{title} · {timestamp} · {insp_count} inspections")
                 header_text = (
                     "id       name                          status    done/total   completed  failed  cancelled"
                 )
                 lines.append(typer.style(header_text, fg=typer.colors.WHITE, bold=True))
                 lines.append(typer.style("-" * 90, fg=typer.colors.BRIGHT_BLACK))
-                for bid, meta in benches[:50]:
-                    s = _summarize_bench(r, bid)
+                for bid, meta in inspections[:50]:
+                    s = _summarize_inspection(r, bid)
                     nm = (meta.get("name", bid) or "").strip()
                     nm = (nm[:28] + "…") if len(nm) > 29 else nm.ljust(29)
                     nm_display = typer.style(nm, fg=typer.colors.WHITE)
@@ -257,7 +257,7 @@ def watch(
                         f"{done}/{total}      {completed}       {failed}    {cancelled}"
                     )
                 lines.append("")
-                lines.append("Use --bench-id to follow one. Ctrl-C to exit.")
+                lines.append("Use --insp-id to follow one. Ctrl-C to exit.")
             _render_lines(lines)
             time.sleep(max(0.2, interval))
     except KeyboardInterrupt:
@@ -270,18 +270,18 @@ def watch(
 @app.command()
 def run(
     config: str = typer.Option(..., "--config", "-c", help="Path to config JSON or '-' for stdin"),
-    name: str | None = typer.Option(None, "--name", "-n", help="Override benchmark name from config"),
+    name: str | None = typer.Option(None, "--name", "-n", help="Override inspection name from config"),
     redis_host: str = typer.Option("localhost", envvar="REDIS_HOST", help="Redis host"),
     redis_port: int = typer.Option(6379, envvar="REDIS_PORT", help="Redis port"),
     wait: bool = typer.Option(False, "--wait", help="Wait for completion"),
     poll_interval: float = typer.Option(2.0, help="Polling interval when waiting (sec)"),
     timeout: int | None = typer.Option(None, help="Max seconds to wait before exiting"),
 ):
-    """Create a benchmark from config, start it, and optionally wait."""
+    """Create an inspection from config, start it, and optionally wait."""
 
     cfg_text = _read_config_text(config)
     try:
-        cfg = BenchmarkConfig.from_json(cfg_text)
+        cfg = InspectionConfig.from_json(cfg_text)
     except Exception as e:
         typer.echo(f"Error: invalid CLI config: {e}", err=True)
         raise typer.Exit(2) from e
@@ -295,7 +295,7 @@ def run(
         typer.echo("Error: config must include non-empty 'repos'", err=True)
         raise typer.Exit(2)
 
-    bench_name = name or (cfg.name or f"cli-{int(time.time())}")
+    insp_name = name or (cfg.name or f"cli-{int(time.time())}")
     params = {"source": "cli", "schema_version": str(cfg.schema_version or "1")}
 
     r = _connect_redis(redis_host, redis_port)
@@ -307,9 +307,9 @@ def run(
         }
         for rr in repos_refs
     ]
-    bench_id = create_benchmark(r, name=bench_name, params=params, repos=repos_payload, workers=workers)
-    typer.echo(bench_id)
-    issued = start_benchmark(r, bench_id)
+    insp_id = create_inspection(r, name=insp_name, params=params, repos=repos_payload, workers=workers)
+    typer.echo(insp_id)
+    issued = start_inspection(r, insp_id)
     typer.secho(f"Issued jobs: {issued}", fg=typer.colors.BLUE, err=True)
 
     if not wait:
@@ -317,8 +317,8 @@ def run(
 
     start_ts = time.time()
     while True:
-        done, total = collect_results_once(r, bench_id)
-        summary = _summarize_bench(r, bench_id)
+        done, total = collect_results_once(r, insp_id)
+        summary = _summarize_inspection(r, insp_id)
         typer.secho(
             f"Progress: {summary['done']}/{summary['total']} "
             f"(completed={summary['counts']['completed']} failed={summary['counts']['failed']})",
@@ -328,7 +328,7 @@ def run(
         if total and done >= total:
             # Mark completed for consistency with GUI page behavior
             r.hset(
-                f"bench:{bench_id}",
+                f"insp:{insp_id}",
                 mapping={"status": "completed", "finished_at": now_iso()},
             )
             break
@@ -337,7 +337,7 @@ def run(
             raise typer.Exit(124)
         time.sleep(max(0.1, poll_interval))
 
-    final = _summarize_bench(r, bench_id)
+    final = _summarize_inspection(r, insp_id)
     failed = final["counts"]["failed"]
     typer.echo(json.dumps(final, ensure_ascii=False))
     raise typer.Exit(1 if failed else 0)
@@ -345,23 +345,23 @@ def run(
 
 @app.command()
 def status(
-    bench_id: str = typer.Argument(..., help="Benchmark ID (supports unique prefix)"),
+    insp_id: str = typer.Argument(..., help="Inspection ID (supports unique prefix)"),
     redis_host: str = typer.Option("localhost", envvar="REDIS_HOST", help="Redis host"),
     redis_port: int = typer.Option(6379, envvar="REDIS_PORT", help="Redis port"),
     json_out: bool = typer.Option(False, "--json", help="Emit JSON summary"),
 ):
-    """Show current status of a benchmark."""
+    """Show current status of an inspection."""
     r = _connect_redis(redis_host, redis_port)
     try:
-        resolved_id = _resolve_bench_id(r, bench_id)
+        resolved_id = _resolve_insp_id(r, insp_id)
     except ValueError as err:
         typer.echo(str(err), err=True)
         raise typer.Exit(1) from err
 
-    if resolved_id != bench_id:
-        typer.echo(f"Resolved benchmark ID '{bench_id}' -> '{resolved_id}'", err=True)
+    if resolved_id != insp_id:
+        typer.echo(f"Resolved inspection ID '{insp_id}' -> '{resolved_id}'", err=True)
 
-    summary = _summarize_bench(r, resolved_id)
+    summary = _summarize_inspection(r, resolved_id)
     if json_out:
         typer.echo(json.dumps(summary, ensure_ascii=False))
     else:
@@ -376,27 +376,27 @@ def status(
 
 @app.command()
 def cancel(
-    bench_id: str = typer.Argument(..., help="Benchmark ID (supports unique prefix)"),
+    insp_id: str = typer.Argument(..., help="Inspection ID (supports unique prefix)"),
     redis_host: str = typer.Option("localhost", envvar="REDIS_HOST", help="Redis host"),
     redis_port: int = typer.Option(6379, envvar="REDIS_PORT", help="Redis port"),
 ):
-    """Cancel a running benchmark by removing queued jobs and marking them cancelled."""
+    """Cancel a running inspection by removing queued jobs and marking them cancelled."""
 
     r = _connect_redis(redis_host, redis_port)
     try:
-        resolved_id = _resolve_bench_id(r, bench_id)
+        resolved_id = _resolve_insp_id(r, insp_id)
     except ValueError as err:
         typer.echo(str(err), err=True)
         raise typer.Exit(1) from err
 
-    if resolved_id != bench_id:
-        typer.echo(f"Resolved benchmark ID '{bench_id}' -> '{resolved_id}'", err=True)
+    if resolved_id != insp_id:
+        typer.echo(f"Resolved inspection ID '{insp_id}' -> '{resolved_id}'", err=True)
 
-    if not get_bench_meta(r, resolved_id):
-        typer.echo(f"No such benchmark: {bench_id}", err=True)
+    if not get_insp_meta(r, resolved_id):
+        typer.echo(f"No such inspection: {insp_id}", err=True)
         raise typer.Exit(1)
 
-    cancelled = cancel_benchmark(r, resolved_id)
+    cancelled = cancel_inspection(r, resolved_id)
     typer.echo(f"Cancelled {cancelled} pending job(s) for {resolved_id[:8]}")
 
 
@@ -435,13 +435,13 @@ def export_default(
             raise typer.Exit()
 
         typer.echo(
-            f"Missing BENCH_ID argument for `cli export {candidate}`.\n"
-            f"Usage: uv run misc/cli/cli.py export {candidate} <BENCH_ID> [options]",
+            f"Missing INSP_ID argument for `cli export {candidate}`.\n"
+            f"Usage: uv run misc/cli/cli.py export {candidate} <INSP_ID> [options]",
             err=True,
         )
         raise typer.Exit(1)
 
-    bench_id = candidate
+    insp_id = candidate
 
     if remaining:
         typer.echo(
@@ -452,7 +452,7 @@ def export_default(
 
     ctx.invoke(
         export_config,
-        bench_id=bench_id,
+        insp_id=insp_id,
         out=out,
         redis_host=redis_host,
         redis_port=redis_port,
@@ -461,7 +461,7 @@ def export_default(
 
 @export_app.command("config")
 def export_config(
-    bench_id: str = typer.Argument(..., help="Benchmark ID"),
+    insp_id: str = typer.Argument(..., help="Inspection ID"),
     out: str | None = typer.Option(
         None,
         "--out",
@@ -471,25 +471,25 @@ def export_config(
     redis_host: str = typer.Option("localhost", envvar="REDIS_HOST", help="Redis host"),
     redis_port: int = typer.Option(6379, envvar="REDIS_PORT", help="Redis port"),
 ) -> None:
-    """Export a minimal config snapshot for a benchmark."""
+    """Export a minimal config snapshot for an inspection."""
 
     r = _connect_redis(redis_host, redis_port)
     try:
-        resolved_id = _resolve_bench_id(r, bench_id)
+        resolved_id = _resolve_insp_id(r, insp_id)
     except ValueError as err:
         typer.echo(str(err), err=True)
         raise typer.Exit(1) from err
 
-    if resolved_id != bench_id:
-        typer.echo(f"Resolved benchmark ID '{bench_id}' -> '{resolved_id}'", err=True)
+    if resolved_id != insp_id:
+        typer.echo(f"Resolved inspection ID '{insp_id}' -> '{resolved_id}'", err=True)
 
-    meta = get_bench_meta(r, resolved_id)
+    meta = get_insp_meta(r, resolved_id)
     if not meta:
-        typer.echo(f"No such benchmark: {bench_id}", err=True)
+        typer.echo(f"No such inspection: {insp_id}", err=True)
         raise typer.Exit(1)
 
-    workers = get_bench_workers(r, resolved_id)
-    repos = get_bench_repos(r, resolved_id)
+    workers = get_insp_workers(r, resolved_id)
+    repos = get_insp_repos(r, resolved_id)
 
     repo_refs: list[RepoRef] = []
     for data in repos:
@@ -498,7 +498,7 @@ def export_config(
         branch = data.get("default_branch") or data.get("branch")
         repo_refs.append(RepoRef(full_name=full or "", git_url=git_url or "", branch=branch))
 
-    cfg_obj = BenchmarkConfig(
+    cfg_obj = InspectionConfig(
         schema_version="1",
         name=meta.get("name", resolved_id) or "",
         workers=workers,
@@ -517,32 +517,32 @@ def export_config(
 
 @export_app.command("cboms")
 def export_cboms(
-    bench_id: str = typer.Argument(..., help="Benchmark ID"),
+    insp_id: str = typer.Argument(..., help="Inspection ID"),
     dest: Path = EXPORT_DEST_OPTION,
     filename: str | None = typer.Option(
         None,
         "--filename",
         "-f",
-        help="Optional ZIP filename (defaults to cboms_<bench>.zip)",
+        help="Optional ZIP filename (defaults to cboms_<insp>.zip)",
     ),
     redis_host: str = typer.Option("localhost", envvar="REDIS_HOST", help="Redis host"),
     redis_port: int = typer.Option(6379, envvar="REDIS_PORT", help="Redis port"),
 ) -> None:
-    """Export a ZIP containing successful CBOMs for a benchmark."""
+    """Export a ZIP containing successful CBOMs for an inspection."""
 
     r = _connect_redis(redis_host, redis_port)
     try:
-        resolved_id = _resolve_bench_id(r, bench_id)
+        resolved_id = _resolve_insp_id(r, insp_id)
     except ValueError as err:
         typer.echo(str(err), err=True)
         raise typer.Exit(1) from err
 
-    if resolved_id != bench_id:
-        typer.echo(f"Resolved benchmark ID '{bench_id}' -> '{resolved_id}'", err=True)
+    if resolved_id != insp_id:
+        typer.echo(f"Resolved inspection ID '{insp_id}' -> '{resolved_id}'", err=True)
 
-    meta = get_bench_meta(r, resolved_id)
+    meta = get_insp_meta(r, resolved_id)
     if not meta:
-        typer.echo(f"No such benchmark: {bench_id}", err=True)
+        typer.echo(f"No such inspection: {insp_id}", err=True)
         raise typer.Exit(1)
 
     dest = dest.expanduser()
@@ -595,7 +595,7 @@ def banner(
     typer.secho("BF-CBOM CLI", fg=theme_color, bold=True)
     typer.echo(
         typer.style(
-            "Create benchmarks, monitor their progress, and export artifacts.",
+            "Create inspections, monitor their progress, and export artifacts.",
             fg=typer.colors.WHITE,
         )
     )
@@ -625,29 +625,29 @@ def banner(
 
     typer.secho("Examples\n", fg=theme_color, bold=True)
     # 1) Watch
-    typer.echo(typer.style("  # Watch live progress of existing benchmarks", fg=theme_color))
-    _echo_uv("watch --bench-id <BENCH_ID>")
+    typer.echo(typer.style("  # Watch live progress of existing inspection", fg=theme_color))
+    _echo_uv("watch --insp-id <INSP_ID>")
     typer.echo("")
     # 2) Check status
-    typer.echo(typer.style("  # Check status of a distinct benchmark", fg=theme_color))
-    _echo_uv("status <BENCH_ID> --json")
+    typer.echo(typer.style("  # Check status of a distinct inspection", fg=theme_color))
+    _echo_uv("status <INSP_ID> --json")
     typer.echo("")
     # 3) Download all CBOMs
     typer.echo(typer.style("  # Download all CBOMs as zip", fg=theme_color))
-    _echo_uv("export cboms <BENCH_ID> --dest ./downloads")
+    _echo_uv("export cboms <INSP_ID> --dest ./downloads")
     typer.echo("")
     # 4) Export config
-    typer.echo(typer.style("  # Export a config for an existing benchmark", fg=theme_color))
-    _echo_uv("export config <BENCH_ID> -o bench.json")
+    typer.echo(typer.style("  # Export a config for an existing inspection", fg=theme_color))
+    _echo_uv("export config <INSP_ID> -o insp.json")
     typer.echo("")
     # 5) Run again with config (two styles)
     typer.echo(typer.style("  # Run again with config", fg=theme_color))
-    _echo_uv("run -c bench.json --wait")
-    _echo_piped("cat bench.json |", "run -c - --wait")
+    _echo_uv("run -c insp.json --wait")
+    _echo_piped("cat insp.json |", "run -c - --wait")
     typer.echo("")
-    # 6) Cancel running benchmark
-    typer.echo(typer.style("  # Cancel a running benchmark", fg=theme_color))
-    _echo_uv("cancel <BENCH_ID>")
+    # 6) Cancel running inspection
+    typer.echo(typer.style("  # Cancel a running inspection", fg=theme_color))
+    _echo_uv("cancel <INSP_ID>")
 
 
 if __name__ == "__main__":

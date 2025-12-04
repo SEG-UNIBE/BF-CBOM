@@ -6,19 +6,19 @@ from coordinator.utils import get_favicon_path
 
 from common.utils import get_status_emoji
 from coordinator.redis_io import (
-    get_bench_meta,
-    get_bench_repos,
-    get_bench_workers,
+    get_insp_meta,
+    get_insp_repos,
+    get_insp_workers,
     get_redis,
-    list_benchmarks,
+    list_inspections,
     pair_key,
 )
 from coordinator.utils import (
     build_cboms_zip,
     derive_status_key_from_payload,
-    format_benchmark_header,
-    get_query_bench_id,
-    set_query_bench_id,
+    format_inspection_header,
+    get_query_insp_id,
+    set_query_insp_id,
 )
 
 ico_path = Path(get_favicon_path())
@@ -51,16 +51,16 @@ def _payload_matches(raw_text: str, tokens: tuple[str, ...]) -> bool:
 
 def _render_job_results(
     r,
-    bench_id: str,
+    insp_id: str,
     repos: list[dict],
     workers: list[str],
     job_idx: dict,
 ) -> None:
     if not repos or not workers:
-        st.info("No repos or workers registered for this benchmark yet.")
+        st.info("No repos or workers registered for this inspection yet.")
         return
 
-    page_key = f"dl_page_{bench_id}"
+    page_key = f"dl_page_{insp_id}"
     if page_key not in st.session_state:
         st.session_state[page_key] = 0
 
@@ -71,19 +71,19 @@ def _render_job_results(
     q = colf1.text_input(
         "Search (repo/worker, space-separated tokens)",
         placeholder="e.g., numpy worker-x timeout",
-        key=f"dl_search_{bench_id}",
+        key=f"dl_search_{insp_id}",
         on_change=reset_page,
     ).strip()
     sel_repo = colf2.selectbox(
         "Repo filter",
         ["(any)"] + [r.get("full_name", "") for r in repos],
-        key=f"dl_sel_repo_{bench_id}",
+        key=f"dl_sel_repo_{insp_id}",
         on_change=reset_page,
     )
     sel_worker = colf3.selectbox(
         "Worker filter",
         ["(any)"] + workers,
-        key=f"dl_sel_worker_{bench_id}",
+        key=f"dl_sel_worker_{insp_id}",
         on_change=reset_page,
     )
     batch_size = int(
@@ -93,7 +93,7 @@ def _render_job_results(
             500,
             50,
             step=10,
-            key=f"dl_batch_{bench_id}",
+            key=f"dl_batch_{insp_id}",
             on_change=reset_page,
         )
     )
@@ -101,7 +101,7 @@ def _render_job_results(
     deep = st.toggle(
         "Deep search in JobResult/CBOM (slow)",
         value=False,
-        key=f"dl_deep_{bench_id}",
+        key=f"dl_deep_{insp_id}",
         on_change=reset_page,
     )
     if deep:
@@ -152,7 +152,7 @@ def _render_job_results(
     if needs_deep_filter() and candidates:
         pipe = r.pipeline()
         for _, _, j_id in candidates:
-            pipe.hget(f"bench:{bench_id}:job:{j_id}", "result_json")
+            pipe.hget(f"insp:{insp_id}:job:{j_id}", "result_json")
         raw_list = pipe.execute()
         tok_tuple = tuple(tokens)
         deep_filtered = []
@@ -174,10 +174,10 @@ def _render_job_results(
     st.session_state[page_key] = page
 
     colp1, colp2, colp_mid, colp3 = st.columns([1, 1, 5, 3])
-    if colp1.button("◀ Prev", disabled=page <= 0, key=f"dl_prev_{bench_id}"):
+    if colp1.button("◀ Prev", disabled=page <= 0, key=f"dl_prev_{insp_id}"):
         st.session_state[page_key] = max(0, page - 1)
         st.rerun()
-    if colp2.button("Next ▶", disabled=page >= max_page, key=f"dl_next_{bench_id}"):
+    if colp2.button("Next ▶", disabled=page >= max_page, key=f"dl_next_{insp_id}"):
         st.session_state[page_key] = min(max_page, page + 1)
         st.rerun()
     colp_mid.caption(f"Showing page {page + 1} of {max_page + 1} · {total} matches")
@@ -189,7 +189,7 @@ def _render_job_results(
     if window:
         pipe = r.pipeline()
         for _, _, j_id in window:
-            pipe.hgetall(f"bench:{bench_id}:job:{j_id}")
+            pipe.hgetall(f"insp:{insp_id}:job:{j_id}")
         metas = pipe.execute()
 
         for (repo_name, worker_name, j_id), meta in zip(window, metas, strict=False):
@@ -244,7 +244,7 @@ def _render_job_results(
 
                 if st.toggle(
                     f"Show CBOM JSON for {repo_name} · {worker_name}",
-                    key=f"dl_cbom_{bench_id}_{j_id}",
+                    key=f"dl_cbom_{insp_id}_{j_id}",
                     value=False,
                 ):
                     cbom_txt = payload.get("json") or "{}"
@@ -269,51 +269,51 @@ def _render_job_results(
 r = get_redis()
 st.title("Downloads")
 
-bench_id_hint = get_query_bench_id() or st.session_state.get("created_bench_id")
-benches = list_benchmarks(r)
-if not benches:
-    st.info("No benchmarks found. Please create one first.")
+insp_id_hint = get_query_insp_id() or st.session_state.get("created_insp_id")
+inspections = list_inspections(r)
+if not inspections:
+    st.info("No inspections found. Please create one first.")
     st.stop()
 
-bench_map = {bid: meta for bid, meta in benches}
-bench_order = [bid for bid, _ in benches]
+insp_map = {iid: meta for iid, meta in inspections}
+insp_order = [iid for iid, _ in inspections]
 
-initial_id = bench_order[0]
-if bench_id_hint and bench_id_hint in bench_map:
-    initial_id = bench_id_hint
+initial_id = insp_order[0]
+if insp_id_hint and insp_id_hint in insp_map:
+    initial_id = insp_id_hint
 
-bench_id = st.selectbox(
-    "Select benchmark",
-    options=bench_order,
-    index=bench_order.index(initial_id),
-    format_func=lambda bid: f"{bench_map.get(bid, {}).get('name', '(unnamed)')} · "
-    f"{bid[:8]} · {bench_map.get(bid, {}).get('status', '?')}",
+insp_id = st.selectbox(
+    "Select inspection",
+    options=insp_order,
+    index=insp_order.index(initial_id),
+    format_func=lambda iid: f"{insp_map.get(iid, {}).get('name', '(unnamed)')} · "
+    f"{iid[:8]} · {insp_map.get(iid, {}).get('status', '?')}",
 )
-set_query_bench_id(bench_id)
+set_query_insp_id(insp_id)
 
-meta = get_bench_meta(r, bench_id) or bench_map.get(bench_id, {})
-name = meta.get("name", bench_id)
+meta = get_insp_meta(r, insp_id) or insp_map.get(insp_id, {})
+name = meta.get("name", insp_id)
 status = meta.get("status", "?")
 created = meta.get("created_at") or meta.get("started_at") or "?"
 expected = meta.get("expected_jobs") or "?"
-repos = get_bench_repos(r, bench_id)
-workers = get_bench_workers(r, bench_id)
-job_idx = r.hgetall(f"bench:{bench_id}:job_index") or {}
+repos = get_insp_repos(r, insp_id)
+workers = get_insp_workers(r, insp_id)
+job_idx = r.hgetall(f"insp:{insp_id}:job_index") or {}
 
-st.markdown(format_benchmark_header(name, bench_id, created, expected), unsafe_allow_html=True)
+st.markdown(format_inspection_header(name, insp_id, created, expected), unsafe_allow_html=True)
 st.caption(f"Status: {status}")
 
-zip_bytes = build_cboms_zip(r, bench_id)
+zip_bytes = build_cboms_zip(r, insp_id)
 if not zip_bytes:
     st.info("No completed CBOMs to download yet.")
 else:
     st.download_button(
         "Download CBOMs",
         data=zip_bytes,
-        file_name=f"cboms_{bench_id[:8]}.zip",
+        file_name=f"cboms_{insp_id[:8]}.zip",
         mime="application/zip",
-        key=f"dl_zip_{bench_id}",
+        key=f"dl_zip_{insp_id}",
     )
 
 st.markdown("### Job Results and CBOMs")
-_render_job_results(r, bench_id, repos, workers, job_idx)
+_render_job_results(r, insp_id, repos, workers, job_idx)

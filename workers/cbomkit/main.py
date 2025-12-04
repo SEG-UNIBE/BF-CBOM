@@ -644,14 +644,13 @@ def _produce(instr: JobInstruction, trace: Trace) -> str | tuple[str, float]:
             pass
         raise RuntimeError(err)
     if err == "backend_unavailable":
-        # Do not requeue; mark as error so the benchmark reflects the failure
+        # Do not requeue; mark as error so the inspection reflects the failure
         trace.add("cbomkit backend not yet ready after restart")
         raise RuntimeError(err)
     raise RuntimeError(err or "cbomkit_failed")
 
 
 handle_instruction = build_handle_instruction(NAME, _produce)
-
 
 def main():
     # Delegate the queue/timeout loop to the shared runner

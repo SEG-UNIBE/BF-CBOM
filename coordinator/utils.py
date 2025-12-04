@@ -8,11 +8,11 @@ import requests
 import streamlit as st
 
 from common.utils import format_repo_info, repo_html_url
-from coordinator.redis_io import get_bench_repos, get_bench_workers, pair_key
+from coordinator.redis_io import get_insp_repos, get_insp_workers, pair_key
 from pathlib import Path
+from coordinator.logger_config import logger
 
 # ----- Query param helpers -----
-
 
 def hide_streamlit_status() -> None:
     """Hide Streamlit's top-right run status widget to prevent flicker.
@@ -45,20 +45,20 @@ def get_favicon_path() -> str:
         return "favicon.svg"
 
 
-def get_query_bench_id() -> str | None:
+def get_query_insp_id() -> str | None:
     try:
-        return st.query_params.get("bench_id")  # Streamlit >= 1.33
+        return st.query_params.get("insp_id")  # Streamlit >= 1.33
     except Exception:
         q = st.experimental_get_query_params()
-        vals = q.get("bench_id", [])
+        vals = q.get("insp_id", [])
         return vals[0] if vals else None
 
 
-def set_query_bench_id(bench_id: str) -> None:
+def set_query_insp_id(insp_id: str) -> None:
     try:
-        st.query_params["bench_id"] = bench_id
+        st.query_params["insp_id"] = insp_id
     except Exception:
-        st.experimental_set_query_params(bench_id=bench_id)
+        st.experimental_set_query_params(insp_id=insp_id)
 
 
 # ----- Repo input helpers -----
@@ -352,15 +352,15 @@ def safe_int(value, default: int = 0) -> int:
             return default
 
 
-def format_benchmark_header(name: str, bench_id: str, created: str, expected: str) -> str:
-    """Return HTML snippet for consistent benchmark header formatting."""
+def format_inspection_header(name: str, insp_id: str, created: str, expected: str) -> str:
+    """Return HTML snippet for consistent inspection header formatting."""
 
     created = created or "?"
     expected = expected or "?"
     return (
         f"**{name}**<br/>"
         f"<span style='opacity:0.75; font-size:0.9rem;'>"
-        f"<b>ID:</b> {bench_id}<br/>"
+        f"<b>ID:</b> {insp_id}<br/>"
         f"<b>Created:</b> {created}  ·  <b>Jobs:</b> {expected}"
         f"</span>"
     )
@@ -423,8 +423,45 @@ def _fetch_repo(full_name: str, token: str | None, timeout: int = 10) -> dict | 
         resp = requests.get(url, headers=_github_headers(token), timeout=timeout)
         if resp.status_code == 200:
             return resp.json()
+        
+        # Log non-200 responses
+        if resp.status_code == 401:
+            logger.warning(
+                "GitHub API 401 Unauthorized for %s - token may be invalid or expired",
+                full_name,
+            )
+        elif resp.status_code == 403:
+            # Check for rate limiting
+            remaining = resp.headers.get("X-RateLimit-Remaining", "?")
+            reset_ts = resp.headers.get("X-RateLimit-Reset", "")
+            reset_info = ""
+            if reset_ts:
+                try:
+                    reset_dt = dt.datetime.fromtimestamp(int(reset_ts), tz=dt.UTC)
+                    reset_info = f" (resets at {reset_dt.isoformat()})"
+                except Exception:
+                    pass
+            logger.warning(
+                "GitHub API 403 Forbidden for %s - rate limit remaining: %s%s",
+                full_name,
+                remaining,
+                reset_info,
+            )
+        elif resp.status_code == 404:
+            logger.warning("GitHub API 404 Not Found for %s - repo may not exist or is private", full_name)
+        else:
+            logger.warning(
+                "GitHub API error %d for %s: %s",
+                resp.status_code,
+                full_name,
+                resp.text[:200] if resp.text else "(no body)",
+            )
         return None
-    except Exception:
+    except requests.exceptions.Timeout:
+        logger.warning("GitHub API timeout for %s after %ds", full_name, timeout)
+        return None
+    except Exception as e:
+        logger.error("GitHub API unexpected error for %s: %s", full_name, e)
         return None
 
 
@@ -458,11 +495,11 @@ def enrich_repos_with_github(repos: list[dict], token: str | None = None) -> lis
     return out
 
 
-def build_cboms_zip(r, bench_id: str) -> bytes:
-    """Collect completed CBOM JSONs for a benchmark and return a ZIP as bytes."""
+def build_cboms_zip(r, insp_id: str) -> bytes:
+    """Collect completed CBOM JSONs for an inspection and return a ZIP as bytes."""
 
-    repos = get_bench_repos(r, bench_id)
-    workers = get_bench_workers(r, bench_id)
+    repos = get_insp_repos(r, insp_id)
+    workers = get_insp_workers(r, insp_id)
 
     mem = io.BytesIO()
     with zipfile.ZipFile(mem, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
@@ -471,10 +508,10 @@ def build_cboms_zip(r, bench_id: str) -> bytes:
         for repo in repos:
             full = repo.get("full_name")
             for w in workers:
-                j_id = r.hget(f"bench:{bench_id}:job_index", pair_key(full, w))
+                j_id = r.hget(f"insp:{insp_id}:job_index", pair_key(full, w))
                 if not j_id:
                     continue
-                raw = r.hget(f"bench:{bench_id}:job:{j_id}", "result_json")
+                raw = r.hget(f"insp:{insp_id}:job:{j_id}", "result_json")
                 if not raw:
                     continue
                 try:
@@ -489,10 +526,10 @@ def build_cboms_zip(r, bench_id: str) -> bytes:
         for repo in repos:
             full = repo.get("full_name")
             for w in workers:
-                j_id = r.hget(f"bench:{bench_id}:job_index", pair_key(full, w))
+                j_id = r.hget(f"insp:{insp_id}:job_index", pair_key(full, w))
                 if not j_id:
                     continue
-                raw = r.hget(f"bench:{bench_id}:job:{j_id}", "result_json")
+                raw = r.hget(f"insp:{insp_id}:job:{j_id}", "result_json")
                 if not raw:
                     continue
                 try:
@@ -511,7 +548,7 @@ def build_cboms_zip(r, bench_id: str) -> bytes:
                 except Exception:
                     pass
                 safe_repo = (full or "").replace("/", "_")
-                path = f"{bench_id}/{w}/{safe_repo}_{w}.json"
+                path = f"{insp_id}/{w}/{safe_repo}_{w}.json"
                 zf.writestr(path, content)
                 done += 1
                 if total:
@@ -535,7 +572,7 @@ def _repo_minimal(d: dict) -> dict:
 
 
 def build_minimal_config_dict(*, name: str, workers: list[str], repos: list[dict]) -> dict:
-    """Return minimal benchmark config dict used by CLI/CI downloads.
+    """Return minimal inspection config dict used by CLI/CI downloads.
 
     Includes only:
       - schema_version

@@ -521,25 +521,36 @@ def format_repo_info(repo: dict) -> str:
     Example: '💬 Python · ⭐1,234 · 💾20,000 KB'
     """
     parts: list[str] = []
+    
+    # Language
     try:
-        lang = repo.get("language")
+        lang = repo.get("language") or repo.get("main_language")
         if lang:
             parts.append(f"💬 {str(lang)}")
     except Exception:
         pass
+    
+    # Stars - check multiple field names and coerce to int
     try:
-        stars = repo.get("stargazers_count")
-        if isinstance(stars, int | float):
-            parts.append(f"⭐{int(stars):,}")
+        stars = repo.get("stargazers_count") or repo.get("stars")
+        if stars is not None:
+            stars_int = _coerce_int(stars, default=0)
+            if stars_int > 0:
+                parts.append(f"⭐{stars_int:,}")
     except Exception:
         pass
+    
+    # Size - check multiple field names and coerce to int
     try:
         size_kb = repo.get("size") or repo.get("size_kb")
-        if isinstance(size_kb, int | float):
-            parts.append(f"💾{int(size_kb):,} KB")
+        if size_kb is not None:
+            size_int = _coerce_int(size_kb, default=0)
+            if size_int > 0:
+                parts.append(f"💾{size_int:,} KB")
     except Exception:
         pass
-    return " · ".join(parts)
+    
+    return " · ".join(parts) if parts else "—"
 
 
 def repo_html_url(repo: dict) -> str:
