@@ -16,6 +16,40 @@ TIMEOUT_SEC = int(os.getenv("WORKER_TIMEOUT_SEC", "6"))  # default 6s
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(NAME)
 
+# Languages supported by CodeQL
+CODEQL_SUPPORTED_LANGUAGES = {
+    "python",
+    "java",
+    "javascript",
+    "typescript",  # uses javascript extractor
+    "c",
+    "c++",
+    "cpp",
+    "c#",
+    "csharp",
+    "go",
+    "ruby",
+    "swift",
+    "kotlin",
+}
+
+# Map GitHub language names to CodeQL language identifiers
+CODEQL_LANGUAGE_MAP = {
+    "python": "python",
+    "java": "java",
+    "javascript": "javascript",
+    "typescript": "javascript",
+    "c": "cpp",
+    "c++": "cpp",
+    "cpp": "cpp",
+    "c#": "csharp",
+    "csharp": "csharp",
+    "go": "go",
+    "ruby": "ruby",
+    "swift": "swift",
+    "kotlin": "kotlin",
+}
+
 
 class CryptobomForgeClient:
     def __init__(self, *, timeout_sec: int = TIMEOUT_SEC):
@@ -105,6 +139,17 @@ class CryptobomForgeClient:
 
         return modified
 
+    def _normalize_language(self, language: str | None) -> str | None:
+        """Normalize and validate language for CodeQL compatibility.
+        
+        Returns the CodeQL language identifier or None if unsupported.
+        """
+        if not language:
+            return None
+        
+        lang_lower = language.lower().strip()
+        return CODEQL_LANGUAGE_MAP.get(lang_lower)
+
     def run_codeql_scan(self, repo_path: str, language: str | None) -> tuple[bool, str | None]:
         """
         Backwards-compat wrapper: execute CodeQL steps while collecting a trace.
@@ -116,22 +161,30 @@ class CryptobomForgeClient:
     # New modular entry (preferred inside this class)
     def _run_codeql_scan(self, repo_path: str, language: str | None, trace: Trace) -> bool:
         logger.info("CodeQL scan requested: repo_path=%r, language=%r", repo_path, language)
+        
         if not language:
-            trace.add("codeql: missing main_language")
+            trace.add("codeql: no language specified for repository")
+            logger.warning("CodeQL scan skipped: no language specified")
             return False
 
-        lang = (language or "").lower()
-        db_path = os.path.join(repo_path, f"codeql-db-{lang}")
-        if not self._codeql_create_db(repo_path, db_path, lang, trace):
+        # Normalize language to CodeQL identifier
+        codeql_lang = self._normalize_language(language)
+        if not codeql_lang:
+            trace.add(f"codeql: unsupported language '{language}' (supported: {', '.join(sorted(CODEQL_SUPPORTED_LANGUAGES))})")
+            logger.warning("CodeQL scan skipped: unsupported language '%s'", language)
             return False
 
-        if lang in ["java", "cpp", "csharp", "go"] and os.path.exists(db_path):
-            if not self._codeql_finalize_db(db_path, lang, trace):
-                trace.add(f"codeql: finalize failed for {lang}; aborting analyze")
+        db_path = os.path.join(repo_path, f"codeql-db-{codeql_lang}")
+        if not self._codeql_create_db(repo_path, db_path, codeql_lang, trace):
+            return False
+
+        if codeql_lang in ["java", "cpp", "csharp", "go"] and os.path.exists(db_path):
+            if not self._codeql_finalize_db(db_path, codeql_lang, trace):
+                trace.add(f"codeql: finalize failed for {codeql_lang}; aborting analyze")
                 return False
 
         ram_flags = self._resolve_ram_flags(trace)
-        return self._codeql_analyze_db(repo_path, db_path, lang, ram_flags, trace)
+        return self._codeql_analyze_db(repo_path, db_path, codeql_lang, ram_flags, trace)
 
     # ----- CodeQL helpers -----
     def _codeql_create_db(self, repo_path: str, db_path: str, lang: str, trace: Trace) -> bool:
@@ -257,6 +310,17 @@ class CryptobomForgeClient:
         Returns raw CBOM JSON text on success; raises on failure so the caller/wrapper can classify.
         """
         trace = trace or Trace()
+        
+        # Validate language early before cloning
+        if not main_language:
+            trace.add("no language specified for repository; cryptobomforge requires a supported language")
+            raise RuntimeError("missing_language")
+        
+        codeql_lang = self._normalize_language(main_language)
+        if not codeql_lang:
+            trace.add(f"unsupported language '{main_language}'; cryptobomforge supports: {', '.join(sorted(CODEQL_SUPPORTED_LANGUAGES))}")
+            raise RuntimeError("unsupported_language")
+        
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_path = clone_repo(git_url, branch=branch, target_dir=tmpdir)
             if not repo_path:
