@@ -17,7 +17,7 @@
         "REDIS_HOST": "localhost",
         "REDIS_PORT": "6379"
       },
-      "envFile": "${workspaceFolder}/.env.secrets",
+      "envFile": "${workspaceFolder}/docker/env/coordinator.env",
       "preLaunchTask": "docker-compose-up-redis",
       "postDebugTask": "docker-compose-down"
     },
@@ -33,7 +33,7 @@
         "REDIS_PORT": "6379",
         "AVAILABLE_LANGUAGES": "python,java",
       },
-      "envFile": "${workspaceFolder}/.env.worker-${input:workerName}",
+      "envFile": "${workspaceFolder}/docker/env/worker-${input:workerName}.env",
       "subProcess": true,
       "preLaunchTask": "docker-compose-up-redis",
       "postDebugTask": "docker-compose-down"
