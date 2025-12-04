@@ -159,6 +159,7 @@ with tab_individual:
                 
                 set_query_insp_id(insp_id)
                 st.success(f"Inspection created: {insp_name} · ID {insp_id}")
+                logger.info("Inspection created: %s · ID %s", insp_name, insp_id)
                 st.session_state["created_insp_id"] = insp_id
                 # Note: No st.rerun() here - let the "Next" button appear at the bottom
 
@@ -399,7 +400,8 @@ with tab_batch:
             # Persist deep-link and offer navigation
             set_query_insp_id(insp_id)
 
-            st.success(f"Inspection created: {insp_name} · ID {insp_id}")
+            st.success(f"Batch Inspection created: {insp_name} · ID {insp_id}")
+            logger.info("Batch Inspection created: %s · ID %s", insp_name, insp_id)
             # Persist for next render so the Next button remains clickable after rerun
             st.session_state["created_insp_id"] = insp_id
 
