@@ -54,7 +54,7 @@ with shared_col1:
 # ============================================================
 # Tabs: Individual vs Batch Inspection
 # ============================================================
-tab_individual, tab_batch = st.tabs(["🔍 Individual Inspection", "📦 Batch Inspection"])
+tab_individual, tab_batch = st.tabs(["🔍 Individual Inspection", "📦 Batch Inspection / Benchmark"])
 
 # ============================================================
 # TAB 1: Individual Inspection
