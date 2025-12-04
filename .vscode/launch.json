@@ -15,7 +15,8 @@
       "env": {
         "PYTHONPATH": "${workspaceFolder}",
         "REDIS_HOST": "localhost",
-        "REDIS_PORT": "6379"
+        "REDIS_PORT": "6379",
+        "AVAILABLE_LANGUAGES": "python,java",
       },
       "envFile": "${workspaceFolder}/docker/env/coordinator.env",
       "preLaunchTask": "docker-compose-up-redis",

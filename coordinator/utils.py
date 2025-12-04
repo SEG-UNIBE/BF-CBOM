@@ -10,9 +10,9 @@ import streamlit as st
 from common.utils import format_repo_info, repo_html_url
 from coordinator.redis_io import get_insp_repos, get_insp_workers, pair_key
 from pathlib import Path
+from coordinator.logger_config import logger
 
 # ----- Query param helpers -----
-
 
 def hide_streamlit_status() -> None:
     """Hide Streamlit's top-right run status widget to prevent flicker.
@@ -423,8 +423,45 @@ def _fetch_repo(full_name: str, token: str | None, timeout: int = 10) -> dict | 
         resp = requests.get(url, headers=_github_headers(token), timeout=timeout)
         if resp.status_code == 200:
             return resp.json()
+        
+        # Log non-200 responses
+        if resp.status_code == 401:
+            logger.warning(
+                "GitHub API 401 Unauthorized for %s - token may be invalid or expired",
+                full_name,
+            )
+        elif resp.status_code == 403:
+            # Check for rate limiting
+            remaining = resp.headers.get("X-RateLimit-Remaining", "?")
+            reset_ts = resp.headers.get("X-RateLimit-Reset", "")
+            reset_info = ""
+            if reset_ts:
+                try:
+                    reset_dt = dt.datetime.fromtimestamp(int(reset_ts), tz=dt.UTC)
+                    reset_info = f" (resets at {reset_dt.isoformat()})"
+                except Exception:
+                    pass
+            logger.warning(
+                "GitHub API 403 Forbidden for %s - rate limit remaining: %s%s",
+                full_name,
+                remaining,
+                reset_info,
+            )
+        elif resp.status_code == 404:
+            logger.warning("GitHub API 404 Not Found for %s - repo may not exist or is private", full_name)
+        else:
+            logger.warning(
+                "GitHub API error %d for %s: %s",
+                resp.status_code,
+                full_name,
+                resp.text[:200] if resp.text else "(no body)",
+            )
         return None
-    except Exception:
+    except requests.exceptions.Timeout:
+        logger.warning("GitHub API timeout for %s after %ds", full_name, timeout)
+        return None
+    except Exception as e:
+        logger.error("GitHub API unexpected error for %s: %s", full_name, e)
         return None
 
 

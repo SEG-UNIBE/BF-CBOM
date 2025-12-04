@@ -305,23 +305,7 @@ with right:
             config.GITHUB_TOKEN = github_input
             st.success("GitHub token updated for this session" if github_input else "GitHub token cleared for this session")
         st.caption("Status: loaded" if config.GITHUB_TOKEN else "Status: not set")
-        
-        # DeepSeek API Key
-        current_deepseek = config.DEEPSEEK_API_KEY or ""
-        deepseek_input = st.text_input(
-            "DEEPSEEK_API_KEY",
-            value=current_deepseek,
-            type="password",
-            key="config_deepseek_key",
-            help="DeepSeek API key for LLM analysis (click the eye to show/hide)",
-        ).strip()
-        if deepseek_input != current_deepseek:
-            config.DEEPSEEK_API_KEY = deepseek_input
-            st.success("DeepSeek API key updated for this session" if deepseek_input else "DeepSeek API key cleared for this session")
-        st.caption("Status: loaded" if config.DEEPSEEK_API_KEY else "Status: not set")
-        
-        st.markdown("**Redis & Caching**")
-        
+            
         # Redis Host (read-only, requires restart)
         st.text_input(
             "REDIS_HOST",
