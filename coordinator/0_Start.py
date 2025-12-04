@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 
 import streamlit as st
+from common import config
 
 from common.utils import (
     get_available_workers,
@@ -282,3 +283,100 @@ with right:
         st.metric("total working time", human_duration(total_time_s))
     with w3:
         st.metric("average working time", human_duration(avg_time_s))
+
+    # ============================================================
+    # Configuration (collapsible)
+    # ============================================================
+    with st.expander("Configuration", expanded=False):
+        st.caption("Environment variables and settings. Changes apply to current session only.")
+        
+        st.markdown("**API Keys**")
+        
+        # GitHub Token
+        current_github = config.GITHUB_TOKEN or ""
+        masked_github = f"{current_github[:8]}...{current_github[-4:]}" if len(current_github) > 12 else ("(not set)" if not current_github else current_github)
+        new_github = st.text_input(
+            "GITHUB_TOKEN",
+            value="",
+            placeholder=masked_github,
+            type="password",
+            key="config_github_token",
+            help="GitHub Personal Access Token for API requests",
+        )
+        if new_github:
+            config.GITHUB_TOKEN = new_github
+            st.success("GitHub token updated for this session")
+        
+        # DeepSeek API Key
+        current_deepseek = config.DEEPSEEK_API_KEY or ""
+        masked_deepseek = f"{current_deepseek[:8]}...{current_deepseek[-4:]}" if len(current_deepseek) > 12 else ("(not set)" if not current_deepseek else current_deepseek)
+        new_deepseek = st.text_input(
+            "DEEPSEEK_API_KEY",
+            value="",
+            placeholder=masked_deepseek,
+            type="password",
+            key="config_deepseek_key",
+            help="DeepSeek API key for LLM analysis",
+        )
+        if new_deepseek:
+            config.DEEPSEEK_API_KEY = new_deepseek
+            st.success("DeepSeek API key updated for this session")
+        
+        st.markdown("**Redis & Caching**")
+        
+        # Redis Host (read-only, requires restart)
+        st.text_input(
+            "REDIS_HOST",
+            value=config.REDIS_HOST,
+            disabled=True,
+            help="Redis host (requires restart to change)",
+        )
+        
+        # Redis Port (read-only, requires restart)
+        st.text_input(
+            "REDIS_PORT",
+            value=str(config.REDIS_PORT),
+            disabled=True,
+            help="Redis port (requires restart to change)",
+        )
+        
+        # GitHub Cache TTL
+        new_cache_ttl = st.number_input(
+            "GITHUB_CACHE_TTL_SEC",
+            value=config.GITHUB_CACHE_TTL_SEC,
+            min_value=0,
+            max_value=604800,  # 1 week
+            step=3600,
+            key="config_cache_ttl",
+            help="GitHub API cache TTL in seconds (default: 86400 = 1 day)",
+        )
+        if new_cache_ttl != config.GITHUB_CACHE_TTL_SEC:
+            config.GITHUB_CACHE_TTL_SEC = int(new_cache_ttl)
+        
+        st.markdown("**Lists**")
+        
+        # Available Languages
+        current_langs = ", ".join(config.AVAILABLE_LANGUAGES) if config.AVAILABLE_LANGUAGES else ""
+        new_langs = st.text_input(
+            "AVAILABLE_LANGUAGES",
+            value=current_langs,
+            placeholder="python, java, javascript",
+            key="config_languages",
+            help="Comma-separated list of languages for GitHub search",
+        )
+        if new_langs and new_langs != current_langs:
+            config.AVAILABLE_LANGUAGES = config._parse_list(new_langs)
+        
+        # Available Workers
+        current_workers = ", ".join(config.AVAILABLE_WORKERS) if config.AVAILABLE_WORKERS else ""
+        new_workers = st.text_input(
+            "AVAILABLE_WORKERS",
+            value=current_workers,
+            placeholder="cdxgen, syft, trivy",
+            key="config_workers",
+            help="Comma-separated list of available worker names",
+        )
+        if new_workers and new_workers != current_workers:
+            config.AVAILABLE_WORKERS = config._parse_list(new_workers)
+
+
