@@ -294,33 +294,31 @@ with right:
         
         # GitHub Token
         current_github = config.GITHUB_TOKEN or ""
-        masked_github = f"{current_github[:8]}...{current_github[-4:]}" if len(current_github) > 12 else ("(not set)" if not current_github else current_github)
-        new_github = st.text_input(
+        github_input = st.text_input(
             "GITHUB_TOKEN",
-            value="",
-            placeholder=masked_github,
+            value=current_github,
             type="password",
             key="config_github_token",
-            help="GitHub Personal Access Token for API requests",
-        )
-        if new_github:
-            config.GITHUB_TOKEN = new_github
-            st.success("GitHub token updated for this session")
+            help="GitHub Personal Access Token for API requests (click the eye to show/hide)",
+        ).strip()
+        if github_input != current_github:
+            config.GITHUB_TOKEN = github_input
+            st.success("GitHub token updated for this session" if github_input else "GitHub token cleared for this session")
+        st.caption("Status: loaded" if config.GITHUB_TOKEN else "Status: not set")
         
         # DeepSeek API Key
         current_deepseek = config.DEEPSEEK_API_KEY or ""
-        masked_deepseek = f"{current_deepseek[:8]}...{current_deepseek[-4:]}" if len(current_deepseek) > 12 else ("(not set)" if not current_deepseek else current_deepseek)
-        new_deepseek = st.text_input(
+        deepseek_input = st.text_input(
             "DEEPSEEK_API_KEY",
-            value="",
-            placeholder=masked_deepseek,
+            value=current_deepseek,
             type="password",
             key="config_deepseek_key",
-            help="DeepSeek API key for LLM analysis",
-        )
-        if new_deepseek:
-            config.DEEPSEEK_API_KEY = new_deepseek
-            st.success("DeepSeek API key updated for this session")
+            help="DeepSeek API key for LLM analysis (click the eye to show/hide)",
+        ).strip()
+        if deepseek_input != current_deepseek:
+            config.DEEPSEEK_API_KEY = deepseek_input
+            st.success("DeepSeek API key updated for this session" if deepseek_input else "DeepSeek API key cleared for this session")
+        st.caption("Status: loaded" if config.DEEPSEEK_API_KEY else "Status: not set")
         
         st.markdown("**Redis & Caching**")
         
@@ -378,5 +376,4 @@ with right:
         )
         if new_workers and new_workers != current_workers:
             config.AVAILABLE_WORKERS = config._parse_list(new_workers)
-
 
