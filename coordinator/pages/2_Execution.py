@@ -70,6 +70,10 @@ with left:
     workers = get_insp_workers(r, insp_id)
     repos = get_insp_repos(r, insp_id)
 
+    # Determine button label based on repo count
+    is_batch = len(repos) > 1
+    start_button_label = "Start Batch Inspection" if is_batch else "Start Inspection"
+
     created = meta.get("created_at") or meta.get("started_at") or "?"
     expected = meta.get("expected_jobs") or "?"
     st.markdown(
@@ -80,9 +84,9 @@ with left:
 
     # Action controls
     if status == "running":
-        st.button("Start Inspection", type="primary", disabled=True)
+        st.button(start_button_label, type="primary", disabled=True)
     elif status == "created":
-        if st.button("Start Inspection", type="primary"):
+        if st.button(start_button_label, type="primary"):
             logger.info("Starting inspection: %s", insp_id)
             issued = start_inspection(r, insp_id)
             set_query_insp_id(insp_id)
@@ -90,7 +94,7 @@ with left:
     else:
         c1, c2 = st.columns([1, 1])
         with c1:
-            if st.button("Start Inspection", type="primary"):
+            if st.button(start_button_label, type="primary"):
                 only_nc = st.session_state.get("only_nc_toggle", False)
                 if only_nc:
                     logger.info("Retrying non-completed jobs for inspection: %s", insp_id)
