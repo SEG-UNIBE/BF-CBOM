@@ -495,8 +495,8 @@ if comp_rows:
                 if toggle_key not in st.session_state:
                     st.session_state[toggle_key] = bool(repo_state.get("exclude_libraries", False))
 
-                # Controls row: [Find button] [Algorithm radio] [Toggle]
-                button_col, algo_col, toggle_col = st.columns([3, 3, 2])
+                # Controls row: [Find button] [Info label] [Toggle]
+                button_col, info_col, toggle_col = st.columns([3, 3, 2])
                 with toggle_col:
                     # More thorough: focus analysis on cryptographic assets only
                     label = "Include cryptographic-assets only"
@@ -526,26 +526,20 @@ if comp_rows:
                 # Do not eagerly fetch results on reruns (e.g., toggle changes).
                 # Result fetching is driven only when a job is actively waiting.
 
+                match_queue = PYQUN_QUEUE
+                result_list = PYQUN_RESULTS_LIST
                 waiting_for_result = (
                     bool(repo_state.get("waiting_for_similarity")) and bool(job_id) and not result_payload
                 )
                 button_disabled = waiting_for_result
-                with algo_col:
-                    algorithm_choice = st.radio(
-                        "Select matching strategy",
-                        ["Clustering Algorithm (RaQuN)", "Optimization Algorithm (JEDI)"],
-                        key=f"algorithm_choice_{insp_id}_{repo_name}",
-                        horizontal=True,
+                with info_col:
+                    st.caption(
+                        "<div style='padding-top: 10px;'>N-Way Matching using RaQuN</div>",
+                        unsafe_allow_html=True,
                     )
-                if ("Optimization" in algorithm_choice):
-                    match_queue = TREESIM_QUEUE
-                    result_list = TREESIM_RESULTS_LIST
-                else:
-                    match_queue = PYQUN_QUEUE
-                    result_list = PYQUN_RESULTS_LIST
                 with button_col:
                     if st.button(
-                        "Find Similar Components Among Workers",
+                        "Find Similar Components Among different CBOMs",
                         key=f"treesimilarity_{insp_id}_{repo_name}",
                         disabled=button_disabled,
                     ):

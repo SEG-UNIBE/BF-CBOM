@@ -216,7 +216,7 @@ services:
       - CALC_TIMEOUT_SEC=300
     env_file: docker/env/misc-treesimilarity.env
     restart: no
-    profiles: [dev, prod, all]
+    profiles: [dev]
 
   misc-pyqun:
     image: bf-cbom/misc-pyqun:${VERSION:-latest}
