@@ -3,8 +3,8 @@ import os
 from pathlib import Path
 
 import streamlit as st
-from common import config
 
+from common import config
 from common.utils import (
     get_available_workers,
     get_project_version_from_toml,
@@ -14,9 +14,9 @@ from coordinator.logger_config import logger
 from coordinator.redis_io import delete_inspection, get_redis, list_inspections
 from coordinator.utils import (
     build_minimal_config_json,
+    get_favicon_path,
     human_duration,
     set_query_insp_id,
-    get_favicon_path,
 )
 
 print("[coordinator] Starting Streamlit app…")
