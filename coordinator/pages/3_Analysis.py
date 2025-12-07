@@ -533,13 +533,13 @@ if comp_rows:
                 )
                 button_disabled = waiting_for_result
                 with info_col:
-                    st.markdown(
-                        "<div style='padding-top: 10px; color: gray;'>RaQuN N-Way Matching</div>",
+                    st.caption(
+                        "<div style='padding-top: 10px;'>N-Way Matching using RaQuN</div>",
                         unsafe_allow_html=True,
                     )
                 with button_col:
                     if st.button(
-                        "Find Similar Components Among Workers",
+                        "Find Similar Components Among different CBOMs",
                         key=f"treesimilarity_{insp_id}_{repo_name}",
                         disabled=button_disabled,
                     ):
