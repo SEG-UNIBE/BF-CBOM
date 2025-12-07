@@ -1,6 +1,7 @@
 import datetime as dt
 import json
 import re
+from pathlib import Path
 
 import streamlit as st
 
@@ -18,7 +19,6 @@ from coordinator.utils import (
 
 # ---------- Streamlit Page ----------
 
-from pathlib import Path
 ico_path = Path(get_favicon_path())
 st.set_page_config(
     page_title="Setup",
@@ -188,7 +188,7 @@ with tab_batch:
         # Place source selector outside the form so UI updates immediately on change
         source = st.radio(
             "Repository source",
-            options=["Search GitHub", "Paste list", "Paste config"],
+            options=["Paste list", "Search GitHub", "Paste config"],
             horizontal=True,
             key="setup_repo_source",
         )
