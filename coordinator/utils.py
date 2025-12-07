@@ -2,15 +2,15 @@ import datetime as dt
 import io
 import json
 import zipfile
+from pathlib import Path
 
 import pandas as pd  # local import to avoid hard dependency at module import
 import requests
 import streamlit as st
 
 from common.utils import format_repo_info, repo_html_url
-from coordinator.redis_io import get_insp_repos, get_insp_workers, pair_key
-from pathlib import Path
 from coordinator.logger_config import logger
+from coordinator.redis_io import get_insp_repos, get_insp_workers, pair_key
 
 # ----- Query param helpers -----
 

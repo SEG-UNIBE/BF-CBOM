@@ -1,8 +1,7 @@
 import json
+from pathlib import Path
 
 import streamlit as st
-from pathlib import Path
-from coordinator.utils import get_favicon_path
 
 from common.utils import get_status_emoji
 from coordinator.redis_io import (
@@ -17,6 +16,7 @@ from coordinator.utils import (
     build_cboms_zip,
     derive_status_key_from_payload,
     format_inspection_header,
+    get_favicon_path,
     get_query_insp_id,
     set_query_insp_id,
 )

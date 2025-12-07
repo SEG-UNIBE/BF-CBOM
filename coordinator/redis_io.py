@@ -11,7 +11,7 @@ from common.cbom_analysis import (
     create_component_match_instruction,
 )
 from common.config import GITHUB_CACHE_TTL_SEC, GITHUB_TOKEN
-from common.models import Inspection, ComponentMatchJobInstruction
+from common.models import ComponentMatchJobInstruction, Inspection
 from common.utils import repo_dict_to_info
 from coordinator.logger_config import logger
 

@@ -1,4 +1,5 @@
 import time
+from pathlib import Path
 
 import streamlit as st
 
@@ -20,14 +21,13 @@ from coordinator.redis_io import (
 )
 from coordinator.utils import (
     format_inspection_header,
+    get_favicon_path,
     get_query_insp_id,
     repos_to_table_df,
     set_query_insp_id,
     summarize_result_cell,
 )
 
-from coordinator.utils import get_favicon_path
-from pathlib import Path
 ico_path = Path(get_favicon_path())
 st.set_page_config(
     page_title="Execution",

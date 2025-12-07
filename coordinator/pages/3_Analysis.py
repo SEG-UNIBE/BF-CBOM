@@ -1,5 +1,6 @@
 import json
 import time
+from pathlib import Path
 from types import SimpleNamespace
 
 import altair as alt
@@ -37,12 +38,11 @@ from coordinator.utils import (
     build_repo_info_url_map,
     estimate_similarity_runtime,
     format_inspection_header,
+    get_favicon_path,
     get_query_insp_id,
     safe_int,
 )
 
-from coordinator.utils import get_favicon_path
-from pathlib import Path
 ico_path = Path(get_favicon_path())
 st.set_page_config(
     page_title="Analysis",
