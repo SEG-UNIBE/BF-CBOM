@@ -66,7 +66,7 @@ with col_title:
         unsafe_allow_html=True,
     )
 st.markdown(
-    "<p style='font-size:1.3rem; color:#888;'>Your <b>B</b>est <b>F</b>riend for Generating, Understanding, and Comparing Cryptography Bills of Materials (<b>CBOMs</b>)</p>",
+    "<p style='font-size:1.3rem; color:#888;'>Your <b>B</b>est <b>F</b>riend for Generating, Understanding, and Comparing Cryptography Bill of Materials (<b>CBOMs</b>)</p>",
     unsafe_allow_html=True,
 )
 
