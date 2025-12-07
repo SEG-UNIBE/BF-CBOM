@@ -244,7 +244,7 @@ At its core, the `Coordinator` orchestrates all inspection activities through a 
 Redis serves dual roles as both a persistence layer for intermediate results and a queue system enabling asynchronous, scalable communication between components.
 This design creates decoupled interactions that make the framework flexible for extension.
 
-![description](./docs/system_architecture.png)
+![description](./docs/system_architecture_.png)
 
 ### Adding Additional Workers
 
