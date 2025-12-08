@@ -20,9 +20,9 @@
 </br>
 
 <div align="center">
-  <a href="https://doi.org/10.5281/zenodo.17140610"><img src="https://zenodo.org/badge/1058056469.svg" alt="DOI" /></a>
   <a href="https://github.com/SEG-UNIBE/BF-CBOM/releases"><img src="https://img.shields.io/github/v/release/SEG-UNIBE/BF-CBOM?include_prereleases" alt="Changelog" /></a>
   <a href="https://youtu.be/-YdBPHsyymU"><img src="https://img.shields.io/badge/Demo-Video-red.svg?logo=youtube&logoColor=white" alt="Demo Video" /></a>
+  <a href="https://doi.org/10.5281/zenodo.17225405"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.17225405.svg" alt="DOI" /></a>
   </br>
   <a href="#"><img src="https://img.shields.io/badge/python-v3.12%2B-blue.svg" alt="Python 3.12+" /></a>
   <a href="#"><img src="https://img.shields.io/badge/Docker-Compose-success.svg" alt="Docker Compose" /></a>
