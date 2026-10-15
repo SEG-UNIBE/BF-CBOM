@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import redis
 
-from .config import REDIS_HOST, REDIS_PORT
+from .config import BLPOP_TIMEOUT_SEC, REDIS_HOST, REDIS_PORT, REDIS_SOCKET_TIMEOUT_SEC
 from .models import JobInstruction, JobResult, Trace
 from .utils import normalize_json
 
@@ -31,12 +31,15 @@ def run_worker(
     log = logger or logging.getLogger(name)
     timeout_sec = int(os.getenv(timeout_env_var, str(default_timeout)))
 
-    r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
+    r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True, socket_timeout=REDIS_SOCKET_TIMEOUT_SEC)
     log.info(f"{name} worker listening for jobs... (queue: jobs:{name})")
 
     while True:
         log.info("awaiting new jobs...\n\n")
-        _, raw = r.blpop(f"jobs:{name}")  # blocking pop
+        item = None
+        while item is None:
+            item = r.blpop(f"jobs:{name}", timeout=BLPOP_TIMEOUT_SEC)  # None on timeout -> keep waiting
+        _, raw = item
         instr = JobInstruction.from_json(raw)
         log.info(
             "📨 Received job instruction for job %s (repo: %s)",

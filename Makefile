@@ -29,8 +29,12 @@ DEV_WORKERS_LIST       := $(call to_space_list,$(DEV_WORKERS))
 PROD_WORKERS_LIST      := $(filter-out $(DEV_WORKERS_LIST),$(AVAILABLE_WORKERS_LIST))
 PROD_WORKERS           := $(call to_comma_list,$(PROD_WORKERS_LIST))
 
+# NO_CACHE=1 rebuilds every layer from the Dockerfiles (e.g. `make up-prod NO_CACHE=1`)
+NO_CACHE ?= 0
+NO_CACHE_FLAG := $(if $(filter 1,$(NO_CACHE)),--no-cache,)
+
 build-base:
-	docker build -f docker/Dockerfile.base \
+	docker build $(NO_CACHE_FLAG) -f docker/Dockerfile.base \
 		-t $(BASE_IMAGE):$(VERSION) .
 
 release:
@@ -43,10 +47,10 @@ SERIAL_BUILD ?= 1
 build-all: ensure-env build-base
 ifeq ($(SERIAL_BUILD),1)
 	@for svc in $$(docker compose config --services); do \
-		echo ">>> building $$svc"; docker compose build $$svc || exit 1; \
+		echo ">>> building $$svc"; docker compose build $(NO_CACHE_FLAG) $$svc || exit 1; \
 	done
 else
-	docker compose build
+	docker compose build $(NO_CACHE_FLAG)
 endif
 
 # Dev: only the explicitly listed dev workers
@@ -93,12 +97,11 @@ ensure-env: $(ENV_FILES)
 $(ENV_DIR)/%.env: $(ENV_DIR)/%.env.template
 	@$(ENSURE_ENV_SCRIPT) $< $@
 
-.PHONY: prune prune-build clean-docker build-base build-all release up-dev up-prod up-prod-pull up-all down logs ps show-workers
+.PHONY: clean-docker build-base build-all release up-dev up-prod up-prod-pull up-all down logs ps show-workers
 
-prune:
-	docker system prune -af
-
-prune-build:
-	docker builder prune -af
-
-clean-docker: prune prune-build
+# Removes BF-CBOM's containers (all profiles) and images only; other Docker projects are untouched.
+# The redis-data volume (stored inspections) is kept; use `docker compose down -v` to drop it too.
+clean-docker:
+	docker compose --profile '*' down --remove-orphans
+	@ids=$$(docker images -q --filter 'reference=bf-cbom/*' --filter 'reference=ghcr.io/seg-unibe/bf-cbom-*' | sort -u); \
+	if [ -n "$$ids" ]; then docker rmi -f $$ids; else echo "no BF-CBOM images to remove"; fi

@@ -6,4 +6,4 @@ requests
 dataclasses_json
 normalize_json
 tqdm
-redis
+redis  # keep the same version as uv.lock

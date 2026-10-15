@@ -9,7 +9,7 @@ import numpy as np
 import redis
 from sentence_transformers import SentenceTransformer
 
-from common.config import REDIS_HOST, REDIS_PORT
+from common.config import BLPOP_TIMEOUT_SEC, REDIS_HOST, REDIS_PORT, REDIS_SOCKET_TIMEOUT_SEC
 from common.models import ComponentMatchJobInstruction, ComponentMatchJobResult
 from common.cbom_analysis import find_components_list
 
@@ -91,11 +91,13 @@ class LetterHistogramVectorizer(Vectorizer):
         return self.vec_dim
 
 
+NEIGHBOURHOOD_SIZE = 3
+
 PyQuN_algo = VanillaRaQuN(
     "high_dim_raqun", 
     candidate_search=NNCandidateSearch(
         vectorizer=BERTEmbedding(),
-        neighbourhood_size=3
+        neighbourhood_size=NEIGHBOURHOOD_SIZE
     )
 )
 
@@ -177,6 +179,10 @@ def _run_raqun(json_files: list[str]):
     global PyQuN_algo
     models = {}
     logger.info("Preparing %d models for RaQuN...", len(json_files))
+    # RaQuN identifies models and elements by id alone (Element.__eq__/__hash__, ModelSet.id_map),
+    # so ids must be unique across all CBOMs and must not collide with the model ids (0..n-1).
+    # The component's index within its own CBOM is kept in custom_id.
+    next_uid = len(json_files)
     # extract and convert to Model/Element/Attribute for RaQuN
     for e_id, json_file in enumerate(json_files):
         if len(json_file)>0:
@@ -200,9 +206,10 @@ def _run_raqun(json_files: list[str]):
                 except:
                     pass
                 attributes = set(DefaultAttribute(attr) for attr in attr_list)
-                element = Element(name=name, ze_id=comp_i, attributes=attributes) # -> corresponds to a cbom component
+                element = Element(name=name, ze_id=next_uid, attributes=attributes) # -> corresponds to a cbom component
                 element.set_model_id(e_id)
-                element.set_element_id(comp_i)
+                element.set_custom_id(comp_i)
+                next_uid += 1
                 models[e_id].append(element)
         
     model_list = []
@@ -218,6 +225,9 @@ def _run_raqun(json_files: list[str]):
         for element in model.get_elements():
             logger.info("  Element: %s, Attributes: %s", element.name, [attr.value for attr in element.attributes])
     model_set = ModelSet(set(model_list))
+
+    # KDTree queries fail when asking for more neighbours than there are elements
+    PyQuN_algo.search.neighbourhood_size = min(NEIGHBOURHOOD_SIZE, len(model_set.get_elements()))
 
     matches, _ = PyQuN_algo.match(model_set)
 
@@ -243,7 +253,7 @@ def _match_from_json_list(json_files: list[str]):
                 for e in elements:
                     file_id = e.model_id  
                     original_idx = best_order[file_id]
-                    comp_id = e.ele_id 
+                    comp_id = e.get_custom_id()
                     try:
                         group.append({
                             "file": original_idx,
@@ -399,17 +409,22 @@ def _handle_instruction(raw_payload: str) -> None:
 def main() -> None:
     global redis_client
 
-    redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
+    redis_client = redis.Redis(
+        host=REDIS_HOST, port=REDIS_PORT, decode_responses=True, socket_timeout=REDIS_SOCKET_TIMEOUT_SEC
+    )
     logger.info("%s listening for component match jobs... (queue: %s)", NAME, JOB_QUEUE)
 
     try:
         while True:
             try:
-                _, raw_payload = redis_client.blpop(JOB_QUEUE)
+                item = redis_client.blpop(JOB_QUEUE, timeout=BLPOP_TIMEOUT_SEC)
             except redis.exceptions.RedisError as err:
                 logger.error("Redis error while waiting for jobs: %s", err)
                 time.sleep(1)
                 continue
+            if item is None:  # BLPOP timed out with no job; keep waiting
+                continue
+            _, raw_payload = item
             if not raw_payload:
                 continue
             _handle_instruction(raw_payload)

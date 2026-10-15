@@ -271,6 +271,19 @@ This design creates decoupled interactions that make the framework flexible for 
 4. Register the worker service in `docker-compose.yml`, pointing at the new `env_file`.
 5. Append the worker name to the `AVAILABLE_WORKERS` list in the `Makefile` so shared targets pick it up.
 
+### Clean Rebuild
+
+To make sure every image is rebuilt from the current Dockerfiles, without reusing cached layers, run:
+
+```bash
+make clean-docker        # remove BF-CBOM's containers and images (other Docker projects are untouched)
+make up-prod NO_CACHE=1  # rebuild every layer from the Dockerfiles and start
+```
+
+`make clean-docker` keeps the `redis-data` volume with your stored inspections; run `docker compose down -v` to delete it as well.
+Upstream base images are pinned by digest, so they resolve to the same content even when re-downloaded.
+Verify with `docker images 'bf-cbom/*'` (all freshly created) and `docker history <image>` (one layer per Dockerfile step).
+
 ### Publishing Release Images
 
 The images pulled by `make up-prod-pull` are built by `.github/workflows/images.yml` from `docker-bake.hcl`.

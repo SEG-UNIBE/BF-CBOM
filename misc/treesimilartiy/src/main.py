@@ -8,7 +8,7 @@ from pathlib import Path
 import json_matching  # type: ignore  # pylint: disable=import-error,wrong-import-position
 import redis
 
-from common.config import REDIS_HOST, REDIS_PORT
+from common.config import BLPOP_TIMEOUT_SEC, REDIS_HOST, REDIS_PORT, REDIS_SOCKET_TIMEOUT_SEC
 from common.models import ComponentMatchJobInstruction, ComponentMatchJobResult
 
 NAME = Path(__file__).resolve().parents[1].name
@@ -207,17 +207,22 @@ def _handle_instruction(raw_payload: str) -> None:
 def main() -> None:
     global redis_client
 
-    redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
+    redis_client = redis.Redis(
+        host=REDIS_HOST, port=REDIS_PORT, decode_responses=True, socket_timeout=REDIS_SOCKET_TIMEOUT_SEC
+    )
     logger.info("%s listening for component match jobs... (queue: %s)", NAME, JOB_QUEUE)
 
     try:
         while True:
             try:
-                _, raw_payload = redis_client.blpop(JOB_QUEUE)
+                item = redis_client.blpop(JOB_QUEUE, timeout=BLPOP_TIMEOUT_SEC)
             except redis.exceptions.RedisError as err:
                 logger.error("Redis error while waiting for jobs: %s", err)
                 time.sleep(1)
                 continue
+            if item is None:  # BLPOP timed out with no job; keep waiting
+                continue
+            _, raw_payload = item
             if not raw_payload:
                 continue
             _handle_instruction(raw_payload)
