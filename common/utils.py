@@ -415,12 +415,28 @@ def normalize_json(payload: str) -> tuple[str, str | None]:
 # ----- Status labels (centralized) -----
 
 # Structured status metadata
+# Job states as shown everywhere in the UI (grid cells, legend, charts, Start page counters).
+# Lifecycle: held -> queued -> running -> completed | failed | timeout; cancelled from any non-terminal state;
+# unsupported is set at issue time when the tool does not cover the repo language (common/tools.yaml).
 _STATUS_META = {
-    "completed": {"emoji": "✅", "label": "Completed", "color": "#2ca02c"},  # green
-    "failed": {"emoji": "💥", "label": "Failed", "color": "#d62728"},  # red
-    "timeout": {"emoji": "⏰", "label": "Timeout", "color": "#9467bd"},  # purple
-    "cancelled": {"emoji": "🚫", "label": "Cancelled", "color": "#7f7f7f"},  # gray
-    "pending": {"emoji": "💤", "label": "Pending", "color": "#1f77b4"},  # blue
+    "completed": {"emoji": "✅", "label": "Completed", "color": "#2ca02c", "help": "worker returned a CBOM"},
+    "failed": {"emoji": "💥", "label": "Failed", "color": "#d62728", "help": "worker errored (details in the notes)"},
+    "timeout": {"emoji": "⏰", "label": "Timeout", "color": "#9467bd", "help": "worker exceeded its time budget"},
+    "cancelled": {"emoji": "🚫", "label": "Cancelled", "color": "#7f7f7f", "help": "cancelled before completion"},
+    "unsupported": {
+        "emoji": "⏭️",
+        "label": "Unsupported",
+        "color": "#c7c7c7",
+        "help": "not run: the tool does not support the repository language (common/tools.yaml)",
+    },
+    "running": {"emoji": "⚙️", "label": "Running", "color": "#ff7f0e", "help": "a worker is processing the job"},
+    "queued": {"emoji": "💤", "label": "Queued", "color": "#1f77b4", "help": "in the worker queue, not started"},
+    "held": {
+        "emoji": "⏸️",
+        "label": "Held",
+        "color": "#17becf",
+        "help": "waits for a later memory-budget wave (EXPERIMENT_MEMORY_BUDGET_GB)",
+    },
 }
 
 
@@ -430,8 +446,8 @@ def get_status_meta() -> dict[str, dict]:
 
 
 def get_status_keys_order() -> list[str]:
-    """Preferred key order for statuses."""
-    return ["completed", "failed", "timeout", "cancelled", "pending"]
+    """Preferred key order for statuses (terminal first, then the live ones)."""
+    return ["completed", "failed", "timeout", "cancelled", "unsupported", "running", "queued", "held"]
 
 
 def status_text(key: str, mode: str = "both") -> str:
@@ -466,6 +482,11 @@ def get_status_order() -> list[str]:
 def get_status_emoji(key: str) -> str:
     """Return emoji for status key."""
     return status_text(key, "emoji")
+
+
+def get_status_help(key: str) -> str:
+    """One-line explanation of a status key for legends ('' for unknown keys)."""
+    return str((_STATUS_META.get(key) or {}).get("help") or "")
 
 
 # ----- Repo formatting helpers -----

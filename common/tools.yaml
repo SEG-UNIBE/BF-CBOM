@@ -122,7 +122,7 @@ tools:
     memory_gb: 4
     approach: patterns (opengrep) + syntax tree
     native_cyclonedx: true          # CycloneDX 1.7
-    languages: [python, go, javascript]   # Java is borderline: nil-pointer crash on `new ECGenParameterSpec(<identifier>)` (jjwt, Keycloak)
+    languages: [java, python, go, javascript]   # Java: nil-pointer crash on `new ECGenParameterSpec(<identifier>)` (jjwt, Keycloak) is worked around in the worker (.cradarignore retry, recorded in the notes)
     voter_group: grep-rules
     status: integrated             # workers/cipherradar
     pilot: {java: borderline, python: pass, go: pass, javascript: pass, c: fail}

@@ -175,9 +175,9 @@ for repo in repos:
     for w in workers:
         j_id = job_idx.get(pair_key(full, w))
         if not j_id:
-            # treat as pending if job wasn't issued
-            worker_status_counts[w][status_text("pending", "label")] += 1
-            repo_worker_status.setdefault(full, {})[w] = "pending"
+            # treat as queued if job wasn't issued
+            worker_status_counts[w][status_text("queued", "label")] += 1
+            repo_worker_status.setdefault(full, {})[w] = "queued"
             continue
         meta = job_meta_cache.get(j_id) or {}
         stt = meta.get("status") or ""
@@ -468,7 +468,7 @@ if comp_rows:
                     else:
                         worker_totals[w] = 0
                 for w in workers:
-                    status_key = status_map.get(w, "pending")
+                    status_key = status_map.get(w, "queued")
                     emoji = get_status_emoji(status_key)
                     total = worker_totals.get(w, 0)
                     rename_map[w] = f"{emoji} {w} ({total})" if emoji else f"{w} ({total})"

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from common.utils import get_status_emoji
+from common.utils import get_status_emoji, get_status_help, get_status_keys_order, status_text
 from coordinator.logger_config import logger
 from coordinator.redis_io import (
     JOB_SUMMARY_FIELDS,
@@ -102,7 +102,7 @@ with left:
     if down and status in ("created", "running"):
         st.warning(
             "No live worker for: " + ", ".join(f"`{w}`" for w in down) + ". "
-            "Their jobs will stay pending until the container is up (`make ps`, `make logs`)."
+            "Their jobs will stay queued until the container is up (`make ps`, `make logs`)."
         )
 
     # Action controls
@@ -137,14 +137,7 @@ with mid:
 
 with right:
     st.subheader("Notes")
-    em = get_status_emoji
-    notes = [
-        f"{em('pending')} Pending: job queued or running.",
-        f"{em('completed')} Completed: worker returned a CBOM successfully.",
-        f"{em('failed')} Failed: worker errored while processing the repo.",
-        f"{em('timeout')} Timeout: worker exceeded its time budget.",
-        f"{em('cancelled')} Cancelled: job was cancelled before completion.",
-    ]
+    notes = [f"{get_status_emoji(k)} {status_text(k, 'label')}: {get_status_help(k)}." for k in get_status_keys_order()]
     st.markdown("\n".join(f"- {line}" for line in notes))
 # Auto-refresh is always on while running; no toggle needed
 
@@ -218,7 +211,7 @@ with col_b:
     cancel_disabled = status != "running"
     if st.button("Cancel", type="primary", disabled=cancel_disabled):
         cancelled = cancel_inspection(r, insp_id)
-        st.toast(f"Cancelled {cancelled} pending jobs")
+        st.toast(f"Cancelled {cancelled} queued, held or running jobs")
         set_query_insp_id(insp_id)
         st.rerun()
 

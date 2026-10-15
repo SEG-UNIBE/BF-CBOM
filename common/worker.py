@@ -12,6 +12,7 @@ from multiprocessing.connection import Connection
 import redis
 
 from .config import BLPOP_TIMEOUT_SEC, REDIS_HOST, REDIS_PORT, REDIS_SOCKET_TIMEOUT_SEC
+from .jobs import mark_job_running
 from .models import JobInstruction, JobResult, Trace
 from .utils import normalize_json
 
@@ -225,6 +226,7 @@ def run_worker(
             instr.job_id,
             instr.repo_info.full_name,
         )
+        mark_job_running(r, instr.job_id, name)  # queued -> running in the coordinator's job record
 
         result = run_job_with_timeout(
             handle_instruction,

@@ -82,6 +82,23 @@ def _http_delete(url: str, timeout: int = 15):
         return None, None, str(e)
 
 
+def parse_progress(message: str) -> tuple[str, str]:
+    """(type, text) of a CBOMkit websocket progress message, e.g. {"type": "ERROR", "message": "Git clone failed: ..."}.
+
+    Types seen from cbomkit 2.1.10: LABEL (incl. the final "Finished"), GITURL, BRANCH, REVISION_HASH, PURL, ERROR.
+    Anything that is not such a JSON object yields ("", "").
+    """
+    try:
+        obj = json.loads(message)
+    except Exception:
+        return "", ""
+    if not isinstance(obj, dict):
+        return "", ""
+    typ = obj.get("type")
+    txt = obj.get("message")
+    return (str(typ).upper() if typ else ""), (str(txt) if txt is not None else "")
+
+
 def _repo_host_path(git_url: str) -> str:
     # Normalize to github.com/org/repo
     url = git_url.strip()
@@ -136,6 +153,9 @@ class CbomKitClient:
         self._lock = threading.Lock()
         self._finished_evt = threading.Event()
         self._last_purl: str | None = None
+        # Set when the backend reports an ERROR progress message (e.g. "Git clone failed: Revision not found: master"
+        # after its silent main -> master retry); the scan will never reach "Finished", so the job fails at once.
+        self._scan_error: str | None = None
 
     def _make_ws_url(self, client_id: str) -> str:
         u = self.ws_url_tmpl
@@ -199,11 +219,11 @@ class CbomKitClient:
             self._ws_connected = True
 
         def on_message(ws, message):
-            try:
-                obj = json.loads(message)
-            except Exception:
-                obj = None
-            txt = (obj or {}).get("message") if isinstance(obj, dict) else None
+            typ, txt = parse_progress(message)
+            if typ == "ERROR":
+                logger.error("cbomkit backend reported: %s", txt)
+                self._scan_error = txt or "unknown error"
+                return
             if txt:
                 # Try to capture the stored PURL with commit, optionally with ?branch=...
                 try:
@@ -479,6 +499,7 @@ class CbomKitClient:
                     continue
                 self._finished_evt.clear()
                 self._last_purl = None
+                self._scan_error = None
                 try:
                     with self._lock:
                         payload = {
@@ -495,6 +516,8 @@ class CbomKitClient:
                 while time.monotonic() < deadline:
                     if self._finished_evt.is_set():
                         return True, True, None
+                    if self._scan_error:
+                        return True, False, f"scan_error:{self._scan_error}"
                     if self._backend_oom_flagged():
                         return True, False, "backend_oom"
                     if self._ws_error:
@@ -565,6 +588,8 @@ class CbomKitClient:
                 return None, time.monotonic() - start, "backend_unavailable"
             if trig_err == "backend_oom":
                 return None, time.monotonic() - start, "backend_oom"
+            if trig_err and trig_err.startswith("scan_error:"):
+                return None, time.monotonic() - start, trig_err
             return None, time.monotonic() - start, "ws_not_finished"
 
         # 3) After finishing, allow a short grace for persistence
@@ -641,6 +666,13 @@ def _produce(instr: JobInstruction, trace: Trace) -> str | tuple[str, float]:
             f"worker_timeout_sec={TIMEOUT_SEC}"
         )
         raise TimeoutError(err)
+    if err and str(err).startswith("scan_error:"):
+        # Deterministic backend failure (clone/checkout/scan error); no point in waiting for the timeout
+        trace.add(
+            f"cbomkit backend error for repo={instr.repo_info.full_name} branch={instr.repo_info.branch}: "
+            f"{str(err)[len('scan_error:') :]}"
+        )
+        raise RuntimeError("cbomkit_scan_error")
     if err == "backend_oom":
         trace.add("cbomkit backend encountered OutOfMemoryError")
         # Give the supervisor time to restart backend before we release the job,

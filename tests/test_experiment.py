@@ -304,3 +304,34 @@ def test_tools_yaml_memory_matches_compose_limits():
         checked += 1
     assert checked >= 10
     assert tool_memory_gb("no-such-tool", registry) == 1.0
+
+
+def test_mark_unsupported_records_meta_and_plan_skips_it(tmp_path: Path):
+    spec = ex.spec_from_dict(
+        {"name": "scope", "tools": ["cbomkit", "cryptoscan"], "repetitions": 2, "repos": [{"full_name": "o/r"}]}
+    )
+    snap = ex.Snapshot(
+        full_name="o/r",
+        source_url="u",
+        branch="main",
+        commit="a" * 40,
+        variant="original",
+        variant_commit="a" * 40,
+        scan_url="s",
+        scan_branch="b",
+        language="Go",
+    )
+    registry = {"cbomkit": {"languages": ["java", "python"]}, "cryptoscan": {"languages": ["go"]}}
+    exp_dir = tmp_path / "scope"
+    recorded = ex.mark_unsupported(spec, [snap], exp_dir, registry=registry)
+    assert recorded == [("cbomkit", "o/r")]
+    metas = sorted(exp_dir.glob("*/*/cbomkit/run*.meta.json"))
+    assert len(metas) == 2
+    assert json.loads(metas[0].read_text())["status"] == "unsupported"
+    assert ex.mark_unsupported(spec, [snap], exp_dir, registry=registry) == []  # idempotent
+    ids = iter(f"id{i}" for i in range(10))
+    jobs, skipped = ex.plan_jobs(spec, [snap], exp_dir, new_id=lambda: next(ids))
+    assert {j.tool for j in jobs} == {"cryptoscan"} and skipped == 2
+    jobs, _ = ex.plan_jobs(spec, [snap], exp_dir, new_id=lambda: next(ids), retry_failed=True)
+    assert {j.tool for j in jobs} == {"cryptoscan"}  # unsupported runs are never retried
+    assert ex.summarize(exp_dir)["per_tool"] == {"cbomkit": {"unsupported": 2}}

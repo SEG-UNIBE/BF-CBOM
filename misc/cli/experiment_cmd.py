@@ -30,6 +30,7 @@ from common.experiment import (
     Snapshot,
     experiment_dir,
     load_spec,
+    mark_unsupported,
     plan_jobs,
     plan_waves,
     resolve_snapshots,
@@ -88,6 +89,10 @@ def _pending_key(name: str) -> str:
     return f"exp:{name}:pending"
 
 
+def _running_key(name: str) -> str:
+    return f"exp:{name}:running"  # job_id -> started_at, written by the workers (common/jobs.py)
+
+
 def _job_from_descriptor(job_id: str, desc: dict) -> PlannedJob:
     return PlannedJob(
         job_id=job_id, snapshot=Snapshot(**desc["snapshot"]), tool=desc["tool"], run_index=int(desc["run_index"])
@@ -114,6 +119,12 @@ def run(
         False, "--no-wait", help="Enqueue and return; collect later with `experiment collect`"
     ),
     retry_failed: bool = typer.Option(False, "--retry-failed", help="Also redo stored runs whose status is not ok"),
+    skip_unsupported: bool = typer.Option(
+        True,
+        "--skip-unsupported/--run-unsupported",
+        help="Record (tool, repo) pairs outside the tool's language scope (tools.yaml) as status 'unsupported' "
+        "instead of running them",
+    ),
     memory_budget_gb: float = typer.Option(
         0.0,
         "--memory-budget-gb",
@@ -160,6 +171,18 @@ def run(
         _cancel_pending(r, spec.name, pending)
         pending = {}
 
+    if skip_unsupported:
+        unsupported = mark_unsupported(spec, snapshots, exp_dir)
+        if unsupported:
+            per_tool: dict[str, int] = {}
+            for tool, _ in unsupported:
+                per_tool[tool] = per_tool.get(tool, 0) + 1
+            typer.secho(
+                "language scope (tools.yaml): recorded as unsupported, not run: "
+                + ", ".join(f"{t} x{n}" for t, n in sorted(per_tool.items())),
+                fg=typer.colors.BLUE,
+                err=True,
+            )
     jobs, skipped = plan_jobs(spec, snapshots, exp_dir, new_id=lambda: str(uuid.uuid4()), retry_failed=retry_failed)
     covered = {(j.snapshot.full_name, j.snapshot.variant, j.tool, j.run_index) for j in pending.values()}
     jobs = [j for j in jobs if (j.snapshot.full_name, j.snapshot.variant, j.tool, j.run_index) not in covered]
@@ -246,6 +269,7 @@ def run(
             return
         done = _collect(r, spec.name, spec.tools, exp_dir, wave_pending, idle_timeout, done=done, total=total)
     r.hset(_status_key(spec.name), mapping={"status": "completed", "finished_at": now_iso()})
+    r.delete(_running_key(spec.name))
     _print_summary(exp_dir)
 
 
@@ -291,6 +315,7 @@ def _collect(
                 continue
             path = write_result(exp_dir, job, result)
             r.hdel(_pending_key(name), result.job_id)
+            r.hdel(_running_key(name), result.job_id)
             done += 1
             r.hset(_status_key(name), mapping={"stored_jobs": str(done), "updated_at": now_iso()})
             colour = typer.colors.GREEN if result.status == "ok" else typer.colors.RED
@@ -392,6 +417,9 @@ def status(name: str = typer.Argument(...), redis_host: str = REDIS_HOST_OPT, re
     r = _redis(redis_host, redis_port)
     meta = r.hgetall(_status_key(name))
     meta["pending_jobs"] = r.hlen(_pending_key(name))
+    running = r.hgetall(_running_key(name))
+    pending_ids = set(r.hkeys(_pending_key(name)))
+    meta["running_jobs"] = {jid: ts for jid, ts in running.items() if jid in pending_ids}
     exp_dir = experiment_dir(name)
     typer.echo(json.dumps({"redis": meta, "disk": summarize(exp_dir) if exp_dir.exists() else None}, indent=2))
 

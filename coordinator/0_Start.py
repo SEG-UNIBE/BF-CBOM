@@ -8,6 +8,7 @@ from common.utils import (
     get_available_workers,
     get_project_version_from_toml,
     get_status_emoji,
+    get_status_keys_order,
 )
 from coordinator.logger_config import logger
 from coordinator.redis_io import JOB_SUMMARY_FIELDS, delete_inspection, get_redis, job_status_key, list_inspections
@@ -178,7 +179,7 @@ with right:
     keys = r.dbsize()
 
     # Global job stats across all inspections (flat fields only; CBOM bodies are never loaded)
-    status_counts = {k: 0 for k in ("completed", "failed", "cancelled", "pending", "timeout")}
+    status_counts = {k: 0 for k in get_status_keys_order()}
     total_duration = 0.0
     duration_count = 0
     try:
@@ -231,15 +232,7 @@ with right:
             st.metric("jobs", f"{total_jobs:,}")
         with j_right:
             em = get_status_emoji
-            breakdown = " · ".join(
-                [
-                    f"{em('completed')} {status_counts['completed']:,}",
-                    f"{em('failed')} {status_counts['failed']:,}",
-                    f"{em('timeout')} {status_counts['timeout']:,}",
-                    f"{em('cancelled')} {status_counts['cancelled']:,}",
-                    f"{em('pending')} {status_counts['pending']:,}",
-                ]
-            )
+            breakdown = " · ".join(f"{em(k)} {status_counts[k]:,}" for k in get_status_keys_order())
             st.markdown(
                 f"<div style='display:flex;align-items:flex-end;height:4.5rem;padding-bottom:0.8rem;'>"
                 f"<span style='opacity:0.65;font-size:0.95rem;'>{breakdown}</span>"

@@ -11,6 +11,7 @@ from common.cbom_analysis import (
     create_component_match_instruction,
 )
 from common.config import EXPERIMENT_MEMORY_BUDGET_GB, GITHUB_CACHE_TTL_SEC, GITHUB_TOKEN
+from common.jobs import EXPERIMENT_ROUTE_PREFIX, JOB_ROUTING_KEY, tool_supports  # noqa: F401  re-exported
 from common.models import ComponentMatchJobInstruction, Inspection
 from common.tools_registry import load_tools, plan_waves, tool_memory_gb
 from common.utils import repo_dict_to_info, resolve_remote_commit
@@ -306,14 +307,14 @@ def pair_key(repo_full_name: str, worker: str) -> str:
 
 
 # Global hash job_id -> insp_id, so any poller can route any worker result.
-JOB_ROUTING_KEY = "jobs:routing"
-# Routing targets with this prefix are batch experiments (misc/cli experiment), not inspections:
+# JOB_ROUTING_KEY / EXPERIMENT_ROUTE_PREFIX live in common/jobs.py (workers use them to mark jobs running).
+# Routing targets with the experiment prefix are batch experiments (misc/cli experiment), not inspections:
 # their results are forwarded untouched to `results:exp:<name>` for the runner to persist.
-EXPERIMENT_ROUTE_PREFIX = "exp:"
 # Statuses that count a job as done for progress purposes.
-TERMINAL_JOB_STATUSES = ("completed", "failed", "cancelled")
+TERMINAL_JOB_STATUSES = ("completed", "failed", "cancelled", "unsupported")
+UNSUPPORTED_STATUS = "unsupported"
 # Flat job-hash fields that are enough to render status/duration/size without the CBOM body.
-JOB_SUMMARY_FIELDS = ("status", "worker_status", "duration_sec", "size_bytes")
+JOB_SUMMARY_FIELDS = ("status", "worker_status", "duration_sec", "size_bytes", "started_at")
 
 
 def job_fields_from_result(job_dict: dict) -> dict[str, str]:
@@ -338,12 +339,13 @@ def job_fields_from_result(job_dict: dict) -> dict[str, str]:
 
 
 def job_status_key(meta: dict) -> str:
-    """Map a job hash to a canonical UI status: completed | timeout | failed | cancelled | pending."""
+    """Map a job hash to a canonical UI status key (see common.utils._STATUS_META).
+
+    Hash values: held | fired (= queued) | running | completed | failed | cancelled | unsupported.
+    """
     stt = (meta.get("status") or "").lower()
-    if stt == "completed":
-        return "completed"
-    if stt == "cancelled":
-        return "cancelled"
+    if stt in ("completed", "cancelled", "unsupported", "running", "held"):
+        return stt
     if stt == "failed":
         ws = (meta.get("worker_status") or "").lower()
         if not ws and meta.get("result_json"):
@@ -353,7 +355,7 @@ def job_status_key(meta: dict) -> str:
             except Exception:
                 ws = ""
         return "timeout" if ws == "timeout" else "failed"
-    return "pending"
+    return "queued"
 
 
 def enrich_repo(r: redis.Redis, repo: dict, gh_token: str | None) -> dict:
@@ -435,10 +437,31 @@ def wave_complete(rows: list[tuple[str, str]], wave: list[str]) -> bool:
     return all(status in TERMINAL_JOB_STATUSES for worker, status in rows if worker in wave_set)
 
 
-def _issue_job(pipe: redis.client.Pipeline, insp_id: str, repo: dict, worker: str, job_id: str, *, hold: bool) -> None:
-    """Create the job record and either queue it or hold it for a later wave."""
-    instr_json = create_job_instruction(repo, worker, job_id).to_json()
+def _issue_job(
+    pipe: redis.client.Pipeline,
+    insp_id: str,
+    repo: dict,
+    worker: str,
+    job_id: str,
+    *,
+    hold: bool,
+    supported: bool = True,
+) -> None:
+    """Create the job record and queue it, hold it for a later wave, or close it as unsupported."""
     fields = {"worker": worker, "repo_full_name": repo.get("full_name"), "sent_at": now_iso()}
+    if not supported:
+        fields.update(
+            {
+                "status": UNSUPPORTED_STATUS,
+                "worker_status": "unsupported",
+                "notes": f"{worker} does not list {repo.get('language') or '?'} in common/tools.yaml; not run",
+            }
+        )
+        pipe.rpush(f"insp:{insp_id}:jobs", job_id)
+        pipe.hset(f"insp:{insp_id}:job_index", mapping={pair_key(repo.get("full_name"), worker): job_id})
+        pipe.hset(f"insp:{insp_id}:job:{job_id}", mapping=fields)
+        return
+    instr_json = create_job_instruction(repo, worker, job_id).to_json()
     if hold:
         fields.update({"status": HELD_STATUS, "instruction_json": instr_json})
     else:
@@ -547,11 +570,15 @@ def start_inspection(r: redis.Redis, insp_id: str) -> int:
     # Optional token for higher rate limits when resolving default branches
     gh_token = GITHUB_TOKEN
 
+    registry = load_tools()
     for idx, repo in enumerate(repos):
         repo = enrich_repo(r, repo, gh_token)
         pipe.lset(repos_key, idx, json.dumps(repo))
         for worker in workers:
-            _issue_job(pipe, insp_id, repo, worker, str(uuid.uuid4()), hold=worker not in first_wave)
+            supported = tool_supports(worker, repo.get("language"), registry)
+            _issue_job(
+                pipe, insp_id, repo, worker, str(uuid.uuid4()), hold=worker not in first_wave, supported=supported
+            )
             issued += 1
     pipe.hset(
         f"insp:{insp_id}",
@@ -733,14 +760,18 @@ def retry_non_completed_inspection(r: redis.Redis, insp_id: str) -> int:
         pipe.lset(repos_key, idx, json.dumps(repo))
         for worker in workers:
             prior_id = r.hget(job_index_key, pair_key(repo.get("full_name"), worker))
-            if prior_id and (r.hget(f"insp:{insp_id}:job:{prior_id}", "status") or "") == "completed":
+            prior = (r.hget(f"insp:{insp_id}:job:{prior_id}", "status") or "") if prior_id else ""
+            if prior in ("completed", UNSUPPORTED_STATUS):
                 continue
             todo.append((repo, worker))
 
-    waves = inspection_waves(sorted({w for _, w in todo}, key=workers.index))
+    registry = load_tools()
+    runnable = [(repo, w) for repo, w in todo if tool_supports(w, repo.get("language"), registry)]
+    waves = inspection_waves(sorted({w for _, w in runnable}, key=workers.index))
     first_wave = set(waves[0]) if waves else set()
     for repo, worker in todo:
-        _issue_job(pipe, insp_id, repo, worker, str(uuid.uuid4()), hold=worker not in first_wave)
+        supported = tool_supports(worker, repo.get("language"), registry)
+        _issue_job(pipe, insp_id, repo, worker, str(uuid.uuid4()), hold=worker not in first_wave, supported=supported)
     issued = len(todo)
 
     if issued:

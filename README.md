@@ -332,10 +332,26 @@ Ruff is configured in `pyproject.toml` for both formatting and linting; unit tes
 
 `.github/workflows/ci.yml` runs all three on every push and pull request.
 
-### Worker liveness
+### Worker Liveness
 
 Every worker refreshes a short-lived `worker:<name>:alive` key in Redis (see `common/worker.py`).
 The Setup page pre-selects only live workers, the Execution page warns before starting jobs for a worker that is down, and the Analysis page disables matching when the `pyqun` matcher is not running.
+
+### Job States
+
+Every job of an inspection is in exactly one state, defined once in `common/utils.py` and used by the grid, the legend, the charts and the Start page counters:
+
+| State | Meaning |
+|---|---|
+| ⏸️ Held | created, but waits for a later memory-budget wave (see "Parallelism and memory") |
+| 💤 Queued | in the worker's Redis queue, no worker has taken it yet |
+| ⚙️ Running | a worker popped the job; the cell shows the elapsed time |
+| ✅ Completed | the worker returned a CBOM |
+| 💥 Failed / ⏰ Timeout | the worker errored (details in the job notes) or exceeded its time budget |
+| 🚫 Cancelled | cancelled before completion |
+| ⏭️ Unsupported | not run: the tool does not list the repository's language in `common/tools.yaml` |
+
+Workers mark a job running the moment they take it (`common/jobs.py`), using the routing hash the coordinator and the runner maintain. Unsupported pairs are decided when jobs are issued, from the repository's main language and the tool's declared `languages`; a repository without a known language is always run. The batch runner records such pairs as `run<k>.meta.json` with status `unsupported` and no CBOM (`--run-unsupported` disables this), so they never count as failures or empty results.
 
 ### Snapshot pinning and provenance
 

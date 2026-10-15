@@ -30,8 +30,9 @@ from pathlib import Path
 
 import yaml
 
+from .jobs import tool_supports
 from .models import JobInstruction, JobResult, RepoInfo
-from .tools_registry import plan_waves  # noqa: F401  re-export; the runner and tests import it from here
+from .tools_registry import load_tools, plan_waves  # noqa: F401  plan_waves re-exported for the runner and tests
 from .utils import resolve_remote_commit
 
 RESULTS_DIR = Path(os.getenv("RESULTS_DIR", "/data/results"))
@@ -480,13 +481,56 @@ def plan_jobs(
             for k in range(1, spec.repetitions + 1):
                 cbom, meta = result_paths(exp_dir, snap.full_name, snap.commit, snap.variant, tool, k)
                 if meta.exists():
-                    if not (retry_failed and _stored_status(meta) != "ok"):
+                    if not (retry_failed and _stored_status(meta) not in ("ok", UNSUPPORTED)):
                         skipped += 1
                         continue
                     meta.unlink()
                     cbom.unlink(missing_ok=True)
                 jobs.append(PlannedJob(job_id=new_id(), snapshot=snap, tool=tool, run_index=k))
     return jobs, skipped
+
+
+UNSUPPORTED = "unsupported"
+
+
+def mark_unsupported(
+    spec: ExperimentSpec, snapshots: list[Snapshot], exp_dir: Path, *, registry: dict[str, dict] | None = None
+) -> list[tuple[str, str]]:
+    """Record (tool, repo) pairs outside the tool's language scope (common/tools.yaml `languages`).
+
+    Writes a `run<k>.meta.json` with status `unsupported` and no CBOM for every repetition that has no stored
+    run yet, so `plan_jobs` skips them (also with --retry-failed) and `summarize` counts them. Returns the
+    (tool, full_name) pairs recorded this time.
+    """
+    registry = load_tools() if registry is None else registry
+    recorded: list[tuple[str, str]] = []
+    for snap in snapshots:
+        for tool in spec.tools:
+            if tool_supports(tool, snap.language, registry):
+                continue
+            written = 0
+            for k in range(1, spec.repetitions + 1):
+                _, meta_path = result_paths(exp_dir, snap.full_name, snap.commit, snap.variant, tool, k)
+                if meta_path.exists():
+                    continue
+                written += 1
+                meta_path.parent.mkdir(parents=True, exist_ok=True)
+                meta = {
+                    "status": UNSUPPORTED,
+                    "worker": tool,
+                    "run_index": k,
+                    "variant": snap.variant,
+                    "variant_commit": snap.variant_commit,
+                    "base_commit": snap.commit,
+                    "source_url": snap.source_url,
+                    "language": snap.language,
+                    "notes": f"{tool} does not list {snap.language or '?'} in common/tools.yaml; not run",
+                    "received_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                }
+                meta_path.write_text(json.dumps(meta, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            if written:
+                recorded.append((tool, snap.full_name))
+    return recorded
 
 
 def write_result(exp_dir: Path, job: PlannedJob, result: JobResult) -> Path:

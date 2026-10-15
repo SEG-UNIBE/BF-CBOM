@@ -57,7 +57,7 @@ with shared_col1:
     )
     down = [w for w in available_workers if not liveness.get(w)]
     if down:
-        st.caption("⚠️ Not running: " + ", ".join(f"`{w}`" for w in down) + " · jobs for them would stay pending")
+        st.caption("⚠️ Not running: " + ", ".join(f"`{w}`" for w in down) + " · jobs for them would stay queued")
     planned_waves = inspection_waves(shared_workers)
     if len(planned_waves) > 1:
         st.caption(
