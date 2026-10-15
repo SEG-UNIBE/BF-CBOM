@@ -5,10 +5,11 @@ from pathlib import Path
 
 import streamlit as st
 
-from common.config import GITHUB_TOKEN
+from common.config import EXPERIMENT_MEMORY_BUDGET_GB, GITHUB_TOKEN
 from common.utils import get_available_workers
 from coordinator.logger_config import logger
-from coordinator.redis_io import create_inspection, get_redis, get_worker_liveness
+from coordinator.redis_io import create_inspection, get_redis, get_worker_liveness, inspection_waves
+from coordinator.scheduler import ensure_scheduler
 from coordinator.utils import (
     enrich_repos_with_github,
     get_favicon_path,
@@ -28,6 +29,7 @@ st.set_page_config(
 )
 
 r = get_redis()
+ensure_scheduler()
 st.title("Setup")
 
 available_workers = get_available_workers()
@@ -56,6 +58,12 @@ with shared_col1:
     down = [w for w in available_workers if not liveness.get(w)]
     if down:
         st.caption("⚠️ Not running: " + ", ".join(f"`{w}`" for w in down) + " · jobs for them would stay pending")
+    planned_waves = inspection_waves(shared_workers)
+    if len(planned_waves) > 1:
+        st.caption(
+            f"Memory budget {EXPERIMENT_MEMORY_BUDGET_GB:g} GiB (EXPERIMENT_MEMORY_BUDGET_GB): these workers run in "
+            f"{len(planned_waves)} waves · " + " → ".join(", ".join(w) for w in planned_waves)
+        )
 
 # ============================================================
 # Tabs: Individual vs Batch Inspection

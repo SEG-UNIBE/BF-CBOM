@@ -382,6 +382,7 @@ def summarize_result_cell(meta: dict) -> str:
     """Return compact cell text for a job in grids from its (flat) job hash.
 
     - fired -> pending emoji
+    - held -> waiting for its memory-budget wave
     - completed -> ✅ + duration/size
     - cancelled -> 🚫 Cancelled
     - failed/timeout -> appropriate emoji + label
@@ -390,6 +391,8 @@ def summarize_result_cell(meta: dict) -> str:
     from coordinator.redis_io import job_status_key
 
     key = job_status_key(meta or {})
+    if (meta or {}).get("status") == "held":
+        return "⏸️ held (later wave)"
     if key == "completed":
         dur = safe_float(meta.get("duration_sec"))
         size_b = safe_int(meta.get("size_bytes"), default=-1)

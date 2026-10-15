@@ -5,6 +5,11 @@ BASE_IMAGE := bf-cbom/base
 AVAILABLE_WORKERS := skeleton,testing,mssbomtool,cbomkit,cdxgen,cryptobomforge,deepseek,cryptoscan,chatgpt,claude,pqcheck,qdarpan,securin-xbom,cipherradar,xgrep,cbomkit-jar
 # Comma-separated list of dev-only workers
 DEV_WORKERS := skeleton,testing,mssbomtool
+# Batch runs (make experiment): memory budget in GiB = sum of the compose memory limits of the workers
+# fed at the same time (common/tools.yaml memory_gb). Tools beyond the budget run in later waves.
+# Laptop default 14 (Docker Desktop VM ~20 GiB); on a big VM set 0 (no limit) or e.g. 64.
+# Override per call: make experiment EXP=... EXPERIMENT_MEMORY_BUDGET_GB=0
+EXPERIMENT_MEMORY_BUDGET_GB ?= 14
 # Export everything defined above to downstream commands for cross-shell support
 .EXPORT_ALL_VARIABLES:
 # ====================================================

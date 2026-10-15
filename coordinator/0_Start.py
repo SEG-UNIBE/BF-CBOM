@@ -11,6 +11,7 @@ from common.utils import (
 )
 from coordinator.logger_config import logger
 from coordinator.redis_io import JOB_SUMMARY_FIELDS, delete_inspection, get_redis, job_status_key, list_inspections
+from coordinator.scheduler import ensure_scheduler
 from coordinator.utils import (
     build_minimal_config_json,
     get_favicon_path,
@@ -33,6 +34,7 @@ st.set_page_config(
 # Establish Redis connection early to report readiness in container logs
 try:
     r = get_redis()
+    ensure_scheduler()
     print("[coordinator] Connected to Redis")
     logger.info(
         "Coordinator: connected to Redis host=%s port=%s",

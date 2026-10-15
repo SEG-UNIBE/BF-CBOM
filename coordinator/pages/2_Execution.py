@@ -13,6 +13,7 @@ from coordinator.redis_io import (
     dead_workers,
     get_insp_meta,
     get_insp_repos,
+    get_insp_waves,
     get_insp_workers,
     get_redis,
     list_inspections,
@@ -22,6 +23,7 @@ from coordinator.redis_io import (
     retry_non_completed_inspection,
     start_inspection,
 )
+from coordinator.scheduler import ensure_scheduler
 from coordinator.utils import (
     format_inspection_header,
     get_favicon_path,
@@ -40,6 +42,7 @@ st.set_page_config(
 )
 
 r = get_redis()
+ensure_scheduler()
 st.title("Execution")
 
 # Resolve insp selection
@@ -84,6 +87,17 @@ with left:
         unsafe_allow_html=True,
     )
     st.caption(f"Workers: {', '.join(workers) if workers else '(none)'} · Status: {status}")
+    waves, wave_no = get_insp_waves(meta)
+    if len(waves) > 1 and status in ("running", "completed", "cancelled"):
+        budget = meta.get("memory_budget_gb") or "?"
+        plan = " → ".join(
+            ("**" if i == wave_no else "") + ", ".join(w) + ("**" if i == wave_no else "")
+            for i, w in enumerate(waves, 1)
+        )
+        st.caption(
+            f"Memory budget {budget} GiB: wave {wave_no}/{len(waves)} · {plan} · "
+            "⏸️ jobs of later waves are held until the current wave has finished"
+        )
     down = dead_workers(r, workers)
     if down and status in ("created", "running"):
         st.warning(

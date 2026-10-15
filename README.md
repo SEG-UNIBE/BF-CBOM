@@ -360,4 +360,18 @@ make analysis ARGS="micro e0-micro"             # recall/precision per tool agai
 make analysis ARGS="sites e0-micro"             # location-aware agreement between tools (analysis/match.py)
 ```
 
+#### Parallelism and Memory
+
+- **One job per worker container.** Each worker pops one job from its Redis queue, runs the tool in a subprocess, pushes the result and only then takes the next job. A batch therefore has as many jobs in flight as there are worker containers: with `make up-prod` that is one per generator, each working on a different repository. Queued jobs cost nothing but a Redis list entry, so the size of a batch never affects memory.
+- **More throughput: replicas.** Workers are stateless, so a tool can be scaled to several containers that share the same queue: `docker compose up -d --scale worker-cryptoscan=3`. The runner needs no change. Each replica has the full memory limit of its service.
+- **Memory limits are caps, not reservations.** Every worker has a memory limit in `docker-compose.yml` (8 GiB for the two CBOMkit workers, 6 GiB for CryptobomForge, 4 GiB for most others). They sum to roughly 49 GiB for the eleven generators, far more than a laptop's Docker VM (Docker Desktop defaults to a fraction of the host RAM). Idle workers use little, but on large repositories the JVM and CodeQL based tools grow towards their caps, and if the VM itself runs out of memory the kernel kills arbitrary containers.
+- **Memory budget (waves).** `EXPERIMENT_MEMORY_BUDGET_GB` in the `Makefile` (default 14, meant for a Docker VM of about 20 GiB) caps the summed limits of the tools a batch feeds at the same time. The runner packs the tools into waves, largest first, runs one wave to completion, then starts the next; the plan is printed before anything is enqueued. With all eleven generators the default gives four waves. On a machine with enough RAM set the budget to 0 (one wave, everything in parallel), either per call or once in the `Makefile`:
+
+  ```bash
+  make experiment EXP=experiments/e1-pilot-corpus.yaml EXPERIMENT_MEMORY_BUDGET_GB=0
+  ```
+
+  The per-tool numbers come from `memory_gb` in `common/tools.yaml`, which a test keeps equal to the compose limits; adjust both when changing a limit. The budget assumes one replica per tool, so with `--scale` count each replica.
+- **Interactive batch inspection.** The Streamlit UI applies the same budget: the Setup page shows the wave plan for the selected workers, and when an inspection starts, jobs for workers outside the first wave are created as *held* (⏸️ in the grid) and queued only once every job of the current wave has finished. A background thread in the coordinator advances the waves, so the browser tab can be closed; it starts with the first page view after the coordinator (re)starts.
+
 See `experiments/README.md` for the spec format and `corpus/README.md` for the repository lists and fixtures (plain directories such as `corpus/micro/java` are published to the git server as deterministic commits). The offline analysis library lives in `analysis/`. `make clean-docker` keeps the volumes; `docker compose down -v` removes them.

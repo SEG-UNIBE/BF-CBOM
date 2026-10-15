@@ -33,6 +33,23 @@ Rerunning a spec is resumable: runs whose `run<k>.meta.json` exists are skipped,
 `lock.json`, and jobs still pending from an interrupted run are collected (`--requeue-pending` to reissue).
 `ARGS=--retry-failed` redoes stored runs whose status is not `ok`.
 
+**Memory budget (waves).** Every worker takes one job at a time, so a batch needs at most the sum of the
+compose memory limits of the workers that have jobs queued (`memory_gb` in `common/tools.yaml`, kept equal
+to `docker-compose.yml` by a test). `EXPERIMENT_MEMORY_BUDGET_GB` (Makefile, default 14 for a laptop whose
+Docker Desktop VM has ~20 GiB) caps that sum: the runner packs the tools into waves (largest first), feeds
+one wave, collects it, then feeds the next; workers of later waves sit idle meanwhile. With the default and
+all eleven workers that is four waves. On a machine with enough RAM set it to 0 (one wave, everything in
+parallel):
+
+```
+make experiment EXP=experiments/e1-pilot-corpus.yaml EXPERIMENT_MEMORY_BUDGET_GB=0   # per call
+```
+
+or change the default in the Makefile once per machine. The wave plan is printed before anything is
+enqueued and stored in the experiment's Redis status (`waves`, `wave`). `--no-wait` enqueues only the
+first wave; after `experiment collect` rerun `run` for the next one. Jobs left pending by an interrupted
+run are already in the queues and are collected in wave 1 regardless of the budget.
+
 Offline analysis of a stored experiment (`analysis/`, no Redis), results under `<exp>/analysis/` on the volume:
 
 ```

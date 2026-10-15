@@ -256,3 +256,51 @@ def test_spec_rejects_path_with_commit_or_url():
         ex.spec_from_dict(
             {"name": "ok", "tools": ["x"], "repos": [{"full_name": "a/b", "path": "p", "commit": "a" * 40}]}
         )
+
+
+# ----- memory budget / waves -----
+
+MEM = {"cbomkit": 8.0, "cbomkit-jar": 8.0, "cryptobomforge": 6.0, "cdxgen": 4.0, "pqcheck": 4.0, "deepseek": 1.0}
+TOOLS = ["cbomkit", "cdxgen", "cryptobomforge", "deepseek", "pqcheck", "cbomkit-jar"]
+
+
+def test_plan_waves_no_budget_is_one_wave_in_spec_order():
+    assert ex.plan_waves(TOOLS, budget_gb=0, memory_gb=MEM) == [TOOLS]
+    assert ex.plan_waves([], budget_gb=14, memory_gb=MEM) == []
+
+
+def test_plan_waves_packs_first_fit_decreasing_within_budget():
+    waves = ex.plan_waves(TOOLS, budget_gb=14, memory_gb=MEM)
+    assert all(sum(MEM[t] for t in w) <= 14 for w in waves)
+    assert sorted(t for w in waves for t in w) == sorted(TOOLS)  # every tool exactly once
+    assert waves[0] == ["cbomkit", "cryptobomforge"]  # 8 + 6, kept in spec order inside the wave
+    assert waves[1] == ["cdxgen", "deepseek", "cbomkit-jar"]  # 8 + 4 + 1
+    assert waves[2] == ["pqcheck"]
+
+
+def test_plan_waves_oversized_tool_gets_its_own_wave_and_pinned_tools_go_first():
+    assert ex.plan_waves(["cbomkit", "deepseek"], budget_gb=4, memory_gb=MEM) == [["cbomkit"], ["deepseek"]]
+    # jobs already in the queues (`first`) are collected in wave 1 even when that exceeds the budget
+    waves = ex.plan_waves(TOOLS, budget_gb=14, memory_gb=MEM, first=["cbomkit-jar", "cbomkit"])
+    assert waves[0] == ["cbomkit", "cbomkit-jar"]
+    assert sorted(t for w in waves for t in w) == sorted(TOOLS)
+
+
+def test_tools_yaml_memory_matches_compose_limits():
+    """`memory_gb` in common/tools.yaml is what the runner budgets with; it must equal the compose limit."""
+    from common.tools_registry import load_tools, tool_memory_gb
+
+    root = Path(__file__).resolve().parents[1]
+    compose = yaml.safe_load((root / "docker-compose.yml").read_text(encoding="utf-8"))
+    registry = load_tools(root / "common" / "tools.yaml")
+    checked = 0
+    for name, entry in registry.items():
+        if entry.get("status") != "integrated":
+            continue
+        service = compose["services"][f"worker-{name}"]
+        limit = service["deploy"]["resources"]["limits"]["memory"].lower()
+        gb = float(limit[:-1]) if limit.endswith("g") else float(limit[:-1]) / 1024
+        assert tool_memory_gb(name, registry) == gb, f"{name}: tools.yaml {entry.get('memory_gb')} vs compose {limit}"
+        checked += 1
+    assert checked >= 10
+    assert tool_memory_gb("no-such-tool", registry) == 1.0

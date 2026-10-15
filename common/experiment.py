@@ -31,6 +31,7 @@ from pathlib import Path
 import yaml
 
 from .models import JobInstruction, JobResult, RepoInfo
+from .tools_registry import plan_waves  # noqa: F401  re-export; the runner and tests import it from here
 from .utils import resolve_remote_commit
 
 RESULTS_DIR = Path(os.getenv("RESULTS_DIR", "/data/results"))

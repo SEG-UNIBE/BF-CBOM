@@ -31,12 +31,14 @@ from common.experiment import (
     experiment_dir,
     load_spec,
     plan_jobs,
+    plan_waves,
     resolve_snapshots,
     spec_to_dict,
     summarize,
     write_result,
 )
 from common.models import JobResult
+from common.tools_registry import load_tools, tool_memory_gb
 from coordinator.redis_io import (
     EXPERIMENT_ROUTE_PREFIX,
     JOB_ROUTING_KEY,
@@ -112,8 +114,20 @@ def run(
         False, "--no-wait", help="Enqueue and return; collect later with `experiment collect`"
     ),
     retry_failed: bool = typer.Option(False, "--retry-failed", help="Also redo stored runs whose status is not ok"),
+    memory_budget_gb: float = typer.Option(
+        0.0,
+        "--memory-budget-gb",
+        envvar="EXPERIMENT_MEMORY_BUDGET_GB",
+        help="Feed tools in waves so the sum of their worker memory limits (tools.yaml memory_gb) stays within "
+        "this many GiB; 0 = no limit (one wave). Compose sets it from EXPERIMENT_MEMORY_BUDGET_GB (Makefile).",
+    ),
 ):
-    """Pin, mirror, enqueue and collect: everything missing on disk for the spec gets (re)run."""
+    """Pin, mirror, enqueue and collect: everything missing on disk for the spec gets (re)run.
+
+    Workers take one job at a time, so a batch's memory need is the sum of the limits of the workers that have
+    jobs queued. With a memory budget the tools are packed into waves (common/experiment.py:plan_waves); each
+    wave is enqueued only after the previous one has been collected.
+    """
     try:
         spec = load_spec(spec_path)
     except (ExperimentError, OSError, yaml.YAMLError) as e:
@@ -154,38 +168,102 @@ def run(
         fg=typer.colors.BLUE,
         err=True,
     )
-    pipe = r.pipeline()
-    for job in jobs:
-        pipe.hset(JOB_ROUTING_KEY, job.job_id, _route_key(spec.name))
-        pipe.hset(_pending_key(spec.name), job.job_id, _descriptor(job))
-        pipe.rpush(f"jobs:{job.tool}", job.instruction().to_json())
-    pipe.hset(
+    registry = load_tools()
+    memory = {t: tool_memory_gb(t, registry) for t in spec.tools}
+    pending_tools = {j.tool for j in pending.values()}
+    active_tools = [t for t in spec.tools if t in pending_tools or any(j.tool == t for j in jobs)]
+    waves = plan_waves(active_tools, budget_gb=memory_budget_gb, memory_gb=memory, first=sorted(pending_tools))
+    for t in active_tools:
+        if t not in registry:
+            msg = f"warning: '{t}' is not in common/tools.yaml; assuming {memory[t]:g} GiB"
+            typer.secho(msg, fg=typer.colors.YELLOW, err=True)
+    if memory_budget_gb > 0:
+        for wave in waves:
+            load = sum(memory[t] for t in wave)
+            over = load > memory_budget_gb
+            typer.secho(
+                f"wave {waves.index(wave) + 1}/{len(waves)}: {', '.join(f'{t} {memory[t]:g}' for t in wave)}"
+                f" = {load:g} GiB" + (" (exceeds the budget: already queued or a single tool)" if over else ""),
+                fg=typer.colors.YELLOW if over else typer.colors.BLUE,
+                err=True,
+            )
+        typer.secho(
+            f"memory budget {memory_budget_gb:g} GiB -> {len(waves)} wave(s); workers of later waves idle meanwhile",
+            fg=typer.colors.BLUE,
+            err=True,
+        )
+    total = len(jobs) + len(pending)
+    r.hset(
         _status_key(spec.name),
         mapping={
-            "status": "running" if (jobs or pending) else "completed",
+            "status": "running" if total else "completed",
             "started_at": now_iso(),
             "expected_jobs": str(spec.expected_jobs),
-            "issued_jobs": str(len(jobs)),
+            "issued_jobs": "0",
             "skipped_jobs": str(skipped),
             "results_dir": str(exp_dir),
             "tools": json.dumps(spec.tools),
+            "memory_budget_gb": f"{memory_budget_gb:g}",
+            "waves": json.dumps(waves),
         },
     )
-    pipe.execute()
-    pending.update({j.job_id: j for j in jobs})
-    if no_wait or not pending:
+    if not total:
         _print_summary(exp_dir)
         return
-    _collect(r, spec.name, spec.tools, exp_dir, pending, idle_timeout)
+    done = 0
+    issued = 0
+    for i, wave in enumerate(waves, 1):
+        wave_jobs = [j for j in jobs if j.tool in wave]
+        pipe = r.pipeline()
+        for job in wave_jobs:
+            pipe.hset(JOB_ROUTING_KEY, job.job_id, _route_key(spec.name))
+            pipe.hset(_pending_key(spec.name), job.job_id, _descriptor(job))
+            pipe.rpush(f"jobs:{job.tool}", job.instruction().to_json())
+        issued += len(wave_jobs)
+        pipe.hset(
+            _status_key(spec.name),
+            mapping={"issued_jobs": str(issued), "wave": f"{i}/{len(waves)}", "updated_at": now_iso()},
+        )
+        pipe.execute()
+        wave_pending = {jid: j for jid, j in pending.items() if j.tool in wave}
+        wave_pending.update({j.job_id: j for j in wave_jobs})
+        if len(waves) > 1:
+            typer.secho(
+                f"wave {i}/{len(waves)} ({', '.join(wave)}): {len(wave_jobs)} job(s) enqueued, "
+                f"{len(wave_pending) - len(wave_jobs)} already pending",
+                fg=typer.colors.BLUE,
+                err=True,
+            )
+        if no_wait:
+            if i < len(waves):
+                typer.secho(
+                    f"--no-wait: only wave {i} was enqueued; after `experiment collect {spec.name}` rerun this "
+                    f"command to issue the remaining {len(waves) - i} wave(s)",
+                    fg=typer.colors.YELLOW,
+                    err=True,
+                )
+            _print_summary(exp_dir)
+            return
+        done = _collect(r, spec.name, spec.tools, exp_dir, wave_pending, idle_timeout, done=done, total=total)
+    r.hset(_status_key(spec.name), mapping={"status": "completed", "finished_at": now_iso()})
+    _print_summary(exp_dir)
 
 
 def _collect(
-    r: redis.Redis, name: str, tools: list[str], exp_dir: Path, pending: dict[str, PlannedJob], idle_timeout: int
-) -> None:
+    r: redis.Redis,
+    name: str,
+    tools: list[str],
+    exp_dir: Path,
+    pending: dict[str, PlannedJob],
+    idle_timeout: int,
+    *,
+    done: int = 0,
+    total: int | None = None,
+) -> int:
+    """Persist results until `pending` is empty; returns the cumulative count of stored results."""
     inbox = f"results:{_route_key(name)}"
     last_progress = time.monotonic()
-    total = len(pending)
-    done = 0
+    total = total if total is not None else done + len(pending)
     warned_dead: set[str] = set()
     redis_failures = 0
     while pending:
@@ -241,8 +319,7 @@ def _collect(
                 r.hset(_status_key(name), mapping={"status": "stalled", "updated_at": now_iso()})
                 _err(f"no result for {idle_timeout}s; {len(pending)} job(s) still pending (rerun to keep waiting)", 4)
             time.sleep(2.0)
-    r.hset(_status_key(name), mapping={"status": "completed", "finished_at": now_iso()})
-    _print_summary(exp_dir)
+    return done
 
 
 def _drain(r: redis.Redis, inbox: str) -> list[str]:
@@ -289,7 +366,14 @@ def collect(
         typer.echo("nothing pending")
         _print_summary(exp_dir)
         return
-    _collect(r, name, tools, exp_dir, pending, idle_timeout)
+    stored = int(r.hget(_status_key(name), "stored_jobs") or 0)
+    _collect(r, name, tools, exp_dir, pending, idle_timeout, done=stored, total=stored + len(pending))
+    r.hset(_status_key(name), mapping={"status": "completed", "finished_at": now_iso()})
+    wave = r.hget(_status_key(name), "wave") or ""
+    if "/" in wave and wave.split("/")[0] != wave.split("/")[1]:
+        msg = f"wave {wave} collected; rerun `experiment run` to issue the next wave"
+        typer.secho(msg, fg=typer.colors.YELLOW, err=True)
+    _print_summary(exp_dir)
 
 
 @experiment_app.command("cancel")
