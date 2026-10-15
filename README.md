@@ -50,7 +50,7 @@ It also offers **benchmarking capabilities** to orchestrate batch CBOM generatio
 
 ### CBOM Generators Under Scrutiny
 
-BF-CBOM currently integrates four different CBOM generation approaches to enable side-by-side comparisons.
+BF-CBOM currently integrates five different CBOM generation approaches to enable side-by-side comparisons.
 Each generator brings a unique methodology for detecting and cataloging cryptographic assets:
 
 - **[`CBOMKit`](https://github.com/PQCA/cbomkit)**:
@@ -65,7 +65,12 @@ CBOM generation currently limited to Python and Java projects.
 Santander Security Research's CLI tool that processes CodeQL SARIF outputs rather than source code directly, making it language-agnostic.
 
 - **[`DeepSeek`](https://www.deepseek.com/)**:
-Experimental LLM-based approach using DeepSeek's language model for zero-shot cryptographic asset detection via prompt-based code analysis.
+LLM-based approach: the worker clones the repository, selects source files that reference crypto APIs, sends them with line numbers to DeepSeek's model (temperature 0) and assembles a CycloneDX 1.6 CBOM with file and line per asset (`common/llm_cbom.py`; other providers plug in as thin adapters).
+
+- **`ChatGPT` / `Claude`** (prepared, opt-in): the same code-reading pipeline with OpenAI or Anthropic models. Put the API key into `docker/env/worker-chatgpt.env` or `docker/env/worker-claude.env` and start with `make up-prod EXTRA_PROFILES=llm`; without keys these workers are not started.
+
+- **[`CryptoScan`](https://github.com/csnp/cryptoscan)**:
+CyberSecurity NonProfit's pattern-based scanner (Apache-2.0) with a catalogue of 90+ crypto patterns across 15+ languages; emits CycloneDX 1.6 CBOMs with code locations.
 
 ## Setup
 
@@ -284,6 +289,8 @@ make up-prod NO_CACHE=1  # rebuild every layer from the Dockerfiles and start
 Run `docker compose down -v` to delete it as well.
 Upstream base images are pinned by digest, so they resolve to the same content even when re-downloaded.
 Verify with `docker images 'bf-cbom/*'` (all freshly created) and `docker history <image>` (one layer per Dockerfile step).
+
+If a build fails with `No space left on device`, run `make clean-cache`: it frees Docker's build cache and dangling images without touching volumes or tagged images.
 
 ### Publishing Release Images
 

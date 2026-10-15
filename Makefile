@@ -2,7 +2,7 @@
 VERSION := $(shell cat VERSION 2>/dev/null || echo "0.0.0")
 BASE_IMAGE := bf-cbom/base
 # Comma-separated list of all workers available in the repo
-AVAILABLE_WORKERS := skeleton,testing,mssbomtool,cbomkit,cdxgen,cryptobomforge,deepseek
+AVAILABLE_WORKERS := skeleton,testing,mssbomtool,cbomkit,cdxgen,cryptobomforge,deepseek,cryptoscan,chatgpt,claude
 # Comma-separated list of dev-only workers
 DEV_WORKERS := skeleton,testing,mssbomtool
 # Export everything defined above to downstream commands for cross-shell support
@@ -46,11 +46,11 @@ release:
 SERIAL_BUILD ?= 1
 build-all: ensure-env build-base
 ifeq ($(SERIAL_BUILD),1)
-	@for svc in $$(docker compose config --services) runner; do \
-		echo ">>> building $$svc"; docker compose --profile tools build $(NO_CACHE_FLAG) $$svc || exit 1; \
+	@for svc in $$(docker compose config --services) runner worker-chatgpt worker-claude; do \
+		echo ">>> building $$svc"; docker compose --profile tools --profile llm build $(NO_CACHE_FLAG) $$svc || exit 1; \
 	done
 else
-	docker compose --profile tools build $(NO_CACHE_FLAG)
+	docker compose --profile tools --profile llm build $(NO_CACHE_FLAG)
 endif
 
 # Dev: only the explicitly listed dev workers
@@ -59,14 +59,16 @@ up-dev: export AVAILABLE_WORKERS := $(DEV_WORKERS)
 up-dev: build-all
 	docker compose up
 
-# Prod: all workers except the dev-only ones
-up-prod: export COMPOSE_PROFILES := prod
+# Prod: all workers except the dev-only ones. Opt-in groups via EXTRA_PROFILES, e.g.
+#   make up-prod EXTRA_PROFILES=llm   (chatgpt + claude workers; need API keys in docker/env/)
+EXTRA_PROFILES ?=
+up-prod: export COMPOSE_PROFILES := prod$(if $(EXTRA_PROFILES),$(comma)$(EXTRA_PROFILES),)
 up-prod: export AVAILABLE_WORKERS := $(PROD_WORKERS)
 up-prod: build-all
 	docker compose up
 
 # Prod from prebuilt GHCR images (no local build; see .github/workflows/images.yml)
-up-prod-pull: export COMPOSE_PROFILES := prod
+up-prod-pull: export COMPOSE_PROFILES := prod$(if $(EXTRA_PROFILES),$(comma)$(EXTRA_PROFILES),)
 up-prod-pull: export AVAILABLE_WORKERS := $(PROD_WORKERS)
 up-prod-pull: ensure-env
 	docker compose pull
@@ -123,7 +125,13 @@ $(ENV_DIR)/%.env: $(ENV_DIR)/%.env.template
 	@$(ENSURE_ENV_SCRIPT) $< $@
 
 .PHONY: clean-docker build-base build-all release up-dev up-prod up-prod-pull up-all down logs ps show-workers \
-	experiment experiment-status experiment-list experiment-export corpus corpus-export
+	experiment experiment-status experiment-list experiment-export corpus corpus-export clean-cache
+
+# Frees Docker's build cache and dangling images (safe: volumes and tagged images are kept).
+# Repeated rebuilds of the large worker images fill the Docker VM disk ("No space left on device").
+clean-cache:
+	docker builder prune -f
+	docker image prune -f
 
 # Removes BF-CBOM's containers (all profiles) and images only; other Docker projects are untouched.
 # The redis-data volume (stored inspections) is kept; use `docker compose down -v` to drop it too.

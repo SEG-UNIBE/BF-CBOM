@@ -187,14 +187,21 @@ def _collect(
     total = len(pending)
     done = 0
     warned_dead: set[str] = set()
+    redis_failures = 0
     while pending:
-        ingest_worker_results(r, _route_key(name), tools)
-        got_any = False
-        while True:
-            raw = r.lpop(inbox)
-            if raw is None:
-                break
-            got_any = True
+        try:
+            ingest_worker_results(r, _route_key(name), tools)
+            batch = _drain(r, inbox)
+        except redis.exceptions.RedisError as e:
+            # Transient DNS / connection blips inside the compose network must not kill a long run.
+            redis_failures += 1
+            typer.secho(f"redis error ({e}); retrying in 5s [{redis_failures}]", fg=typer.colors.YELLOW, err=True)
+            if time.monotonic() - last_progress > idle_timeout:
+                _err(f"redis unreachable for {idle_timeout}s; {len(pending)} job(s) still pending", 5)
+            time.sleep(5.0)
+            continue
+        got_any = bool(batch)
+        for raw in batch:
             try:
                 result = JobResult.from_json(raw)
             except Exception:
@@ -236,6 +243,16 @@ def _collect(
             time.sleep(2.0)
     r.hset(_status_key(name), mapping={"status": "completed", "finished_at": now_iso()})
     _print_summary(exp_dir)
+
+
+def _drain(r: redis.Redis, inbox: str) -> list[str]:
+    """Pop everything currently in the experiment inbox."""
+    batch: list[str] = []
+    while True:
+        raw = r.lpop(inbox)
+        if raw is None:
+            return batch
+        batch.append(raw)
 
 
 def _print_summary(exp_dir: Path) -> None:

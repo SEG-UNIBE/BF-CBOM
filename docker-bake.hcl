@@ -22,6 +22,9 @@ group "default" {
     "worker-cdxgen",
     "worker-cryptobomforge",
     "worker-deepseek",
+    "worker-chatgpt",
+    "worker-claude",
+    "worker-cryptoscan",
     "misc-pyqun",
     "gitserver",
     "runner",
@@ -82,6 +85,24 @@ target "worker-deepseek" {
   inherits   = ["_from-base"]
   dockerfile = "docker/Dockerfile.worker-deepseek"
   tags       = ["${REGISTRY}-worker-deepseek:${VERSION}"]
+}
+
+target "worker-chatgpt" {
+  inherits   = ["_from-base"]
+  dockerfile = "docker/Dockerfile.worker-chatgpt"
+  tags       = ["${REGISTRY}-worker-chatgpt:${VERSION}"]
+}
+
+target "worker-claude" {
+  inherits   = ["_from-base"]
+  dockerfile = "docker/Dockerfile.worker-claude"
+  tags       = ["${REGISTRY}-worker-claude:${VERSION}"]
+}
+
+target "worker-cryptoscan" {
+  inherits   = ["_from-base"]
+  dockerfile = "docker/Dockerfile.worker-cryptoscan"
+  tags       = ["${REGISTRY}-worker-cryptoscan:${VERSION}"]
 }
 
 target "worker-cdxgen" {

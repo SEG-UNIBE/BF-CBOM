@@ -1,0 +1,41 @@
+# syntax=docker/dockerfile:1.7
+# docker/Dockerfile.worker-cryptoscan
+# CSNP CryptoScan (Apache-2.0): static Go binary from the pinned GitHub release, checksum-verified.
+ARG BASE_IMAGE=base
+ARG BASE_TAG=latest
+FROM ${BASE_IMAGE}:${BASE_TAG}
+
+ARG CRYPTOSCAN_VERSION=1.4.0
+# sha256 of cryptoscan_<version>_linux_<arch>.tar.gz from the release's checksums.txt
+ARG CRYPTOSCAN_SHA256_AMD64=49aa043bd3f46927efa8ee89a2344d30f2ec351ae9e0cf2791ac8206b45be19d
+ARG CRYPTOSCAN_SHA256_ARM64=b5856d591d654977712d703fff9efc6c59743574b7eade54c385eb6fdcb11b01
+ARG TARGETARCH
+
+USER root
+RUN set -eu; \
+    case "${TARGETARCH}" in \
+      amd64) sum="${CRYPTOSCAN_SHA256_AMD64}";; \
+      arm64) sum="${CRYPTOSCAN_SHA256_ARM64}";; \
+      *) echo "unsupported arch ${TARGETARCH}" >&2; exit 1;; \
+    esac; \
+    url="https://github.com/csnp/cryptoscan/releases/download/v${CRYPTOSCAN_VERSION}/cryptoscan_${CRYPTOSCAN_VERSION}_linux_${TARGETARCH}.tar.gz"; \
+    curl -fsSL --retry 5 --retry-delay 5 -o /tmp/cryptoscan.tgz "$url"; \
+    echo "${sum}  /tmp/cryptoscan.tgz" | sha256sum -c -; \
+    mkdir -p /tmp/cs && tar -xzf /tmp/cryptoscan.tgz -C /tmp/cs; \
+    install -m 0755 "$(find /tmp/cs -type f -name cryptoscan | head -1)" /usr/local/bin/cryptoscan; \
+    rm -rf /tmp/cs /tmp/cryptoscan.tgz; \
+    cryptoscan version
+ENV TOOL_VERSION="cryptoscan ${CRYPTOSCAN_VERSION}"
+
+USER appuser
+WORKDIR /app
+ENV PYTHONPATH=/app
+
+COPY --chown=appuser:appuser pyproject.toml uv.lock ./
+COPY --chown=appuser:appuser common/ ./common/
+RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=1000,gid=1000 \
+    uv sync --frozen --no-dev
+
+COPY --chown=appuser:appuser workers/cryptoscan/ ./workers/cryptoscan/
+
+ENTRYPOINT ["tini", "-g", "--", "uv", "run", "--frozen", "--no-dev", "workers/cryptoscan/main.py"]

@@ -12,6 +12,8 @@ REDIS_SOCKET_TIMEOUT_SEC = 30
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 GITHUB_CACHE_TTL_SEC = int(os.getenv("GITHUB_CACHE_TTL_SEC", "86400"))  # default 1 day
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
 
 def _parse_list(raw: str | None) -> list[str]:

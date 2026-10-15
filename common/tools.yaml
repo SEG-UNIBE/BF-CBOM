@@ -24,7 +24,23 @@ tools:
     native_cyclonedx: true          # assembled by the worker from the model's structured answer
     languages: [java, python]
     voter_group: llm                # sensitivity analysis merges all LLM workers into one voter
-  # cryptoscan:    { engine: cryptoscan, approach: patterns, native_cyclonedx: true }
+  chatgpt:
+    engine: llm
+    approach: LLM reading pre-filtered source files (same prompts and file selection as deepseek)
+    native_cyclonedx: true
+    languages: [java, python]
+    voter_group: llm
+  claude:
+    engine: llm
+    approach: LLM reading pre-filtered source files (same prompts and file selection as deepseek)
+    native_cyclonedx: true
+    languages: [java, python]
+    voter_group: llm
+  cryptoscan:
+    engine: cryptoscan               # CSNP CryptoScan 1.4.0, regex pattern catalogue (90+ patterns)
+    approach: patterns
+    native_cyclonedx: true          # `--format cbom` emits CycloneDX 1.6 with evidence.occurrences
+    languages: [java, python, go, javascript, typescript, c, cpp, rust, csharp, ruby, php]
   # scanoss:       { engine: scanoss-crypto-finder, approach: call graph, native_cyclonedx: false }
   # xgrep:         { engine: mondoo-xgrep, approach: syntax tree + data flow, native_cyclonedx: true }
   # cryptoscope:   { engine: ibm-cryptoscope, approach: data flow, native_cyclonedx: unknown }

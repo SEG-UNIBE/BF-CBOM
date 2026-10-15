@@ -1,0 +1,7 @@
+# LLM-only smoke on one dense repo (checks chunk splitting and token accounting).
+name: e0-llm-smoke
+tools: [deepseek]
+repetitions: 1
+repos:
+  - full_name: authlib/authlib
+    language: Python

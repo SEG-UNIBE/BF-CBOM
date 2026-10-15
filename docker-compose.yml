@@ -92,7 +92,7 @@ services:
     depends_on:
       - redis
     environment:
-      - AVAILABLE_WORKERS=${AVAILABLE_WORKERS:-cdxgen,cbomkit,deepseek,cryptobomforge}
+      - AVAILABLE_WORKERS=${AVAILABLE_WORKERS:-cdxgen,cbomkit,deepseek,cryptobomforge,cryptoscan,chatgpt,claude}
       - AVAILABLE_LANGUAGES=python,java
       - GITHUB_CACHE_TTL_SEC=86400
       - COMPONENT_MATCH_WAIT_SEC=420
@@ -251,13 +251,117 @@ services:
       - REDIS_HOST=redis
       - BF_CBOM_IMAGE=bf-cbom/worker-deepseek:${VERSION:-latest}
       - REDIS_PORT=6379
-      - WORKER_TIMEOUT_SEC=120
+      - WORKER_TIMEOUT_SEC=900
+      # code-reading LLM budget (common/llm_cbom.py): files sent, chars per request, requests per repo
+      - LLM_MAX_FILES=40
+      - LLM_MAX_CHUNK_CHARS=40000
+      - LLM_MAX_CHUNKS=16
+      - LLM_MAX_OUTPUT_TOKENS=8192
+      - LLM_API_TIMEOUT_SEC=180
     env_file: docker/env/worker-deepseek.env
     restart: on-failure:3
     deploy:
       resources:
         limits:
           memory: 1g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    profiles: [prod, all]
+
+  worker-chatgpt:
+    image: bf-cbom/worker-chatgpt:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-chatgpt
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-chatgpt:${VERSION:-latest}
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=900
+      # code-reading LLM budget (common/llm_cbom.py): files sent, chars per request, requests per repo
+      - LLM_MAX_FILES=40
+      - LLM_MAX_CHUNK_CHARS=40000
+      - LLM_MAX_CHUNKS=16
+      - LLM_MAX_OUTPUT_TOKENS=8192
+      - LLM_API_TIMEOUT_SEC=180
+    env_file: docker/env/worker-chatgpt.env
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    # no API key yet: opt in with `make up-prod EXTRA_PROFILES=llm` once docker/env/worker-chatgpt.env has the key
+    profiles: [llm, all]
+
+  worker-claude:
+    image: bf-cbom/worker-claude:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-claude
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-claude:${VERSION:-latest}
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=900
+      # code-reading LLM budget (common/llm_cbom.py): files sent, chars per request, requests per repo
+      - LLM_MAX_FILES=40
+      - LLM_MAX_CHUNK_CHARS=40000
+      - LLM_MAX_CHUNKS=16
+      - LLM_MAX_OUTPUT_TOKENS=8192
+      - LLM_API_TIMEOUT_SEC=180
+    env_file: docker/env/worker-claude.env
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    # no API key yet: opt in with `make up-prod EXTRA_PROFILES=llm` once docker/env/worker-claude.env has the key
+    profiles: [llm, all]
+
+  worker-cryptoscan:
+    image: bf-cbom/worker-cryptoscan:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-cryptoscan
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-cryptoscan:${VERSION:-latest}
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=600
+    env_file: docker/env/worker-cryptoscan.env
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 2g
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     profiles: [prod, all]
