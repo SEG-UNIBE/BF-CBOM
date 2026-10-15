@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import shutil
 import subprocess
 import time
@@ -31,20 +32,20 @@ class CdxgenClient:
         except Exception as e:
             raise RuntimeError(f"failed_prepare_workdir: {e}") from e
 
-    def _run_cdxgen(self, repo_dir: Path, out_file: Path, trace: Trace) -> None:
-        # Revert to the previously working form: absolute output path and repo path
+    def _run_cdxgen(self, repo_dir: Path, out_file: Path, trace: Trace, *, evidence: bool = True) -> None:
         cmd = [
             self.binary,
             "--json-pretty",
             "--include-crypto",
-            # file/line occurrences for components; off by default in cdxgen
-            "--evidence",
             # never run pip/npm/maven for arbitrary repos (also off for reproducibility)
             "--no-install-deps",
             "-o",
             str(out_file),
             str(repo_dir),
         ]
+        if evidence:
+            # file/line occurrences for components; off by default in cdxgen
+            cmd.insert(3, "--evidence")
         logger.info("Running cdxgen: %s", " ".join(cmd))
         trace.add(f"cdxgen cmd: {' '.join(cmd)}")
         try:
@@ -100,18 +101,30 @@ class CdxgenClient:
                 f"stdout_tail: {stdout_tail or '(empty)'}"
             )
 
-    def generate_cbom(self, git_url: str, branch: str = "main", trace: Trace | None = None) -> str:
+    def generate_cbom(
+        self, git_url: str, branch: str = "main", trace: Trace | None = None, commit: str | None = None
+    ) -> str:
         trace = trace or Trace()
         work_root = Path("/tmp") / f"cdxgen-{int(time.time() * 1000)}"
         repo_dir = work_root / "repo"
         out_file = work_root / "bom.json"
         self._ensure_clean_dir(work_root)
         try:
-            cloned_path = clone_repo(git_url, branch=branch, target_dir=str(repo_dir))
+            cloned_path = clone_repo(git_url, branch=branch, target_dir=str(repo_dir), commit=commit)
             if not cloned_path:
                 trace.add("git clone failed")
                 raise RuntimeError("git_clone_failed")
-            self._run_cdxgen(Path(cloned_path), out_file, trace)
+            try:
+                self._run_cdxgen(Path(cloned_path), out_file, trace)
+            except RuntimeError as exc:
+                if not str(exc).startswith("cdxgen_no_output rc=0"):
+                    raise
+                # cdxgen 11.x exits 0 without writing a BOM in --evidence mode on some Maven
+                # projects. Rerun without evidence so the job still yields a CBOM; the fallback is
+                # recorded in the result notes (no occurrences in this output).
+                logger.warning("cdxgen wrote no output with --evidence; retrying without it")
+                trace.add("fallback: --evidence produced no output, reran without --evidence")
+                self._run_cdxgen(Path(cloned_path), out_file, trace, evidence=False)
             return out_file.read_text(encoding="utf-8")
         finally:
             # Best-effort cleanup
@@ -126,6 +139,7 @@ def _produce(instr: JobInstruction, trace: Trace) -> str:
         git_url=instr.repo_info.git_url,
         branch=instr.repo_info.branch,
         trace=trace,
+        commit=instr.repo_info.commit,
     )
 
 
@@ -133,12 +147,19 @@ handle_instruction = build_handle_instruction(NAME, _produce)
 
 
 def main():
+    version = None
     try:
         ver = subprocess.run(["cdxgen", "--version"], capture_output=True, text=True, timeout=30)
-        logger.info("cdxgen version: %s", (ver.stdout or ver.stderr).strip())
+        # "\x1b[1mCycloneDX Generator 11.7.0\x1b[0m\nRuntime: Node.js, ..." -> "11.7.0"
+        out = re.sub(r"\x1b\[[0-9;]*m", "", (ver.stdout or "") + (ver.stderr or ""))
+        m = re.search(r"\b(\d+\.\d+\.\d+)\b", out)
+        version = m.group(1) if m else (out.strip().splitlines() or [None])[0]
+        logger.info("cdxgen version: %s", version)
     except Exception as e:
         logger.warning("could not determine cdxgen version: %s", e)
-    run_worker(NAME, handle_instruction, default_timeout=TIMEOUT_SEC)
+    run_worker(
+        NAME, handle_instruction, default_timeout=TIMEOUT_SEC, tool_version=f"cdxgen {version}" if version else None
+    )
 
 
 if __name__ == "__main__":

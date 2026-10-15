@@ -1,15 +1,17 @@
 import threading
 import time
+
 import psutil
 
 
 class TimingStruct:
     def __init__(self):
-        self.start = None          # CPU start (float) or 0.0
-        self.end = None            # CPU end (float)
-        self.elapsed = None        # Elapsed CPU (float) or wall fallback
-        self.wall_start = None     # Wall clock start
-        self.wall_end = None       # Wall clock end
+        self.start = None  # CPU start (float) or 0.0
+        self.end = None  # CPU end (float)
+        self.elapsed = None  # Elapsed CPU (float) or wall fallback
+        self.wall_start = None  # Wall clock start
+        self.wall_end = None  # Wall clock end
+
 
 class Stopwatch:
     def __init__(self):

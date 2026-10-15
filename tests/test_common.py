@@ -113,7 +113,9 @@ def test_summarize_component_types_groups_by_worker():
         },
     ]
     table = summarize_component_types(rows, ["w1", "w2"])
-    assert table["o/r"] == [{"component.type": "cryptographic-asset", "asset.type": "algorithm", "name": "AES", "w1": 2, "w2": 1}]
+    assert table["o/r"] == [
+        {"component.type": "cryptographic-asset", "asset.type": "algorithm", "name": "AES", "w1": 2, "w2": 1}
+    ]
 
 
 # ----- matching input -----

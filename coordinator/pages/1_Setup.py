@@ -11,10 +11,10 @@ from coordinator.logger_config import logger
 from coordinator.redis_io import create_inspection, get_redis, get_worker_liveness
 from coordinator.utils import (
     enrich_repos_with_github,
+    get_favicon_path,
     github_search_multi_language,
     parse_repo_urls,
     set_query_insp_id,
-    get_favicon_path,
 )
 
 # ---------- Streamlit Page ----------

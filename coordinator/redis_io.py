@@ -12,7 +12,7 @@ from common.cbom_analysis import (
 )
 from common.config import GITHUB_CACHE_TTL_SEC, GITHUB_TOKEN
 from common.models import ComponentMatchJobInstruction, Inspection
-from common.utils import repo_dict_to_info
+from common.utils import repo_dict_to_info, resolve_remote_commit
 from coordinator.logger_config import logger
 
 
@@ -306,6 +306,9 @@ def pair_key(repo_full_name: str, worker: str) -> str:
 
 # Global hash job_id -> insp_id, so any poller can route any worker result.
 JOB_ROUTING_KEY = "jobs:routing"
+# Routing targets with this prefix are batch experiments (misc/cli experiment), not inspections:
+# their results are forwarded untouched to `results:exp:<name>` for the runner to persist.
+EXPERIMENT_ROUTE_PREFIX = "exp:"
 # Statuses that count a job as done for progress purposes.
 TERMINAL_JOB_STATUSES = ("completed", "failed", "cancelled")
 # Flat job-hash fields that are enough to render status/duration/size without the CBOM body.
@@ -350,6 +353,43 @@ def job_status_key(meta: dict) -> str:
                 ws = ""
         return "timeout" if ws == "timeout" else "failed"
     return "pending"
+
+
+def enrich_repo(r: redis.Redis, repo: dict, gh_token: str | None) -> dict:
+    """Return a copy of a repo snapshot with branch, commit, language, stars and size filled in.
+
+    The branch is the explicit one if given, else the GitHub default branch. The commit is
+    resolved once (git ls-remote) and then kept, so re-runs and retries scan the same snapshot.
+    GitHub metadata is best-effort and cached; it is never required for a job to run.
+    """
+    repo = dict(repo)
+    fullname = repo.get("full_name")
+    branch = repo.get("branch") or repo.get("default_branch")
+    if not branch:
+        resolved = fetch_default_branch(r, fullname, gh_token)
+        branch = resolved or "main"
+        if resolved:
+            repo["default_branch"] = resolved
+    repo["branch"] = branch
+    git_url = repo.get("clone_url") or repo.get("git_url") or (f"https://github.com/{fullname}.git" if fullname else "")
+    if not repo.get("commit") and git_url:
+        sha = resolve_remote_commit(git_url, branch)
+        if sha:
+            repo["commit"] = sha
+        else:
+            logger.warning("Could not resolve commit for %s@%s; jobs will scan the branch head", fullname, branch)
+    if not repo.get("language"):
+        top = fetch_top_language(r, fullname, gh_token)
+        if top:
+            repo["language"] = top
+    if repo.get("stargazers_count") in (None, "") or repo.get("size") in (None, ""):
+        meta = fetch_repo_meta(r, fullname, gh_token)
+        if isinstance(meta, dict):
+            if repo.get("stargazers_count") in (None, "") and "stargazers_count" in meta:
+                repo["stargazers_count"] = meta.get("stargazers_count")
+            if repo.get("size") in (None, "") and "size" in meta:  # GitHub "size" is in KB
+                repo["size"] = meta.get("size")
+    return repo
 
 
 def create_inspection(r: redis.Redis, name: str, params: dict, repos: list[dict], workers: list[str]) -> str:
@@ -408,31 +448,8 @@ def start_inspection(r: redis.Redis, insp_id: str) -> int:
     gh_token = GITHUB_TOKEN
 
     for idx, repo in enumerate(repos):
-        repo = dict(repo)
+        repo = enrich_repo(r, repo, gh_token)
         fullname = repo.get("full_name")
-        branch = repo.get("default_branch") or repo.get("branch")
-        if not branch:
-            resolved = fetch_default_branch(r, fullname, gh_token)
-            branch = resolved or "main"
-            if resolved:
-                repo["default_branch"] = resolved
-        # Ensure branch is set for job instruction
-        repo["branch"] = branch
-        # Ensure a language is set to aid language-specific workers
-        if not repo.get("language"):
-            top = fetch_top_language(r, fullname, gh_token)
-            if top:
-                repo["language"] = top
-        # Best-effort fill stars and size if missing (helps UI summaries)
-        if repo.get("stargazers_count") in (None, "") or repo.get("size") in (None, ""):
-            meta = fetch_repo_meta(r, fullname, gh_token)
-            if isinstance(meta, dict):
-                if repo.get("stargazers_count") in (None, "") and "stargazers_count" in meta:
-                    repo["stargazers_count"] = meta.get("stargazers_count")
-                # GitHub "size" is in KB
-                if repo.get("size") in (None, "") and "size" in meta:
-                    repo["size"] = meta.get("size")
-
         pipe.lset(repos_key, idx, json.dumps(repo))
 
         for worker in workers:
@@ -501,6 +518,13 @@ def ingest_worker_results(r: redis.Redis, polling_insp_id: str, workers: list[st
             insp_id = _route_result(r, polling_insp_id, job_id) if job_id else None
             if not insp_id:
                 logger.warning("Dropping result for unknown job %s from %s", job_id, results_key)
+                continue
+            if insp_id.startswith(EXPERIMENT_ROUTE_PREFIX):
+                pipe = r.pipeline()
+                pipe.rpush(f"results:{insp_id}", raw)
+                pipe.hdel(JOB_ROUTING_KEY, job_id)
+                pipe.execute()
+                ingested += 1
                 continue
             job_key = f"insp:{insp_id}:job:{job_id}"
             current = r.hget(job_key, "status") or ""
@@ -623,27 +647,8 @@ def retry_non_completed_inspection(r: redis.Redis, insp_id: str) -> int:
     pipe = r.pipeline()
     job_index_key = f"insp:{insp_id}:job_index"
     for idx, repo in enumerate(repos):
-        repo = dict(repo)
+        repo = enrich_repo(r, repo, gh_token)
         fullname = repo.get("full_name")
-        branch = repo.get("default_branch") or repo.get("branch")
-        if not branch:
-            resolved = fetch_default_branch(r, fullname, gh_token)
-            branch = resolved or "main"
-            if resolved:
-                repo["default_branch"] = resolved
-        repo["branch"] = branch
-        if not repo.get("language"):
-            top = fetch_top_language(r, fullname, gh_token)
-            if top:
-                repo["language"] = top
-        if repo.get("stargazers_count") in (None, "") or repo.get("size") in (None, ""):
-            meta = fetch_repo_meta(r, fullname, gh_token)
-            if isinstance(meta, dict):
-                if repo.get("stargazers_count") in (None, "") and "stargazers_count" in meta:
-                    repo["stargazers_count"] = meta.get("stargazers_count")
-                if repo.get("size") in (None, "") and "size" in meta:
-                    repo["size"] = meta.get("size")
-
         pipe.lset(repos_key, idx, json.dumps(repo))
 
         for worker in workers:

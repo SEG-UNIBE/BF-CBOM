@@ -12,6 +12,8 @@ FROM ${BASE_IMAGE}:${BASE_TAG}
 USER appuser
 WORKDIR /app
 ENV PYTHONPATH=/app
+# Reported in every JobResult.tool_version (keep in sync with the FROM line above)
+ENV TOOL_VERSION="cbomkit 2.1.10"
 
 # 1) Deps first for better caching
 COPY --chown=appuser:appuser pyproject.toml uv.lock ./

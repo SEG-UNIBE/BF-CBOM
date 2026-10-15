@@ -46,11 +46,11 @@ release:
 SERIAL_BUILD ?= 1
 build-all: ensure-env build-base
 ifeq ($(SERIAL_BUILD),1)
-	@for svc in $$(docker compose config --services); do \
-		echo ">>> building $$svc"; docker compose build $(NO_CACHE_FLAG) $$svc || exit 1; \
+	@for svc in $$(docker compose config --services) runner; do \
+		echo ">>> building $$svc"; docker compose --profile tools build $(NO_CACHE_FLAG) $$svc || exit 1; \
 	done
 else
-	docker compose build $(NO_CACHE_FLAG)
+	docker compose --profile tools build $(NO_CACHE_FLAG)
 endif
 
 # Dev: only the explicitly listed dev workers
@@ -80,6 +80,31 @@ up-all: build-all
 down:
 	docker compose down
 
+# ---- Batch experiments (results stay in the results-data volume; see experiments/README.md) ----
+# make experiment EXP=experiments/e0-smoke.yaml
+experiment: ensure-env
+	docker compose run --rm runner experiment run /app/$(EXP) $(ARGS)
+
+# make experiment-status NAME=e0-smoke   /   make experiment-list
+experiment-status:
+	docker compose run --rm runner experiment status $(NAME)
+
+experiment-list:
+	docker compose run --rm runner experiment list
+
+# make experiment-export NAME=e0-smoke  -> exports/<name>.zip (the only path from the volume to the host)
+experiment-export:
+	mkdir -p exports
+	docker compose run --rm -v "$(CURDIR)/exports:/export" runner experiment export $(NAME) --dest /export
+
+# make corpus ARGS="--per-language 100"  -> results volume: corpus/corpus.yaml (export with experiment-export-corpus)
+corpus: ensure-env
+	docker compose run --rm runner experiment corpus build $(ARGS)
+
+corpus-export:
+	mkdir -p exports
+	docker compose run --rm -v "$(CURDIR)/exports:/export" runner sh -c 'cp /data/results/corpus/*.yaml /export/'
+
 logs:
 	docker compose logs -f
 
@@ -97,7 +122,8 @@ ensure-env: $(ENV_FILES)
 $(ENV_DIR)/%.env: $(ENV_DIR)/%.env.template
 	@$(ENSURE_ENV_SCRIPT) $< $@
 
-.PHONY: clean-docker build-base build-all release up-dev up-prod up-prod-pull up-all down logs ps show-workers
+.PHONY: clean-docker build-base build-all release up-dev up-prod up-prod-pull up-all down logs ps show-workers \
+	experiment experiment-status experiment-list experiment-export corpus corpus-export
 
 # Removes BF-CBOM's containers (all profiles) and images only; other Docker projects are untouched.
 # The redis-data volume (stored inspections) is kept; use `docker compose down -v` to drop it too.

@@ -46,6 +46,9 @@ class RepoInfo(DataClassJsonMixin):
     size_kb: int
     main_language: str | None = None
     stars: int | None = None
+    # Exact snapshot that was (or must be) scanned. Resolved at inspection start; workers
+    # that clone check out this SHA, so repeated runs and mutants scan identical bytes.
+    commit: str | None = None
 
 
 @dataclass
@@ -58,6 +61,13 @@ class JobResult(DataClassJsonMixin):
     size_bytes: int | None = None
     worker: str | None = None
     error: str | None = None
+    # Provenance (filled by common.worker.run_worker): generator version string, the image
+    # the worker ran in, and which repetition of the same (repo, tool) pair this was.
+    tool_version: str | None = None
+    image_ref: str | None = None
+    run_index: int | None = None
+    # Non-fatal remarks from the worker (e.g. a fallback that was taken) for successful jobs.
+    notes: str | None = None
 
 
 @dataclass
@@ -65,6 +75,7 @@ class JobInstruction(DataClassJsonMixin):
     job_id: str
     tool: str
     repo_info: RepoInfo
+    run_index: int | None = None
 
 
 @dataclass
@@ -121,6 +132,7 @@ class RepoRef(DataClassJsonMixin):
     full_name: str
     git_url: str
     branch: str | None = None
+    commit: str | None = None
 
 
 @dataclass

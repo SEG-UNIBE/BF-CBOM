@@ -19,6 +19,66 @@ services:
         retries: 5
         start_period: 1s
 
+  # Local read-only git server (smart HTTP) on the compose network only. The runner mirrors every
+  # repo here at its pinned commit and pushes mutant branches; workers clone from
+  # http://gitserver/<owner>/<repo>.git so all tools scan identical bytes.
+  gitserver:
+    image: bf-cbom/gitserver:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.gitserver
+    volumes:
+      - git-data:/srv/git
+      - git-certs:/certs
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETUID, SETGID, NET_BIND_SERVICE, DAC_OVERRIDE]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/healthz"]
+      interval: 5s
+      timeout: 2s
+      retries: 5
+      start_period: 2s
+
+  # Batch experiment runner (on demand): `docker compose run --rm runner experiment run /app/experiments/<x>.yaml`
+  runner:
+    image: bf-cbom/runner:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.runner
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+    depends_on:
+      redis:
+        condition: service_healthy
+      gitserver:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - RESULTS_DIR=/data/results
+      - GIT_MIRROR_DIR=/srv/git
+      - GITSERVER_URL=http://gitserver
+    env_file: docker/env/coordinator.env  # GITHUB_TOKEN for the corpus builder
+    volumes:
+      - results-data:/data/results
+      - git-data:/srv/git
+      - ./experiments:/app/experiments:ro
+    restart: "no"
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    profiles: [tools]
+
   coordinator:
     image: bf-cbom/coordinator:${VERSION:-latest}
     build:
@@ -39,6 +99,8 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     env_file: docker/env/coordinator.env
+    volumes:
+      - results-data:/data/results:ro  # stored experiments (read-only in the UI)
     restart: on-failure:3
     deploy:
       resources:
@@ -66,6 +128,7 @@ services:
         condition: service_healthy
     environment:
       - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-skeleton:${VERSION:-latest}
       - REDIS_PORT=6379
       - WORKER_TIMEOUT_SEC=6
     env_file: docker/env/worker-skeleton.env
@@ -94,6 +157,7 @@ services:
         condition: service_healthy
     environment:
       - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-testing:${VERSION:-latest}
       - REDIS_PORT=6379
       - WORKER_TIMEOUT_SEC=6
       - TESTING_MIN_CBOM_KB=50
@@ -123,11 +187,14 @@ services:
         condition: service_healthy
     environment:
       - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-cbomkit:${VERSION:-latest}
       - REDIS_PORT=6379
       - WORKER_TIMEOUT_SEC=600
       - CBOMKIT_HEALTH_WAIT_SEC=20
       - JAVA_OPTS=-Xms1g -Xmx6g -XX:+ExitOnOutOfMemoryError
     env_file: docker/env/worker-cbomkit.env
+    volumes:
+      - git-certs:/certs:ro  # trust the local git server's certificate (CBOMkit forces https)
     restart: on-failure:3
     deploy:
       resources:
@@ -152,6 +219,7 @@ services:
         condition: service_healthy
     environment:
       - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-cdxgen:${VERSION:-latest}
       - REDIS_PORT=6379
       - WORKER_TIMEOUT_SEC=600
       - CDXGEN_DEBUG_MODE=debug
@@ -181,6 +249,7 @@ services:
         condition: service_healthy
     environment:
       - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-deepseek:${VERSION:-latest}
       - REDIS_PORT=6379
       - WORKER_TIMEOUT_SEC=120
     env_file: docker/env/worker-deepseek.env
@@ -208,6 +277,7 @@ services:
         condition: service_healthy
     environment:
       - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-mssbomtool:${VERSION:-latest}
       - REDIS_PORT=6379
       - WORKER_TIMEOUT_SEC=120
     env_file: docker/env/worker-mssbomtool.env
@@ -236,6 +306,7 @@ services:
         condition: service_healthy
     environment:
       - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-cryptobomforge:${VERSION:-latest}
       - REDIS_PORT=6379
       - WORKER_TIMEOUT_SEC=600
       - AVAILABLE_LANGUAGES=python,java
@@ -263,6 +334,7 @@ services:
         condition: service_healthy
     environment:
       - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/misc-treesimilarity:${VERSION:-latest}
       - REDIS_PORT=6379
       - CALC_TIMEOUT_SEC=300
     env_file: docker/env/misc-treesimilarity.env
@@ -287,6 +359,7 @@ services:
         condition: service_healthy
     environment:
       - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/misc-pyqun:${VERSION:-latest}
       - REDIS_PORT=6379
       - CALC_TIMEOUT_SEC=300
     env_file: docker/env/misc-pyqun.env
@@ -301,3 +374,6 @@ services:
 
 volumes:
   redis-data:
+  git-data:      # bare mirrors + mutant branches served by gitserver
+  git-certs:     # gitserver's self-signed TLS certificate, trusted by worker-cbomkit
+  results-data:  # experiment results (CBOMs + meta); export with `make experiment-export`

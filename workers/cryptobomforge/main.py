@@ -72,7 +72,7 @@ _SKIP_DIRS = {".git", "node_modules", "vendor", "build", "dist", "target", "__py
 def _detect_language(repo_path: str) -> str | None:
     """Return the CodeQL language with the most source files under repo_path, or None."""
     counts: dict[str, int] = dict.fromkeys(_LANGUAGE_EXTENSIONS, 0)
-    for root, dirs, files in os.walk(repo_path):
+    for _root, dirs, files in os.walk(repo_path):
         dirs[:] = [d for d in dirs if d not in _SKIP_DIRS]
         for f in files:
             ext = os.path.splitext(f)[1].lower()
@@ -217,9 +217,8 @@ class CryptobomForgeClient:
         # Normalize language to CodeQL identifier
         codeql_lang = self._normalize_language(language)
         if not codeql_lang:
-            trace.add(
-                f"codeql: unsupported language '{language}' (supported: {', '.join(sorted(CODEQL_SUPPORTED_LANGUAGES))})"
-            )
+            supported = ", ".join(sorted(CODEQL_SUPPORTED_LANGUAGES))
+            trace.add(f"codeql: unsupported language '{language}' (supported: {supported})")
             logger.warning("CodeQL scan skipped: unsupported language '%s'", language)
             return False
 
@@ -354,6 +353,7 @@ class CryptobomForgeClient:
         branch: str = "main",
         main_language: str | None = None,
         trace: Trace | None = None,
+        commit: str | None = None,
     ) -> str:
         """Clone -> CodeQL -> cryptobom with progressive error trace accumulation.
 
@@ -362,7 +362,7 @@ class CryptobomForgeClient:
         trace = trace or Trace()
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            repo_path = clone_repo(git_url, branch=branch, target_dir=tmpdir)
+            repo_path = clone_repo(git_url, branch=branch, target_dir=tmpdir, commit=commit)
             if not repo_path:
                 trace.add("git clone failed")
                 raise RuntimeError("git_clone_failed")
@@ -471,6 +471,7 @@ def _produce(instr: JobInstruction, trace: Trace) -> str:
         branch=instr.repo_info.branch,
         main_language=instr.repo_info.main_language,
         trace=trace,
+        commit=instr.repo_info.commit,
     )
 
 

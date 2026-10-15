@@ -23,6 +23,8 @@ group "default" {
     "worker-cryptobomforge",
     "worker-deepseek",
     "misc-pyqun",
+    "gitserver",
+    "runner",
   ]
 }
 
@@ -55,6 +57,19 @@ target "coordinator" {
   inherits   = ["_from-base"]
   dockerfile = "docker/Dockerfile.coordinator"
   tags       = ["${REGISTRY}-coordinator:${VERSION}"]
+}
+
+target "runner" {
+  inherits   = ["_from-base"]
+  dockerfile = "docker/Dockerfile.runner"
+  tags       = ["${REGISTRY}-runner:${VERSION}"]
+}
+
+target "gitserver" {
+  inherits   = ["_common"]
+  dockerfile = "docker/Dockerfile.gitserver"
+  platforms  = MULTI_ARCH
+  tags       = ["${REGISTRY}-gitserver:${VERSION}"]
 }
 
 target "worker-cbomkit" {

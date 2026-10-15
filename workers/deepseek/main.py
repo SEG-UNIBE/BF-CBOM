@@ -14,6 +14,7 @@ NAME = os.getenv("WORKER_NAME") or os.path.basename(os.path.dirname(__file__))
 TIMEOUT_SEC = int(os.getenv("WORKER_TIMEOUT_SEC", "300"))
 # Keep the API call well inside the worker budget; the runner kills the job at TIMEOUT_SEC anyway.
 API_TIMEOUT_SEC = max(30.0, TIMEOUT_SEC - 15.0)
+MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -64,7 +65,7 @@ class DeepSeekClient:
                 f"Please only return the formatted JSON."
             )
             response = self.client.chat.completions.create(
-                model="deepseek-chat",
+                model=MODEL,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
@@ -109,7 +110,7 @@ handle_instruction = build_handle_instruction(NAME, _produce)
 
 def main():
     # Delegate the queue/timeout loop to the shared runner
-    run_worker(NAME, handle_instruction, default_timeout=TIMEOUT_SEC)
+    run_worker(NAME, handle_instruction, default_timeout=TIMEOUT_SEC, tool_version=f"deepseek {MODEL}")
 
 
 if __name__ == "__main__":

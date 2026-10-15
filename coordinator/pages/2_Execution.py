@@ -6,8 +6,8 @@ import streamlit as st
 from common.utils import get_status_emoji
 from coordinator.logger_config import logger
 from coordinator.redis_io import (
-    cancel_inspection,
     JOB_SUMMARY_FIELDS,
+    cancel_inspection,
     collect_results_once,
     count_done_jobs,
     dead_workers,

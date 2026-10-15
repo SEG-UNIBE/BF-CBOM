@@ -345,6 +345,9 @@ class CbomKitClient:
             obj = json.loads(text or "{}")
         except Exception:
             return text
+        # /v1/cbom/last/1 wraps the single result in a list: [{"bom": {...}, "projectIdentifier": ...}]
+        if isinstance(obj, list) and len(obj) == 1 and isinstance(obj[0], dict):
+            obj = obj[0]
         target = obj.get("bom") if isinstance(obj, dict) and isinstance(obj.get("bom"), dict) else obj
         try:
             comps = target.get("components") if isinstance(target, dict) else None
@@ -441,7 +444,8 @@ class CbomKitClient:
 
     def _build_purl_candidates(self, namespace: str, name: str, branch: str, sha7: str | None) -> list[str]:
         base = f"pkg:github/{namespace}/{name}"
-        qs = f"?branch={branch}" if branch and branch.lower() != "main" else ""
+        # CBOMkit stores the branch URL-encoded inside the identifier (bfcbom/x -> bfcbom%2Fx)
+        qs = f"?branch={parse.quote(branch, safe='')}" if branch and branch.lower() != "main" else ""
         cands: list[str] = []
         if sha7:
             # Prefer short 7-char commit, with and without branch qualifier
@@ -540,7 +544,7 @@ class CbomKitClient:
             if st not in (200, 204, 404):
                 logger.warning("CBOM delete returned %s for id=%s: %s", st, rid, (body or "")[:120])
 
-    def generate_cbom(self, git_url, branch="main") -> tuple[str | None, float, str | None]:
+    def generate_cbom(self, git_url, branch="main", commit: str | None = None) -> tuple[str | None, float, str | None]:
         start = time.monotonic()
         # 1) Snapshot last/1 before scan (sequential change detection)
         before = self._get_last_raw()
@@ -570,7 +574,9 @@ class CbomKitClient:
         ns, name = self._purl_namespace_name(git_url)
         host, owner, repo = self._owner_repo_from_giturl(git_url)
         if ns and name and owner and repo:
-            sha = self._github_head_sha(owner, repo, branch)
+            sha = commit[:7] if commit else None
+            if sha is None and host == "github.com":
+                sha = self._github_head_sha(owner, repo, branch)
             for pid in self._build_purl_candidates(ns, name, branch, sha):
                 rid = parse.quote(pid, safe="")
                 logger.info("Trying CBOM fetch for reconstructed id: %s", pid)
@@ -624,6 +630,7 @@ def _produce(instr: JobInstruction, trace: Trace) -> str | tuple[str, float]:
     payload, duration, err = client.generate_cbom(
         git_url=instr.repo_info.git_url,
         branch=instr.repo_info.branch,
+        commit=instr.repo_info.commit,
     )
     if payload is not None:
         return payload, duration
@@ -651,6 +658,7 @@ def _produce(instr: JobInstruction, trace: Trace) -> str | tuple[str, float]:
 
 
 handle_instruction = build_handle_instruction(NAME, _produce)
+
 
 def main():
     # Delegate the queue/timeout loop to the shared runner

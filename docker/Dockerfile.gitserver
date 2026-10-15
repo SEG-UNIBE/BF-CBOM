@@ -1,0 +1,30 @@
+# syntax=docker/dockerfile:1.7
+# docker/Dockerfile.gitserver
+# Read-only smart-HTTP git server (nginx + fcgiwrap + git http-backend) for the compose network.
+# The runner writes bare mirrors into the shared `git-data` volume; workers clone from
+# http://gitserver/<owner>/<repo>.git. Nothing is published to the host.
+FROM alpine:3.22@sha256:5291449c3df73caf6ed85e649dec1b9e818b39a5d8c871e97afc13e9cd5e8fa8
+
+RUN apk add --no-cache git git-daemon nginx fcgiwrap spawn-fcgi openssl \
+ && test -x /usr/libexec/git-core/git-http-backend \
+ # let clients fetch any reachable commit by SHA (workers check out pinned commits)
+ && git config --system uploadpack.allowAnySHA1InWant true \
+ && git config --system uploadpack.allowReachableSHA1InWant true \
+ && git config --system http.receivepack false \
+ # mirrors are written by the runner (uid 1000) and served by the nginx user
+ && git config --system --add safe.directory '*' \
+ && mkdir -p /srv/git /run/nginx /certs \
+ # uid 1000 == appuser in the runner image, which writes the mirrors
+ && chown 1000:1000 /srv/git && chmod 755 /srv/git
+
+COPY docker/gitserver/nginx.conf /etc/nginx/nginx.conf
+COPY docker/gitserver/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod 0755 /usr/local/bin/entrypoint.sh
+
+# /certs holds the self-signed server certificate generated on first start; shared read-only with
+# worker-cbomkit, whose JVM must trust it (CBOMkit forces https:// for scan URLs).
+VOLUME ["/srv/git", "/certs"]
+EXPOSE 80 443
+HEALTHCHECK --interval=5s --timeout=2s --retries=5 --start-period=2s \
+  CMD wget -q -O /dev/null http://127.0.0.1/healthz || exit 1
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

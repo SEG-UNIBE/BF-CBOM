@@ -305,3 +305,25 @@ Ruff is configured in `pyproject.toml` for both formatting and linting; unit tes
 
 Every worker refreshes a short-lived `worker:<name>:alive` key in Redis (see `common/worker.py`).
 The Setup page pre-selects only live workers, the Execution page warns before starting jobs for a worker that is down, and the Analysis page disables matching when the `pyqun` matcher is not running.
+
+### Snapshot pinning and provenance
+
+Every inspection resolves each repository's branch to a commit SHA when it starts (`git ls-remote`, no token needed) and stores it with the repo snapshot.
+Workers that clone check out exactly that commit (`common/utils.py:clone_repo`), so re-executing or retrying an inspection scans the same bytes.
+Each `JobResult` records `tool_version` (reported by the worker, e.g. `cdxgen 11.7.0`), `image_ref` (the image it ran in) and `run_index`, plus `notes` for non-fatal fallbacks such as cdxgen rerunning without `--evidence`.
+
+### Batch experiments (journal extension)
+
+Reproducible, resumable batch runs for the research agenda described in `CLAUDE.md`. Everything they produce stays inside Docker named volumes:
+
+- `gitserver`: a read-only smart-HTTP git server on the compose network. The runner mirrors every repo there at its pinned commit (volume `git-data`); mutants are branches `bfcbom/<variant>`. Each snapshot is served as its own small bare repo `<owner>/<repo>--<sha12>.git` (objects shared with the mirror, HEAD on the snapshot branch), which workers scan. CBOMkit insists on `https://` and drops `.git`, so the server also speaks TLS with a self-signed certificate (volume `git-certs`) that the CBOMkit worker trusts.
+- `runner`: an on-demand container running `bf-cbom experiment ...`. Results land in the `results-data` volume as `<exp>/<owner>__<repo>@<sha12>/<variant>/<tool>/run<k>.json` plus a `run<k>.meta.json` with status, duration, tool version and image.
+
+```bash
+make experiment EXP=experiments/e0-smoke.yaml   # pin, mirror, enqueue, collect (resumable)
+make experiment-status NAME=e0-smoke
+make experiment-export NAME=e0-smoke            # -> exports/e0-smoke.zip, the only path to the host
+make corpus ARGS="--per-language 100"           # stratified GitHub corpus with pinned commits
+```
+
+See `experiments/README.md` for the spec format. `make clean-docker` keeps the volumes; `docker compose down -v` removes them.

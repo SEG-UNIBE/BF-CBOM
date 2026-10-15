@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
+import csv
 import logging
+import multiprocessing
 import os
 import time
-import multiprocessing
 from pathlib import Path
-import csv
+
 import numpy as np
 import redis
 from sentence_transformers import SentenceTransformer
@@ -12,7 +13,6 @@ from sentence_transformers import SentenceTransformer
 from common.config import BLPOP_TIMEOUT_SEC, REDIS_HOST, REDIS_PORT, REDIS_SOCKET_TIMEOUT_SEC
 from common.models import ComponentMatchJobInstruction, ComponentMatchJobResult
 from common.worker import publish_heartbeat
-from common.cbom_analysis import find_components_list
 
 NAME = "pyqun"
 JOB_QUEUE = f"jobs:{NAME}"
@@ -26,26 +26,19 @@ logger = logging.getLogger(NAME)
 
 redis_client: redis.Redis | None = None
 
-import sys
-import string
 import json
-from pathlib import Path
+import string
+import sys
 
 sys.path.insert(0, str(Path(__file__).parent.absolute()))
 
-from RaQuN_Lab.datamodel.modelset.ModelSet import ModelSet
-from RaQuN_Lab.datamodel.modelset.Element import Element
 from RaQuN_Lab.datamodel.modelset.attribute.DefaultAttribute import DefaultAttribute
+from RaQuN_Lab.datamodel.modelset.Element import Element
 from RaQuN_Lab.datamodel.modelset.Model import Model
+from RaQuN_Lab.datamodel.modelset.ModelSet import ModelSet
 from RaQuN_Lab.strategies.RaQuN.candidatesearch.NNCandidateSearch.NNCandidateSearch import NNCandidateSearch
-from RaQuN_Lab.strategies.RaQuN.candidatesearch.NNCandidateSearch.vectorization.ZeroOneVectorization import (
-    ZeroOneVectorizer,
-)
-from RaQuN_Lab.strategies.RaQuN.RaQuN import VanillaRaQuN
 from RaQuN_Lab.strategies.RaQuN.candidatesearch.NNCandidateSearch.vectorization.Vectorizer import Vectorizer
-from RaQuN_Lab.strategies.RaQuN.candidatesearch.NNCandidateSearch.vectorization.DimensionalityReduction.SVDReduction import (
-    SVDReduction,
-)
+from RaQuN_Lab.strategies.RaQuN.RaQuN import VanillaRaQuN
 
 
 class BERTEmbedding(Vectorizer):
@@ -83,7 +76,7 @@ class LetterHistogramVectorizer(Vectorizer):
         vec = np.zeros(self.vec_dim)
         # Iterate attribute values in a deterministic order
         for val in sorted(
-            (str(getattr(attr, "value", attr)).lower() for attr in (getattr(element, "attributes", []) or []))
+            str(getattr(attr, "value", attr)).lower() for attr in (getattr(element, "attributes", []) or [])
         ):
             for c in val:
                 if c in self.letter_indices:
@@ -205,7 +198,7 @@ def _run_raqun(json_files: list[str]):
                     primitive = comp["cryptoProperties"]["algorithmProperties"]["primitive"]
                     attr_list.append(primitive)
 
-                except:
+                except Exception:
                     pass
                 attributes = set(DefaultAttribute(attr) for attr in attr_list)
                 element = Element(
@@ -262,7 +255,7 @@ def _match_from_json_list(json_files: list[str]):
                     comp_id = e.get_custom_id()
                     try:
                         group.append({"file": original_idx, "component": comp_id, "cost": 0.0})
-                    except:
+                    except Exception:
                         logger.error(f"Error during extraction of component: {comp_id} from file: {file_id}")
                 grouped_elements.append(group)
 

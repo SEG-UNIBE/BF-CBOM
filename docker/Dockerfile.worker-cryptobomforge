@@ -80,5 +80,8 @@ COPY common/ ./common/
 COPY workers/cryptobomforge/ ./workers/cryptobomforge/
 
 # Define the entrypoint for the application.
+# Reported in every JobResult.tool_version
+ENV TOOL_VERSION="cryptobom-forge ${CRYPTOBOM_FORGE_VERSION}; codeql ${CODEQL_VERSION}; codeql-java-queries ${CODEQL_JAVA_QUERIES}; codeql-python-queries ${CODEQL_PYTHON_QUERIES}"
+
 ENTRYPOINT ["tini", "--", "python", "-m", "workers.cryptobomforge.main"]
 

@@ -75,6 +75,20 @@ psql -tc "SELECT 1 FROM pg_roles WHERE rolname='${POSTGRES_USER}'" | grep -q 1 |
 psql -tc "SELECT 1 FROM pg_database WHERE datname='${POSTGRES_DB}'" | grep -q 1 || \
   psql -c "CREATE DATABASE ${POSTGRES_DB} OWNER ${POSTGRES_USER};"
 
+# Trust the local git server (BF-CBOM batch experiments scan https://gitserver/<owner>/<repo>).
+GITSERVER_CERT="${GITSERVER_CERT:-/certs/gitserver.crt}"
+if [ -s "$GITSERVER_CERT" ]; then
+  TRUSTSTORE="$STATE_DIR/cacerts"
+  if cp /etc/ssl/certs/java/cacerts "$TRUSTSTORE" 2>/dev/null \
+     && keytool -importcert -noprompt -keystore "$TRUSTSTORE" -storepass changeit \
+          -alias gitserver -file "$GITSERVER_CERT" >/dev/null 2>&1; then
+    export JAVA_OPTS="${JAVA_OPTS:-} -Djavax.net.ssl.trustStore=$TRUSTSTORE -Djavax.net.ssl.trustStorePassword=changeit"
+    echo "[cbomkit] trusting git server certificate from $GITSERVER_CERT"
+  else
+    echo "[cbomkit] WARNING: could not import $GITSERVER_CERT into a truststore; https://gitserver scans will fail" >&2
+  fi
+fi
+
 echo "[cbomkit] Launching CBOMkit backend on port ${CBOMKIT_PORT}..."
 export QUARKUS_DATASOURCE_JDBC_URL="jdbc:postgresql://127.0.0.1:5432/${POSTGRES_DB}"
 export QUARKUS_DATASOURCE_USERNAME="${POSTGRES_USER}"

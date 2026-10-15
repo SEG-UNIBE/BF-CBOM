@@ -1,3 +1,4 @@
+import functools
 import json
 import logging
 import multiprocessing
@@ -181,6 +182,7 @@ def run_worker(
     default_timeout: int = 60,
     timeout_env_var: str = "WORKER_TIMEOUT_SEC",
     logger: logging.Logger | None = None,
+    tool_version: str | None = None,
 ):
     """
     Generic worker runner that:
@@ -188,10 +190,16 @@ def run_worker(
     - Executes `handle_instruction` in a subprocess with a hard timeout
     - Catches timeouts/crashes and returns structured JobResult
     - Pushes results to `results:{name}`
+
+    Provenance: every result carries `tool_version` (argument, else env TOOL_VERSION), the
+    image it ran in (env BF_CBOM_IMAGE, set in docker-compose.yml) and the instruction's run_index.
     """
 
     log = logger or logging.getLogger(name)
     timeout_sec = int(os.getenv(timeout_env_var, str(default_timeout)))
+    tool_version = tool_version or os.getenv("TOOL_VERSION") or None
+    image_ref = os.getenv("BF_CBOM_IMAGE") or None
+    log.info("tool_version=%s image=%s", tool_version, image_ref)
 
     r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True, socket_timeout=REDIS_SOCKET_TIMEOUT_SEC)
     log.info(f"{name} worker listening for jobs... (queue: jobs:{name})")
@@ -224,8 +232,12 @@ def run_worker(
             timeout_sec,
             worker_name=name,
             log=log,
-            on_tick=lambda: publish_heartbeat(r, name, "busy", instr.job_id),
+            on_tick=functools.partial(publish_heartbeat, r, name, "busy", instr.job_id),
         )
+
+        result.tool_version = result.tool_version or tool_version
+        result.image_ref = image_ref
+        result.run_index = instr.run_index
 
         if _push_result(r, name, result, log):
             log.info(
@@ -262,6 +274,7 @@ def build_handle_instruction(
         log.info("[%s] Running on repo %s", name, instr.repo_info.full_name)
         trace = Trace()
         override_duration: float | None = None
+        notes: str | None = None
         try:
             raw_or_tuple = produce_cbom(instr, trace)
             # Allow producers to override duration by returning (raw, duration_sec)
@@ -274,6 +287,7 @@ def build_handle_instruction(
             if norm_err is None:
                 status = "ok"
                 error_msg = None
+                notes = trace.text()
             else:
                 status = "error"
                 tt = trace.text()
@@ -302,6 +316,7 @@ def build_handle_instruction(
             size_bytes=len(cbom_as_json.encode("utf-8")),
             worker=name,
             error=error_msg,
+            notes=notes,
         )
 
     return _handle

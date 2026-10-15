@@ -1,0 +1,30 @@
+# syntax=docker/dockerfile:1.7
+# docker/Dockerfile.runner
+# Batch experiment runner: `docker compose run --rm runner experiment run /app/experiments/<x>.yaml`.
+# Writes git mirrors to the git-data volume and results to the results-data volume; never to the host.
+ARG BASE_IMAGE=base
+ARG BASE_TAG=latest
+FROM ${BASE_IMAGE}:${BASE_TAG}
+USER root
+# Volume mount points, owned by appuser so the first mount initialises the volumes writable
+RUN mkdir -p /data/results /srv/git && chown -R appuser:appuser /data /srv/git
+USER appuser
+WORKDIR /app
+
+COPY --chown=appuser:appuser pyproject.toml uv.lock ./
+COPY --chown=appuser:appuser common/ ./common/
+RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=1000,gid=1000 \
+    uv sync --frozen --no-dev
+
+COPY --chown=appuser:appuser coordinator/redis_io.py coordinator/logger_config.py ./coordinator/
+COPY --chown=appuser:appuser misc/__init__.py ./misc/
+COPY --chown=appuser:appuser misc/cli/ ./misc/cli/
+COPY --chown=appuser:appuser docs/logo.txt ./docs/logo.txt
+
+ENV PYTHONPATH=/app \
+    RESULTS_DIR=/data/results \
+    GIT_MIRROR_DIR=/srv/git \
+    GITSERVER_URL=http://gitserver
+
+ENTRYPOINT ["tini", "-g", "--", "uv", "run", "--frozen", "--no-dev", "misc/cli/cli.py"]
+CMD ["--help"]

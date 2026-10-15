@@ -1,4 +1,3 @@
-import json
 import os
 from pathlib import Path
 
@@ -61,13 +60,15 @@ with col_title:
     st.markdown(
         f"""
         <div style='display:flex; align-items:flex-end; height:72px;'>
-            <span style='color:#888; font-size:1.3rem; font-family:monospace; font-weight:400; margin-left:0.8rem; align-self:flex-end; margin-bottom:1px;'>v{version}</span>
+            <span style='color:#888; font-size:1.3rem; font-family:monospace; font-weight:400;
+                         margin-left:0.8rem; align-self:flex-end; margin-bottom:1px;'>v{version}</span>
         </div>
         """,
         unsafe_allow_html=True,
     )
 st.markdown(
-    "<p style='font-size:1.3rem; color:#888;'>Your <b>B</b>est <b>F</b>riend for Generating, Understanding, and Comparing Cryptography Bill of Materials (<b>CBOMs</b>)</p>",
+    "<p style='font-size:1.3rem; color:#888;'>Your <b>B</b>est <b>F</b>riend for Generating, Understanding, "
+    "and Comparing Cryptography Bill of Materials (<b>CBOMs</b>)</p>",
     unsafe_allow_html=True,
 )
 
@@ -270,7 +271,8 @@ with right:
     # ============================================================
     with st.expander("Configuration", expanded=False):
         st.caption(
-            "Effective settings of this coordinator. Edit `docker/env/coordinator.env` / `docker-compose.yml` and restart to change them."
+            "Effective settings of this coordinator. "
+            "Edit `docker/env/coordinator.env` / `docker-compose.yml` and restart to change them."
         )
         rows = [
             ("GITHUB_TOKEN", "set" if config.GITHUB_TOKEN else "not set (unauthenticated GitHub API, 60 req/h)"),

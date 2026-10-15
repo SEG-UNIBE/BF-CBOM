@@ -1,0 +1,30 @@
+# Engine / rule-set families of the CBOM generators (BF-CBOM 2.0, Phase 2 "engine independence").
+# Tools sharing an engine count as one voter in the agreement-based scoring (RQ4). `native_cyclonedx`
+# tells whether the tool itself emits CycloneDX (RQ1 validity is measured only for those; for the
+# others our adapter produces the CBOM). Fill in the new workers as they are added.
+tools:
+  cbomkit:
+    engine: sonar-cryptography      # IBM/PQCA sonar-cryptography plugin (Java, Python)
+    approach: syntax tree + resolution of provider strings
+    native_cyclonedx: true
+    languages: [java, python]
+  cdxgen:
+    engine: cdxgen
+    approach: dependency manifests + evidence; crypto output is mostly libraries
+    native_cyclonedx: true
+    languages: [java, python]
+  cryptobomforge:
+    engine: codeql                  # Santander cryptobom-forge on CodeQL crypto queries
+    approach: data flow (CodeQL)
+    native_cyclonedx: true
+    languages: [java, python]
+  deepseek:
+    engine: llm                     # provider adapters share prompts and file selection (common/llm_cbom.py, Phase 2)
+    approach: LLM reading pre-filtered source files
+    native_cyclonedx: true          # assembled by the worker from the model's structured answer
+    languages: [java, python]
+    voter_group: llm                # sensitivity analysis merges all LLM workers into one voter
+  # cryptoscan:    { engine: cryptoscan, approach: patterns, native_cyclonedx: true }
+  # scanoss:       { engine: scanoss-crypto-finder, approach: call graph, native_cyclonedx: false }
+  # xgrep:         { engine: mondoo-xgrep, approach: syntax tree + data flow, native_cyclonedx: true }
+  # cryptoscope:   { engine: ibm-cryptoscope, approach: data flow, native_cyclonedx: unknown }

@@ -3,6 +3,8 @@
 ARG BASE_IMAGE=base
 ARG BASE_TAG=latest
 FROM ${BASE_IMAGE}:${BASE_TAG}
+USER root
+RUN mkdir -p /data/results && chown appuser:appuser /data/results
 USER appuser
 WORKDIR /app
 

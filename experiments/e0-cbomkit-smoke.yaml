@@ -1,0 +1,7 @@
+# Checks that CBOMkit scans a repo served by the local git server (http://gitserver/...).
+name: e0-cbomkit-smoke
+tools: [cbomkit]
+repetitions: 1
+repos:
+  - full_name: authlib/authlib
+    language: Python

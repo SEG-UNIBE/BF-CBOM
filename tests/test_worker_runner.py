@@ -63,7 +63,9 @@ def test_exception_in_handler_becomes_error_result():
 
 def test_on_tick_is_called_while_running():
     ticks = []
-    run_job_with_timeout(lambda i: (time.sleep(2.2), _ok(i))[1], INSTR, 10, worker_name="t", on_tick=lambda: ticks.append(1))
+    run_job_with_timeout(
+        lambda i: (time.sleep(2.2), _ok(i))[1], INSTR, 10, worker_name="t", on_tick=lambda: ticks.append(1)
+    )
     assert len(ticks) >= 2
 
 
@@ -80,3 +82,21 @@ def test_build_handle_instruction_maps_outcomes():
     res = build_handle_instruction("t", _timeout)(INSTR)
     assert res.status == "timeout"
     assert "tool took too long" in res.error
+
+
+def test_build_handle_instruction_keeps_trace_as_notes_on_success():
+    def _ok_with_note(instr, trace):
+        trace.add("fallback: reran without --evidence")
+        return '{"components": []}'
+
+    res = build_handle_instruction("t", _ok_with_note)(INSTR)
+    assert res.status == "ok"
+    assert res.notes == "fallback: reran without --evidence"
+    assert res.error is None
+
+
+def test_job_instruction_carries_run_index():
+    instr = JobInstruction(job_id="j", tool="t", repo_info=RI, run_index=3)
+    assert JobInstruction.from_json(instr.to_json()).run_index == 3
+    legacy = '{"job_id":"j","tool":"t","repo_info":' + RI.to_json() + "}"
+    assert JobInstruction.from_json(legacy).run_index is None

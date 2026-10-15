@@ -1,0 +1,13 @@
+# Smallest end-to-end experiment: two repos, two tools, one repetition.
+#   make experiment EXP=experiments/e0-smoke.yaml
+# Results: results-data volume, /data/results/e0-smoke/<owner>__<repo>@<sha12>/original/<tool>/run1.json
+name: e0-smoke
+description: Pipeline smoke test (pin, mirror on gitserver, run, persist).
+tools: [cdxgen, cryptobomforge]
+repetitions: 1
+repos:
+  - full_name: authlib/authlib
+    language: Python
+  - full_name: killme2008/aviatorscript
+    branch: master
+    language: Java
