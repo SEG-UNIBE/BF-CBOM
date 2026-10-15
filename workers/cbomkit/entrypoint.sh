@@ -44,7 +44,9 @@ pg_ctl -D "$PGDATA" -l "$PGDATA/server.log" \
   -o "-h 127.0.0.1 -p 5432 -k /tmp -c unix_socket_directories=/tmp" \
   -w start || { tail -n 100 "$PGDATA/server.log" >&2; exit 1; }
 
+SHUTTING_DOWN=0
 cleanup() {
+  SHUTTING_DOWN=1
   echo "[cbomkit] Shutting down..."
   if [ -n "${BACKEND_PID:-}" ] && kill -0 "$BACKEND_PID" 2>/dev/null; then kill "$BACKEND_PID" || true; fi
   if [ -n "${LOG_TAIL_PID:-}" ] && kill -0 "$LOG_TAIL_PID" 2>/dev/null; then kill "$LOG_TAIL_PID" || true; fi
@@ -133,7 +135,7 @@ echo "[cbomkit] Starting Python worker..."
 export CBOMKIT_BASE_URL="http://127.0.0.1:${CBOMKIT_PORT}"
 
 # Launch Python worker in background and keep it running
-uv run --no-dev workers/cbomkit/main.py &
+uv run --frozen --no-dev workers/cbomkit/main.py &
 PY_PID=$!
 
 # Optionally stream backend logs to stdout for docker logs visibility
@@ -145,6 +147,7 @@ fi
 # Supervise backend and Python: restart backend on exit; if Python exits, stop backend and exit
 while true; do
   if ! kill -0 "$PY_PID" 2>/dev/null; then
+    [ "$SHUTTING_DOWN" -eq 1 ] && exit 0
     echo "[cbomkit] Python worker exited; shutting down"
     stop_backend
     exit 1
@@ -158,6 +161,7 @@ while true; do
   wait "$BACKEND_PID"
   EXIT_CODE=$?
   set -e
+  [ "$SHUTTING_DOWN" -eq 1 ] && exit 0
   echo "[cbomkit] Backend exited (code=$EXIT_CODE); checking for OOM and restarting..."
   if grep -qE "OutOfMemoryError|Out of memory" "$BACKEND_LOG"; then
     echo "[cbomkit] OOM detected; creating sentinel and restarting Postgres and backend."

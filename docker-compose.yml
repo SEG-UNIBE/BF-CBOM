@@ -2,7 +2,7 @@ name: bf-cbom
 services:
 
   redis:
-    image: redis:7
+    image: redis:7.4@sha256:4fa24486b8bcca8eec45ee0eb166edc674795e53a2b53d1a9ef263eecebaac85
     ports:
       - "6379:6379"
     volumes:
@@ -93,8 +93,8 @@ services:
       context: .
       dockerfile: ./docker/Dockerfile.worker-cbomkit
       args:
-        BASE_IMAGE: ${BASE_IMAGE}
-        BASE_TAG: ${VERSION}
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
     depends_on:
       coordinator:
         condition: service_healthy
@@ -173,7 +173,7 @@ services:
       - WORKER_TIMEOUT_SEC=120
     env_file: docker/env/worker-mssbomtool.env
     restart: on-failure:3
-    profiles: [prod, all]
+    profiles: [dev, all]
 
   worker-cryptobomforge:
     image: bf-cbom/worker-cryptobomforge:${VERSION:-latest}

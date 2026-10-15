@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 # docker/Dockerfile.worker-skeleton
 ARG BASE_IMAGE=base
 ARG BASE_TAG=latest
@@ -11,11 +12,11 @@ ENV PYTHONPATH=/app \
 # Dependencies first for caching
 COPY --chown=appuser:appuser pyproject.toml uv.lock ./
 COPY --chown=appuser:appuser common/ ./common/
-RUN pip install --no-cache-dir --upgrade pip \
- && uv sync --frozen --no-dev
+RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=1000,gid=1000 \
+    uv sync --frozen --no-dev
 
 # Worker code
 COPY --chown=appuser:appuser workers/skeleton/ ./workers/skeleton/
 
 # Proper PID 1 and clean shutdown
-ENTRYPOINT ["tini","-g","--","uv","run","--no-dev","workers/skeleton/main.py"]
+ENTRYPOINT ["tini","-g","--","uv", "run", "--frozen", "--no-dev","workers/skeleton/main.py"]

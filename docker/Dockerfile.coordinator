@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 # docker/Dockerfile.coordinator
 ARG BASE_IMAGE=base
 ARG BASE_TAG=latest
@@ -8,8 +9,8 @@ WORKDIR /app
 # Dependency resolution first (better caching)
 COPY --chown=appuser:appuser pyproject.toml uv.lock ./
 COPY --chown=appuser:appuser common/ ./common/
-RUN pip install --no-cache-dir --upgrade pip
-RUN uv sync --frozen --no-dev
+RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=1000,gid=1000 \
+    uv sync --frozen --no-dev
 
 # Now copy the actual service code
 COPY --chown=appuser:appuser coordinator/ ./coordinator/
@@ -18,4 +19,4 @@ COPY --chown=appuser:appuser docs/ ./docs/
 ENV PYTHONPATH=/app
 ENV STREAMLIT_CONFIG=coordinator/.streamlit/config.toml
 
-ENTRYPOINT ["tini", "-g", "--", "uv", "run", "--no-dev", "streamlit", "run", "coordinator/0_Start.py", "--server.port=8501", "--server.address=0.0.0.0"]
+ENTRYPOINT ["tini", "-g", "--", "uv", "run", "--frozen", "--no-dev", "streamlit", "run", "coordinator/0_Start.py", "--server.port=8501", "--server.address=0.0.0.0"]

@@ -236,3 +236,4 @@ ruff.toml
 .pyproject-black.toml
 
 .idea/
+notes.md

@@ -1,9 +1,11 @@
+# syntax=docker/dockerfile:1.7
 # docker/Dockerfile.misc-treesimilarity
 # Dedicated container for the tree similarity worker that builds the
 # native pybind11 extension linking against OR-Tools.
 
-# Allow the target architecture to be overridden while defaulting to amd64.
-FROM --platform=linux/amd64 ubuntu:24.04
+# amd64-only on purpose: links against the prebuilt amd64 OR-Tools release below.
+FROM ghcr.io/astral-sh/uv:0.12.5@sha256:e85be844203885286c60ffad8a858d48afb6c5a5c237ca0e67f12e74b8f174b1 AS uv
+FROM --platform=linux/amd64 ubuntu:24.04@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -28,10 +30,12 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Python tooling (uv for consistency with other workers)
-RUN python3 -m pip install --no-cache-dir uv --break-system-packages
+COPY --from=uv /uv /uvx /usr/local/bin/
+ENV UV_LINK_MODE=copy
 
 # Create non-root user and workspace
-RUN useradd -m appuser && mkdir -p /app && chown -R appuser:appuser /app
+# ubuntu:24.04 already ships uid 1000 (ubuntu), so pin appuser to 1001
+RUN useradd -m -u 1001 appuser && mkdir -p /app && chown -R appuser:appuser /app
 ENV PATH="/home/appuser/.local/bin:${PATH}"
 USER appuser
 WORKDIR /app
@@ -41,21 +45,27 @@ COPY --chown=appuser:appuser pyproject.toml uv.lock README.md LICENSE ./
 COPY --chown=appuser:appuser common/ ./common/
 
 # Prepare virtual environment with project dependencies (without installing the root project)
-RUN uv sync --frozen --no-dev --no-install-project
+RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=1001,gid=1001 \
+    uv sync --frozen --no-dev --no-install-project
 
 # Copy tree similarity sources
 COPY --chown=appuser:appuser misc/treesimilartiy/ ./misc/treesimilartiy/
 
 # Fetch required third-party dependencies into the expected external/ folder
-RUN mkdir -p misc/treesimilartiy/external \
-    && git clone --depth 1 https://gitlab.com/libeigen/eigen.git misc/treesimilartiy/external/eigen \
-    && git clone --depth 1 https://github.com/DaveGamble/cJSON.git misc/treesimilartiy/external/cJSON \
-    && git clone --depth 1 https://github.com/DatabaseGroup/tree-similarity.git misc/treesimilartiy/external/tree-similarity
+# (pinned commits; bump deliberately)
+ARG EIGEN_REF=1888fad464fd2f25923cbd498f00aa51285c89c3
+ARG CJSON_REF=6d9f2443ab071f86e5d9b43025a40929ec41c46c
+ARG TREESIM_REF=f20ad2ffb2852ebee6033775cdaa369e0cf4b7fd
+RUN set -e; ext=misc/treesimilartiy/external; mkdir -p "$ext"; \
+    fetch() { git init -q "$ext/$1" && git -C "$ext/$1" fetch -q --depth 1 "$2" "$3" && git -C "$ext/$1" checkout -q FETCH_HEAD; }; \
+    fetch eigen https://gitlab.com/libeigen/eigen.git "$EIGEN_REF"; \
+    fetch cJSON https://github.com/DaveGamble/cJSON.git "$CJSON_REF"; \
+    fetch tree-similarity https://github.com/DatabaseGroup/tree-similarity.git "$TREESIM_REF"
 
 # Download and unpack the official OR-Tools binary release (override ORTOOLS_URL if needed)
 ARG ORTOOLS_URL="https://github.com/google/or-tools/releases/download/v9.12/or-tools_amd64_ubuntu-24.04_cpp_v9.12.4544.tar.gz"
 USER root
-RUN curl -#Lf "$ORTOOLS_URL" -o /tmp/or-tools.tar.gz \
+RUN curl -#Lf --retry 5 --retry-all-errors --retry-delay 5 "$ORTOOLS_URL" -o /tmp/or-tools.tar.gz \
     && mkdir -p /opt/or-tools \
     && tar -xzf /tmp/or-tools.tar.gz -C /opt/or-tools --strip-components=1 \
     && rm /tmp/or-tools.tar.gz
@@ -73,4 +83,4 @@ RUN cmake -S misc/treesimilartiy -B misc/treesimilartiy/build -DPython3_EXECUTAB
 # Ensure the extension is importable
 ENV PYTHONPATH=/app:/app/misc/treesimilartiy/build
 
-ENTRYPOINT ["tini", "-g", "--", "uv", "run", "--no-dev", "python", "misc/treesimilartiy/src/main.py"]
+ENTRYPOINT ["tini", "-g", "--", "uv", "run", "--frozen", "--no-dev", "python", "misc/treesimilartiy/src/main.py"]

@@ -1,0 +1,9 @@
+cyclonedx-python-lib @ https://github.com/pre-quantum-research/cyclonedx-python-lib/archive/3efcbb9a22ed4235ebb126ad80836deb2a27d25f.tar.gz
+click
+jsonschema
+PyYAML
+requests
+dataclasses_json
+normalize_json
+tqdm
+redis

@@ -37,7 +37,7 @@ fi
 # 3) Refresh uv.lock so version is consistent
 if command -v uv >/dev/null 2>&1; then
   echo "Syncing uv.lock ..."
-  uv sync --frozen --no-dev || true
+  uv lock || true
 else
   echo "uv not found; skipping lockfile refresh."
 fi

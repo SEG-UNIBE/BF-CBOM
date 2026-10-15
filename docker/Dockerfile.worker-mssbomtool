@@ -1,14 +1,17 @@
+# syntax=docker/dockerfile:1.7
 # docker/Dockerfile.worker-mssbomtool
 
 # --- Stage 1: build the sbom-tool as a local .NET tool
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS sbom_build
+FROM ghcr.io/astral-sh/uv:0.12.5@sha256:e85be844203885286c60ffad8a858d48afb6c5a5c237ca0e67f12e74b8f174b1 AS uv
+FROM mcr.microsoft.com/dotnet/sdk:8.0@sha256:f7e28a0a3f6f9235929ec19274fd0ddf8534e9159f99fac602ac73304f1ce99f AS sbom_build
 ENV DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1 \
     DOTNET_CLI_TELEMETRY_OPTOUT=1 \
     NUGET_XMLDOC_MODE=skip
-RUN dotnet tool install --tool-path /tools Microsoft.Sbom.DotNetTool
+ARG SBOM_TOOL_VERSION=4.1.13
+RUN dotnet tool install --tool-path /tools Microsoft.Sbom.DotNetTool --version ${SBOM_TOOL_VERSION}
 
 # --- Stage 2: runtime (Python + .NET runtime)
-FROM python:3.12-slim AS runtime
+FROM python:3.12-slim-trixie@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1 AS runtime
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install tini + prerequisites and .NET 8 runtime (arch-agnostic)
@@ -35,7 +38,8 @@ RUN install -d -o appuser -g appuser /app
 WORKDIR /app
 ENV PYTHONPATH=/app \
     UV_PROJECT_ENVIRONMENT=/home/appuser/.venvs/mssbomtool
-RUN pip install --no-cache-dir --upgrade pip uv
+COPY --from=uv /uv /uvx /usr/local/bin/
+ENV UV_LINK_MODE=copy
 
 # Copy dependency manifests first for better caching
 COPY --chown=appuser:appuser pyproject.toml uv.lock README.md LICENSE ./
@@ -43,9 +47,10 @@ COPY --chown=appuser:appuser common/ ./common/
 
 # Create the venv and sync as appuser
 USER appuser
-RUN uv sync --frozen --no-dev --no-install-project
+RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=1000,gid=1000 \
+    uv sync --frozen --no-dev --no-install-project
 
 # Worker code
 COPY --chown=appuser:appuser workers/mssbomtool/ ./workers/mssbomtool/
 
-ENTRYPOINT ["tini", "-g", "--", "uv", "run", "--no-dev", "workers/mssbomtool/main.py"]
+ENTRYPOINT ["tini", "-g", "--", "uv", "run", "--frozen", "--no-dev", "workers/mssbomtool/main.py"]

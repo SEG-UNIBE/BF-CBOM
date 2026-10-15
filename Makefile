@@ -36,10 +36,18 @@ build-base:
 release:
 	bash ./scripts/bump_version.sh $(VERSION)
 
-# Helper to build all services with the correct base tag
+# Helper to build all services (of the active profile) with the correct base tag.
+# SERIAL_BUILD=1 (default) builds one service at a time to avoid OOM in the Docker VM;
+# use SERIAL_BUILD=0 for a faster parallel build on machines with plenty of RAM.
+SERIAL_BUILD ?= 1
 build-all: ensure-env build-base
+ifeq ($(SERIAL_BUILD),1)
+	@for svc in $$(docker compose config --services); do \
+		echo ">>> building $$svc"; docker compose build $$svc || exit 1; \
+	done
+else
 	docker compose build
-	docker image prune -f
+endif
 
 # Dev: only the explicitly listed dev workers
 up-dev: export COMPOSE_PROFILES := dev
@@ -52,6 +60,13 @@ up-prod: export COMPOSE_PROFILES := prod
 up-prod: export AVAILABLE_WORKERS := $(PROD_WORKERS)
 up-prod: build-all
 	docker compose up
+
+# Prod from prebuilt GHCR images (no local build; see .github/workflows/images.yml)
+up-prod-pull: export COMPOSE_PROFILES := prod
+up-prod-pull: export AVAILABLE_WORKERS := $(PROD_WORKERS)
+up-prod-pull: ensure-env
+	docker compose pull
+	docker compose up --no-build
 
 # All: exactly what's in AVAILABLE_WORKERS
 up-all: export COMPOSE_PROFILES := all
@@ -78,7 +93,7 @@ ensure-env: $(ENV_FILES)
 $(ENV_DIR)/%.env: $(ENV_DIR)/%.env.template
 	@$(ENSURE_ENV_SCRIPT) $< $@
 
-.PHONY: prune prune-build clean-docker build-base build-all release up-dev up-prod up-all down logs ps show-workers
+.PHONY: prune prune-build clean-docker build-base build-all release up-dev up-prod up-prod-pull up-all down logs ps show-workers
 
 prune:
 	docker system prune -af

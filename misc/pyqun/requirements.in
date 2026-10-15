@@ -1,0 +1,8 @@
+numpy
+redis
+scikit-learn
+psutil
+dataclasses-json
+requests
+tqdm
+sentence-transformers

@@ -81,6 +81,10 @@ If everything is set up correctly, you will see two version strings.
 docker --version && docker compose version
 ```
 
+> [!TIP]
+> **Apple Silicon (M-series) Macs:** the `cryptobomforge` worker only exists for `linux/amd64` (CodeQL ships no Linux arm64 binaries), so Docker emulates it.
+> Enable *Settings → General → Use Rosetta for x86_64/amd64 emulation on Apple Silicon* in Docker Desktop; it is much faster and more stable than the default emulation.
+
 **🚩 2. This Repo**
 
 Clone the repository and navigate into it:
@@ -109,8 +113,21 @@ Prepare the environment files under `docker/env/`. Each service ships with a `*.
 
 At minimum set `GITHUB_TOKEN` inside `docker/env/coordinator.env`. In case you do not have one already, see [how to create a personal access token (classic)](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-personal-access-token-classic).
 
-From this point, you can continue with the setup using one of the two options described below.
-Either way, the build takes about 5–15 minutes for the first time (depending on hardware and internet speed) and requires roughly 20 GB of disk space for the images.
+**🚩 4. Start with Prebuilt Images (recommended)**
+
+Pull the published release images from GHCR and start the stack, without building anything locally:
+
+```bash
+make up-prod-pull
+```
+
+Open [http://localhost:8501](http://localhost:8501) once the containers are up, and stop the stack anytime with `Ctrl+C`.
+The images need roughly 20 GB of disk space.
+
+### Building the Images Yourself
+
+If you want to build the images locally instead (e.g., to change a worker), continue with one of the two options described below.
+Either way, the build takes about 5–15 minutes for the first time (depending on hardware and internet speed).
 
 ### Option 1 – Disposable Builder Container
 
@@ -253,6 +270,12 @@ This design creates decoupled interactions that make the framework flexible for 
 3. Start from `docker/Dockerfile.worker-skeleton` (or craft a bespoke Dockerfile if required).
 4. Register the worker service in `docker-compose.yml`, pointing at the new `env_file`.
 5. Append the worker name to the `AVAILABLE_WORKERS` list in the `Makefile` so shared targets pick it up.
+
+### Publishing Release Images
+
+The images pulled by `make up-prod-pull` are built by `.github/workflows/images.yml` from `docker-bake.hcl`.
+Run `make release VERSION=<x.y.z>`, commit, then push a matching `v<x.y.z>` tag; the workflow refuses tags that do not match the `VERSION` file.
+Base images, uv and third-party sources are pinned (by digest or commit) inside the Dockerfiles; bump them deliberately.
 
 ### Formatting and Linting
 

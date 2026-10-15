@@ -1,8 +1,13 @@
-FROM python:3.10-slim
+# syntax=docker/dockerfile:1.7
+FROM python:3.10-slim-trixie@sha256:6ff506466f8b1e981719b468cc0023b8ef000b983cdec0eafe119d01f379e31d
 
-RUN apt-get update && apt-get install -y git
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
 
-RUN git clone https://github.com/RomanBoegli/PyQuN.git /opt/RaQuN_Lab
+# Pinned PyQuN commit (bump deliberately)
+ARG PYQUN_REF=b11785329edbfc5ba994e92171152d0344bef9ee
+RUN git clone https://github.com/RomanBoegli/PyQuN.git /opt/RaQuN_Lab \
+ && git -C /opt/RaQuN_Lab checkout --detach ${PYQUN_REF}
 
 WORKDIR /opt/RaQuN_Lab
 
@@ -14,17 +19,10 @@ RUN find /opt/RaQuN_Lab -type d -exec touch {}/__init__.py \;
 RUN touch /opt/RaQuN_Lab/__init__.py
 
 COPY common/ ./common/
-RUN pip install --no-cache-dir --upgrade pip --timeout 120
-
-RUN python3 -m pip install -U \ 
-numpy \
-redis \
-scikit-learn \
-psutil \
-dataclasses-json \
-requests \
-tqdm \
-sentence-transformers
+# Deps pinned in misc/pyqun/requirements.txt (regenerate from requirements.in with uv pip compile)
+COPY misc/pyqun/requirements.txt /tmp/requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python3 -m pip install --timeout 120 -r /tmp/requirements.txt
 
 COPY misc/pyqun/main.py /opt/RaQuN_Lab/main.py
 COPY misc/pyqun/Stopwatch.py /opt/RaQuN_Lab/utils/Stopwatch.py
