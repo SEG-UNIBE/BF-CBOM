@@ -280,7 +280,8 @@ make clean-docker        # remove BF-CBOM's containers and images (other Docker 
 make up-prod NO_CACHE=1  # rebuild every layer from the Dockerfiles and start
 ```
 
-`make clean-docker` keeps the `redis-data` volume with your stored inspections; run `docker compose down -v` to delete it as well.
+`make clean-docker` keeps the `redis-data` volume with your stored inspections.
+Run `docker compose down -v` to delete it as well.
 Upstream base images are pinned by digest, so they resolve to the same content even when re-downloaded.
 Verify with `docker images 'bf-cbom/*'` (all freshly created) and `docker history <image>` (one layer per Dockerfile step).
 
