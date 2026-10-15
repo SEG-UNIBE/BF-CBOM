@@ -70,6 +70,7 @@ services:
       - results-data:/data/results
       - git-data:/srv/git
       - ./experiments:/app/experiments:ro
+      - ./corpus:/app/corpus:ro
     restart: "no"
     deploy:
       resources:
@@ -92,7 +93,7 @@ services:
     depends_on:
       - redis
     environment:
-      - AVAILABLE_WORKERS=${AVAILABLE_WORKERS:-cdxgen,cbomkit,deepseek,cryptobomforge,cryptoscan,chatgpt,claude}
+      - AVAILABLE_WORKERS=${AVAILABLE_WORKERS:-cdxgen,cbomkit,deepseek,cryptobomforge,cryptoscan,chatgpt,claude,pqcheck,qdarpan,securin-xbom,cipherradar,xgrep,cbomkit-jar}
       - AVAILABLE_LANGUAGES=python,java
       - GITHUB_CACHE_TTL_SEC=86400
       - COMPONENT_MATCH_WAIT_SEC=420
@@ -362,6 +363,177 @@ services:
       resources:
         limits:
           memory: 2g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    profiles: [prod, all]
+
+  worker-pqcheck:
+    image: bf-cbom/worker-pqcheck:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-pqcheck
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-pqcheck:${VERSION:-latest}
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=900
+    env_file: docker/env/worker-pqcheck.env
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    profiles: [prod, all]
+
+  worker-qdarpan:
+    image: bf-cbom/worker-qdarpan:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-qdarpan
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-qdarpan:${VERSION:-latest}
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=900
+    env_file: docker/env/worker-qdarpan.env
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    profiles: [prod, all]
+
+  worker-securin-xbom:
+    image: bf-cbom/worker-securin-xbom:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-securin-xbom
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-securin-xbom:${VERSION:-latest}
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=1800
+    env_file: docker/env/worker-securin-xbom.env
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    profiles: [prod, all]
+
+  worker-cipherradar:
+    image: bf-cbom/worker-cipherradar:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-cipherradar
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-cipherradar:${VERSION:-latest}
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=1800
+    env_file: docker/env/worker-cipherradar.env
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    profiles: [prod, all]
+
+  worker-xgrep:
+    # proprietary binary (free of charge); local experiments only, image is never published
+    image: bf-cbom/worker-xgrep:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-xgrep
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-xgrep:${VERSION:-latest}
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=2700
+    env_file: docker/env/worker-xgrep.env
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    profiles: [prod, all]
+
+  worker-cbomkit-jar:
+    # same engine as worker-cbomkit, packaged as the standalone action jar (one voter in RQ4, two tools otherwise)
+    image: bf-cbom/worker-cbomkit-jar:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-cbomkit-jar
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-cbomkit-jar:${VERSION:-latest}
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=2700
+      - CBOMKIT_HEAP=6g
+    env_file: docker/env/worker-cbomkit-jar.env
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 8g
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     profiles: [prod, all]

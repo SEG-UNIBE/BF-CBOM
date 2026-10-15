@@ -1,0 +1,107 @@
+# The 16 real projects of the pilot experiment (2026-10-08), pinned to the commits scanned then.
+# Format: a corpus file for experiment specs (`corpus: ../corpus/pilot-2026-10-08.yaml`, see
+# experiments/README.md). The `pilot_*` keys are metadata for the analysis and are ignored by the runner.
+# The four short hashes recorded for the native corpus were resolved to full SHAs against the
+# upstream tags on 2026-10-15 (git ls-remote <tag>^{}).
+built_at: "2026-10-08"
+source: colleague's pilot (BF-CBOM_miniexperiment_coworker/corpus-sources.tsv)
+repos:
+  # ---- Java / Python (pilot "javapy" corpus)
+  - full_name: jpadilla/pyjwt
+    language: Python
+    branch: master
+    commit: 868cf4ab2ca5a0a39da40e5a14dd740b203662b2
+    pilot_ref: "2.9.0"
+    pilot_size: micro
+  - full_name: jwtk/jjwt
+    language: Java
+    branch: main
+    commit: 0df975627c2c1d796b6d0309b7eb25fc53e15f9b
+    pilot_ref: "0.12.6"
+    pilot_size: mid
+  - full_name: paramiko/paramiko
+    language: Python
+    branch: main
+    commit: 23f92003898b060df0e2b8b1d889455264e63a3e
+    pilot_ref: "3.5.0"
+    pilot_size: mid
+  - full_name: jasypt/jasypt
+    language: Java
+    branch: master
+    commit: bb8a5182e634ef9690234b39c8bb972ad92f5039
+    pilot_ref: jasypt-1.9.3
+    pilot_size: mid
+  - full_name: opendatalab/MinerU
+    language: Python
+    branch: master
+    commit: ed50cc15bc2c9bfb00520dadfe61979866e62236
+    pilot_ref: HEAD on 2026-10-08
+    pilot_size: mid
+  - full_name: apache/kafka
+    language: Java
+    branch: trunk
+    commit: 771b9576b00ecf5b64ab6e8bedf04156fbdb5cd6
+    pilot_ref: "3.8.0"
+    pilot_size: large
+    note: CBOMkit indexes only 7 files unless the repo root has a src/ directory (pilot workaround)
+  - full_name: keycloak/keycloak
+    language: Java
+    branch: main
+    commit: 632f214aa2d668e8b59920c3dfcc449da68254a4
+    pilot_ref: "26.0.0"
+    pilot_size: large
+  - full_name: ansible/ansible
+    language: Python
+    branch: devel
+    commit: a26c0f7b504bc39c2257b4180016c6c08bab738e
+    pilot_ref: v2.17.0
+    pilot_size: large
+  # ---- Go / C / JavaScript (pilot "native" corpus)
+  - full_name: golang-jwt/jwt
+    language: Go
+    branch: main
+    commit: 7ceae619e739dc8a7bf577214aa8ebf26668e9db
+    pilot_ref: v5.3.1
+    pilot_size: micro
+  - full_name: FiloSottile/age
+    language: Go
+    branch: main
+    commit: b74dce4cdbe35b5e5f66c06d9612b72f89028758
+    pilot_ref: v1.3.2
+    pilot_size: mid
+  - full_name: smallstep/crypto
+    language: Go
+    branch: master
+    commit: 622be32d9288f7491092aacf19f7bbc035684fc0
+    pilot_ref: v0.91.0
+    pilot_size: mid
+  - full_name: panva/jose
+    language: TypeScript
+    branch: main
+    commit: 505a55b8f73536082367b2614cb77e927ba96ec1
+    pilot_ref: v6.2.12
+    pilot_size: mid
+  - full_name: openssh/openssh-portable
+    language: C
+    branch: master
+    commit: d76b2675116617394cd355a3437b4963a562b64d
+    pilot_ref: V_9_9_P2
+    pilot_size: mid
+  - full_name: curl/curl
+    language: C
+    branch: master
+    commit: 01346829096c61b372692f6dc43ffa778c6caccd
+    pilot_ref: curl-8_22_0
+    pilot_size: large
+  - full_name: parse-community/parse-server
+    language: JavaScript
+    branch: alpha
+    commit: 4ec73c57725d0157157e2a918ca518e5853c98ea
+    pilot_ref: "9.10.3"
+    pilot_size: large
+  - full_name: hashicorp/vault
+    language: Go
+    branch: main
+    commit: 76fdd6587523c4c6cb079635075e019714d23470
+    pilot_ref: v2.1.2
+    pilot_size: large

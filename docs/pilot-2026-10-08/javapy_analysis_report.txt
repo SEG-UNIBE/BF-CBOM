@@ -1,0 +1,36 @@
+## Precision by k (main seeded sample only; yes = real crypto use; lenient = yes+related)
+stratum | n | strict P (yes) | lenient P (yes+related) | yes, non-test only | family right among yes w/ known family | population clusters
+k=1 | 25 | 12/25 (48%) | 23/25 (92%) | 7/14 (50%) | 9/10 (90%) (partial 1) | 1239
+k=2 | 25 | 22/25 (88%) | 25/25 (100%) | 17/20 (85%) | 19/19 (100%) (partial 0) | 85
+k>=3 | 25 | 25/25 (100%) | 25/25 (100%) | 19/19 (100%) | 23/24 (96%) (partial 1) | 179
+
+## Per tool: solo (k=1; main+supplement) vs confirmed (k>=2; main) precision, strict (yes) / lenient (yes+related)
+lang tool | solo n | solo strict | solo lenient | confirmed n | confirmed strict | confirmed lenient | population solo / confirmed clusters (real projects)
+java xgrep | 6 | 2/6 (33%) | 6/6 (100%) | 15 | 14/15 (93%) | 15/15 (100%) | 55 / 109
+java cbomkit | 6 | 6/6 (100%) | 6/6 (100%) | 14 | 14/14 (100%) | 14/14 (100%) | 29 / 66
+java q-darpan | 6 | 6/6 (100%) | 6/6 (100%) | 16 | 16/16 (100%) | 16/16 (100%) | 48 / 102
+java securin-xbom | 6 | 3/6 (50%) | 3/6 (50%) | 6 | 6/6 (100%) | 6/6 (100%) | 52 / 26
+java cipherradar | 13 | 4/13 (31%) | 13/13 (100%) | 18 | 17/18 (94%) | 18/18 (100%) | 727 / 104
+python xgrep | 6 | 6/6 (100%) | 6/6 (100%) | 19 | 17/19 (89%) | 19/19 (100%) | 27 / 103
+python cbomkit | 6 | 5/6 (83%) | 6/6 (100%) | 1 | 1/1 (100%) | 1/1 (100%) | 15 / 2
+python cipherradar | 6 | 1/6 (17%) | 5/6 (83%) | 18 | 16/18 (89%) | 18/18 (100%) | 251 / 103
+python pqcheck | 6 | 6/6 (100%) | 6/6 (100%) | 22 | 22/22 (100%) | 22/22 (100%) | 17 / 116
+python securin-xbom | 6 | 1/6 (17%) | 1/6 (17%) | 12 | 12/12 (100%) | 12/12 (100%) | 18 / 73
+
+## k=1 stratum composition (real projects): solo clusters per tool
+cipherradar/java=727, cipherradar/python=251, xgrep/java=55, securin-xbom/java=52, q-darpan/java=48, cbomkit/java=29, xgrep/python=27, securin-xbom/python=18, pqcheck/python=17, cbomkit/python=15
+
+## Missed by all: 75 grep candidates not within +-2 lines of any tool site ({'mid-jjwt': 11, 'mid-jasypt': 1, 'large-kafka': 10, 'large-keycloak': 28, 'micro-pyjwt': 4, 'mid-paramiko': 15, 'mid-mineru': 3, 'large-ansible': 3}); sample 20: yes=13, related=7, no=0; est. true uses missed by all (grep-visible) ~ 49
+  large-keycloak/services/src/main/java/org/keycloak/crypto/ClientMacSignatureVerifierContext.java:37 [HMAC (dynamic)] SecretKeySpec(clientSecret, getJavaAlgorithm(alg)) HMAC key
+  large-kafka/server-common/src/main/java/org/apache/kafka/security/IvParamsEncoder.java:39 [AES-CBC IV] new IvParameterSpec for password-encoder cipher
+  mid-jjwt/api/src/main/java/io/jsonwebtoken/SigningKeyResolverAdapter.java:85 [HMAC (dynamic)] new SecretKeySpec(keyBytes, alg.getJcaName())
+  mid-jjwt/impl/src/main/java/io/jsonwebtoken/impl/security/SecretJwkFactory.java:137 [HMAC (dynamic)] new SecretKeySpec(bytes, jcaName)
+  micro-pyjwt/tests/keys/__init__.py:54 [EC P-521] ec.EllipticCurvePublicNumbers(..., ec.SECP521R1()) in test keys
+  large-keycloak/core/src/main/java16/org/keycloak/jose/jwk/JWKParser.java:115 [EdDSA (dynamic)] KeyFactory.getInstance(crv).generatePublic (OKP keys)
+  large-keycloak/testsuite/integration-arquillian/tests/base/src/main/java/org/keycloak/testsuite/util/KeyUtils.java:56 [EC (dynamic curve)] new ECGenParameterSpec(curve) + kpg.initialize (file excluded for cipherradar)
+  large-kafka/clients/src/main/java/org/apache/kafka/common/security/ssl/DefaultSslEngineFactory.java:245 [TLS (dynamic)] SSLContext.getInstance(protocol)
+  large-keycloak/core/src/main/java/org/keycloak/jose/jwe/enc/AesCbcHmacShaEncryptionProvider.java:128 [AES-CBC IV] new IvParameterSpec(ivBytes) for AES-CBC decrypt
+  large-keycloak/core/src/test/java/org/keycloak/jose/jwk/JWKTest.java:206 [EC P-256] new ECGenParameterSpec("secp256r1") in test (file excluded for cipherradar)
+  mid-jjwt/impl/src/main/java/io/jsonwebtoken/impl/security/ECCurve.java:114 [EC (dynamic curve)] params.init(new ECGenParameterSpec(getJcaName()))
+  micro-pyjwt/jwt/algorithms.py:160 [hash (dynamic)] hashes.Hash(hash_alg()) digest computation
+  mid-paramiko/paramiko/pkey.py:630 [AES-CTR] mode = modes.CTR selected for encrypted private key file

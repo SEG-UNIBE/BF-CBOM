@@ -1,0 +1,58 @@
+# syntax=docker/dockerfile:1.7
+# docker/Dockerfile.worker-cipherradar
+# CipherRadar `cradar` CLI built from the pinned source commit (Go), plus the opengrep binary it
+# shells out to for pass 2 (pinned release, checksum-verified). Rules are embedded in the binary.
+ARG BASE_IMAGE=base
+ARG BASE_TAG=latest
+
+# ---- build stage: Go toolchain (image index digest of golang:1.26-bookworm, 2026-10-15)
+FROM golang:1.26-bookworm@sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c AS gobuild
+ARG CRADAR_REPO=https://github.com/nk-sentinel/cipherradar
+ARG CRADAR_COMMIT=efa5d9d
+RUN git clone --quiet "${CRADAR_REPO}" /src && git -C /src checkout --quiet "${CRADAR_COMMIT}"
+WORKDIR /src/cli
+# cgo is required (go-tree-sitter); the binary links against glibc, which the runtime image also has
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=1 go build -trimpath \
+      -ldflags="-s -w -X github.com/nk-sentinel/cipherradar/cli/internal/cmd.Version=${CRADAR_COMMIT} -X github.com/nk-sentinel/cipherradar/cli/internal/cmd.Commit=${CRADAR_COMMIT}" \
+      -o /out/cradar ./cmd/cradar \
+ && /out/cradar version
+
+# ---- runtime
+FROM ${BASE_IMAGE}:${BASE_TAG}
+ARG CRADAR_COMMIT=efa5d9d
+ARG OPENGREP_VERSION=1.12.1
+# sha256 of opengrep_manylinux_<arch> from the v1.12.1 release (computed 2026-10-15)
+ARG OPENGREP_SHA256_X86=f18f3c7012070dec9ac612e1d6715a3d9d34e966e8c5f67c190c5f6ac8d63963
+ARG OPENGREP_SHA256_AARCH64=078d7b69b04e416ed4f2ebf59bdb7dae17e744e0a3af380f9f392af219aec8b8
+ARG TARGETARCH
+
+USER root
+COPY --from=gobuild /out/cradar /usr/local/bin/cradar
+RUN set -eu; \
+    case "${TARGETARCH}" in \
+      amd64) arch=x86; sum="${OPENGREP_SHA256_X86}";; \
+      arm64) arch=aarch64; sum="${OPENGREP_SHA256_AARCH64}";; \
+      *) echo "unsupported arch ${TARGETARCH}" >&2; exit 1;; \
+    esac; \
+    url="https://github.com/opengrep/opengrep/releases/download/v${OPENGREP_VERSION}/opengrep_manylinux_${arch}"; \
+    curl -fsSL --retry 5 --retry-delay 5 -o /usr/local/bin/opengrep "$url"; \
+    echo "${sum}  /usr/local/bin/opengrep" | sha256sum -c -; \
+    chmod 0755 /usr/local/bin/opengrep; \
+    opengrep --version; \
+    cradar version
+ENV TOOL_VERSION="cradar ${CRADAR_COMMIT} opengrep ${OPENGREP_VERSION}" \
+    SEMGREP_SEND_METRICS=off OPENGREP_SEND_METRICS=off DO_NOT_TRACK=1
+
+USER appuser
+WORKDIR /app
+ENV PYTHONPATH=/app
+
+COPY --chown=appuser:appuser pyproject.toml uv.lock ./
+COPY --chown=appuser:appuser common/ ./common/
+RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=1000,gid=1000 \
+    uv sync --frozen --no-dev
+
+COPY --chown=appuser:appuser workers/cipherradar/ ./workers/cipherradar/
+
+ENTRYPOINT ["tini", "-g", "--", "uv", "run", "--frozen", "--no-dev", "workers/cipherradar/main.py"]

@@ -1,0 +1,54 @@
+# syntax=docker/dockerfile:1.7
+# docker/Dockerfile.worker-pqcheck
+# pqcheck (Apache-2.0): Python/tree-sitter scanner for Python and Go, CycloneDX 1.6 output.
+# Built from the pinned source commit (the PyPI wheels are x86_64-only). Its Go module analyser is a
+# bundled Go binary (`crypto-analyzer`) that the wheel build hashes and pins (hatch_build.py), and it
+# needs a Go toolchain at run time (go/packages); both come from the Go build stage.
+ARG BASE_IMAGE=base
+ARG BASE_TAG=latest
+
+# ---- build stage (image index digest of golang:1.26-bookworm, 2026-10-15)
+FROM golang:1.26-bookworm@sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c AS gobuild
+ARG PQCHECK_REPO=https://github.com/Rafael-Ryu/pqcheck
+ARG PQCHECK_COMMIT=3e99c74
+ARG TARGETARCH
+RUN git clone --quiet "${PQCHECK_REPO}" /src && git -C /src checkout --quiet "${PQCHECK_COMMIT}"
+WORKDIR /src/tools/crypto-analyzer
+# Same steps as upstream's cibuildwheel before-build: go generate copies the crypto catalog next to
+# the go:embed, then the static analyzer binary lands where the wheel build picks it up and pins it.
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    GOTOOLCHAIN=local go generate ./... \
+ && CGO_ENABLED=0 GOTOOLCHAIN=local go build -mod=readonly -trimpath -buildvcs=false -ldflags=-buildid= \
+      -o "/src/src/pqcheck/bin/linux-${TARGETARCH}/crypto-analyzer" ./cmd/crypto-analyzer
+
+# ---- runtime
+FROM ${BASE_IMAGE}:${BASE_TAG}
+ARG PQCHECK_COMMIT=3e99c74
+ARG PQCHECK_VERSION=0.1.0
+
+USER root
+COPY --from=gobuild /usr/local/go /usr/local/go
+COPY --from=gobuild /src /opt/pqcheck-src
+ENV PATH="/usr/local/go/bin:${PATH}"
+RUN set -eu; \
+    uv venv --quiet /opt/pqcheck \
+ && uv pip install --quiet --python /opt/pqcheck/bin/python /opt/pqcheck-src \
+ && ln -s /opt/pqcheck/bin/pqcheck /usr/local/bin/pqcheck \
+ && rm -rf /opt/pqcheck-src \
+ && pqcheck version \
+ && go version
+ENV TOOL_VERSION="pqcheck ${PQCHECK_VERSION} (${PQCHECK_COMMIT})" \
+    GOTOOLCHAIN=local GOFLAGS=-mod=mod GOPATH=/tmp/gopath GOCACHE=/tmp/gocache GOMODCACHE=/tmp/gomodcache
+
+USER appuser
+WORKDIR /app
+ENV PYTHONPATH=/app
+
+COPY --chown=appuser:appuser pyproject.toml uv.lock ./
+COPY --chown=appuser:appuser common/ ./common/
+RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=1000,gid=1000 \
+    uv sync --frozen --no-dev
+
+COPY --chown=appuser:appuser workers/pqcheck/ ./workers/pqcheck/
+
+ENTRYPOINT ["tini", "-g", "--", "uv", "run", "--frozen", "--no-dev", "workers/pqcheck/main.py"]

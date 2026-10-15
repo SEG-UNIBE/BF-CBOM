@@ -1,0 +1,53 @@
+# Algorithm family table: the coarse normalisation layer used by the call-site matcher and the
+# micro ground truth. A reported name (or, as a fallback, a tool's rule id) maps to the set of all
+# families whose pattern matches it, case-insensitively; e.g. "SHA256withECDSA" -> {EC, SHA-2},
+# "HmacSHA512" -> {HMAC, SHA-2}, "jca-cipher-getinstance" -> {} (unknown).
+#
+# Origin: merged from the two regex tables of the pilot experiment of 2026-10-08
+# (work/compare/javapy/normalize.py and work/compare/native/normalize.py). Decisions carried over:
+#   - EC covers ECDSA, ECDH, EdDSA, X25519 and named curves: mislabelled EC variants still match;
+#   - an unknown name must not match anything (the pilot's wildcard inflated weak tools);
+#   - "OPENSSL" does not count as TLS.
+# Phase 3 adds the fine-grained alias table (analysis/data/algorithms.yaml) on top of this.
+version: "2026-10-15.1"
+families:
+  - name: RSA
+    pattern: 'RSA|PKCS-?1(?![0-9])|MGF1|OAEP|(^|[^A-Z])[RP]S(256|384|512)([^0-9]|$)'
+  - name: EC
+    pattern: 'ECDSA|ECDH|ECIES|EDDSA|ED25519|ED448|X25519|X448|SECP|PRIME256|CURVE|ELLIPTIC|(^|[^A-Z])EC([^A-Z]|$)|(^|[^A-Z0-9])P-?(224|256|384|521)([^0-9]|$)|(^|[^A-Z])ES(256|384|512)([^0-9]|$)'
+  - name: DSA
+    pattern: '(^|[^A-Z])DSA|WITHDSA'
+  - name: DH
+    pattern: '(^|[^A-Z])(FF)?DHE?([^A-Z]|$)|DIFFIE'
+  - name: PQC
+    pattern: 'ML-?KEM|ML-?DSA|KYBER|DILITHIUM|SLH-?DSA|SPHINCS|FALCON|FN-?DSA|HQC|FRODO'
+  - name: AES
+    pattern: 'AES'
+  - name: DES
+    pattern: '(^|[^A-Z]|AND)(3?DES|TRIPLEDES|DESEDE)(EDE|[^A-Z]|$)'
+  - name: ChaCha
+    pattern: 'CHACHA|SALSA|POLY1305|SECRETBOX'
+  - name: CIPHER-other
+    pattern: 'BLOWFISH|RC4|ARCFOUR|CAMELLIA|RC2|CAST5?|(^|[^A-Z])IDEA([^A-Z]|$)'
+  - name: SHA-1
+    pattern: 'SHA-?1(?![0-9])|(^|[^A-Z])SHA([^A-Z0-9-]|$)'
+  - name: SHA-2
+    pattern: 'SHA-?(224|256|384|512)|SHA2(?![0-9])|HMACSHA2'
+  - name: SHA-3
+    pattern: 'SHA-?3(?![0-9][0-9])|SHAKE|KECCAK'
+  - name: MD5
+    pattern: 'MD5'
+  - name: HASH-other
+    pattern: 'BLAKE|WHIRLPOOL|RIPEMD|MD2|MD4'
+  - name: HMAC
+    pattern: 'HMAC|(^|-)MAC-|(^|[^A-Z])HS(256|384|512)([^0-9]|$)'
+  - name: PBKDF
+    pattern: 'PBKDF2?|PBE'
+  - name: KDF-other
+    pattern: 'BCRYPT|SCRYPT|ARGON|HKDF|CONCAT(ENATION)?KDF|(^|[^A-Z])KDF'
+  - name: RANDOM
+    pattern: 'PRNG|RANDOM|DRBG|(^|[^A-Z])RAND([^A-Z]|$)'
+  - name: TLS
+    pattern: 'TLS|(?<!OPEN)SSL'
+  - name: CERT
+    pattern: 'X\.?509|CERTIFICATE|KEYSTORE|(^|[^A-Z])JKS|PKCS-?#?12|TRUSTSTORE'

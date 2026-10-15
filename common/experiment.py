@@ -21,7 +21,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
+import tempfile
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -59,6 +61,9 @@ class RepoSpec:
     stars: int | None = None
     size_kb: int | None = None
     variants: list[str] = field(default_factory=lambda: [ORIGINAL_VARIANT])
+    # A plain directory (e.g. corpus/micro/java) published to the git server by the runner instead of
+    # a remote repo; resolved to an absolute path at spec load time.
+    path: str | None = None
 
     @property
     def owner(self) -> str:
@@ -69,8 +74,16 @@ class RepoSpec:
         return self.full_name.split("/", 1)[1]
 
     @property
+    def is_fixture(self) -> bool:
+        return bool(self.path)
+
+    @property
     def source_url(self) -> str:
-        return self.git_url or f"https://github.com/{self.full_name}.git"
+        if self.git_url:
+            return self.git_url
+        if self.path:
+            return f"fixture:{self.path}"
+        return f"https://github.com/{self.full_name}.git"
 
 
 @dataclass
@@ -86,7 +99,7 @@ class ExperimentSpec:
         return sum(len(r.variants) for r in self.repos) * len(self.tools) * self.repetitions
 
 
-def _as_repo_spec(item: dict) -> RepoSpec:
+def _as_repo_spec(item: dict, *, base_dir: Path | None = None) -> RepoSpec:
     full_name = str(item.get("full_name") or "").strip()
     if full_name.count("/") != 1:
         raise ExperimentError(f"repo full_name must be owner/name, got {full_name!r}")
@@ -97,6 +110,14 @@ def _as_repo_spec(item: dict) -> RepoSpec:
     commit = item.get("commit")
     if commit is not None and not _SHA_RE.match(str(commit)):
         raise ExperimentError(f"commit for {full_name} must be a full 40-hex SHA")
+    path = item.get("path")
+    if path:
+        if item.get("git_url") or commit:
+            raise ExperimentError(f"{full_name}: 'path' cannot be combined with git_url or commit")
+        p = Path(str(path))
+        if not p.is_absolute() and base_dir is not None:
+            p = base_dir / p
+        path = str(p.resolve()) if p.exists() else str(p)
     return RepoSpec(
         full_name=full_name,
         git_url=item.get("git_url") or None,
@@ -106,6 +127,7 @@ def _as_repo_spec(item: dict) -> RepoSpec:
         stars=item.get("stars"),
         size_kb=item.get("size_kb") or item.get("size"),
         variants=[str(v) for v in variants],
+        path=path or None,
     )
 
 
@@ -136,7 +158,7 @@ def spec_from_dict(data: dict, *, base_dir: Path | None = None) -> ExperimentSpe
         repos_raw = list(corpus.get("repos") or []) + repos_raw
     if not repos_raw:
         raise ExperimentError("experiment needs 'repos' or a 'corpus' file with repos")
-    repos = [_as_repo_spec(r) for r in repos_raw]
+    repos = [_as_repo_spec(r, base_dir=base_dir) for r in repos_raw]
     seen: set[str] = set()
     for r in repos:
         if r.full_name in seen:
@@ -219,6 +241,64 @@ def ensure_mirror(spec: RepoSpec, commit: str, *, mirror_dir: Path = GIT_MIRROR_
     branch = variant_branch(ORIGINAL_VARIANT, commit)
     _git(["-C", str(bare), "update-ref", f"refs/heads/{branch}", commit])
     return bare
+
+
+FIXTURE_AUTHOR = ("BF-CBOM fixtures", "fixtures@bf-cbom.invalid")
+FIXTURE_DATE = "2026-10-08T00:00:00Z"
+
+
+def publish_fixture(spec: RepoSpec, *, mirror_dir: Path = GIT_MIRROR_DIR) -> str:
+    """Commit a plain directory (`RepoSpec.path`, e.g. corpus/micro/java) into the base mirror.
+
+    The commit is deterministic (fixed author, date and message), so the SHA depends only on the
+    files' contents and modes: the same fixture gets the same snapshot id on every machine.
+    Returns the commit; `ensure_mirror` then finds it in the mirror like any upstream commit.
+    """
+    if not spec.path:
+        raise ExperimentError(f"{spec.full_name} is not a fixture (no path)")
+    src = Path(spec.path)
+    if not src.is_dir():
+        raise ExperimentError(f"fixture directory for {spec.full_name} not found: {src}")
+    env = {
+        "GIT_AUTHOR_NAME": FIXTURE_AUTHOR[0],
+        "GIT_AUTHOR_EMAIL": FIXTURE_AUTHOR[1],
+        "GIT_AUTHOR_DATE": FIXTURE_DATE,
+        "GIT_COMMITTER_NAME": FIXTURE_AUTHOR[0],
+        "GIT_COMMITTER_EMAIL": FIXTURE_AUTHOR[1],
+        "GIT_COMMITTER_DATE": FIXTURE_DATE,
+    }
+    with tempfile.TemporaryDirectory(prefix="fixture-") as tmp:
+        work = Path(tmp) / "work"
+        shutil.copytree(src, work, ignore=shutil.ignore_patterns(".git"))
+        old_env = {k: os.environ.get(k) for k in env}
+        os.environ.update(env)
+        try:
+            for args in (
+                ["init", "-q", "-b", "main"],
+                ["add", "-A", "--", "."],
+                ["commit", "-q", "--allow-empty", "-m", f"BF-CBOM fixture {spec.full_name}"],
+            ):
+                proc = _git(["-C", str(work), *args])
+                if proc.returncode != 0:
+                    raise ExperimentError(f"fixture commit failed for {spec.full_name}: {proc.stderr.strip()[-300:]}")
+        finally:
+            for k, v in old_env.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+        sha = _git(["-C", str(work), "rev-parse", "HEAD"]).stdout.strip()
+        if not _SHA_RE.match(sha):
+            raise ExperimentError(f"fixture commit failed for {spec.full_name}")
+        bare = mirror_path(spec.full_name, mirror_dir)
+        if not (bare / "HEAD").exists():
+            bare.parent.mkdir(parents=True, exist_ok=True)
+            proc = _git(["clone", "--bare", "--quiet", str(work), str(bare)])
+        else:
+            proc = _git(["-C", str(bare), "fetch", "--quiet", str(work), "+refs/heads/main:refs/heads/main"])
+        if proc.returncode != 0:
+            raise ExperimentError(f"publishing fixture {spec.full_name} failed: {proc.stderr.strip()[-300:]}")
+    return sha
 
 
 def ensure_scan_repo(
@@ -325,6 +405,11 @@ def resolve_snapshots(
         prior = locked.get(repo.full_name) or {}
         branch = repo.branch or prior.get("branch") or "main"
         commit = prior.get("commit") or repo.commit
+        if repo.is_fixture:
+            published = publish_fixture(repo, mirror_dir=mirror_dir)
+            if commit and commit != published:
+                log(f"  {repo.full_name}: fixture changed since lock.json ({published[:12]}); keeping {commit[:12]}")
+            commit = commit or published
         if not commit:
             commit = resolve_remote_commit(repo.source_url, branch)
             if not commit:

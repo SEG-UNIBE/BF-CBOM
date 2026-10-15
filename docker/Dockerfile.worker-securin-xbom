@@ -1,0 +1,35 @@
+# syntax=docker/dockerfile:1.7
+# docker/Dockerfile.worker-securin-xbom
+# securin-xbom (Apache-2.0): semgrep-rule scanner, CycloneDX 1.6 output. Installed from the pinned
+# source commit into its own venv together with a pinned semgrep. No cdxgen on purpose (see worker).
+ARG BASE_IMAGE=base
+ARG BASE_TAG=latest
+FROM ${BASE_IMAGE}:${BASE_TAG}
+
+ARG XBOM_REPO=https://github.com/securin-public/securin-xbom
+ARG XBOM_COMMIT=a270c5f
+ARG SEMGREP_VERSION=1.181.0
+
+USER root
+RUN set -eu; \
+    git clone --quiet "${XBOM_REPO}" /opt/xbom-src \
+ && git -C /opt/xbom-src checkout --quiet "${XBOM_COMMIT}" \
+ && uv venv --quiet /opt/xbom \
+ && uv pip install --quiet --python /opt/xbom/bin/python /opt/xbom-src "semgrep==${SEMGREP_VERSION}" \
+ && rm -rf /opt/xbom-src \
+ && /opt/xbom/bin/python -c "import xbom, importlib.metadata as m; print('xbom', m.version('xbom'), 'semgrep', m.version('semgrep'))"
+ENV TOOL_VERSION="xbom 0.1.0 (${XBOM_COMMIT}) semgrep ${SEMGREP_VERSION}" \
+    SEMGREP_SEND_METRICS=off SEMGREP_ENABLE_VERSION_CHECK=0
+
+USER appuser
+WORKDIR /app
+ENV PYTHONPATH=/app
+
+COPY --chown=appuser:appuser pyproject.toml uv.lock ./
+COPY --chown=appuser:appuser common/ ./common/
+RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=1000,gid=1000 \
+    uv sync --frozen --no-dev
+
+COPY --chown=appuser:appuser workers/securin-xbom/ ./workers/securin-xbom/
+
+ENTRYPOINT ["tini", "-g", "--", "uv", "run", "--frozen", "--no-dev", "workers/securin-xbom/main.py"]

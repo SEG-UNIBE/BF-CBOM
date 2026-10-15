@@ -195,3 +195,30 @@ def test_anthropic_provider_request_and_usage():
 
     with pytest.raises(RuntimeError, match="anthropic api 429"):
         llm.AnthropicProvider(name="claude", model="m", api_key="k", post=failing_post).complete("S", "U")
+
+
+def test_has_api_key_rejects_placeholders():
+    from common.llm_worker import has_api_key
+
+    assert has_api_key("sk-real-key")
+    assert (
+        not has_api_key(None)
+        and not has_api_key("")
+        and not has_api_key(" your_secret ")
+        and not has_api_key("'changeme'")
+    )
+
+
+def test_select_files_covers_all_micro_languages():
+    from common.llm_cbom import select_files
+
+    root = Path(__file__).resolve().parents[1] / "corpus" / "micro"
+    for lang, sub, expected in (
+        ("Java", "java", "CryptoDemo.java"),
+        ("Python", "python", "crypto_demo.py"),
+        ("Go", "go", "main.go"),
+        ("JavaScript", "javascript", "crypto_demo.js"),
+        ("C", "c", "crypto_demo.c"),
+    ):
+        sel = select_files(root / sub, lang)
+        assert [p.name for p in sel.files] == [expected], lang

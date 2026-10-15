@@ -1,0 +1,184 @@
+# Ground truth for the hand-written micro projects (one per language, 11 crypto assets each).
+#
+# Origin: the pilot experiment of 2026-10-08 (A. Boll's grading rules; projects and this table were
+# written with AI assistance and have NOT been reviewed by a human yet; review before any paper use).
+# Used by analysis/groundtruth.py (inclusion bar: a tool must find >= 50 % of the assets with a
+# usable location) and as the seed of the mutation snippet catalog (Phase 4): every asset below is a
+# known crypto call with a known canonical record.
+#
+# Hit rule: a tool "finds" an asset if it reports a cryptographic-asset occurrence at one of the
+# asset's lines in the project's file whose algorithm family is compatible with the asset's families
+# (or unknown, counted separately as a lenient hit). Wrong parameters (key size, hash) do not count
+# against a hit; they are reported separately.
+version: "2026-10-08"
+families_table: analysis/data/families.yaml
+
+assets:
+  - id: rsa-2048-keygen
+    name: RSA-2048 key generation
+    families: [RSA]
+    expected: {family: RSA, primitive: pke, function: keygen, keysize: 2048}
+  - id: ec-p256-keygen
+    name: EC P-256 (secp256r1) key generation
+    families: [EC]
+    expected: {family: EC, primitive: pke, function: keygen, curve: P-256}
+  - id: aes-256-key
+    name: AES-256 key
+    families: [AES]
+    expected: {family: AES, primitive: block-cipher, function: keygen, keysize: 256}
+  - id: aes-gcm-encrypt
+    name: AES-GCM encryption
+    families: [AES]
+    expected: {family: AES, primitive: ae, function: encrypt, mode: GCM, keysize: 256}
+  - id: des-cbc
+    name: (3)DES-CBC, weak cipher
+    families: [DES]
+    expected: {family: DES, primitive: block-cipher, mode: CBC}
+    note: single DES in micro-java, 3DES everywhere else
+  - id: sha-256
+    name: SHA-256 hash
+    families: [SHA-2]
+    expected: {family: SHA-2, variant: SHA-256, primitive: hash}
+  - id: md5
+    name: MD5 hash, weak
+    families: [MD5]
+    expected: {family: MD5, primitive: hash}
+  - id: hmac-sha512
+    name: HMAC-SHA512
+    families: [HMAC, SHA-2]
+    expected: {family: HMAC, primitive: mac, digest: SHA-512}
+  - id: ecdsa-sha256-sign
+    name: ECDSA with SHA-256 signature, algorithm passed through a constant
+    families: [EC]
+    expected: {family: EC, variant: ECDSA, primitive: signature, digest: SHA-256, curve: P-256}
+    insertion_style: constant   # the algorithm or hash name is defined on a separate line (see `related`)
+  - id: rsa-oaep-sha256
+    name: RSA-OAEP with SHA-256 encryption
+    families: [RSA]
+    expected: {family: RSA, primitive: pke, function: encrypt, padding: OAEP, digest: SHA-256}
+  - id: pbkdf2-hmac-sha256
+    name: PBKDF2-HMAC-SHA256, 600000 iterations
+    families: [PBKDF]
+    expected: {family: PBKDF, variant: PBKDF2, primitive: kdf, digest: SHA-256, iterations: 600000}
+
+projects:
+  micro-java:
+    path: corpus/micro/java
+    language: java
+    file: src/main/java/demo/CryptoDemo.java
+    lines:
+      rsa-2048-keygen: [12, 13]
+      ec-p256-keygen: [16, 17]
+      aes-256-key: [20, 21]
+      aes-gcm-encrypt: [24, 25]
+      des-cbc: [27]
+      sha-256: [29]
+      md5: [30]
+      hmac-sha512: [32]
+      ecdsa-sha256-sign: [34, 35]
+      rsa-oaep-sha256: [37, 38]
+      pbkdf2-hmac-sha256: [40, 41]
+    related:
+      9: SIG_ALG constant ("SHA256withECDSA") used on line 34
+  micro-python:
+    path: corpus/micro/python
+    language: python
+    file: demo/crypto_demo.py
+    lines:
+      rsa-2048-keygen: [15]
+      ec-p256-keygen: [16]
+      aes-256-key: [18]
+      aes-gcm-encrypt: [19]
+      des-cbc: [21]
+      sha-256: [23]
+      md5: [24]
+      hmac-sha512: [26]
+      ecdsa-sha256-sign: [28]
+      rsa-oaep-sha256: [30]
+      pbkdf2-hmac-sha256: [35]
+    related:
+      11: HASH constant (hashes.SHA256()) used on line 28
+      32: OAEP padding arguments of the call on line 30
+  micro-go:
+    path: corpus/micro/go
+    language: go
+    file: main.go
+    lines:
+      rsa-2048-keygen: [26]
+      ec-p256-keygen: [27]
+      aes-256-key: [29, 31]
+      aes-gcm-encrypt: [32, 34]
+      des-cbc: [36, 37]
+      sha-256: [41]
+      md5: [42]
+      hmac-sha512: [44]
+      ecdsa-sha256-sign: [50, 48]
+      rsa-oaep-sha256: [52]
+      pbkdf2-hmac-sha256: [56]
+    related:
+      21: SigHash constant (crypto.SHA256) used on line 48
+    # extra lines where a finding of the given family is a real sub-use, not a false positive
+    accepted:
+      30: [RANDOM, AES]
+      33: [AES]
+      39: [DES]
+      45: [HMAC]
+      46: [HMAC]
+      49: [SHA-2]
+      55: [RANDOM]
+      26: [RANDOM]
+      27: [RANDOM]
+      50: [RANDOM]
+      52: [SHA-2, RANDOM]
+      56: [SHA-2, HMAC]
+  micro-javascript:
+    path: corpus/micro/javascript
+    language: javascript
+    file: crypto_demo.js
+    lines:
+      rsa-2048-keygen: [9]
+      ec-p256-keygen: [10]
+      aes-256-key: [12, 14]
+      aes-gcm-encrypt: [14, 15]
+      des-cbc: [17, 18]
+      sha-256: [20]
+      md5: [21]
+      hmac-sha512: [23]
+      ecdsa-sha256-sign: [25]
+      rsa-oaep-sha256: [27, 28]
+      pbkdf2-hmac-sha256: [33]
+    related:
+      4: SIG_ALG constant ('sha256') used on line 25
+    accepted:
+      12: [RANDOM]
+      13: [RANDOM, AES]
+      17: [RANDOM]
+      25: [SHA-2]
+      27: [SHA-2]
+      28: [SHA-2]
+      32: [RANDOM]
+      33: [SHA-2, HMAC]
+  micro-c:
+    path: corpus/micro/c
+    language: c
+    file: crypto_demo.c
+    lines:
+      rsa-2048-keygen: [18]
+      ec-p256-keygen: [19]
+      aes-256-key: [21, 23]
+      aes-gcm-encrypt: [23, 24]
+      des-cbc: [27, 28]
+      sha-256: [30]
+      md5: [31]
+      hmac-sha512: [33]
+      ecdsa-sha256-sign: [36, 37]
+      rsa-oaep-sha256: [41, 39, 40, 42, 43]
+      pbkdf2-hmac-sha256: [46]
+    related:
+      9: SIG_MD macro (EVP_sha256) used on line 36
+    accepted:
+      21: [RANDOM]
+      36: [SHA-2]
+      42: [SHA-2]
+      45: [RANDOM]
+      46: [SHA-2, HMAC]

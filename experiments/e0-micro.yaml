@@ -1,0 +1,25 @@
+# Every tool on the hand-written micro projects (corpus/micro, 11 known crypto assets per language).
+# The directories are published to the git server as deterministic fixture commits (`path:`), so
+# every worker scans them like any other repo. Afterwards:
+#   make experiment EXP=experiments/e0-micro.yaml
+#   make analysis ARGS="micro e0-micro"      # recall/precision per tool against corpus/micro/ground_truth.yaml
+#   make analysis ARGS="sites e0-micro"      # call-site agreement between the tools
+name: e0-micro
+tools: [cbomkit, cdxgen, cryptobomforge, cryptoscan, deepseek, pqcheck, qdarpan, securin-xbom, cipherradar, xgrep, cbomkit-jar]
+repetitions: 1
+repos:
+  - full_name: bfcbom/micro-java
+    path: ../corpus/micro/java
+    language: Java
+  - full_name: bfcbom/micro-python
+    path: ../corpus/micro/python
+    language: Python
+  - full_name: bfcbom/micro-go
+    path: ../corpus/micro/go
+    language: Go
+  - full_name: bfcbom/micro-javascript
+    path: ../corpus/micro/javascript
+    language: JavaScript
+  - full_name: bfcbom/micro-c
+    path: ../corpus/micro/c
+    language: C

@@ -1,0 +1,44 @@
+# syntax=docker/dockerfile:1.7
+# docker/Dockerfile.worker-xgrep
+# Mondoo xgrep: free of charge but proprietary (LicenseRef-Mondoo-Proprietary). The binary is taken
+# from the public npm package at build time and verified against the registry's sha512; the image
+# is for local experiments only and must not be pushed (not in the docker-bake default group).
+# Pinned to 0.80.0, the version the pilot of 2026-10-08 graded.
+ARG BASE_IMAGE=base
+ARG BASE_TAG=latest
+FROM ${BASE_IMAGE}:${BASE_TAG}
+
+ARG XGREP_VERSION=0.80.0
+# sha512 (hex) of @mondoohq/xgrep_linux_<arch>-<version>.tgz, from the npm registry's dist.integrity
+ARG XGREP_SHA512_AMD64=4da1f623625a80a5c9f950e4a9f00f2e652e4c44c3de80d3f0c0b06139f2ee1b6c067d191e8e4d2fcb9245f0753ad16aa56755996ab3a932ad4ef90b84277068
+ARG XGREP_SHA512_ARM64=eca3c7104fdf9a9e5acc584b3c1a2aa294dd79104f160e29825a9da6fb511c7f3ecf46a82842bac6f90473a856b0c58926ad9a418ac42a815b995ad3e376adb7
+ARG TARGETARCH
+
+USER root
+RUN set -eu; \
+    case "${TARGETARCH}" in \
+      amd64) sum="${XGREP_SHA512_AMD64}";; \
+      arm64) sum="${XGREP_SHA512_ARM64}";; \
+      *) echo "unsupported arch ${TARGETARCH}" >&2; exit 1;; \
+    esac; \
+    url="https://registry.npmjs.org/@mondoohq/xgrep_linux_${TARGETARCH}/-/xgrep_linux_${TARGETARCH}-${XGREP_VERSION}.tgz"; \
+    curl -fsSL --retry 5 --retry-delay 5 -o /tmp/xgrep.tgz "$url"; \
+    echo "${sum}  /tmp/xgrep.tgz" | sha512sum -c -; \
+    mkdir -p /tmp/xg && tar -xzf /tmp/xgrep.tgz -C /tmp/xg; \
+    install -m 0755 "$(find /tmp/xg -type f -name xgrep | head -1)" /usr/local/bin/xgrep; \
+    rm -rf /tmp/xg /tmp/xgrep.tgz; \
+    HOME=/tmp XGREP_UPDATE_CHECK=0 DO_NOT_TRACK=1 xgrep version
+ENV TOOL_VERSION="xgrep ${XGREP_VERSION}" XGREP_UPDATE_CHECK=0 DO_NOT_TRACK=1
+
+USER appuser
+WORKDIR /app
+ENV PYTHONPATH=/app
+
+COPY --chown=appuser:appuser pyproject.toml uv.lock ./
+COPY --chown=appuser:appuser common/ ./common/
+RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=1000,gid=1000 \
+    uv sync --frozen --no-dev
+
+COPY --chown=appuser:appuser workers/xgrep/ ./workers/xgrep/
+
+ENTRYPOINT ["tini", "-g", "--", "uv", "run", "--frozen", "--no-dev", "workers/xgrep/main.py"]

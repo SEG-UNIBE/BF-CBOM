@@ -1,0 +1,36 @@
+# syntax=docker/dockerfile:1.7
+# docker/Dockerfile.worker-qdarpan
+# Q-DARPAN (Apache-2.0): Python/tree-sitter scanner for Java, Go and C/C++, CycloneDX 1.7 output.
+# Installed from the pinned source commit into its own venv (the base image sets UV_SYSTEM_PYTHON,
+# so the interpreter is passed explicitly).
+ARG BASE_IMAGE=base
+ARG BASE_TAG=latest
+FROM ${BASE_IMAGE}:${BASE_TAG}
+
+ARG QDARPAN_REPO=https://github.com/RohanExploit/q-darpan
+ARG QDARPAN_COMMIT=72a4edd
+ARG QDARPAN_VERSION=0.1.0
+
+USER root
+RUN set -eu; \
+    git clone --quiet "${QDARPAN_REPO}" /opt/qdarpan-src \
+ && git -C /opt/qdarpan-src checkout --quiet "${QDARPAN_COMMIT}" \
+ && uv venv --quiet /opt/qdarpan \
+ && uv pip install --quiet --python /opt/qdarpan/bin/python /opt/qdarpan-src \
+ && ln -s /opt/qdarpan/bin/qdarpan /usr/local/bin/qdarpan \
+ && rm -rf /opt/qdarpan-src \
+ && qdarpan --version
+ENV TOOL_VERSION="qdarpan ${QDARPAN_VERSION} (${QDARPAN_COMMIT})"
+
+USER appuser
+WORKDIR /app
+ENV PYTHONPATH=/app
+
+COPY --chown=appuser:appuser pyproject.toml uv.lock ./
+COPY --chown=appuser:appuser common/ ./common/
+RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=1000,gid=1000 \
+    uv sync --frozen --no-dev
+
+COPY --chown=appuser:appuser workers/qdarpan/ ./workers/qdarpan/
+
+ENTRYPOINT ["tini", "-g", "--", "uv", "run", "--frozen", "--no-dev", "workers/qdarpan/main.py"]

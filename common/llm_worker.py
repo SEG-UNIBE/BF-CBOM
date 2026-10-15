@@ -24,12 +24,20 @@ TIMEOUT_SEC = int(os.getenv("WORKER_TIMEOUT_SEC", "900"))
 API_TIMEOUT_SEC = float(os.getenv("LLM_API_TIMEOUT_SEC", "180"))
 
 
+# Values the env templates ship with; treated as "no key" so an unconfigured worker exits instead of failing jobs.
+_PLACEHOLDER_KEYS = {"", "your_secret", "changeme", "todo", "xxx", "none"}
+
+
+def has_api_key(value: str | None) -> bool:
+    return bool(value) and value.strip().strip("'\"").lower() not in _PLACEHOLDER_KEYS
+
+
 def run_llm_worker(
     name: str, make_provider: Callable[[], LLMProvider], *, tool_version: str, api_key: str | None
 ) -> None:
     """Start the queue loop for one LLM worker. Exits early with a clear message when the key is missing."""
     log = logging.getLogger(name)
-    if not api_key:
+    if not has_api_key(api_key):
         log.error("%s: API key not configured (see docker/env/worker-%s.env); refusing to start", name, name)
         raise SystemExit(1)
     provider = make_provider()

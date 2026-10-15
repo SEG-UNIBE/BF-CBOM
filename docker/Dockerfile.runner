@@ -19,12 +19,15 @@ RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=1000,gid=1000 \
 COPY --chown=appuser:appuser coordinator/redis_io.py coordinator/logger_config.py ./coordinator/
 COPY --chown=appuser:appuser misc/__init__.py ./misc/
 COPY --chown=appuser:appuser misc/cli/ ./misc/cli/
+COPY --chown=appuser:appuser analysis/ ./analysis/
 COPY --chown=appuser:appuser docs/logo.txt ./docs/logo.txt
 
+# ./corpus is mounted at /app/corpus (fixtures published to the git server, micro ground truth)
 ENV PYTHONPATH=/app \
     RESULTS_DIR=/data/results \
     GIT_MIRROR_DIR=/srv/git \
-    GITSERVER_URL=http://gitserver
+    GITSERVER_URL=http://gitserver \
+    GROUND_TRUTH_PATH=/app/corpus/micro/ground_truth.yaml
 
 ENTRYPOINT ["tini", "-g", "--", "uv", "run", "--frozen", "--no-dev", "misc/cli/cli.py"]
 CMD ["--help"]

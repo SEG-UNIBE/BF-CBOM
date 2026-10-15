@@ -1,0 +1,661 @@
+{
+  "bomFormat" : "CycloneDX",
+  "specVersion" : "1.6",
+  "serialNumber" : "urn:uuid:19bedd9e-6c61-40df-a2c8-55d66ef136f9",
+  "version" : 1,
+  "metadata" : {
+    "timestamp" : "2026-10-08T12:45:48Z",
+    "tools" : {
+      "services" : [
+        {
+          "provider" : {
+            "name" : "PQCA"
+          },
+          "name" : "CBOMkit"
+        }
+      ]
+    }
+  },
+  "components" : [
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "02bc5e97-b0d4-4927-89cd-fb4b4d873883",
+      "name" : "HMAC-SHA-512",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "src/main/java/demo/CryptoDemo.java",
+            "line" : 32,
+            "offset" : 18,
+            "additionalContext" : "javax.crypto.Mac#getInstance(Ljava/lang/String;)Ljavax/crypto/Mac;"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "mac",
+          "cryptoFunctions" : [
+            "tag"
+          ]
+        },
+        "oid" : "1.2.840.113549.2.11"
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "0d33e2f8-7825-4bba-b3bd-55398da81f57",
+      "name" : "MGF1",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "src/main/java/demo/CryptoDemo.java",
+            "line" : 37,
+            "offset" : 22,
+            "additionalContext" : "javax.crypto.Cipher#getInstance(Ljava/lang/String;)Ljavax/crypto/Cipher;"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "other"
+        },
+        "oid" : "1.2.840.113549.1.1.8"
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "93da1940-ec71-4a6d-aac7-736e9c77151c",
+      "name" : "HMAC-SHA-256",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "src/main/java/demo/CryptoDemo.java",
+            "line" : 40,
+            "offset" : 34,
+            "additionalContext" : "javax.crypto.SecretKeyFactory#getInstance(Ljava/lang/String;)Ljavax/crypto/SecretKeyFactory;"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "mac",
+          "cryptoFunctions" : [
+            "tag"
+          ]
+        },
+        "oid" : "1.2.840.113549.2.9"
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "0c5514ad-e980-4b20-b507-5824e749acae",
+      "name" : "key@0c5514ad-e980-4b20-b507-5824e749acae",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "src/main/java/demo/CryptoDemo.java",
+            "line" : 16,
+            "offset" : 33,
+            "additionalContext" : "java.security.KeyPairGenerator#getInstance(Ljava/lang/String;)Ljava/security/KeyPairGenerator;"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "related-crypto-material",
+        "relatedCryptoMaterialProperties" : {
+          "type" : "secret-key"
+        }
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "96a2a2ab-4a48-4a4c-afae-4651cbd047f3",
+      "name" : "RSA-OAEP",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "src/main/java/demo/CryptoDemo.java",
+            "line" : 37,
+            "offset" : 22,
+            "additionalContext" : "javax.crypto.Cipher#getInstance(Ljava/lang/String;)Ljavax/crypto/Cipher;"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "pke",
+          "parameterSetIdentifier" : "2048",
+          "mode" : "ecb",
+          "padding" : "oaep",
+          "cryptoFunctions" : [
+            "encrypt"
+          ]
+        },
+        "oid" : "1.2.840.113549.1.1.7"
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "b607c73e-a94e-42f4-80d0-5e472ad4ac65",
+      "name" : "ECDSA-SHA-256",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "src/main/java/demo/CryptoDemo.java",
+            "line" : 34,
+            "offset" : 24,
+            "additionalContext" : "java.security.Signature#getInstance(Ljava/lang/String;)Ljava/security/Signature;"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "signature"
+        },
+        "oid" : "1.2.840.10045.4.3.2"
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "961775c5-f517-48a2-aec9-40b520215c59",
+      "name" : "PBKDF2-HMAC-SHA-256",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "src/main/java/demo/CryptoDemo.java",
+            "line" : 40,
+            "offset" : 34,
+            "additionalContext" : "javax.crypto.SecretKeyFactory#getInstance(Ljava/lang/String;)Ljavax/crypto/SecretKeyFactory;"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "kdf",
+          "parameterSetIdentifier" : "256",
+          "cryptoFunctions" : [
+            "keyderive"
+          ]
+        }
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "304f3c3d-c9b2-43b2-82fc-26f0d0e7d6a1",
+      "name" : "salt@304f3c3d-c9b2-43b2-82fc-26f0d0e7d6a1",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "src/main/java/demo/CryptoDemo.java",
+            "line" : 41,
+            "offset" : 34,
+            "additionalContext" : "javax.crypto.spec.PBEKeySpec#<init>([C[BII)V"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "related-crypto-material",
+        "relatedCryptoMaterialProperties" : {
+          "type" : "salt",
+          "size" : 128
+        }
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "e7408a13-a14f-4e95-ba39-79b611008156",
+      "name" : "secret-key@e7408a13-a14f-4e95-ba39-79b611008156",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "src/main/java/demo/CryptoDemo.java",
+            "line" : 40,
+            "offset" : 34,
+            "additionalContext" : "javax.crypto.SecretKeyFactory#getInstance(Ljava/lang/String;)Ljavax/crypto/SecretKeyFactory;"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "related-crypto-material",
+        "relatedCryptoMaterialProperties" : {
+          "type" : "secret-key",
+          "size" : 256
+        }
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "2ece4e4d-f01a-4b4b-87da-b3410e1b644c",
+      "name" : "RSA-2048",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "src/main/java/demo/CryptoDemo.java",
+            "line" : 12,
+            "offset" : 34,
+            "additionalContext" : "java.security.KeyPairGenerator#getInstance(Ljava/lang/String;)Ljava/security/KeyPairGenerator;"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "pke",
+          "parameterSetIdentifier" : "2048",
+          "cryptoFunctions" : [
+            "keygen"
+          ]
+        },
+        "oid" : "1.2.840.113549.1.1.1"
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "4c2cd314-ec04-4a6e-a11c-45f0dd5d266f",
+      "name" : "AES-128-GCM",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "src/main/java/demo/CryptoDemo.java",
+            "line" : 24,
+            "offset" : 21,
+            "additionalContext" : "javax.crypto.Cipher#getInstance(Ljava/lang/String;)Ljavax/crypto/Cipher;"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "ae",
+          "parameterSetIdentifier" : "128",
+          "mode" : "gcm",
+          "cryptoFunctions" : [
+            "encrypt"
+          ]
+        },
+        "oid" : "2.16.840.1.101.3.4.1"
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "edbc89b7-b809-4944-bd8e-912a77f1bce7",
+      "name" : "AES-256",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "src/main/java/demo/CryptoDemo.java",
+            "line" : 20,
+            "offset" : 30,
+            "additionalContext" : "javax.crypto.KeyGenerator#getInstance(Ljava/lang/String;)Ljavax/crypto/KeyGenerator;"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "block-cipher",
+          "parameterSetIdentifier" : "256",
+          "cryptoFunctions" : [
+            "keygen"
+          ]
+        },
+        "oid" : "2.16.840.1.101.3.4.1"
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "3176b0d7-f219-45f3-922b-6b75de5b5b95",
+      "name" : "iv@3176b0d7-f219-45f3-922b-6b75de5b5b95",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "src/main/java/demo/CryptoDemo.java",
+            "line" : 25,
+            "offset" : 50,
+            "additionalContext" : "javax.crypto.spec.GCMParameterSpec#<init>(I[B)V"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "related-crypto-material",
+        "relatedCryptoMaterialProperties" : {
+          "type" : "initialization-vector",
+          "size" : 96
+        }
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "23acc1ae-e22f-4339-b7ad-5deb506661ac",
+      "name" : "SHA-256",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "src/main/java/demo/CryptoDemo.java",
+            "line" : 29,
+            "offset" : 28,
+            "additionalContext" : "java.security.MessageDigest#getInstance(Ljava/lang/String;)Ljava/security/MessageDigest;"
+          },
+          {
+            "location" : "src/main/java/demo/CryptoDemo.java",
+            "line" : 34,
+            "offset" : 24,
+            "additionalContext" : "java.security.Signature#getInstance(Ljava/lang/String;)Ljava/security/Signature;"
+          },
+          {
+            "location" : "src/main/java/demo/CryptoDemo.java",
+            "line" : 37,
+            "offset" : 22,
+            "additionalContext" : "javax.crypto.Cipher#getInstance(Ljava/lang/String;)Ljavax/crypto/Cipher;"
+          },
+          {
+            "location" : "src/main/java/demo/CryptoDemo.java",
+            "line" : 40,
+            "offset" : 34,
+            "additionalContext" : "javax.crypto.SecretKeyFactory#getInstance(Ljava/lang/String;)Ljavax/crypto/SecretKeyFactory;"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "hash",
+          "parameterSetIdentifier" : "256",
+          "cryptoFunctions" : [
+            "digest"
+          ]
+        },
+        "oid" : "2.16.840.1.101.3.4.2.1"
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "7bc5db73-4461-406b-abf9-9545a8532539",
+      "name" : "key@7bc5db73-4461-406b-abf9-9545a8532539",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "src/main/java/demo/CryptoDemo.java",
+            "line" : 12,
+            "offset" : 34,
+            "additionalContext" : "java.security.KeyPairGenerator#getInstance(Ljava/lang/String;)Ljava/security/KeyPairGenerator;"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "related-crypto-material",
+        "relatedCryptoMaterialProperties" : {
+          "type" : "secret-key",
+          "size" : 2048
+        }
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "02a3b13a-b7d6-4120-8362-4bcd8e1b168e",
+      "name" : "secret-key@02a3b13a-b7d6-4120-8362-4bcd8e1b168e",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "src/main/java/demo/CryptoDemo.java",
+            "line" : 20,
+            "offset" : 30,
+            "additionalContext" : "javax.crypto.KeyGenerator#getInstance(Ljava/lang/String;)Ljavax/crypto/KeyGenerator;"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "related-crypto-material",
+        "relatedCryptoMaterialProperties" : {
+          "type" : "secret-key",
+          "size" : 256
+        }
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "7cc55b40-76dd-4213-9c20-f55e60ab140f",
+      "name" : "key@7cc55b40-76dd-4213-9c20-f55e60ab140f",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "src/main/java/demo/CryptoDemo.java",
+            "line" : 16,
+            "offset" : 33,
+            "additionalContext" : "java.security.KeyPairGenerator#getInstance(Ljava/lang/String;)Ljava/security/KeyPairGenerator;"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "related-crypto-material",
+        "relatedCryptoMaterialProperties" : {
+          "type" : "secret-key"
+        }
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "f6e52369-9141-4d7e-a8dc-bf1b1ac55ef2",
+      "name" : "password@f6e52369-9141-4d7e-a8dc-bf1b1ac55ef2",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "src/main/java/demo/CryptoDemo.java",
+            "line" : 41,
+            "offset" : 34,
+            "additionalContext" : "javax.crypto.spec.PBEKeySpec#<init>([C[BII)V"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "related-crypto-material",
+        "relatedCryptoMaterialProperties" : {
+          "type" : "password",
+          "size" : 16
+        }
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "e5b199d2-3c3c-4e5f-906e-040636d33327",
+      "name" : "EC",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "src/main/java/demo/CryptoDemo.java",
+            "line" : 16,
+            "offset" : 33,
+            "additionalContext" : "java.security.KeyPairGenerator#getInstance(Ljava/lang/String;)Ljava/security/KeyPairGenerator;"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "pke",
+          "cryptoFunctions" : [
+            "keygen"
+          ]
+        }
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "59816e9b-6bbc-41a4-8c5a-e1715c7e5d4d",
+      "name" : "DES-56-CBC",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "src/main/java/demo/CryptoDemo.java",
+            "line" : 27,
+            "offset" : 24,
+            "additionalContext" : "javax.crypto.Cipher#getInstance(Ljava/lang/String;)Ljavax/crypto/Cipher;"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "block-cipher",
+          "parameterSetIdentifier" : "56",
+          "mode" : "cbc",
+          "padding" : "pkcs5"
+        }
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "76ecdadd-372d-4508-9b79-7e07770b5424",
+      "name" : "SHA-512",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "src/main/java/demo/CryptoDemo.java",
+            "line" : 32,
+            "offset" : 18,
+            "additionalContext" : "javax.crypto.Mac#getInstance(Ljava/lang/String;)Ljavax/crypto/Mac;"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "hash",
+          "parameterSetIdentifier" : "512",
+          "cryptoFunctions" : [
+            "digest"
+          ]
+        },
+        "oid" : "2.16.840.1.101.3.4.2.3"
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "91f7ad45-9d93-490c-9d0e-ec08c3e14494",
+      "name" : "EC-secp256r1",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "src/main/java/demo/CryptoDemo.java",
+            "line" : 17,
+            "offset" : 29,
+            "additionalContext" : "java.security.spec.ECGenParameterSpec#<init>(Ljava/lang/String;)V"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "pke",
+          "curve" : "secp256r1",
+          "cryptoFunctions" : [
+            "keygen"
+          ]
+        },
+        "oid" : "1.2.840.10045.2.1"
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "403d6e1c-e1c9-4534-84ac-db4fec16bcbe",
+      "name" : "MD5",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "src/main/java/demo/CryptoDemo.java",
+            "line" : 30,
+            "offset" : 28,
+            "additionalContext" : "java.security.MessageDigest#getInstance(Ljava/lang/String;)Ljava/security/MessageDigest;"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "hash",
+          "parameterSetIdentifier" : "128",
+          "cryptoFunctions" : [
+            "digest"
+          ]
+        }
+      }
+    }
+  ],
+  "dependencies" : [
+    {
+      "ref" : "7cc55b40-76dd-4213-9c20-f55e60ab140f",
+      "dependsOn" : [
+        "91f7ad45-9d93-490c-9d0e-ec08c3e14494"
+      ]
+    },
+    {
+      "ref" : "e7408a13-a14f-4e95-ba39-79b611008156",
+      "dependsOn" : [
+        "961775c5-f517-48a2-aec9-40b520215c59",
+        "f6e52369-9141-4d7e-a8dc-bf1b1ac55ef2",
+        "304f3c3d-c9b2-43b2-82fc-26f0d0e7d6a1"
+      ]
+    },
+    {
+      "ref" : "0c5514ad-e980-4b20-b507-5824e749acae",
+      "dependsOn" : [
+        "e5b199d2-3c3c-4e5f-906e-040636d33327"
+      ]
+    },
+    {
+      "ref" : "b607c73e-a94e-42f4-80d0-5e472ad4ac65",
+      "dependsOn" : [
+        "23acc1ae-e22f-4339-b7ad-5deb506661ac"
+      ]
+    },
+    {
+      "ref" : "7bc5db73-4461-406b-abf9-9545a8532539",
+      "dependsOn" : [
+        "2ece4e4d-f01a-4b4b-87da-b3410e1b644c"
+      ]
+    },
+    {
+      "ref" : "96a2a2ab-4a48-4a4c-afae-4651cbd047f3",
+      "dependsOn" : [
+        "0d33e2f8-7825-4bba-b3bd-55398da81f57",
+        "23acc1ae-e22f-4339-b7ad-5deb506661ac"
+      ]
+    },
+    {
+      "ref" : "02a3b13a-b7d6-4120-8362-4bcd8e1b168e",
+      "dependsOn" : [
+        "edbc89b7-b809-4944-bd8e-912a77f1bce7"
+      ]
+    },
+    {
+      "ref" : "93da1940-ec71-4a6d-aac7-736e9c77151c",
+      "dependsOn" : [
+        "23acc1ae-e22f-4339-b7ad-5deb506661ac"
+      ]
+    },
+    {
+      "ref" : "4c2cd314-ec04-4a6e-a11c-45f0dd5d266f",
+      "dependsOn" : [
+        "3176b0d7-f219-45f3-922b-6b75de5b5b95"
+      ]
+    },
+    {
+      "ref" : "02bc5e97-b0d4-4927-89cd-fb4b4d873883",
+      "dependsOn" : [
+        "76ecdadd-372d-4508-9b79-7e07770b5424"
+      ]
+    },
+    {
+      "ref" : "961775c5-f517-48a2-aec9-40b520215c59",
+      "dependsOn" : [
+        "93da1940-ec71-4a6d-aac7-736e9c77151c"
+      ]
+    }
+  ]
+}

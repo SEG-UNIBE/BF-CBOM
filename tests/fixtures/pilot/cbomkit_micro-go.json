@@ -1,0 +1,340 @@
+{
+  "bomFormat" : "CycloneDX",
+  "specVersion" : "1.6",
+  "serialNumber" : "urn:uuid:4cbfc4dc-7aca-43bb-8dfe-275f25fcfeb8",
+  "version" : 1,
+  "metadata" : {
+    "timestamp" : "2026-10-08T15:30:35Z",
+    "tools" : {
+      "services" : [
+        {
+          "provider" : {
+            "name" : "PQCA"
+          },
+          "name" : "CBOMkit"
+        }
+      ]
+    }
+  },
+  "components" : [
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "a7a44127-5874-408c-93f0-74b23c44c4ec",
+      "name" : "HMAC-SHA-512",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "main.go",
+            "line" : 44,
+            "offset" : 8,
+            "additionalContext" : "New"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "mac",
+          "cryptoFunctions" : [
+            "tag"
+          ]
+        },
+        "oid" : "1.2.840.113549.2.11"
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "50b3b9c5-affb-493a-a79e-611b80cdd831",
+      "name" : "DESede192-CBC",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "main.go",
+            "line" : 36,
+            "offset" : 16,
+            "additionalContext" : "NewTripleDESCipher"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "block-cipher",
+          "parameterSetIdentifier" : "192",
+          "mode" : "cbc"
+        }
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "c3a38c2f-33da-4b25-8c55-43cf7af7729e",
+      "name" : "RSA-OAEP",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "main.go",
+            "line" : 26,
+            "offset" : 14,
+            "additionalContext" : "GenerateKey"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "pke",
+          "parameterSetIdentifier" : "2048",
+          "padding" : "oaep"
+        },
+        "oid" : "1.2.840.113549.1.1.7"
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "4d3a8c66-bdf7-4fa5-a4bf-61c41aa83ca0",
+      "name" : "PBKDF2-SHA-256",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "main.go",
+            "line" : 56,
+            "offset" : 12,
+            "additionalContext" : "Key"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "kdf",
+          "parameterSetIdentifier" : "256"
+        }
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "ad4099da-322b-4b88-88be-4d4234f869fa",
+      "name" : "AES-GCM",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "main.go",
+            "line" : 31,
+            "offset" : 13,
+            "additionalContext" : "NewCipher"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "ae",
+          "parameterSetIdentifier" : "128",
+          "mode" : "gcm"
+        },
+        "oid" : "2.16.840.1.101.3.4.1"
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "40b242a7-39b3-4f62-833d-f6ff288b055a",
+      "name" : "SHA-256",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "main.go",
+            "line" : 56,
+            "offset" : 55
+          },
+          {
+            "location" : "main.go",
+            "line" : 52,
+            "offset" : 27,
+            "additionalContext" : "New"
+          },
+          {
+            "location" : "main.go",
+            "line" : 41,
+            "offset" : 11,
+            "additionalContext" : "Sum256"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "hash",
+          "parameterSetIdentifier" : "256",
+          "cryptoFunctions" : [
+            "digest"
+          ]
+        },
+        "oid" : "2.16.840.1.101.3.4.2.1"
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "31b337bf-c07d-42a7-84e9-5a97a5dd7085",
+      "name" : "RSA-2048",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "main.go",
+            "line" : 26,
+            "offset" : 14,
+            "additionalContext" : "GenerateKey"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "pke",
+          "parameterSetIdentifier" : "2048"
+        },
+        "oid" : "1.2.840.113549.1.1.1"
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "28622675-4be8-4708-95d6-b737add04d12",
+      "name" : "NATIVEPRNG",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "main.go",
+            "line" : 27,
+            "offset" : 48
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "drbg"
+        }
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "c745104b-f7ed-44ba-b7c5-2256e98f1c51",
+      "name" : "SHA-512",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "main.go",
+            "line" : 44,
+            "offset" : 17
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "hash",
+          "parameterSetIdentifier" : "512",
+          "cryptoFunctions" : [
+            "digest"
+          ]
+        },
+        "oid" : "2.16.840.1.101.3.4.2.3"
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "88eb8718-2f12-4793-9be4-6bfd52f8dd80",
+      "name" : "AES",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "main.go",
+            "line" : 31,
+            "offset" : 13,
+            "additionalContext" : "NewCipher"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "block-cipher",
+          "parameterSetIdentifier" : "128",
+          "mode" : "cbc"
+        }
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "2e05fca7-bae4-4741-98f0-de9072ab6bcc",
+      "name" : "ECDSA-secp256r1",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "main.go",
+            "line" : 27,
+            "offset" : 13,
+            "additionalContext" : "GenerateKey"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "signature",
+          "curve" : "secp256r1"
+        }
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "ed2d627b-6a94-42d2-a2f1-4518926a27c3",
+      "name" : "MD5",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "main.go",
+            "line" : 42,
+            "offset" : 9,
+            "additionalContext" : "Sum"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "hash",
+          "parameterSetIdentifier" : "128",
+          "cryptoFunctions" : [
+            "digest"
+          ]
+        }
+      }
+    }
+  ],
+  "dependencies" : [
+    {
+      "ref" : "2e05fca7-bae4-4741-98f0-de9072ab6bcc",
+      "dependsOn" : [
+        "28622675-4be8-4708-95d6-b737add04d12"
+      ]
+    },
+    {
+      "ref" : "a7a44127-5874-408c-93f0-74b23c44c4ec",
+      "dependsOn" : [
+        "c745104b-f7ed-44ba-b7c5-2256e98f1c51"
+      ]
+    },
+    {
+      "ref" : "c3a38c2f-33da-4b25-8c55-43cf7af7729e",
+      "dependsOn" : [
+        "40b242a7-39b3-4f62-833d-f6ff288b055a"
+      ]
+    },
+    {
+      "ref" : "4d3a8c66-bdf7-4fa5-a4bf-61c41aa83ca0",
+      "dependsOn" : [
+        "40b242a7-39b3-4f62-833d-f6ff288b055a"
+      ]
+    }
+  ]
+}

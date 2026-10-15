@@ -50,12 +50,15 @@ It also offers **benchmarking capabilities** to orchestrate batch CBOM generatio
 
 ### CBOM Generators Under Scrutiny
 
-BF-CBOM currently integrates five different CBOM generation approaches to enable side-by-side comparisons.
+BF-CBOM currently integrates eleven CBOM generator workers (plus two opt-in LLM providers) to enable side-by-side comparisons.
 Each generator brings a unique methodology for detecting and cataloging cryptographic assets:
 
 - **[`CBOMKit`](https://github.com/PQCA/cbomkit)**:
 IBM Research's dedicated CBOM generator for Python and Java, now maintained by the Post-Quantum Cryptography Alliance.
 Uses SonarQube for static analysis and supports compliance policy checks.
+
+- **`CBOMKit` action jar** ([cbomkit-action](https://github.com/cbomkit/cbomkit-action)):
+the same sonar-cryptography engine packaged as a standalone jar, run without the server and database and with the languages (Java, Python, Go) chosen per repository. Kept as a second worker so differences between the two packagings are measured; in agreement-based scoring both count as one voter (`voter_group` in `common/tools.yaml`).
 
 - **[`cdxgen`](https://github.com/CycloneDX/cdxgen)**:
 CycloneDX's official generator, primarily for SBOMs but with CBOM extensions since April 2024.
@@ -71,6 +74,26 @@ LLM-based approach: the worker clones the repository, selects source files that 
 
 - **[`CryptoScan`](https://github.com/csnp/cryptoscan)**:
 CyberSecurity NonProfit's pattern-based scanner (Apache-2.0) with a catalogue of 90+ crypto patterns across 15+ languages; emits CycloneDX 1.6 CBOMs with code locations.
+
+- **[`pqcheck`](https://github.com/Rafael-Ryu/pqcheck)**:
+tree-sitter scanner for Python and Go (Apache-2.0) with a bundled go/types analyser; native CycloneDX 1.6 with file and line per asset.
+
+- **[`Q-DARPAN`](https://github.com/RohanExploit/q-darpan)**:
+tree-sitter scanner for Java, Go and C/C++ (Apache-2.0), CycloneDX 1.7. Its locations live in custom properties; the worker copies them into `evidence.occurrences`.
+
+- **[`securin-xbom`](https://github.com/securin-public/securin-xbom)**:
+semgrep-rule scanner for Java and Python (Apache-2.0), CycloneDX 1.6. Runs strictly offline with its bundled rules so results do not depend on the semgrep registry.
+
+- **[`CipherRadar`](https://github.com/nk-sentinel/cipherradar)**:
+opengrep rules plus tree-sitter (`cradar` CLI, built from source), CycloneDX 1.7, many languages. Known crash on some Java EC parameter code is worked around automatically with `.cradarignore` and recorded in the result notes.
+
+- **[`xgrep`](https://mondoo.com/docs/xgrep/code-scanning/cbom)** (Mondoo):
+tree-sitter and data-flow scanner for Java, Python, Go and JS/TS, CycloneDX 1.6. Free of charge but proprietary: the worker fetches the pinned npm package at build time and the image is never published (it is outside the `docker-bake.hcl` default group). **Note:** Mondoo's terms reportedly forbid publishing benchmark results.
+
+**Not yet integrated, blocked on access:**
+
+- **[`SCANOSS crypto-finder`](https://github.com/scanoss/crypto-finder)** (GPL-2.0, opengrep-based): the openly published rule set contains almost no Java or Python rules (0/11 on the Java micro project in the pilot), so a worker built on it would say nothing about the tool for the languages BF-CBOM studies. The full rule set is served through the SCANOSS API and needs a key; a research key has been requested. The worker follows the same pattern as the others once the key is available.
+- **IBM Cryptoscope** ([Moffie et al., 2025](https://arxiv.org/abs/2503.19531)): a data-flow based CBOM generator for Java described in a paper; the implementation is not public. The artifact has been requested from the authors.
 
 ## Setup
 
@@ -275,6 +298,7 @@ This design creates decoupled interactions that make the framework flexible for 
 3. Start from `docker/Dockerfile.worker-skeleton` (or craft a bespoke Dockerfile if required).
 4. Register the worker service in `docker-compose.yml`, pointing at the new `env_file`.
 5. Append the worker name to the `AVAILABLE_WORKERS` list in the `Makefile` so shared targets pick it up.
+6. Add a bake target in `docker-bake.hcl` and an entry in `common/tools.yaml` (engine family, language scope), which the analysis uses to group tools that share an engine.
 
 ### Clean Rebuild
 
@@ -331,6 +355,9 @@ make experiment EXP=experiments/e0-smoke.yaml   # pin, mirror, enqueue, collect 
 make experiment-status NAME=e0-smoke
 make experiment-export NAME=e0-smoke            # -> exports/e0-smoke.zip, the only path to the host
 make corpus ARGS="--per-language 100"           # stratified GitHub corpus with pinned commits
+make experiment EXP=experiments/e0-micro.yaml   # every tool on the hand-written micro projects (corpus/micro)
+make analysis ARGS="micro e0-micro"             # recall/precision per tool against corpus/micro/ground_truth.yaml
+make analysis ARGS="sites e0-micro"             # location-aware agreement between tools (analysis/match.py)
 ```
 
-See `experiments/README.md` for the spec format. `make clean-docker` keeps the volumes; `docker compose down -v` removes them.
+See `experiments/README.md` for the spec format and `corpus/README.md` for the repository lists and fixtures (plain directories such as `corpus/micro/java` are published to the git server as deterministic commits). The offline analysis library lives in `analysis/`. `make clean-docker` keeps the volumes; `docker compose down -v` removes them.

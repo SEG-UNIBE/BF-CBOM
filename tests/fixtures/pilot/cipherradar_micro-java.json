@@ -1,0 +1,1799 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.7",
+  "version": 1,
+  "serialNumber": "urn:uuid:9e66854b-f8e9-43df-aa98-5688c71550ac",
+  "metadata": {
+    "timestamp": "2026-10-08T15:30:06Z",
+    "tools": [
+      {
+        "name": "CipherRadar",
+        "version": "dev",
+        "vendor": "nk-sentinel"
+      }
+    ]
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "crypto-library-import",
+      "description": "Cryptographic library import detected. This library is part of the project's cryptographic supply chain.\n",
+      "properties": [
+        {
+          "name": "severity",
+          "value": "info"
+        },
+        {
+          "name": "confidence",
+          "value": "high"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-java-crypto-library-import"
+        },
+        {
+          "name": "library",
+          "value": "bouncycastle-or-jca-or-spring-security-crypto-or-jjwt-or-nimbus-jose-jwt-or-jasypt-or-commons-codec-or-google-tink-or-jbcrypt-or-argon2-jvm"
+        },
+        {
+          "name": "fingerprint",
+          "value": "28ad4ab993cba511a8c92349fe55602fca2ecc90954d47cbb22f56738f9f8dd9"
+        },
+        {
+          "name": "detectionPass",
+          "value": "2"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 4
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "name": "jca-cipher-getinstance",
+      "description": "JCA Cipher.getInstance() cipher-spec detected",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "other"
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "info"
+        },
+        {
+          "name": "confidence",
+          "value": "high"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-java-jca-cipher-getinstance"
+        },
+        {
+          "name": "quantumStatus",
+          "value": "quantum-vulnerable"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "medium"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "Algorithm not recognized — review manually"
+        },
+        {
+          "name": "fingerprint",
+          "value": "2d36233d88130844b31ad4777f70b34ca01f594ec7dc92ff96f868dd3c047646"
+        },
+        {
+          "name": "detectionPass",
+          "value": "2"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 37
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "name": "ecb-mode-usage",
+      "description": "ECB mode used for block cipher. ECB does not provide semantic security — identical plaintext blocks produce identical ciphertext.\n",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "block-cipher",
+          "nistQuantumSecurityLevel": 1
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "medium"
+        },
+        {
+          "name": "confidence",
+          "value": "high"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-java-ecb-mode-usage"
+        },
+        {
+          "name": "quantumStatus",
+          "value": "quantum-safe"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "none"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "Algorithm not recognized — review manually"
+        },
+        {
+          "name": "fingerprint",
+          "value": "1eeec7042dd8f49aa939d42f919c4dd8e9911462eb1cf05875167835eb71ab18"
+        },
+        {
+          "name": "detectionPass",
+          "value": "2"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 37
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "name": "jca-cipher-getinstance",
+      "description": "JCA Cipher.getInstance() cipher-spec detected",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "other"
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "info"
+        },
+        {
+          "name": "confidence",
+          "value": "high"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-java-jca-cipher-getinstance"
+        },
+        {
+          "name": "quantumStatus",
+          "value": "broken"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "critical"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "Algorithm not recognized — review manually"
+        },
+        {
+          "name": "fingerprint",
+          "value": "2d36233d88130844b31ad4777f70b34ca01f594ec7dc92ff96f868dd3c047646"
+        },
+        {
+          "name": "detectionPass",
+          "value": "2"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 27
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "name": "jca-cipher-getinstance",
+      "description": "JCA Cipher.getInstance() cipher-spec detected",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "other",
+          "nistQuantumSecurityLevel": 1
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "info"
+        },
+        {
+          "name": "confidence",
+          "value": "high"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-java-jca-cipher-getinstance"
+        },
+        {
+          "name": "quantumStatus",
+          "value": "quantum-safe"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "none"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "Algorithm not recognized — review manually"
+        },
+        {
+          "name": "fingerprint",
+          "value": "2d36233d88130844b31ad4777f70b34ca01f594ec7dc92ff96f868dd3c047646"
+        },
+        {
+          "name": "detectionPass",
+          "value": "2"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 24
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "name": "jca-keygenerator-getinstance",
+      "description": "JCA KeyGenerator.getInstance() algorithm detected",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "block-cipher",
+          "nistQuantumSecurityLevel": 1
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "info"
+        },
+        {
+          "name": "confidence",
+          "value": "high"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-java-jca-keygenerator-getinstance"
+        },
+        {
+          "name": "quantumStatus",
+          "value": "quantum-safe"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "none"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "Algorithm not recognized — review manually"
+        },
+        {
+          "name": "fingerprint",
+          "value": "e27d601e8490809f406e8d562e8a69ace9f403a73d3a75ec5f79dd473ab14b6d"
+        },
+        {
+          "name": "detectionPass",
+          "value": "2"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 20
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "name": "bc-curve-p-256-secp256r1",
+      "description": "EC curve P-256 (secp256r1) detected",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "key-agree",
+          "parameterSetIdentifier": "256",
+          "classicalSecurityLevel": 256
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "info"
+        },
+        {
+          "name": "confidence",
+          "value": "high"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-java-bc-curve-p-256-secp256r1"
+        },
+        {
+          "name": "quantumStatus",
+          "value": "quantum-vulnerable"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "critical"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "Algorithm not recognized — review manually"
+        },
+        {
+          "name": "fingerprint",
+          "value": "687b9d5f8e761ba04782619137bf748c4a3f570cdd48b00c983dbe83307d49c0"
+        },
+        {
+          "name": "detectionPass",
+          "value": "2"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 17
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "name": "ec-curve-from-ecgenparameterspec",
+      "description": "EC key generation with named curve detected via ECGenParameterSpec. The curve parameter determines the key strength and quantum vulnerability.\n",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "signature"
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "info"
+        },
+        {
+          "name": "confidence",
+          "value": "high"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-java-ec-curve-from-ecgenparameterspec"
+        },
+        {
+          "name": "quantumStatus",
+          "value": "quantum-vulnerable"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "high"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "Algorithm not recognized — review manually"
+        },
+        {
+          "name": "fingerprint",
+          "value": "606619c8adea0236388bfff35be1d0b76afff2f798388883470773ca2a0c05b9"
+        },
+        {
+          "name": "detectionPass",
+          "value": "2"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 17
+          }
+        ]
+      }
+    },
+    {
+      "type": "library",
+      "name": "crypto-library-import",
+      "description": "Cryptographic library import detected. This library is part of the project's cryptographic supply chain.\n",
+      "properties": [
+        {
+          "name": "severity",
+          "value": "info"
+        },
+        {
+          "name": "confidence",
+          "value": "high"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-java-crypto-library-import"
+        },
+        {
+          "name": "library",
+          "value": "bouncycastle-or-jca-or-spring-security-crypto-or-jjwt-or-nimbus-jose-jwt-or-jasypt-or-commons-codec-or-google-tink-or-jbcrypt-or-argon2-jvm"
+        },
+        {
+          "name": "fingerprint",
+          "value": "a1d0983991fe3bd75f73a8f5eb4159786bfe608128fb4685187254323a3df428"
+        },
+        {
+          "name": "detectionPass",
+          "value": "2"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 6
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "FIND-1",
+      "name": "RSA",
+      "description": "Algorithm reference \"RSA\" detected via regex",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "pke",
+          "algorithmFamily": "RSASSA-PKCS1"
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "info"
+        },
+        {
+          "name": "confidence",
+          "value": "low"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-regex-algo-rsa"
+        },
+        {
+          "name": "quantumStatus",
+          "value": "quantum-vulnerable"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "critical"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "Migrate to ML-KEM (encryption) or ML-DSA (signatures)"
+        },
+        {
+          "name": "cradar:quantum:migrationTarget",
+          "value": "ML-KEM (FIPS 203) for key establishment; ML-DSA (FIPS 204) for signatures"
+        },
+        {
+          "name": "fingerprint",
+          "value": "06ae1bc1728bb1aafd0d2c02ebdc2e5d2a47620b0220101e8c2ede13b5b20c3e"
+        },
+        {
+          "name": "detectionPass",
+          "value": "1"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 12
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "FIND-10",
+      "name": "SHA-256",
+      "description": "Algorithm reference \"SHA-256\" detected via regex",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "hash",
+          "algorithmFamily": "SHA-2"
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "info"
+        },
+        {
+          "name": "confidence",
+          "value": "low"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-regex-algo-sha-256"
+        },
+        {
+          "name": "quantumStatus",
+          "value": "quantum-safe"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "none"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "Algorithm not recognized — review manually"
+        },
+        {
+          "name": "fingerprint",
+          "value": "014586e8b80410f67f1002133e7e21a93c051f357bf4162985774f50fba09dbd"
+        },
+        {
+          "name": "detectionPass",
+          "value": "1"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 29
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "FIND-11",
+      "name": "MD5",
+      "description": "Hash function MD5 via MessageDigest.getInstance()",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "hash",
+          "algorithmFamily": "MD5",
+          "cryptoFunctions": [
+            "digest"
+          ]
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "high"
+        },
+        {
+          "name": "confidence",
+          "value": "high"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-java-jca-digest-md5"
+        },
+        {
+          "name": "quantumStatus",
+          "value": "broken"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "critical"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "Do not use — collision attacks practical since 2004"
+        },
+        {
+          "name": "cradar:quantum:migrationTarget",
+          "value": "SHA-256 or SHA-3 (FIPS 202)"
+        },
+        {
+          "name": "fingerprint",
+          "value": "f917ea54be3a6f92cac50524a65915b31e08e7a23b6a3cf1d2bd827572cd4303"
+        },
+        {
+          "name": "detectionPass",
+          "value": "1"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 30
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "FIND-12",
+      "name": "MD5",
+      "description": "Algorithm reference \"MD5\" detected via regex",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "hash",
+          "algorithmFamily": "MD5"
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "medium"
+        },
+        {
+          "name": "confidence",
+          "value": "low"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-regex-algo-md5"
+        },
+        {
+          "name": "quantumStatus",
+          "value": "broken"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "critical"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "Do not use — collision attacks practical since 2004"
+        },
+        {
+          "name": "cradar:quantum:migrationTarget",
+          "value": "SHA-256 or SHA-3 (FIPS 202)"
+        },
+        {
+          "name": "fingerprint",
+          "value": "e1b74b968594999f2655dd8cc290b6203279cf8bf9f6a130135c5c37e75061fc"
+        },
+        {
+          "name": "detectionPass",
+          "value": "1"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 30
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "FIND-13",
+      "name": "HmacSHA512",
+      "description": "MAC HmacSHA512 via Mac.getInstance()",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "mac",
+          "algorithmFamily": "HMAC",
+          "cryptoFunctions": [
+            "tag"
+          ],
+          "nistQuantumSecurityLevel": 1
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "info"
+        },
+        {
+          "name": "confidence",
+          "value": "high"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-java-jca-mac-hmacsha512"
+        },
+        {
+          "name": "quantumStatus",
+          "value": "quantum-safe"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "none"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "HMAC inherits the underlying hash's PQ strength"
+        },
+        {
+          "name": "fingerprint",
+          "value": "c2df03e7ccbdbcc2b185de7100b629aab3e4d7277ae16925bf038175a7bcc322"
+        },
+        {
+          "name": "detectionPass",
+          "value": "1"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 32
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "FIND-14",
+      "name": "SHA512",
+      "description": "Hash SHA512 (extracted from HMAC HmacSHA512)",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "hash",
+          "algorithmFamily": "SHA-2",
+          "cryptoFunctions": [
+            "digest"
+          ],
+          "nistQuantumSecurityLevel": 5
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "info"
+        },
+        {
+          "name": "confidence",
+          "value": "high"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-java-jca-hash-sha512"
+        },
+        {
+          "name": "quantumStatus",
+          "value": "quantum-safe"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "none"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "256-bit PQ security"
+        },
+        {
+          "name": "fingerprint",
+          "value": "43c6d07246f98a25c0c781bbb6c0d65f5190bfef60da1b982ed61a4ed279dc6e"
+        },
+        {
+          "name": "detectionPass",
+          "value": "1"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 32
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "FIND-15",
+      "name": "SHA256 ",
+      "description": "Hash SHA256  (extracted from signature SHA256 with ECDSA)",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "hash",
+          "algorithmFamily": "SHA-2",
+          "cryptoFunctions": [
+            "digest"
+          ],
+          "nistQuantumSecurityLevel": 1
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "info"
+        },
+        {
+          "name": "confidence",
+          "value": "medium"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-java-jca-hash-sha256 "
+        },
+        {
+          "name": "quantumStatus",
+          "value": "quantum-safe"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "none"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "128-bit PQ security; adequate"
+        },
+        {
+          "name": "fingerprint",
+          "value": "20f1b9d72d6c6bc3142b2625b315346f04f5404586fdcf821b9c4761566bdb78"
+        },
+        {
+          "name": "detectionPass",
+          "value": "1"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 34
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "FIND-16",
+      "name": "SHA256 with ECDSA",
+      "description": "Signature SHA256withECDSA via Signature.getInstance()",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "signature",
+          "algorithmFamily": "ECDSA",
+          "cryptoFunctions": [
+            "sign"
+          ]
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "info"
+        },
+        {
+          "name": "confidence",
+          "value": "medium"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-java-jca-signature-sha256withecdsa"
+        },
+        {
+          "name": "quantumStatus",
+          "value": "quantum-vulnerable"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "high"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "Migrate to ML-DSA"
+        },
+        {
+          "name": "cradar:quantum:migrationTarget",
+          "value": "ML-DSA (FIPS 204) or SLH-DSA (FIPS 205)"
+        },
+        {
+          "name": "fingerprint",
+          "value": "2d3281ab7b813100f17c135caa41adbde465a4f59d03f7f040c37604b316889e"
+        },
+        {
+          "name": "detectionPass",
+          "value": "1"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 34
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "FIND-17",
+      "name": "SHA-256",
+      "description": "Hash SHA-256 (extracted from OAEP padding)",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "hash",
+          "algorithmFamily": "SHA-2",
+          "cryptoFunctions": [
+            "digest"
+          ],
+          "nistQuantumSecurityLevel": 1
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "info"
+        },
+        {
+          "name": "confidence",
+          "value": "high"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-java-jca-oaep-hash-sha-256"
+        },
+        {
+          "name": "quantumStatus",
+          "value": "quantum-safe"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "none"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "128-bit PQ security; adequate"
+        },
+        {
+          "name": "fingerprint",
+          "value": "0c5161180e590f6396858cb46c6a0c9c032690b08d0ae7f04849270ff12474af"
+        },
+        {
+          "name": "detectionPass",
+          "value": "1"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 37
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "FIND-18",
+      "name": "RSA-ECB/OAEPWithSHA-256AndMGF1Padding",
+      "description": "Cipher RSA/ECB/OAEPWithSHA-256AndMGF1Padding via Cipher.getInstance()",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "block-cipher",
+          "algorithmFamily": "RSASSA-PKCS1",
+          "mode": "ecb",
+          "padding": "oaep",
+          "cryptoFunctions": [
+            "encrypt"
+          ]
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "high"
+        },
+        {
+          "name": "confidence",
+          "value": "high"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-java-jca-cipher-rsa-ecb"
+        },
+        {
+          "name": "quantumStatus",
+          "value": "quantum-vulnerable"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "medium"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "Migrate to ML-KEM (encryption) or ML-DSA (signatures)"
+        },
+        {
+          "name": "cradar:quantum:migrationTarget",
+          "value": "ML-KEM (FIPS 203) for key establishment; ML-DSA (FIPS 204) for signatures"
+        },
+        {
+          "name": "fingerprint",
+          "value": "cbe94e49c665bbe18a8d2325a0d3a1bab43f96a4344a15b19ec80f400eb40d9f"
+        },
+        {
+          "name": "detectionPass",
+          "value": "1"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 37
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "FIND-19",
+      "name": "RSA",
+      "description": "Algorithm reference \"RSA\" detected via regex",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "pke",
+          "algorithmFamily": "RSASSA-PKCS1"
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "info"
+        },
+        {
+          "name": "confidence",
+          "value": "low"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-regex-algo-rsa"
+        },
+        {
+          "name": "quantumStatus",
+          "value": "quantum-vulnerable"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "critical"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "Migrate to ML-KEM (encryption) or ML-DSA (signatures)"
+        },
+        {
+          "name": "cradar:quantum:migrationTarget",
+          "value": "ML-KEM (FIPS 203) for key establishment; ML-DSA (FIPS 204) for signatures"
+        },
+        {
+          "name": "fingerprint",
+          "value": "a822d165fd6549e0b063f18c1d370bb1bad7cd5c35d83505c80d8b33bf325c05"
+        },
+        {
+          "name": "detectionPass",
+          "value": "1"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 37
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "FIND-2",
+      "name": "RSA-2048",
+      "description": "Key pair generation using RSA via KeyPairGenerator.getInstance()",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "pke",
+          "algorithmFamily": "RSASSA-PKCS1",
+          "parameterSetIdentifier": "2048",
+          "cryptoFunctions": [
+            "generate"
+          ],
+          "classicalSecurityLevel": 2048
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "info"
+        },
+        {
+          "name": "confidence",
+          "value": "high"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-java-jca-keypairgen-rsa"
+        },
+        {
+          "name": "quantumStatus",
+          "value": "quantum-vulnerable"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "critical"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "Migrate to ML-KEM (encryption) or ML-DSA (signatures)"
+        },
+        {
+          "name": "cradar:quantum:migrationTarget",
+          "value": "ML-KEM (FIPS 203) for key establishment; ML-DSA (FIPS 204) for signatures"
+        },
+        {
+          "name": "fingerprint",
+          "value": "54f7b1a2f0c41d07ef30b341e4448e21a2f3d618f00ecdaa85361b24af330568"
+        },
+        {
+          "name": "detectionPass",
+          "value": "1"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 12
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "FIND-20",
+      "name": "SHA256",
+      "description": "Hash SHA256 (extracted from KDF PBKDF2WithHmacSHA256)",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "hash",
+          "algorithmFamily": "SHA-2",
+          "cryptoFunctions": [
+            "digest"
+          ],
+          "nistQuantumSecurityLevel": 1
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "info"
+        },
+        {
+          "name": "confidence",
+          "value": "high"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-java-jca-hash-sha256"
+        },
+        {
+          "name": "quantumStatus",
+          "value": "quantum-safe"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "none"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "128-bit PQ security; adequate"
+        },
+        {
+          "name": "fingerprint",
+          "value": "72bedfef695095ff4468cb9c982194d4a6a37acd1e568a603c1d66ebb8600cf3"
+        },
+        {
+          "name": "detectionPass",
+          "value": "1"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 40
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "FIND-21",
+      "name": "PBKDF2",
+      "description": "PBKDF2 via SecretKeyFactory.getInstance(\"PBKDF2WithHmacSHA256\")",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "kdf",
+          "algorithmFamily": "PBKDF2",
+          "cryptoFunctions": [
+            "keyderive"
+          ],
+          "nistQuantumSecurityLevel": 1
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "info"
+        },
+        {
+          "name": "confidence",
+          "value": "high"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-java-jca-secretkeyfactory-pbkdf2"
+        },
+        {
+          "name": "quantumStatus",
+          "value": "quantum-safe"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "none"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "Use ≥600k iterations + SHA-256 minimum"
+        },
+        {
+          "name": "fingerprint",
+          "value": "b5a38dbb50b45395e127e8c219b37811390c24472a6b5b3d1a97f178ae13233c"
+        },
+        {
+          "name": "detectionPass",
+          "value": "1"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 40
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "FIND-22",
+      "name": "PBKDF2",
+      "description": "PBKDF2 key derivation via new PBEKeySpec()",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "kdf",
+          "algorithmFamily": "PBKDF2",
+          "cryptoFunctions": [
+            "keyderive"
+          ],
+          "nistQuantumSecurityLevel": 1
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "info"
+        },
+        {
+          "name": "confidence",
+          "value": "high"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-java-jca-pbekeyspec-pbkdf2"
+        },
+        {
+          "name": "quantumStatus",
+          "value": "quantum-safe"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "none"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "Use ≥600k iterations + SHA-256 minimum"
+        },
+        {
+          "name": "fingerprint",
+          "value": "81efd1eeb78a205941d318f3169e69c953ff4fb0fa7d4b4904f58f93b44e9771"
+        },
+        {
+          "name": "detectionPass",
+          "value": "1"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 41
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "FIND-3",
+      "name": "EC",
+      "description": "Key pair generation using EC via KeyPairGenerator.getInstance()",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "pke",
+          "algorithmFamily": "ECDSA",
+          "cryptoFunctions": [
+            "generate"
+          ]
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "info"
+        },
+        {
+          "name": "confidence",
+          "value": "high"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-java-jca-keypairgen-ec"
+        },
+        {
+          "name": "quantumStatus",
+          "value": "quantum-vulnerable"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "critical"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "Migrate to ML-KEM (key agreement) or ML-DSA (signatures)"
+        },
+        {
+          "name": "cradar:quantum:migrationTarget",
+          "value": "ML-KEM (FIPS 203) for key establishment; ML-DSA (FIPS 204) for signatures"
+        },
+        {
+          "name": "fingerprint",
+          "value": "b731adc5a29d8c0df9fdf7760cd4a1d52772e37feef38b92d50bec795f9e4e66"
+        },
+        {
+          "name": "detectionPass",
+          "value": "1"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 16
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "FIND-4",
+      "name": "EC-secp256r1",
+      "description": "EC key with curve secp256r1 via ECGenParameterSpec",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "pke",
+          "algorithmFamily": "ECDSA",
+          "parameterSetIdentifier": "256",
+          "cryptoFunctions": [
+            "generate"
+          ],
+          "classicalSecurityLevel": 256
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "info"
+        },
+        {
+          "name": "confidence",
+          "value": "high"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-java-jca-ec-curve-secp256r1"
+        },
+        {
+          "name": "quantumStatus",
+          "value": "quantum-vulnerable"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "critical"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "Migrate to ML-KEM (key agreement) or ML-DSA (signatures)"
+        },
+        {
+          "name": "cradar:quantum:migrationTarget",
+          "value": "ML-KEM (FIPS 203) for key establishment; ML-DSA (FIPS 204) for signatures"
+        },
+        {
+          "name": "fingerprint",
+          "value": "02c1a748a4304621bd86bb7a8e1a1d2cc7087fcbab0bd6067f5ed8effeb43ec2"
+        },
+        {
+          "name": "detectionPass",
+          "value": "1"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 17
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "FIND-5",
+      "name": "AES-256",
+      "description": "Symmetric key generation for AES via KeyGenerator.getInstance()",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "block-cipher",
+          "algorithmFamily": "AES",
+          "parameterSetIdentifier": "256",
+          "cryptoFunctions": [
+            "generate"
+          ],
+          "classicalSecurityLevel": 256,
+          "nistQuantumSecurityLevel": 1
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "info"
+        },
+        {
+          "name": "confidence",
+          "value": "high"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-java-jca-keygen-aes"
+        },
+        {
+          "name": "quantumStatus",
+          "value": "quantum-safe"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "none"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "AES is quantum-safe; prefer AES-256 for PQ margin"
+        },
+        {
+          "name": "fingerprint",
+          "value": "df9a1ca4d497e32d651d3e3f0b01e37d31a8de1a7f89747f285bc2b34be090fa"
+        },
+        {
+          "name": "detectionPass",
+          "value": "1"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 20
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "FIND-6",
+      "name": "AES-GCM/NoPadding",
+      "description": "Cipher AES/GCM/NoPadding via Cipher.getInstance()",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "ae",
+          "algorithmFamily": "AES",
+          "mode": "gcm",
+          "padding": "raw",
+          "cryptoFunctions": [
+            "encrypt"
+          ],
+          "nistQuantumSecurityLevel": 1
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "info"
+        },
+        {
+          "name": "confidence",
+          "value": "high"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-java-jca-cipher-aes-gcm"
+        },
+        {
+          "name": "quantumStatus",
+          "value": "quantum-safe"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "none"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "AES is quantum-safe; prefer AES-256 for PQ margin"
+        },
+        {
+          "name": "fingerprint",
+          "value": "7131253a092fdf189be15595270ca15c9a3a94c31058163a54a9440762d1f4ac"
+        },
+        {
+          "name": "detectionPass",
+          "value": "1"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 24
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "FIND-7",
+      "name": "DES-CBC/PKCS5Padding",
+      "description": "Cipher DES/CBC/PKCS5Padding via Cipher.getInstance()",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "block-cipher",
+          "algorithmFamily": "DES",
+          "mode": "cbc",
+          "padding": "pkcs5",
+          "cryptoFunctions": [
+            "encrypt"
+          ]
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "high"
+        },
+        {
+          "name": "confidence",
+          "value": "high"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-java-jca-cipher-des-cbc"
+        },
+        {
+          "name": "quantumStatus",
+          "value": "broken"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "critical"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "Do not use — 56-bit key is trivially brutable"
+        },
+        {
+          "name": "cradar:quantum:migrationTarget",
+          "value": "AES-256 (FIPS 197)"
+        },
+        {
+          "name": "fingerprint",
+          "value": "f421968a8469c43a1e999ee68c18c0898986b923f63e726ac4d25c5bd3d704b9"
+        },
+        {
+          "name": "detectionPass",
+          "value": "1"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 27
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "FIND-8",
+      "name": "DES",
+      "description": "Algorithm reference \"DES\" detected via regex",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "block-cipher",
+          "algorithmFamily": "DES"
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "medium"
+        },
+        {
+          "name": "confidence",
+          "value": "low"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-regex-algo-des"
+        },
+        {
+          "name": "quantumStatus",
+          "value": "broken"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "critical"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "Do not use — 56-bit key is trivially brutable"
+        },
+        {
+          "name": "cradar:quantum:migrationTarget",
+          "value": "AES-256 (FIPS 197)"
+        },
+        {
+          "name": "fingerprint",
+          "value": "62d39f4c44589abc4acae436ff042a32297367ee5320ba5e8e7461d0f681cad5"
+        },
+        {
+          "name": "detectionPass",
+          "value": "1"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 27
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "FIND-9",
+      "name": "SHA-256",
+      "description": "Hash function SHA-256 via MessageDigest.getInstance()",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "hash",
+          "algorithmFamily": "SHA-2",
+          "cryptoFunctions": [
+            "digest"
+          ],
+          "nistQuantumSecurityLevel": 1
+        }
+      },
+      "properties": [
+        {
+          "name": "severity",
+          "value": "info"
+        },
+        {
+          "name": "confidence",
+          "value": "high"
+        },
+        {
+          "name": "ruleId",
+          "value": "cbom-java-jca-digest-sha256"
+        },
+        {
+          "name": "quantumStatus",
+          "value": "quantum-safe"
+        },
+        {
+          "name": "cradar:quantum:priority",
+          "value": "none"
+        },
+        {
+          "name": "cradar:quantum:recommendation",
+          "value": "128-bit PQ security; adequate"
+        },
+        {
+          "name": "fingerprint",
+          "value": "7a5406ccc5b4f11cc9f601bd74c49826de3b77aaded09de99f155d168fa6597d"
+        },
+        {
+          "name": "detectionPass",
+          "value": "1"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 29
+          }
+        ]
+      }
+    }
+  ]
+}

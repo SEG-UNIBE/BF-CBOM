@@ -200,3 +200,59 @@ def test_mirror_lock_plan_and_write(upstream, tmp_path: Path):
     assert (len(jobs3), skipped3) == (7, 1)  # the failed run is redone, the ok one kept
     assert not jobs[1].paths(exp_dir)[1].exists()
     assert ex.summarize(exp_dir) == {"name": "e", "stored_runs": 1, "per_tool": {"t1": {"ok": 1}}}
+
+
+# ----- fixtures published from plain directories -----
+
+
+def test_publish_fixture_is_deterministic_and_resolvable(tmp_path: Path):
+    src = tmp_path / "micro"
+    (src / "pkg").mkdir(parents=True)
+    (src / "pkg" / "a.py").write_text("import hashlib\n")
+    mirror = tmp_path / "mirror"
+    spec = ex.RepoSpec(full_name="bfcbom/micro-x", path=str(src))
+    sha1 = ex.publish_fixture(spec, mirror_dir=mirror)
+    sha_again = ex.publish_fixture(spec, mirror_dir=mirror)
+    assert sha1 == sha_again and len(sha1) == 40
+    assert spec.source_url == f"fixture:{src}"
+    # same content from another directory (e.g. another machine) -> same SHA (author, date, message are fixed)
+    other = tmp_path / "copy"
+    other.mkdir()
+    (other / "pkg").mkdir()
+    (other / "pkg" / "a.py").write_text("import hashlib\n")
+    assert ex.publish_fixture(ex.RepoSpec(full_name="bfcbom/micro-x", path=str(other)), mirror_dir=mirror) == sha1
+    # changed content -> new SHA, published into the existing mirror
+    (src / "pkg" / "a.py").write_text("import hmac\n")
+    sha2 = ex.publish_fixture(spec, mirror_dir=mirror)
+    assert sha2 != sha1
+    bare = ex.mirror_path("bfcbom/micro-x", mirror)
+    assert _git("rev-parse", "refs/heads/main", cwd=bare) == sha2
+    assert _git("cat-file", "-t", sha1, cwd=bare) == "commit"
+
+    # an experiment spec with `path:` relative to the spec file
+    spec_file = tmp_path / "exp" / "e.yaml"
+    spec_file.parent.mkdir()
+    spec_file.write_text(
+        yaml.safe_dump(
+            {"name": "e-fix", "tools": ["cdxgen"], "repos": [{"full_name": "bfcbom/micro-x", "path": "../micro"}]}
+        )
+    )
+    loaded = ex.load_spec(spec_file)
+    assert loaded.repos[0].path == str(src.resolve()) and loaded.repos[0].is_fixture
+    exp_dir = tmp_path / "results" / "e-fix"
+    snaps = ex.resolve_snapshots(loaded, exp_dir, mirror_dir=mirror, server_url="http://gs", log=lambda m: None)
+    assert [s.commit for s in snaps] == [sha2]
+    assert snaps[0].scan_url == f"http://gs/bfcbom/micro-x--{sha2[:12]}.git"
+    scan = ex.scan_repo_path("bfcbom/micro-x", sha2, mirror)
+    assert _git("rev-parse", "HEAD", cwd=scan) == sha2
+    # the lock keeps the commit even if the fixture changes again
+    (src / "pkg" / "a.py").write_text("import ssl\n")
+    snaps2 = ex.resolve_snapshots(loaded, exp_dir, mirror_dir=mirror, server_url="http://gs", log=lambda m: None)
+    assert snaps2[0].commit == sha2
+
+
+def test_spec_rejects_path_with_commit_or_url():
+    with pytest.raises(ex.ExperimentError):
+        ex.spec_from_dict(
+            {"name": "ok", "tools": ["x"], "repos": [{"full_name": "a/b", "path": "p", "commit": "a" * 40}]}
+        )

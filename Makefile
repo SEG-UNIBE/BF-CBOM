@@ -2,7 +2,7 @@
 VERSION := $(shell cat VERSION 2>/dev/null || echo "0.0.0")
 BASE_IMAGE := bf-cbom/base
 # Comma-separated list of all workers available in the repo
-AVAILABLE_WORKERS := skeleton,testing,mssbomtool,cbomkit,cdxgen,cryptobomforge,deepseek,cryptoscan,chatgpt,claude
+AVAILABLE_WORKERS := skeleton,testing,mssbomtool,cbomkit,cdxgen,cryptobomforge,deepseek,cryptoscan,chatgpt,claude,pqcheck,qdarpan,securin-xbom,cipherradar,xgrep,cbomkit-jar
 # Comma-separated list of dev-only workers
 DEV_WORKERS := skeleton,testing,mssbomtool
 # Export everything defined above to downstream commands for cross-shell support
@@ -107,6 +107,10 @@ corpus-export:
 	mkdir -p exports
 	docker compose run --rm -v "$(CURDIR)/exports:/export" runner sh -c 'cp /data/results/corpus/*.yaml /export/'
 
+# make analysis ARGS="micro e0-micro"  /  ARGS="sites e0-micro"  -> results volume: <exp>/analysis/
+analysis:
+	docker compose run --rm --no-deps runner analysis $(ARGS)
+
 logs:
 	docker compose logs -f
 
@@ -125,7 +129,7 @@ $(ENV_DIR)/%.env: $(ENV_DIR)/%.env.template
 	@$(ENSURE_ENV_SCRIPT) $< $@
 
 .PHONY: clean-docker build-base build-all release up-dev up-prod up-prod-pull up-all down logs ps show-workers \
-	experiment experiment-status experiment-list experiment-export corpus corpus-export clean-cache
+	experiment experiment-status experiment-list experiment-export corpus corpus-export analysis clean-cache
 
 # Frees Docker's build cache and dangling images (safe: volumes and tagged images are kept).
 # Repeated rebuilds of the large worker images fill the Docker VM disk ("No space left on device").

@@ -26,7 +26,7 @@ from .models import RepoInfo, Trace
 
 logger = logging.getLogger(__name__)
 
-PROMPT_VERSION = "2026-10-15.1"
+PROMPT_VERSION = "2026-10-15.2"  # prompt + file-selection version (recorded in the CBOM metadata)
 
 LLM_MAX_FILES = int(os.getenv("LLM_MAX_FILES", "40"))
 LLM_MAX_CHUNK_CHARS = int(os.getenv("LLM_MAX_CHUNK_CHARS", "40000"))  # ~10k tokens of code per request
@@ -37,6 +37,9 @@ LLM_MAX_FILE_BYTES = int(os.getenv("LLM_MAX_FILE_BYTES", "400000"))
 SOURCE_EXTENSIONS: dict[str, set[str]] = {
     "python": {".py"},
     "java": {".java", ".kt", ".scala"},
+    "go": {".go"},
+    "javascript": {".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx"},
+    "c": {".c", ".h", ".cc", ".cpp", ".hpp", ".cxx"},
 }
 SKIP_DIRS = {
     ".git", ".hg", ".svn", "node_modules", "build", "dist", "target", "out", ".venv", "venv", "env", "__pycache__",
@@ -58,6 +61,25 @@ CRYPTO_API_PATTERNS: dict[str, re.Pattern] = {
         r"SSLContext|SSLSocket|TrustManager|X509|Certificate|CertificateFactory|SecretKeySpec|IvParameterSpec|GCMParameterSpec|"
         r"PBEKeySpec|SecretKeyFactory|RSAPublicKey|ECGenParameterSpec|Argon2|BCrypt|SCrypt|PBKDF2|HmacSHA|SHA-?\d|MD5|AES|RSA|"
         r"ECDSA|Ed25519|X25519|ChaCha20|TLS)\b"
+    ),
+    "go": re.compile(
+        r"\b(crypto/(aes|cipher|des|dsa|ecdsa|ecdh|ed25519|elliptic|hmac|md5|rand|rc4|rsa|sha1|sha256|sha3|sha512|"
+        r"subtle|tls|x509)|golang\.org/x/crypto|filippo\.io|cloudflare/circl|crypto\.SHA\d+|rsa\.|ecdsa\.|ed25519\.|"
+        r"aes\.|cipher\.|hmac\.|sha256\.|sha512\.|md5\.|pbkdf2\.|scrypt\.|argon2\.|hkdf\.|chacha20|nacl|tls\.Config|"
+        r"x509\.|GenerateKey|NewGCM|NewCBC|NewCTR|Sum256|Sum512)\b"
+    ),
+    "javascript": re.compile(
+        r"\b(crypto|node:crypto|webcrypto|subtle|crypto-js|jsonwebtoken|jose|bcrypt(js)?|argon2|tweetnacl|libsodium|"
+        r"sodium-native|forge|elliptic|secp256k1|noble|createHash|createHmac|createCipheriv|createDecipheriv|createSign|"
+        r"createVerify|generateKeyPair(Sync)?|publicEncrypt|privateDecrypt|pbkdf2(Sync)?|scrypt(Sync)?|hkdf(Sync)?|"
+        r"randomBytes|sign|verify|encrypt|decrypt|digest|importKey|exportKey|deriveKey|deriveBits|SHA-?\d+|MD5|AES|RSA|"
+        r"ECDSA|Ed25519|X25519|HMAC|TLS|https)\b"
+    ),
+    "c": re.compile(
+        r"\b(openssl/|EVP_[A-Za-z0-9_]+|RAND_bytes|HMAC(_[A-Za-z]+)?|SHA\d*_(Init|Update|Final)|MD5_(Init|Update|Final)|"
+        r"AES_[a-z_]+|RSA_[a-z_]+|EC_KEY_[a-z_]+|ECDSA_[a-z_]+|PKCS5_PBKDF2_HMAC|X509_[a-z_]+|SSL_CTX_[a-z_]+|SSL_[a-z_]+|"
+        r"gcrypt|gnutls|mbedtls_[a-z0-9_]+|wolfSSL|sodium_[a-z_]+|crypto_[a-z0-9_]+|br_[a-z0-9_]+|nettle_[a-z0-9_]+|"
+        r"CryptEncrypt|BCrypt[A-Za-z]+|SecKey[A-Za-z]+|CC[A-Za-z]*Crypt[A-Za-z]*|libtomcrypt)\b"
     ),
 }
 # "other" languages: the union of both pattern sets
@@ -99,7 +121,19 @@ def _language_key(language: str | None) -> str | None:
     if not language:
         return None
     lang = language.strip().lower()
-    return {"python": "python", "java": "java", "kotlin": "java", "scala": "java"}.get(lang)
+    return {
+        "python": "python",
+        "java": "java",
+        "kotlin": "java",
+        "scala": "java",
+        "go": "go",
+        "golang": "go",
+        "javascript": "javascript",
+        "typescript": "javascript",
+        "c": "c",
+        "c++": "c",
+        "cpp": "c",
+    }.get(lang)
 
 
 def _detect_language(repo_path: Path) -> str | None:

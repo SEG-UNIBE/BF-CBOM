@@ -1,0 +1,265 @@
+{
+  "bomFormat" : "CycloneDX",
+  "specVersion" : "1.6",
+  "serialNumber" : "urn:uuid:44716925-3207-4a1a-822b-4a0988f4b754",
+  "version" : 1,
+  "metadata" : {
+    "timestamp" : "2026-10-08T12:45:51Z",
+    "tools" : {
+      "services" : [
+        {
+          "provider" : {
+            "name" : "PQCA"
+          },
+          "name" : "CBOMkit"
+        }
+      ]
+    }
+  },
+  "components" : [
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "758581d5-b5df-405f-af16-464fe4b35883",
+      "name" : "AES-256-GCM",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "demo/crypto_demo.py",
+            "line" : 18,
+            "offset" : 14,
+            "additionalContext" : "generate_key"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "ae",
+          "parameterSetIdentifier" : "256",
+          "mode" : "gcm",
+          "cryptoFunctions" : [
+            "encrypt",
+            "keygen"
+          ]
+        },
+        "oid" : "2.16.840.1.101.3.4.1.46"
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "61be1784-f15e-414f-8d52-ba13d650fb6d",
+      "name" : "private-key@61be1784-f15e-414f-8d52-ba13d650fb6d",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "demo/crypto_demo.py",
+            "line" : 15,
+            "offset" : 14,
+            "additionalContext" : "generate_private_key"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "related-crypto-material",
+        "relatedCryptoMaterialProperties" : {
+          "type" : "private-key",
+          "size" : 2048
+        }
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "8b94dab1-54eb-48f7-8926-5b57c4d86282",
+      "name" : "secret-key@8b94dab1-54eb-48f7-8926-5b57c4d86282",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "demo/crypto_demo.py",
+            "line" : 18,
+            "offset" : 14,
+            "additionalContext" : "generate_key"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "related-crypto-material",
+        "relatedCryptoMaterialProperties" : {
+          "type" : "secret-key"
+        }
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "5fbb00c7-2b95-4e49-8f2f-ecc29a21406c",
+      "name" : "PBKDF2-SHA-256",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "demo/crypto_demo.py",
+            "line" : 35,
+            "offset" : 10,
+            "additionalContext" : "PBKDF2HMAC"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "kdf",
+          "parameterSetIdentifier" : "256",
+          "cryptoFunctions" : [
+            "keyderive"
+          ]
+        }
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "e244b2df-ce13-4691-9a3b-a0bb1d0b0bdf",
+      "name" : "SHA-256",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "demo/crypto_demo.py",
+            "line" : 35,
+            "offset" : 10,
+            "additionalContext" : "PBKDF2HMAC"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "hash",
+          "parameterSetIdentifier" : "256",
+          "cryptoFunctions" : [
+            "digest"
+          ]
+        },
+        "oid" : "2.16.840.1.101.3.4.2.1"
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "fa332d08-50e1-483f-9aaa-00b13ff729be",
+      "name" : "private-key@fa332d08-50e1-483f-9aaa-00b13ff729be",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "demo/crypto_demo.py",
+            "line" : 16,
+            "offset" : 13,
+            "additionalContext" : "generate_private_key"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "related-crypto-material",
+        "relatedCryptoMaterialProperties" : {
+          "type" : "private-key"
+        }
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "497e6029-8d6e-4504-bfef-559dbd105621",
+      "name" : "RSA-2048",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "demo/crypto_demo.py",
+            "line" : 15,
+            "offset" : 14,
+            "additionalContext" : "generate_private_key"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "pke",
+          "parameterSetIdentifier" : "2048",
+          "cryptoFunctions" : [
+            "keygen"
+          ]
+        },
+        "oid" : "1.2.840.113549.1.1.1"
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "6c2ef782-7548-454a-a03a-17aae730d7a0",
+      "name" : "ECDSA-secp256r1",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "demo/crypto_demo.py",
+            "line" : 28,
+            "offset" : 10,
+            "additionalContext" : "sign"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "signature",
+          "curve" : "secp256r1",
+          "cryptoFunctions" : [
+            "keygen",
+            "sign"
+          ]
+        }
+      }
+    },
+    {
+      "type" : "cryptographic-asset",
+      "bom-ref" : "6066637d-045d-41b0-83a9-82ce32f9da53",
+      "name" : "3DES-CBC",
+      "evidence" : {
+        "occurrences" : [
+          {
+            "location" : "demo/crypto_demo.py",
+            "line" : 21,
+            "offset" : 13,
+            "additionalContext" : "Cipher"
+          }
+        ]
+      },
+      "cryptoProperties" : {
+        "assetType" : "algorithm",
+        "algorithmProperties" : {
+          "primitive" : "block-cipher",
+          "parameterSetIdentifier" : "64",
+          "mode" : "cbc"
+        }
+      }
+    }
+  ],
+  "dependencies" : [
+    {
+      "ref" : "fa332d08-50e1-483f-9aaa-00b13ff729be",
+      "dependsOn" : [
+        "6c2ef782-7548-454a-a03a-17aae730d7a0"
+      ]
+    },
+    {
+      "ref" : "8b94dab1-54eb-48f7-8926-5b57c4d86282",
+      "dependsOn" : [
+        "758581d5-b5df-405f-af16-464fe4b35883"
+      ]
+    },
+    {
+      "ref" : "61be1784-f15e-414f-8d52-ba13d650fb6d",
+      "dependsOn" : [
+        "497e6029-8d6e-4504-bfef-559dbd105621"
+      ]
+    },
+    {
+      "ref" : "5fbb00c7-2b95-4e49-8f2f-ecc29a21406c",
+      "dependsOn" : [
+        "e244b2df-ce13-4691-9a3b-a0bb1d0b0bdf"
+      ]
+    }
+  ]
+}

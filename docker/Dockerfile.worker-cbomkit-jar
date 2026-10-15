@@ -1,0 +1,32 @@
+# syntax=docker/dockerfile:1.7
+# docker/Dockerfile.worker-cbomkit-jar
+# CBOMkit as the standalone action jar (Apache-2.0): the jar and its bundled BouncyCastle jars are
+# taken from the upstream cbomkit-action image (pinned by digest), run on a JRE in our base image.
+# Same sonar-cryptography engine as docker/Dockerfile.worker-cbomkit, different packaging.
+ARG BASE_IMAGE=base
+ARG BASE_TAG=latest
+
+# cbomkit-action v2.3.0 (image index digest, 2026-10-15): cbomkit-lib 1.3.0, sonar-cryptography 1.7.0
+FROM ghcr.io/cbomkit/cbomkit-action:v2.3.0@sha256:47c2505267dc5f055152616ffa0d0076b7d0824fe9e0de670b572d1ebad2fc4b AS upstream
+
+FROM ${BASE_IMAGE}:${BASE_TAG}
+USER root
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openjdk-21-jre-headless \
+ && rm -rf /var/lib/apt/lists/*
+COPY --from=upstream --chown=appuser:appuser /cbomkit-action/ /cbomkit-action/
+ENV TOOL_VERSION="cbomkit-action v2.3.0 (sonar-cryptography 1.7.0)" \
+    CBOMKIT_JAVA_JAR_DIR=/cbomkit-action/java/scan
+
+USER appuser
+WORKDIR /app
+ENV PYTHONPATH=/app
+
+COPY --chown=appuser:appuser pyproject.toml uv.lock ./
+COPY --chown=appuser:appuser common/ ./common/
+RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=1000,gid=1000 \
+    uv sync --frozen --no-dev
+
+COPY --chown=appuser:appuser workers/cbomkit-jar/ ./workers/cbomkit-jar/
+
+ENTRYPOINT ["tini", "-g", "--", "uv", "run", "--frozen", "--no-dev", "workers/cbomkit-jar/main.py"]

@@ -24,8 +24,18 @@ repos:                     # and/or explicit repos
     commit: <40-hex sha>   # optional pin; otherwise resolved with git ls-remote on first run
     language: Python       # helps language-specific tools
     variants: [original, m-rsa2048-insert-01]   # mutants are branches bfcbom/<variant> on gitserver
+  - full_name: bfcbom/micro-java
+    path: ../corpus/micro/java   # a plain directory (relative to this file) published to gitserver as a
+    language: Java               # deterministic fixture commit; no git_url/commit (see corpus/README.md)
 ```
 
 Rerunning a spec is resumable: runs whose `run<k>.meta.json` exists are skipped, commits come from
 `lock.json`, and jobs still pending from an interrupted run are collected (`--requeue-pending` to reissue).
 `ARGS=--retry-failed` redoes stored runs whose status is not `ok`.
+
+Offline analysis of a stored experiment (`analysis/`, no Redis), results under `<exp>/analysis/` on the volume:
+
+```
+make analysis ARGS="micro e0-micro"   # recall/precision per tool on the micro projects (corpus/micro/ground_truth.yaml)
+make analysis ARGS="sites e0-micro"   # call-site clusters across tools: k distribution, confirmed/solo per tool
+```

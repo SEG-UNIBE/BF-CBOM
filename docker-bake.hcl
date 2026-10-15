@@ -25,6 +25,11 @@ group "default" {
     "worker-chatgpt",
     "worker-claude",
     "worker-cryptoscan",
+    "worker-pqcheck",
+    "worker-qdarpan",
+    "worker-securin-xbom",
+    "worker-cipherradar",
+    "worker-cbomkit-jar",
     "misc-pyqun",
     "gitserver",
     "runner",
@@ -105,6 +110,33 @@ target "worker-cryptoscan" {
   tags       = ["${REGISTRY}-worker-cryptoscan:${VERSION}"]
 }
 
+target "worker-pqcheck" {
+  inherits   = ["_from-base"]
+  dockerfile = "docker/Dockerfile.worker-pqcheck"
+  tags       = ["${REGISTRY}-worker-pqcheck:${VERSION}"]
+}
+target "worker-qdarpan" {
+  inherits   = ["_from-base"]
+  dockerfile = "docker/Dockerfile.worker-qdarpan"
+  tags       = ["${REGISTRY}-worker-qdarpan:${VERSION}"]
+}
+target "worker-securin-xbom" {
+  inherits   = ["_from-base"]
+  dockerfile = "docker/Dockerfile.worker-securin-xbom"
+  tags       = ["${REGISTRY}-worker-securin-xbom:${VERSION}"]
+}
+target "worker-cipherradar" {
+  inherits   = ["_from-base"]
+  dockerfile = "docker/Dockerfile.worker-cipherradar"
+  tags       = ["${REGISTRY}-worker-cipherradar:${VERSION}"]
+}
+
+target "worker-cbomkit-jar" {
+  inherits   = ["_from-base"]
+  dockerfile = "docker/Dockerfile.worker-cbomkit-jar"
+  tags       = ["${REGISTRY}-worker-cbomkit-jar:${VERSION}"]
+}
+
 target "worker-cdxgen" {
   inherits   = ["_common"]
   dockerfile = "docker/Dockerfile.worker-cdxgen"
@@ -133,4 +165,13 @@ target "misc-treesimilarity" {
   dockerfile = "docker/Dockerfile.misc-treesimilarity"
   platforms  = ["linux/amd64"]
   tags       = ["${REGISTRY}-misc-treesimilarity:${VERSION}"]
+}
+
+# Mondoo xgrep: proprietary binary, local experiments only. Deliberately NOT in the default group,
+# so `docker buildx bake` for a release never builds or pushes it. Build it with
+# `docker buildx bake worker-xgrep` or `docker compose build worker-xgrep`.
+target "worker-xgrep" {
+  inherits   = ["_from-base"]
+  dockerfile = "docker/Dockerfile.worker-xgrep"
+  tags       = ["bf-cbom/worker-xgrep:${VERSION}"]
 }
