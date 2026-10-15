@@ -37,6 +37,10 @@ class CdxgenClient:
             self.binary,
             "--json-pretty",
             "--include-crypto",
+            # file/line occurrences for components; off by default in cdxgen
+            "--evidence",
+            # never run pip/npm/maven for arbitrary repos (also off for reproducibility)
+            "--no-install-deps",
             "-o",
             str(out_file),
             str(repo_dir),
@@ -129,6 +133,11 @@ handle_instruction = build_handle_instruction(NAME, _produce)
 
 
 def main():
+    try:
+        ver = subprocess.run(["cdxgen", "--version"], capture_output=True, text=True, timeout=30)
+        logger.info("cdxgen version: %s", (ver.stdout or ver.stderr).strip())
+    except Exception as e:
+        logger.warning("could not determine cdxgen version: %s", e)
     run_worker(NAME, handle_instruction, default_timeout=TIMEOUT_SEC)
 
 

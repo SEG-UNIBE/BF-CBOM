@@ -1,0 +1,27 @@
+# Lint, format check and unit tests on every push / PR. No Docker needed.
+name: ci
+
+on:
+  push:
+    branches: ["main", "dev"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.12.5"
+      - name: Install (locked)
+        run: uv sync --frozen
+      - name: Ruff lint
+        run: uv run ruff check .
+      - name: Ruff format
+        run: uv run ruff format --check .
+      - name: Unit tests
+        run: uv run pytest -q

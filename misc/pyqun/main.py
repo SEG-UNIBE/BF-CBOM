@@ -11,6 +11,7 @@ from sentence_transformers import SentenceTransformer
 
 from common.config import BLPOP_TIMEOUT_SEC, REDIS_HOST, REDIS_PORT, REDIS_SOCKET_TIMEOUT_SEC
 from common.models import ComponentMatchJobInstruction, ComponentMatchJobResult
+from common.worker import publish_heartbeat
 from common.cbom_analysis import find_components_list
 
 NAME = "pyqun"
@@ -37,26 +38,27 @@ from RaQuN_Lab.datamodel.modelset.Element import Element
 from RaQuN_Lab.datamodel.modelset.attribute.DefaultAttribute import DefaultAttribute
 from RaQuN_Lab.datamodel.modelset.Model import Model
 from RaQuN_Lab.strategies.RaQuN.candidatesearch.NNCandidateSearch.NNCandidateSearch import NNCandidateSearch
-from RaQuN_Lab.strategies.RaQuN.candidatesearch.NNCandidateSearch.vectorization.ZeroOneVectorization import ZeroOneVectorizer
+from RaQuN_Lab.strategies.RaQuN.candidatesearch.NNCandidateSearch.vectorization.ZeroOneVectorization import (
+    ZeroOneVectorizer,
+)
 from RaQuN_Lab.strategies.RaQuN.RaQuN import VanillaRaQuN
 from RaQuN_Lab.strategies.RaQuN.candidatesearch.NNCandidateSearch.vectorization.Vectorizer import Vectorizer
-from RaQuN_Lab.strategies.RaQuN.candidatesearch.NNCandidateSearch.vectorization.DimensionalityReduction.SVDReduction import SVDReduction
-    
+from RaQuN_Lab.strategies.RaQuN.candidatesearch.NNCandidateSearch.vectorization.DimensionalityReduction.SVDReduction import (
+    SVDReduction,
+)
+
 
 class BERTEmbedding(Vectorizer):
     def __init__(self):
-        self.model = SentenceTransformer('all-MiniLM-L6-v2')  # Fast, small, good for most tasks
+        self.model = SentenceTransformer("all-MiniLM-L6-v2")  # Fast, small, good for most tasks
         self.vec_dim = self.model.get_sentence_embedding_dimension()
 
-    def innit(self, m_s: 'ModelSet') -> None:
+    def innit(self, m_s: "ModelSet") -> None:
         pass
 
-    def vectorize(self, element: 'Element'):
+    def vectorize(self, element: "Element"):
         # Combine all attribute values into a single, deterministically ordered string
-        vals = (
-            str(getattr(attr, 'value', attr)).lower()
-            for attr in (getattr(element, 'attributes', []) or [])
-        )
+        vals = (str(getattr(attr, "value", attr)).lower() for attr in (getattr(element, "attributes", []) or []))
         attr_texts = sorted(vals)
         text = " ".join(attr_texts)
         vec = self.model.encode(text, show_progress_bar=False)
@@ -64,7 +66,8 @@ class BERTEmbedding(Vectorizer):
 
     def dim(self):
         return self.vec_dim
-    
+
+
 class LetterHistogramVectorizer(Vectorizer):
     def __init__(self):
         # Use lowercase English letters
@@ -72,15 +75,15 @@ class LetterHistogramVectorizer(Vectorizer):
         self.letter_indices = {c: i for i, c in enumerate(self.letters)}
         self.vec_dim = len(self.letters)
 
-    def innit(self, m_s: 'ModelSet') -> None:
+    def innit(self, m_s: "ModelSet") -> None:
         # No need to build a global attribute map, just set vector dimension
         pass
 
-    def vectorize(self, element: 'Element'):
+    def vectorize(self, element: "Element"):
         vec = np.zeros(self.vec_dim)
         # Iterate attribute values in a deterministic order
         for val in sorted(
-            (str(getattr(attr, 'value', attr)).lower() for attr in (getattr(element, 'attributes', []) or []))
+            (str(getattr(attr, "value", attr)).lower() for attr in (getattr(element, "attributes", []) or []))
         ):
             for c in val:
                 if c in self.letter_indices:
@@ -94,17 +97,14 @@ class LetterHistogramVectorizer(Vectorizer):
 NEIGHBOURHOOD_SIZE = 3
 
 PyQuN_algo = VanillaRaQuN(
-    "high_dim_raqun", 
-    candidate_search=NNCandidateSearch(
-        vectorizer=BERTEmbedding(),
-        neighbourhood_size=NEIGHBOURHOOD_SIZE
-    )
+    "high_dim_raqun",
+    candidate_search=NNCandidateSearch(vectorizer=BERTEmbedding(), neighbourhood_size=NEIGHBOURHOOD_SIZE),
 )
 
 
 def DFS(sub_dict, prefix: list, results: list):
     """
-    extracts all leaves from the json tree as a list of strings containing all from root to leaf 
+    extracts all leaves from the json tree as a list of strings containing all from root to leaf
     args:
         - dict: containing the current branch of the tree
         - list[string]: a list of key strings that lead to this branch
@@ -129,6 +129,7 @@ def DFS(sub_dict, prefix: list, results: list):
         value = str(sub_dict)
         prefix.append(value)
         results.append(prefix)
+
 
 def _write_models_csv(models: dict, out_path: str) -> None:
     """Write model elements to CSV for debugging.
@@ -162,10 +163,11 @@ def _convert_json_string_to_dict(documents: list[list[str]]) -> list[list[dict]]
         for json_file in doc:
             json_dict = json.loads(json_file)
             doc_list.append(json_dict)
-    
+
         out.append(doc_list)
 
     return out
+
 
 def _run_raqun_with_order(json_files, order=None):
     if order is None:
@@ -174,6 +176,7 @@ def _run_raqun_with_order(json_files, order=None):
     matches = _run_raqun(shuffled_json_files)
 
     return matches, order
+
 
 def _run_raqun(json_files: list[str]):
     global PyQuN_algo
@@ -185,7 +188,7 @@ def _run_raqun(json_files: list[str]):
     next_uid = len(json_files)
     # extract and convert to Model/Element/Attribute for RaQuN
     for e_id, json_file in enumerate(json_files):
-        if len(json_file)>0:
+        if len(json_file) > 0:
             models[e_id] = []
             for comp_i, comp in enumerate(json_file):
                 attr_list = []
@@ -194,9 +197,8 @@ def _run_raqun(json_files: list[str]):
 
                 attr_list.append(type)
                 attr_list.append(name)
-                
-                try:
 
+                try:
                     assetType = comp["cryptoProperties"]["assetType"]
                     attr_list.append(assetType)
 
@@ -206,18 +208,22 @@ def _run_raqun(json_files: list[str]):
                 except:
                     pass
                 attributes = set(DefaultAttribute(attr) for attr in attr_list)
-                element = Element(name=name, ze_id=next_uid, attributes=attributes) # -> corresponds to a cbom component
+                element = Element(
+                    name=name, ze_id=next_uid, attributes=attributes
+                )  # -> corresponds to a cbom component
                 element.set_model_id(e_id)
                 element.set_custom_id(comp_i)
                 next_uid += 1
                 models[e_id].append(element)
-        
+
     model_list = []
 
     for model_id in models:
         model = Model(elements=set(models[model_id]), ze_id=model_id)
         model_list.append(model)
-    logger.info("Loaded %d models with total %d elements", len(model_list), sum(len(m.get_elements()) for m in model_list))
+    logger.info(
+        "Loaded %d models with total %d elements", len(model_list), sum(len(m.get_elements()) for m in model_list)
+    )
     # Debug CSV output (comment out the following line to disable)
     # _write_models_csv(models, MODELS_CSV_PATH)
     for i, model in enumerate(model_list):
@@ -246,20 +252,16 @@ def _match_from_json_list(json_files: list[str]):
     grouped_elements = []
 
     for match in matches_list:
-        if hasattr(match, 'get_elements'):
+        if hasattr(match, "get_elements"):
             elements = match.get_elements()
             if elements and len(elements) > 1:
                 group = []
                 for e in elements:
-                    file_id = e.model_id  
+                    file_id = e.model_id
                     original_idx = best_order[file_id]
                     comp_id = e.get_custom_id()
                     try:
-                        group.append({
-                            "file": original_idx,
-                            "component": comp_id,
-                            "cost": 0.0
-                        })
+                        group.append({"file": original_idx, "component": comp_id, "cost": 0.0})
                     except:
                         logger.error(f"Error during extraction of component: {comp_id} from file: {file_id}")
                 grouped_elements.append(group)
@@ -267,8 +269,7 @@ def _match_from_json_list(json_files: list[str]):
     return grouped_elements
 
 
-def _match_components(documents: list[list[str]]) ->  list[dict]:
-    
+def _match_components(documents: list[list[str]]) -> list[dict]:
     logger.info("Starting n-way component matching for %d documents...", len(documents))
     serialized = _match_from_json_list(documents)
 
@@ -283,13 +284,19 @@ def _run_match_with_timeout(func, args, timeout_seconds):
     """
     with multiprocessing.Pool(processes=1) as pool:
         result = pool.apply_async(func, args=(args,))
-        try:
-            return result.get(timeout=timeout_seconds)
-        except multiprocessing.TimeoutError:
-            logger.error("Component matching timed out after %d seconds.", timeout_seconds)
-            # The pool is automatically terminated, which should kill the child process
-            return None
-        
+        deadline = time.monotonic() + timeout_seconds
+        while not result.ready():
+            # Keep the liveness key fresh during long matches (it expires in ~30s otherwise).
+            if redis_client is not None:
+                publish_heartbeat(redis_client, NAME, "busy")
+            if time.monotonic() >= deadline:
+                logger.error("Component matching timed out after %d seconds.", timeout_seconds)
+                # Leaving the `with` block terminates the pool and kills the child process
+                return None
+            result.wait(5)
+        return result.get()
+
+
 def _handle_instruction(raw_payload: str) -> None:
     global redis_client
 
@@ -302,21 +309,16 @@ def _handle_instruction(raw_payload: str) -> None:
     logger.info(
         "📨 Received job instruction for job %s (repo: %s)", instruction.job_id, instruction.repo_info.full_name
     )
-    
-    
+
     # Transform the list of CbomJson objects into a list of documents (list[str])
-    documents = [
-        entry.components_as_json
-        for entry in instruction.CbomJsons
-        if entry.components_as_json
-    ]
+    documents = [entry.components_as_json for entry in instruction.CbomJsons if entry.components_as_json]
 
     # documents_raw = [
     #     entry.entire_json_raw
     #     for entry in instruction.CbomJsons
     #     if entry.entire_json_raw
     # ]
-    
+
     tools = [entry.tool for entry in instruction.CbomJsons if entry.components_as_json]
     if len(documents) < 2:
         logger.warning("Need at least two documents with components to match. Aborting.")
@@ -358,9 +360,7 @@ def _handle_instruction(raw_payload: str) -> None:
     match_results = None
 
     try:
-         match_results = _run_match_with_timeout(
-            _match_components, documents, timeout_seconds=TIMEOUT_SEC
-        )
+        match_results = _run_match_with_timeout(_match_components, documents, timeout_seconds=TIMEOUT_SEC)
     except TimeoutError as err:
         status = "timeout"
         error_msg = str(err)
@@ -373,9 +373,7 @@ def _handle_instruction(raw_payload: str) -> None:
     if status == "ok":
         if match_results is None:
             status = "timeout"
-            error_msg = (
-                f"Component matching timed out after {TIMEOUT_SEC} seconds"
-            )
+            error_msg = f"Component matching timed out after {TIMEOUT_SEC} seconds"
             matches = []
         else:
             matches = match_results
@@ -416,6 +414,7 @@ def main() -> None:
 
     try:
         while True:
+            publish_heartbeat(redis_client, NAME, "idle")
             try:
                 item = redis_client.blpop(JOB_QUEUE, timeout=BLPOP_TIMEOUT_SEC)
             except redis.exceptions.RedisError as err:
@@ -427,6 +426,7 @@ def main() -> None:
             _, raw_payload = item
             if not raw_payload:
                 continue
+            publish_heartbeat(redis_client, NAME, "busy")
             _handle_instruction(raw_payload)
     except KeyboardInterrupt:
         logger.info("Received shutdown signal, stopping listener")

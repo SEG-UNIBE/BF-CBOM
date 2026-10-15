@@ -11,6 +11,9 @@ from common.worker import build_handle_instruction, run_worker
 
 # Derive worker name from env or directory to make cloning simple
 NAME = os.getenv("WORKER_NAME") or os.path.basename(os.path.dirname(__file__))
+TIMEOUT_SEC = int(os.getenv("WORKER_TIMEOUT_SEC", "300"))
+# Keep the API call well inside the worker budget; the runner kills the job at TIMEOUT_SEC anyway.
+API_TIMEOUT_SEC = max(30.0, TIMEOUT_SEC - 15.0)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -23,7 +26,12 @@ class DeepSeekClient:
         if not token:
             raise OSError("DEEPSEEK_API_KEY not set")
         self.api_key = token
-        self.client = OpenAI(api_key=self.api_key, base_url="https://api.deepseek.com")
+        self.client = OpenAI(
+            api_key=self.api_key,
+            base_url="https://api.deepseek.com",
+            timeout=API_TIMEOUT_SEC,
+            max_retries=1,
+        )
 
     def generate_cbom(self, git_url, branch="main"):
         start_time = time.time()
@@ -101,8 +109,7 @@ handle_instruction = build_handle_instruction(NAME, _produce)
 
 def main():
     # Delegate the queue/timeout loop to the shared runner
-    # Default timeout 5 minutes for DeepSeek worker
-    run_worker(NAME, handle_instruction, default_timeout=300)
+    run_worker(NAME, handle_instruction, default_timeout=TIMEOUT_SEC)
 
 
 if __name__ == "__main__":

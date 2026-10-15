@@ -8,7 +8,7 @@ import streamlit as st
 from common.config import GITHUB_TOKEN
 from common.utils import get_available_workers
 from coordinator.logger_config import logger
-from coordinator.redis_io import create_inspection, get_redis
+from coordinator.redis_io import create_inspection, get_redis, get_worker_liveness
 from coordinator.utils import (
     enrich_repos_with_github,
     github_search_multi_language,
@@ -44,12 +44,18 @@ with shared_col1:
         key="shared_insp_name",
     )
 
+    liveness = get_worker_liveness(r, available_workers)
+    live_workers = [w for w in available_workers if liveness.get(w)]
     shared_workers = st.multiselect(
         "Workers",
         options=available_workers,
-        default=available_workers,
+        default=live_workers or available_workers,
         key="shared_workers",
+        help="Pre-selected: workers with a live heartbeat. Others are configured but not running.",
     )
+    down = [w for w in available_workers if not liveness.get(w)]
+    if down:
+        st.caption("⚠️ Not running: " + ", ".join(f"`{w}`" for w in down) + " · jobs for them would stay pending")
 
 # ============================================================
 # Tabs: Individual vs Batch Inspection
@@ -61,7 +67,7 @@ tab_individual, tab_batch = st.tabs(["🔍 Individual Inspection", "📦 Batch I
 # ============================================================
 with tab_individual:
     st.caption("Inspect a single repository using multiple CBOM generators.")
-    
+
     ind_col1, ind_mid, ind_col2 = st.columns([6, 0.5, 3], vertical_alignment="top")
 
     # Render Notes column FIRST (before any st.stop() calls)
@@ -75,7 +81,7 @@ with tab_individual:
 
     with ind_mid:
         st.write("")
-    
+
     with ind_col1:
         repo_url = st.text_input(
             "GitHub Repository URL",
@@ -110,7 +116,7 @@ with tab_individual:
             description = repo_meta.get("description", "")
             default_branch = repo_meta.get("default_branch", "main")
             pushed_at = repo_meta.get("pushed_at", "")
-            
+
             # Compact info line
             info_parts = [
                 f"💬 {language or 'N/A'}",
@@ -124,7 +130,7 @@ with tab_individual:
                     info_parts.append(f"📅 {days_ago}d ago")
                 except Exception:
                     pass
-            
+
             st.caption(f"**{name}** · " + " · ".join(info_parts))
             if description:
                 st.caption(f"_{description[:120]}{'...' if len(description) > 120 else ''}_")
@@ -137,26 +143,26 @@ with tab_individual:
                 insp_name = insp_name_input.strip()
                 if not insp_name:
                     insp_name = f"{repo_meta.get('full_name', 'repo').replace('/', '-')}"
-                
+
                 # Ensure repo has required fields
                 repo_data = dict(repo_meta)
                 if not repo_data.get("git_url"):
                     repo_data["git_url"] = f"https://github.com/{repo_data['full_name']}.git"
                 if not repo_data.get("branch"):
                     repo_data["branch"] = repo_data.get("default_branch", "main")
-                
+
                 params = {
                     "source": "individual",
                     "count": 1,
                 }
-                
+
                 logger.info(
                     "Creating individual inspection '%s' with %d workers",
                     insp_name,
                     len(shared_workers),
                 )
                 insp_id = create_inspection(r, name=insp_name, params=params, repos=[repo_data], workers=shared_workers)
-                
+
                 set_query_insp_id(insp_id)
                 st.success(f"Inspection created: {insp_name} · ID {insp_id}")
                 logger.info("Inspection created: %s · ID %s", insp_name, insp_id)
@@ -210,9 +216,7 @@ with tab_batch:
                 from common.config import AVAILABLE_LANGUAGES
 
                 lang_options = AVAILABLE_LANGUAGES or ["python", "java"]
-                languages = st.multiselect(
-                    "Languages", options=lang_options, default=lang_options[:1]
-                )
+                languages = st.multiselect("Languages", options=lang_options, default=lang_options[:1])
 
                 stars_min, stars_max = st.slider(
                     "Stars range",

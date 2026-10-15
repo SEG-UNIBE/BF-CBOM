@@ -21,6 +21,11 @@ dependencies = [
     "typer>=0.12.5",
 ]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra"
+
 [tool.black]
 line-length = 120
 target-version = ["py312"]

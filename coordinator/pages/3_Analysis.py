@@ -1,4 +1,5 @@
 import json
+import os
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -25,11 +26,13 @@ from common.utils import get_status_emoji, get_status_keys_order, status_text
 from coordinator.logger_config import logger
 from coordinator.redis_io import (
     collect_repo_cboms,
+    dead_workers,
     enqueue_component_match_instruction,
     get_insp_meta,
     get_insp_repos,
     get_insp_workers,
     get_redis,
+    job_status_key,
     list_inspections,
     pair_key,
     prepare_component_match_instruction,
@@ -57,45 +60,58 @@ st.title("Analysis")
 if "component_similarity_jobs" not in st.session_state:
     st.session_state["component_similarity_jobs"] = {}
 
-TREESIM_WORKER = "treesimilartiy"
-TREESIM_QUEUE = f"jobs:{TREESIM_WORKER}"
-TREESIM_RESULTS_LIST = f"results:{TREESIM_WORKER}"
-
 PYQUN_WORKER = "pyqun"
 PYQUN_QUEUE = f"jobs:{PYQUN_WORKER}"
 PYQUN_RESULTS_LIST = f"results:{PYQUN_WORKER}"
 
 
+# Upper bound for waiting on a component-match job. The matcher workers abort at
+# CALC_TIMEOUT_SEC (300s in docker-compose.yml); the margin covers queueing and model load.
+COMPONENT_MATCH_WAIT_SEC = int(os.getenv("COMPONENT_MATCH_WAIT_SEC", "420"))
+
+
 def _latest_similarity_result(
-    redis_conn: redis.Redis, repo_full_name: str, *, target_job_id: str | None = None, result_list=TREESIM_RESULTS_LIST
+    redis_conn: redis.Redis,
+    repo_full_name: str,
+    *,
+    insp_id: str,
+    target_job_id: str | None = None,
+    result_list=PYQUN_RESULTS_LIST,
 ) -> dict | None:
-    """Return the newest similarity result for repo (optionally matching job_id)."""
+    """Return the similarity result for (insp, repo), preferring the given job id.
 
-    entries = redis_conn.lrange(result_list, 0, -1)
-    if not entries:
-        return None
-
+    Results are moved out of the worker's list into `insp:<id>:match_results` the first
+    time they are seen, so the list never grows and reloads find the result again.
+    """
+    store_key = f"insp:{insp_id}:match_results"
     target_repo = (repo_full_name or "").strip()
-    target_job = target_job_id
 
-    for entry_text in reversed(entries):
+    if target_job_id:
+        stored = redis_conn.hget(store_key, target_job_id)
+        if stored:
+            try:
+                return json.loads(stored)
+            except json.JSONDecodeError:
+                pass
+
+    for entry_text in redis_conn.lrange(result_list, 0, -1):
         try:
             entry_payload = json.loads(entry_text)
         except json.JSONDecodeError:
+            redis_conn.lrem(result_list, 1, entry_text)
             continue
-
-        if target_job and entry_payload.get("job_id") != target_job:
+        job_id = entry_payload.get("job_id")
+        if entry_payload.get("inspection_id") == insp_id and job_id:
+            # Claim every result of this inspection, not only the one we are waiting for.
+            pipe = redis_conn.pipeline()
+            pipe.hset(store_key, job_id, entry_text)
+            pipe.lrem(result_list, 1, entry_text)
+            pipe.execute()
+        if target_job_id and job_id != target_job_id:
             continue
-
         if (entry_payload.get("repo_full_name") or "").strip() != target_repo:
             continue
-
         return entry_payload
-
-    if target_job:
-        return None
-
-    # No repo match when scanning entire list
     return None
 
 
@@ -165,25 +181,7 @@ for repo in repos:
             continue
         meta = job_meta_cache.get(j_id) or {}
         stt = meta.get("status") or ""
-        status_key = "pending"
-        if stt == "completed":
-            status_key = "completed"
-        elif stt == "failed":
-            # Distinguish timeout using worker payload
-            raw = meta.get("result_json")
-            is_timeout = False
-            if raw:
-                try:
-                    payload = json.loads(raw)
-                    if payload.get("status") == "timeout":
-                        is_timeout = True
-                except json.JSONDecodeError:
-                    pass
-            status_key = "timeout" if is_timeout else "failed"
-        elif stt == "cancelled":
-            status_key = "cancelled"
-        else:
-            status_key = "pending"
+        status_key = job_status_key(meta)
         worker_status_counts[w][status_text(status_key, "label")] += 1
         repo_worker_status.setdefault(full, {})[w] = status_key
 
@@ -537,11 +535,15 @@ if comp_rows:
                         "<div style='padding-top: 10px;'>N-Way Matching using RaQuN</div>",
                         unsafe_allow_html=True,
                     )
+                matcher_down = bool(dead_workers(r, [PYQUN_WORKER]))
+                if matcher_down and not result_payload:
+                    info_col.caption(f"⚠️ `{PYQUN_WORKER}` matcher not running")
                 with button_col:
                     if st.button(
-                        "Find Similar Components Among different CBOMs",
+                        "Find similar components across tools",
                         key=f"treesimilarity_{insp_id}_{repo_name}",
-                        disabled=button_disabled,
+                        disabled=button_disabled or matcher_down,
+                        help="n-way matching of the tools' components with RaQuN",
                     ):
                         instruction = prepare_component_match_instruction(
                             r, insp_id, repo_obj, exclude_types=exclude_libraries
@@ -583,7 +585,6 @@ if comp_rows:
                             repo_state["issued_full_components"] = issued_full_components
                             repo_state["issued_minimized_documents"] = issued_min_docs
                             enqueue_component_match_instruction(r, instruction, match_queue)
-                            # enqueue_component_match_instruction(r, instruction, TREESIM_QUEUE)
                             repo_state["job_id"] = instruction.job_id
                             repo_state.pop("result", None)
                             repo_state.pop("result_exclude_libraries", None)
@@ -597,7 +598,7 @@ if comp_rows:
 
                 if waiting_for_result and not result_payload:
                     result_payload = _latest_similarity_result(
-                        r, repo_name, target_job_id=job_id, result_list=result_list
+                        r, repo_name, insp_id=insp_id, target_job_id=job_id, result_list=result_list
                     )
                     if result_payload:
                         repo_state["result"] = result_payload
@@ -607,11 +608,13 @@ if comp_rows:
 
                 if waiting_for_result and not repo_state.get("result"):
                     poll_interval = 2.0
+                    wait_deadline = time.monotonic() + COMPONENT_MATCH_WAIT_SEC
                     with st.spinner("Waiting for similarity result…", show_time=True):
-                        while not repo_state.get("result"):
+                        while not repo_state.get("result") and time.monotonic() < wait_deadline:
                             result_payload = _latest_similarity_result(
                                 r,
                                 repo_name,
+                                insp_id=insp_id,
                                 target_job_id=repo_state.get("job_id"),
                                 result_list=result_list,
                             )
@@ -626,6 +629,21 @@ if comp_rows:
                                 st.session_state["component_similarity_jobs"][insp_id] = insp_jobs_state
                                 break
                             time.sleep(poll_interval)
+                    if not repo_state.get("result"):
+                        repo_state["waiting_for_similarity"] = False
+                        repo_state.pop("job_id", None)
+                        st.session_state["component_similarity_jobs"][insp_id] = insp_jobs_state
+                        if dead_workers(r, [PYQUN_WORKER]):
+                            st.error(
+                                f"The `{PYQUN_WORKER}` matcher is not running (no heartbeat). "
+                                "Start it (`make ps`, `make logs misc-pyqun`) and retry."
+                            )
+                        else:
+                            st.error(
+                                f"No similarity result after {COMPONENT_MATCH_WAIT_SEC}s although the matcher is "
+                                "alive; the job probably exceeded CALC_TIMEOUT_SEC. Retry with fewer components "
+                                "(toggle 'cryptographic-assets only')."
+                            )
 
                 if repo_state.get("result"):
                     result_payload = repo_state["result"]

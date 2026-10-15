@@ -110,7 +110,7 @@ def _resolve_insp_id(r: redis.Redis, insp_id: str) -> str:
     if r.exists(f"insp:{insp_id}"):
         return insp_id
 
-    inspections = r.smembers("inspecs") or []
+    inspections = r.smembers("inspects") or []
     matches = [bid for bid in inspections if bid.startswith(insp_id)]
 
     if not matches:
@@ -611,6 +611,7 @@ def banner(
     typer.echo(typer.style(f"  {redis_host}:{redis_port}", fg=typer.colors.WHITE))
 
     typer.echo("")
+
     # Helper to emphasize the interesting part after the CLI path
     def _echo_uv(args: str) -> None:
         left = typer.style("uv run misc/cli/cli.py", fg=typer.colors.BRIGHT_BLACK)

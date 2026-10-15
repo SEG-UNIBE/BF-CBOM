@@ -226,8 +226,8 @@ def clone_repo(github_url, branch="main", target_dir="repo"):
                     bar.close()
             return process.returncode, "\n".join(last_lines)
 
-        # Try with requested branch (shallow)
-        attempts = []
+        # Shallow clone of exactly the requested branch. No silent fallback to the default
+        # branch: a scan attributed to the wrong branch is worse than a failed job.
         cmd_with_branch = [
             "git",
             "clone",
@@ -240,43 +240,14 @@ def clone_repo(github_url, branch="main", target_dir="repo"):
             target_dir,
         ]
         rc, tail = _run_clone(cmd_with_branch)
-        attempts.append((rc, tail))
-
-        # Fallback: clone default branch (shallow) when branch is missing or other errors occur
-        if rc != 0:
-            # Clean up target dir before retry
-            if os.path.exists(target_dir):
-                shutil.rmtree(target_dir, ignore_errors=True)
-            cmd_default = [
-                "git",
-                "clone",
-                "--progress",
-                "--depth",
-                "1",
-                auth_url,
-                target_dir,
-            ]
-            rc, tail = _run_clone(cmd_default)
-            attempts.append((rc, tail))
-
-            # If default succeeded and a non-default branch was requested, try checking it out
-            if rc == 0 and branch:
-                try:
-                    subprocess.run(
-                        ["git", "-C", target_dir, "checkout", "-q", branch],
-                        check=False,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                        env=env,
-                    )
-                except Exception:
-                    pass
 
         if rc != 0:
             # Derive friendlier reason; still print tail for diagnostics
             reason = "unknown"
             low = (tail or "").lower()
-            if "repository not found" in low:
+            if "remote branch" in low and "not found" in low:
+                reason = f"branch '{branch}' not found"
+            elif "repository not found" in low:
                 reason = "private or not found"
             elif "authentication failed" in low or "could not read username" in low:
                 reason = "private repo (auth required)"
@@ -284,7 +255,7 @@ def clone_repo(github_url, branch="main", target_dir="repo"):
                 reason = "ssl certificate error"
             elif "could not resolve host" in low or "timed out" in low:
                 reason = "network error"
-            print(f"Error: Git clone failed (rc=128): {reason}", file=sys.stderr)
+            print(f"Error: Git clone failed (rc={rc}): {reason}", file=sys.stderr)
             if tail:
                 safe_tail = re.sub(r"https://[^@]+@github.com/", "https://github.com/", tail)
                 print(safe_tail, file=sys.stderr)
@@ -521,7 +492,7 @@ def format_repo_info(repo: dict) -> str:
     Example: '💬 Python · ⭐1,234 · 💾20,000 KB'
     """
     parts: list[str] = []
-    
+
     # Language
     try:
         lang = repo.get("language") or repo.get("main_language")
@@ -529,7 +500,7 @@ def format_repo_info(repo: dict) -> str:
             parts.append(f"💬 {str(lang)}")
     except Exception:
         pass
-    
+
     # Stars - check multiple field names and coerce to int
     try:
         stars = repo.get("stargazers_count") or repo.get("stars")
@@ -539,7 +510,7 @@ def format_repo_info(repo: dict) -> str:
                 parts.append(f"⭐{stars_int:,}")
     except Exception:
         pass
-    
+
     # Size - check multiple field names and coerce to int
     try:
         size_kb = repo.get("size") or repo.get("size_kb")
@@ -549,7 +520,7 @@ def format_repo_info(repo: dict) -> str:
                 parts.append(f"💾{size_int:,} KB")
     except Exception:
         pass
-    
+
     return " · ".join(parts) if parts else "—"
 
 

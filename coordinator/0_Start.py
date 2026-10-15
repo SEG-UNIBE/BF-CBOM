@@ -11,11 +11,12 @@ from common.utils import (
     get_status_emoji,
 )
 from coordinator.logger_config import logger
-from coordinator.redis_io import delete_inspection, get_redis, list_inspections
+from coordinator.redis_io import JOB_SUMMARY_FIELDS, delete_inspection, get_redis, job_status_key, list_inspections
 from coordinator.utils import (
     build_minimal_config_json,
     get_favicon_path,
     human_duration,
+    safe_float,
     set_query_insp_id,
 )
 
@@ -173,45 +174,24 @@ with right:
     peak_mem = info.get("used_memory_peak_human") or info.get("used_memory_peak") or "?"
     keys = r.dbsize()
 
-    # Global job stats across all inspections
+    # Global job stats across all inspections (flat fields only; CBOM bodies are never loaded)
     status_counts = {k: 0 for k in ("completed", "failed", "cancelled", "pending", "timeout")}
     total_duration = 0.0
     duration_count = 0
     try:
-        for key in r.scan_iter("insp:*:job:*"):
-            stt = (r.hget(key, "status") or "").lower()
-            if stt == "completed":
-                status_counts["completed"] += 1
-            elif stt == "cancelled":
-                status_counts["cancelled"] += 1
-            elif stt == "failed":
-                # Inspect payload to separate timeouts
-                raw = r.hget(key, "result_json")
-                if raw:
-                    try:
-                        payload = json.loads(raw)
-                        if (payload or {}).get("status") == "timeout":
-                            status_counts["timeout"] += 1
-                        else:
-                            status_counts["failed"] += 1
-                    except Exception:
-                        status_counts["failed"] += 1
-                else:
-                    status_counts["failed"] += 1
-            else:
-                status_counts["pending"] += 1
-            raw = r.hget(key, "result_json")
-            if raw:
-                try:
-                    payload = json.loads(raw)
-                    dur = payload.get("duration_sec")
-                    if isinstance(dur, int | float):
-                        total_duration += float(dur)
-                        duration_count += 1
-                except Exception:
-                    pass
+        job_keys = list(r.scan_iter("insp:*:job:*", count=500))
+        pipe = r.pipeline()
+        for key in job_keys:
+            pipe.hmget(key, JOB_SUMMARY_FIELDS)
+        for values in pipe.execute():
+            meta = dict(zip(JOB_SUMMARY_FIELDS, values, strict=True))
+            status_counts[job_status_key(meta)] += 1
+            dur = safe_float(meta.get("duration_sec"))
+            if dur is not None:
+                total_duration += dur
+                duration_count += 1
     except Exception:
-        pass
+        logger.exception("Failed to compute global job stats")
 
     # Row 1: uptime, connected clients, Redis keys
     try:
@@ -285,79 +265,18 @@ with right:
         st.metric("average working time", human_duration(avg_time_s))
 
     # ============================================================
-    # Configuration (collapsible)
+    # Effective configuration (read-only: values are bound at import time in
+    # common.config and the workers; change docker/env/*.env or docker-compose.yml and restart)
     # ============================================================
     with st.expander("Configuration", expanded=False):
-        st.caption("Environment variables and settings. Changes apply to current session only.")
-        
-        st.markdown("**API Keys**")
-        
-        # GitHub Token
-        current_github = config.GITHUB_TOKEN or ""
-        github_input = st.text_input(
-            "GITHUB_TOKEN",
-            value=current_github,
-            type="password",
-            key="config_github_token",
-            help="GitHub Personal Access Token for API requests (click the eye to show/hide)",
-        ).strip()
-        if github_input != current_github:
-            config.GITHUB_TOKEN = github_input
-            st.success("GitHub token updated for this session" if github_input else "GitHub token cleared for this session")
-        st.caption("Status: loaded" if config.GITHUB_TOKEN else "Status: not set")
-            
-        # Redis Host (read-only, requires restart)
-        st.text_input(
-            "REDIS_HOST",
-            value=config.REDIS_HOST,
-            disabled=True,
-            help="Redis host (requires restart to change)",
+        st.caption(
+            "Effective settings of this coordinator. Edit `docker/env/coordinator.env` / `docker-compose.yml` and restart to change them."
         )
-        
-        # Redis Port (read-only, requires restart)
-        st.text_input(
-            "REDIS_PORT",
-            value=str(config.REDIS_PORT),
-            disabled=True,
-            help="Redis port (requires restart to change)",
-        )
-        
-        # GitHub Cache TTL
-        new_cache_ttl = st.number_input(
-            "GITHUB_CACHE_TTL_SEC",
-            value=config.GITHUB_CACHE_TTL_SEC,
-            min_value=0,
-            max_value=604800,  # 1 week
-            step=3600,
-            key="config_cache_ttl",
-            help="GitHub API cache TTL in seconds (default: 86400 = 1 day)",
-        )
-        if new_cache_ttl != config.GITHUB_CACHE_TTL_SEC:
-            config.GITHUB_CACHE_TTL_SEC = int(new_cache_ttl)
-        
-        st.markdown("**Lists**")
-        
-        # Available Languages
-        current_langs = ", ".join(config.AVAILABLE_LANGUAGES) if config.AVAILABLE_LANGUAGES else ""
-        new_langs = st.text_input(
-            "AVAILABLE_LANGUAGES",
-            value=current_langs,
-            placeholder="python, java, javascript",
-            key="config_languages",
-            help="Comma-separated list of languages for GitHub search",
-        )
-        if new_langs and new_langs != current_langs:
-            config.AVAILABLE_LANGUAGES = config._parse_list(new_langs)
-        
-        # Available Workers
-        current_workers = ", ".join(config.AVAILABLE_WORKERS) if config.AVAILABLE_WORKERS else ""
-        new_workers = st.text_input(
-            "AVAILABLE_WORKERS",
-            value=current_workers,
-            placeholder="cdxgen, syft, trivy",
-            key="config_workers",
-            help="Comma-separated list of available worker names",
-        )
-        if new_workers and new_workers != current_workers:
-            config.AVAILABLE_WORKERS = config._parse_list(new_workers)
-
+        rows = [
+            ("GITHUB_TOKEN", "set" if config.GITHUB_TOKEN else "not set (unauthenticated GitHub API, 60 req/h)"),
+            ("REDIS_HOST / REDIS_PORT", f"{config.REDIS_HOST}:{config.REDIS_PORT}"),
+            ("GITHUB_CACHE_TTL_SEC", str(config.GITHUB_CACHE_TTL_SEC)),
+            ("AVAILABLE_LANGUAGES", ", ".join(config.AVAILABLE_LANGUAGES) or "(auto)"),
+            ("AVAILABLE_WORKERS", ", ".join(config.AVAILABLE_WORKERS) or "(auto-discovered)"),
+        ]
+        st.table({"setting": [k for k, _ in rows], "value": [v for _, v in rows]})

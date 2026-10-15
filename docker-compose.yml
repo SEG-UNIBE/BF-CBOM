@@ -4,10 +4,14 @@ services:
   redis:
     image: redis:7.4@sha256:4fa24486b8bcca8eec45ee0eb166edc674795e53a2b53d1a9ef263eecebaac85
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"  # loopback only: Redis has no auth
     volumes:
       - redis-data:/data
     restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 1g
     healthcheck:
         test: ["CMD", "redis-cli", "ping"]
         interval: 2s
@@ -24,17 +28,22 @@ services:
         BASE_IMAGE: ${BASE_IMAGE:-base}
         BASE_TAG: ${VERSION:-latest}
     ports:
-      - "8501:8501"
+      - "127.0.0.1:8501:8501"  # loopback only; the UI exposes config/tokens
     depends_on:
       - redis
     environment:
       - AVAILABLE_WORKERS=${AVAILABLE_WORKERS:-cdxgen,cbomkit,deepseek,cryptobomforge}
       - AVAILABLE_LANGUAGES=python,java
       - GITHUB_CACHE_TTL_SEC=86400
+      - COMPONENT_MATCH_WAIT_SEC=420
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     env_file: docker/env/coordinator.env
     restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 2g
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8501/_stcore/health"]
       interval: 2s
@@ -61,6 +70,12 @@ services:
       - WORKER_TIMEOUT_SEC=6
     env_file: docker/env/worker-skeleton.env
     restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     profiles: [dev, all]
 
 
@@ -85,6 +100,12 @@ services:
       - TESTING_MAX_CBOM_KB=1000
     env_file: docker/env/worker-testing.env
     restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     profiles: [dev, all]
 
   worker-cbomkit:
@@ -108,6 +129,12 @@ services:
       - JAVA_OPTS=-Xms1g -Xmx6g -XX:+ExitOnOutOfMemoryError
     env_file: docker/env/worker-cbomkit.env
     restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 8g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     profiles: [prod, all]
 
   worker-cdxgen:
@@ -130,6 +157,12 @@ services:
       - CDXGEN_DEBUG_MODE=debug
     env_file: docker/env/worker-cdxgen.env
     restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     profiles: [prod, all]
 
 
@@ -152,6 +185,12 @@ services:
       - WORKER_TIMEOUT_SEC=120
     env_file: docker/env/worker-deepseek.env
     restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     profiles: [prod, all]
 
   worker-mssbomtool:
@@ -173,6 +212,12 @@ services:
       - WORKER_TIMEOUT_SEC=120
     env_file: docker/env/worker-mssbomtool.env
     restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     profiles: [dev, all]
 
   worker-cryptobomforge:
@@ -197,6 +242,12 @@ services:
       - CODEQL_RAM_MB=4096
     env_file: docker/env/worker-cryptobomforge.env
     restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 6g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     profiles: [prod, all]
 
   misc-treesimilarity:
@@ -216,6 +267,12 @@ services:
       - CALC_TIMEOUT_SEC=300
     env_file: docker/env/misc-treesimilarity.env
     restart: no
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     profiles: [dev]
 
   misc-pyqun:
@@ -234,6 +291,12 @@ services:
       - CALC_TIMEOUT_SEC=300
     env_file: docker/env/misc-pyqun.env
     restart: no
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     profiles: [dev, prod, all]
 
 volumes:

@@ -291,9 +291,17 @@ The images pulled by `make up-prod-pull` are built by `.github/workflows/images.
 Run `make release VERSION=<x.y.z>`, commit, then push a matching `v<x.y.z>` tag; the workflow refuses tags that do not match the `VERSION` file.
 Base images, uv and third-party sources are pinned (by digest or commit) inside the Dockerfiles; bump them deliberately.
 
-### Formatting and Linting
+### Formatting, Linting and Tests
 
-Ruff is configured in `pyproject.toml` for both formatting and linting:
+Ruff is configured in `pyproject.toml` for both formatting and linting; unit tests live in `tests/` and need no Docker:
 
 - `uv run ruff format`
 - `uv run ruff check --fix`
+- `uv run pytest`
+
+`.github/workflows/ci.yml` runs all three on every push and pull request.
+
+### Worker liveness
+
+Every worker refreshes a short-lived `worker:<name>:alive` key in Redis (see `common/worker.py`).
+The Setup page pre-selects only live workers, the Execution page warns before starting jobs for a worker that is down, and the Analysis page disables matching when the `pyqun` matcher is not running.

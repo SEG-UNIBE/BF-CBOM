@@ -34,6 +34,13 @@ else
   echo "pyproject.toml not found in repo root ($ROOT_DIR); skipping."
 fi
 
+# 2b) Update CITATION.cff version
+if [ -f CITATION.cff ]; then
+  echo "Updating CITATION.cff ..."
+  # portable (BSD/GNU sed): rewrite the existing top-level version line
+  sed -i.bak -E "s/^version: .*/version: $V/" CITATION.cff && rm -f CITATION.cff.bak
+fi
+
 # 3) Refresh uv.lock so version is consistent
 if command -v uv >/dev/null 2>&1; then
   echo "Syncing uv.lock ..."

@@ -1,15 +1,177 @@
+import json
 import logging
+import multiprocessing
 import os
+import signal
 import time
 import traceback
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
+from multiprocessing.connection import Connection
 
 import redis
 
 from .config import BLPOP_TIMEOUT_SEC, REDIS_HOST, REDIS_PORT, REDIS_SOCKET_TIMEOUT_SEC
 from .models import JobInstruction, JobResult, Trace
 from .utils import normalize_json
+
+# Seconds to wait for a job process to exit after SIGTERM before SIGKILL.
+_KILL_GRACE_SEC = 5.0
+# How often the parent wakes up while a job runs (used for heartbeats via on_tick).
+_TICK_SEC = 1.0
+# Attempts to push a result to Redis before giving up on it.
+_PUSH_ATTEMPTS = 6
+# Liveness key TTL; refreshed every BLPOP timeout while idle and every tick while busy.
+HEARTBEAT_TTL_SEC = max(30, BLPOP_TIMEOUT_SEC * 3)
+
+
+def heartbeat_key(worker_name: str) -> str:
+    return f"worker:{worker_name}:alive"
+
+
+def publish_heartbeat(r: redis.Redis, worker_name: str, state: str, job_id: str | None = None) -> None:
+    """Best-effort liveness marker read by the coordinator (missing key == worker down)."""
+    payload = json.dumps({"state": state, "job_id": job_id, "ts": time.time()})
+    try:
+        r.set(heartbeat_key(worker_name), payload, ex=HEARTBEAT_TTL_SEC)
+    except redis.exceptions.RedisError:
+        pass
+
+
+def _job_process_entry(conn: Connection, handle_instruction: Callable, instr: JobInstruction, worker_name: str) -> None:
+    """Child-process body: run the handler and send the JobResult JSON back over the pipe."""
+    # Own process group, so a timeout can kill grandchildren too (git, codeql, cdxgen, ...).
+    try:
+        os.setsid()
+    except OSError:
+        pass
+    try:
+        payload = handle_instruction(instr).to_json()
+    except BaseException:
+        payload = JobResult(
+            job_id=instr.job_id,
+            status="error",
+            repo_info=instr.repo_info,
+            json="{}",
+            size_bytes=0,
+            worker=worker_name,
+            error=traceback.format_exc(limit=8),
+        ).to_json()
+    try:
+        conn.send(payload)
+    finally:
+        conn.close()
+
+
+def _kill_process_group(proc: multiprocessing.process.BaseProcess, log: logging.Logger) -> None:
+    """Terminate a job process and everything it spawned (it runs in its own process group)."""
+    pid = proc.pid
+    if pid is None:
+        return
+    for sig, wait in ((signal.SIGTERM, _KILL_GRACE_SEC), (signal.SIGKILL, 2.0)):
+        if not proc.is_alive():
+            return
+        try:
+            os.killpg(pid, sig)
+        except ProcessLookupError:
+            return
+        except PermissionError:
+            # Not our process group (setsid failed); fall back to the process itself.
+            proc.terminate() if sig == signal.SIGTERM else proc.kill()
+        proc.join(wait)
+    if proc.is_alive():
+        log.error("Job process %s survived SIGKILL", pid)
+
+
+def run_job_with_timeout(
+    handle_instruction: Callable[[JobInstruction], JobResult],
+    instr: JobInstruction,
+    timeout_sec: float,
+    *,
+    worker_name: str,
+    log: logging.Logger | None = None,
+    on_tick: Callable[[], None] | None = None,
+) -> JobResult:
+    """Run `handle_instruction(instr)` in a forked subprocess with a hard deadline.
+
+    On timeout the whole process group is killed, so hung clones, CodeQL runs or API
+    calls cannot block the worker. A crash of the job process yields an "error" result
+    instead of taking the worker down.
+    """
+    log = log or logging.getLogger(worker_name)
+    ctx = multiprocessing.get_context("fork")
+    parent_conn, child_conn = ctx.Pipe(duplex=False)
+    proc = ctx.Process(
+        target=_job_process_entry,
+        args=(child_conn, handle_instruction, instr, worker_name),
+        name=f"{worker_name}-job-{instr.job_id[:8]}",
+    )
+    start = time.monotonic()
+    proc.start()
+    child_conn.close()
+
+    payload: str | None = None
+    deadline = start + timeout_sec
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        if parent_conn.poll(min(_TICK_SEC, remaining)):
+            try:
+                payload = parent_conn.recv()
+            except EOFError:
+                payload = None
+            break
+        if on_tick is not None:
+            try:
+                on_tick()
+            except Exception:
+                log.debug("on_tick failed", exc_info=True)
+        if not proc.is_alive():
+            # Exited without sending; drain anything that may have arrived in between.
+            if parent_conn.poll(0.1):
+                payload = parent_conn.recv()
+            break
+    elapsed = time.monotonic() - start
+
+    if payload is not None:
+        proc.join(_KILL_GRACE_SEC)
+        if proc.is_alive():
+            _kill_process_group(proc, log)
+        parent_conn.close()
+        return JobResult.from_json(payload)
+
+    if proc.is_alive():
+        log.error("Job %s timed out after %.1fs; killing job process", instr.job_id, elapsed)
+        _kill_process_group(proc, log)
+        status, error = "timeout", f"timeout after {elapsed:.1f}s (limit {timeout_sec:g}s); job process killed"
+    else:
+        log.error("Job %s process exited with code %s without a result", instr.job_id, proc.exitcode)
+        status, error = "error", f"job process exited with code {proc.exitcode} without returning a result"
+    parent_conn.close()
+    return JobResult(
+        job_id=instr.job_id,
+        status=status,
+        repo_info=instr.repo_info,
+        json="{}",
+        duration_sec=elapsed,
+        size_bytes=0,
+        worker=worker_name,
+        error=error,
+    )
+
+
+def _push_result(r: redis.Redis, name: str, result: JobResult, log: logging.Logger) -> bool:
+    payload = result.to_json()
+    for attempt in range(_PUSH_ATTEMPTS):
+        try:
+            r.rpush(f"results:{name}", payload)
+            return True
+        except redis.exceptions.RedisError as err:
+            delay = min(2**attempt, 10)
+            log.warning("Redis push failed for job %s (%s); retrying in %ss", result.job_id, err, delay)
+            time.sleep(delay)
+    log.error("Giving up on pushing result for job %s after %d attempts", result.job_id, _PUSH_ATTEMPTS)
+    return False
 
 
 def run_worker(
@@ -23,8 +185,8 @@ def run_worker(
     """
     Generic worker runner that:
     - Listens on Redis list `jobs:{name}` for JobInstruction JSON
-    - Executes `handle_instruction` with a thread + timeout
-    - Catches timeouts/errors and returns structured JobResult
+    - Executes `handle_instruction` in a subprocess with a hard timeout
+    - Catches timeouts/crashes and returns structured JobResult
     - Pushes results to `results:{name}`
     """
 
@@ -38,54 +200,39 @@ def run_worker(
         log.info("awaiting new jobs...\n\n")
         item = None
         while item is None:
-            item = r.blpop(f"jobs:{name}", timeout=BLPOP_TIMEOUT_SEC)  # None on timeout -> keep waiting
+            publish_heartbeat(r, name, "idle")
+            try:
+                item = r.blpop(f"jobs:{name}", timeout=BLPOP_TIMEOUT_SEC)  # None on timeout -> keep waiting
+            except redis.exceptions.RedisError as err:
+                log.error("Redis error while waiting for jobs: %s", err)
+                time.sleep(1)
         _, raw = item
-        instr = JobInstruction.from_json(raw)
+        try:
+            instr = JobInstruction.from_json(raw)
+        except Exception:
+            log.exception("Dropping malformed job payload: %.300s", raw)
+            continue
         log.info(
             "📨 Received job instruction for job %s (repo: %s)",
             instr.job_id,
             instr.repo_info.full_name,
         )
 
-        start = time.monotonic()
-        try:
-            with ThreadPoolExecutor(max_workers=1) as ex:
-                fut = ex.submit(handle_instruction, instr)
-                result: JobResult = fut.result(timeout=timeout_sec)
-        except TimeoutError:
-            elapsed = time.monotonic() - start
-            log.error("Job %s timed out after %.1fs", instr.job_id, elapsed)
-            result = JobResult(
-                job_id=instr.job_id,
-                status="timeout",
-                repo_info=instr.repo_info,
-                json="{}",
-                duration_sec=elapsed,
-                size_bytes=0,
-                worker=name,
-                error=f"timeout after {elapsed:.1f}s (limit {timeout_sec}s)",
-            )
-        except Exception:
-            elapsed = time.monotonic() - start
-            err = traceback.format_exc(limit=8)
-            log.exception("Unhandled error while processing job %s", instr.job_id)
-            result = JobResult(
-                job_id=instr.job_id,
-                status="error",
-                repo_info=instr.repo_info,
-                json="{}",
-                duration_sec=elapsed,
-                size_bytes=0,
-                worker=name,
-                error=err,
-            )
-
-        r.rpush(f"results:{name}", result.to_json())
-        log.info(
-            "📤 Sent job result for job %s (repo: %s)",
-            result.job_id,
-            result.repo_info.full_name,
+        result = run_job_with_timeout(
+            handle_instruction,
+            instr,
+            timeout_sec,
+            worker_name=name,
+            log=log,
+            on_tick=lambda: publish_heartbeat(r, name, "busy", instr.job_id),
         )
+
+        if _push_result(r, name, result, log):
+            log.info(
+                "📤 Sent job result for job %s (repo: %s)",
+                result.job_id,
+                result.repo_info.full_name,
+            )
         time.sleep(0.2)
 
 
@@ -114,10 +261,10 @@ def build_handle_instruction(
         start = time.monotonic()
         log.info("[%s] Running on repo %s", name, instr.repo_info.full_name)
         trace = Trace()
+        override_duration: float | None = None
         try:
             raw_or_tuple = produce_cbom(instr, trace)
             # Allow producers to override duration by returning (raw, duration_sec)
-            override_duration: float | None = None
             if isinstance(raw_or_tuple, tuple) and len(raw_or_tuple) == 2:
                 raw, override_duration = raw_or_tuple  # type: ignore[assignment]
             else:
@@ -144,11 +291,8 @@ def build_handle_instruction(
 
         duration = time.monotonic() - start
         # If producer provided a duration, prefer it
-        try:
-            if "override_duration" in locals() and isinstance(override_duration, int | float):
-                duration = float(override_duration)
-        except Exception:
-            pass
+        if isinstance(override_duration, int | float):
+            duration = float(override_duration)
         return JobResult(
             job_id=instr.job_id,
             status=status,

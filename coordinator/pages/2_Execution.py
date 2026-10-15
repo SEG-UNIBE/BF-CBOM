@@ -7,7 +7,10 @@ from common.utils import get_status_emoji
 from coordinator.logger_config import logger
 from coordinator.redis_io import (
     cancel_inspection,
+    JOB_SUMMARY_FIELDS,
     collect_results_once,
+    count_done_jobs,
+    dead_workers,
     get_insp_meta,
     get_insp_repos,
     get_insp_workers,
@@ -81,6 +84,12 @@ with left:
         unsafe_allow_html=True,
     )
     st.caption(f"Workers: {', '.join(workers) if workers else '(none)'} · Status: {status}")
+    down = dead_workers(r, workers)
+    if down and status in ("created", "running"):
+        st.warning(
+            "No live worker for: " + ", ".join(f"`{w}`" for w in down) + ". "
+            "Their jobs will stay pending until the container is up (`make ps`, `make logs`)."
+        )
 
     # Action controls
     if status == "running":
@@ -147,15 +156,18 @@ if not df.empty:
     # Initialize worker columns
     for w in workers:
         df[w] = ""
-    # Fill worker result cells
+    # Fill worker result cells (one pipelined round-trip; never loads the CBOM bodies)
+    cells: list[tuple[int, str, str]] = []
+    pipe = r.pipeline()
     for i, repo in enumerate(repos):
         full = repo.get("full_name")
         for w in workers:
             j_id = job_idx.get(pair_key(full, w))
             if j_id:
-                stt = r.hget(f"insp:{insp_id}:job:{j_id}", "status") or ""
-                raw = r.hget(f"insp:{insp_id}:job:{j_id}", "result_json")
-                df.at[i, w] = summarize_result_cell(stt, raw)
+                cells.append((i, w, j_id))
+                pipe.hmget(f"insp:{insp_id}:job:{j_id}", JOB_SUMMARY_FIELDS)
+    for (i, w, _), values in zip(cells, pipe.execute(), strict=True):
+        df.at[i, w] = summarize_result_cell(dict(zip(JOB_SUMMARY_FIELDS, values, strict=True)))
 
     show_cols = ["repo", "info", "url"] + workers
     view_df = df.loc[:, show_cols].copy()
@@ -169,13 +181,7 @@ if not df.empty:
     )
 
     # Progress (full width)
-    jobs = r.lrange(f"insp:{insp_id}:jobs", 0, -1) or []
-    done = 0
-    for job_id in jobs:
-        stt = r.hget(f"insp:{insp_id}:job:{job_id}", "status") or ""
-        if stt in ("completed", "failed", "cancelled"):
-            done += 1
-    total = len(jobs)
+    done, total = count_done_jobs(r, insp_id)
     if total > 0:
         st.progress(done / total, text=f"Completed {done}/{total}")
         st.caption(f"Expected jobs: {expected}")

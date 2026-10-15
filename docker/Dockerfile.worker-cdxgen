@@ -9,6 +9,11 @@ FROM ${CDXGEN_IMAGE}:${CDXGEN_TAG}
 # Stay root on purpose for this one worker
 USER root
 WORKDIR /app
+# The container runs with cap_drop=ALL, so root has no DAC_OVERRIDE: make the dirs cdxgen
+# writes to actually owned/writable by root (upstream ships /tmp/cdxgen-temp as uid 1000
+# and /root without the owner write bit).
+RUN chmod 0700 /root && mkdir -p /root/.m2 /tmp/cdxgen-temp \
+ && chown -R root:root /tmp/cdxgen-temp && chmod 1777 /tmp/cdxgen-temp
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONPATH=/app
 
 # Keep venv out of /app just to avoid lock/perm weirdness

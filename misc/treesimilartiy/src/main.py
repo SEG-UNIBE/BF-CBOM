@@ -10,6 +10,7 @@ import redis
 
 from common.config import BLPOP_TIMEOUT_SEC, REDIS_HOST, REDIS_PORT, REDIS_SOCKET_TIMEOUT_SEC
 from common.models import ComponentMatchJobInstruction, ComponentMatchJobResult
+from common.worker import publish_heartbeat
 
 NAME = Path(__file__).resolve().parents[1].name
 JOB_QUEUE = f"jobs:{NAME}"
@@ -214,6 +215,7 @@ def main() -> None:
 
     try:
         while True:
+            publish_heartbeat(redis_client, NAME, "idle")
             try:
                 item = redis_client.blpop(JOB_QUEUE, timeout=BLPOP_TIMEOUT_SEC)
             except redis.exceptions.RedisError as err:
@@ -225,6 +227,7 @@ def main() -> None:
             _, raw_payload = item
             if not raw_payload:
                 continue
+            publish_heartbeat(redis_client, NAME, "busy")
             _handle_instruction(raw_payload)
     except KeyboardInterrupt:
         logger.info("Received shutdown signal, stopping listener")
