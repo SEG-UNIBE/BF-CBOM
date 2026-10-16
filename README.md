@@ -393,6 +393,7 @@ make corpus ARGS="--per-language 100"           # stratified GitHub corpus with 
 make experiment EXP=experiments/e0-micro.yaml   # every tool on the hand-written micro projects (corpus/micro)
 make analysis ARGS="micro e0-micro"             # recall/precision per tool against corpus/micro/ground_truth.yaml
 make analysis ARGS="sites e0-micro"             # location-aware agreement between tools (analysis/match.py)
+make analysis ARGS="tables e0-micro"            # flat CSV tables (runs, sites, clusters, micro) for pandas/R
 ```
 
 #### Parallelism and Memory

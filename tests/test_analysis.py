@@ -193,3 +193,91 @@ def test_score_sites_lenient_and_false_positives():
     assert score.sites == 4 and score.sites_in_file == 3 and score.sites_correct == 2
     assert score.false_sites == [{"line": 23, "families": ["MD5"], "raw": []}]
     assert score.passes_bar is False and "sha-256" in score.missed
+
+
+# ----- CSV tables -----
+
+SNAPSHOT = "bfcbom__micro-java@0123456789ab"
+
+
+def _fake_experiment(root: Path) -> Path:
+    """Tiny stored experiment: two ok runs on micro-java plus one unsupported run without a CBOM."""
+    exp = root / "exp-tables"
+    exp.mkdir()
+    (exp / "experiment.yaml").write_text(
+        "name: exp-tables\ntools: [cbomkit, cipherradar, pqcheck]\nrepos:\n"
+        "  - full_name: bfcbom/micro-java\n    language: Java\n",
+        encoding="utf-8",
+    )
+    for tool in ("cbomkit", "cipherradar", "pqcheck"):
+        d = exp / SNAPSHOT / "original" / tool
+        d.mkdir(parents=True)
+        meta = {"worker": tool, "run_index": 1, "variant": "original", "base_commit": "0123456789ab" + "0" * 28}
+        if tool == "pqcheck":
+            meta.update(status="unsupported", language="Java")
+        else:
+            meta.update(status="ok", duration_sec=1.5, tool_version="1.0")
+            (d / "run1.json").write_text(json.dumps(_cbom(f"{tool}_micro-java")), encoding="utf-8")
+        (d / "run1.meta.json").write_text(json.dumps(meta), encoding="utf-8")
+    return exp
+
+
+def _read_csv(path: Path) -> list[dict]:
+    import csv
+
+    with path.open(encoding="utf-8", newline="") as fh:
+        return list(csv.DictReader(fh))
+
+
+def test_run_rows_counts_and_unsupported(tmp_path):
+    from analysis.tables import run_rows
+
+    rows = {r["tool"]: r for r in run_rows(_fake_experiment(tmp_path))}
+    assert set(rows) == {"cbomkit", "cipherradar", "pqcheck"}
+    assert rows["pqcheck"]["status"] == "unsupported" and "components" not in rows["pqcheck"]
+    cbom = _cbom("cbomkit_micro-java")
+    assert rows["cbomkit"]["components"] == len(cbom["components"])
+    assert rows["cbomkit"]["repo"] == "bfcbom/micro-java" and rows["cbomkit"]["snapshot"] == SNAPSHOT
+    assert 0 < rows["cbomkit"]["algorithm_assets"] <= rows["cbomkit"]["crypto_assets"]
+
+
+def test_write_csv_round_trip_and_empty_header(tmp_path):
+    from analysis.tables import RUNS_COLUMNS, write_csv
+
+    assert write_csv(tmp_path / "empty.csv", [], RUNS_COLUMNS) == 0
+    assert (tmp_path / "empty.csv").read_text(encoding="utf-8") == ",".join(RUNS_COLUMNS) + "\n"
+    write_csv(tmp_path / "x.csv", [{"a": ["x", "y"], "b": None, "c": True}], ["a", "b", "c"])
+    assert _read_csv(tmp_path / "x.csv") == [{"a": "x;y", "b": "", "c": "true"}]
+
+
+def test_tables_command_writes_joinable_tables(tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+
+    from analysis import tables as tbl
+    from misc.cli import analysis_cmd
+
+    exp = _fake_experiment(tmp_path)
+    monkeypatch.setattr(analysis_cmd, "experiment_dir", lambda name: tmp_path / name)
+    result = CliRunner().invoke(analysis_cmd.analysis_app, ["tables", "exp-tables"])
+    assert result.exit_code == 0, result.output
+    out = exp / "analysis"
+    expected = ["runs.csv", "sites-run1.csv", "groups-callsite-run1.csv", "members-callsite-run1.csv"]
+    assert all((out / f).exists() for f in expected + ["micro-run1.csv", "tables-run1.json"])
+
+    sites = _read_csv(out / "sites-run1.csv")
+    groups = _read_csv(out / "groups-callsite-run1.csv")
+    members = _read_csv(out / "members-callsite-run1.csv")
+    assert list(sites[0]) == tbl.SITES_COLUMNS and list(groups[0]) == tbl.CALLSITE_GROUP_COLUMNS
+    record_ids = [s["record_id"] for s in sites]
+    assert len(record_ids) == len(set(record_ids))
+    group_ids = {g["group_id"] for g in groups}
+    assert {m["record_id"] for m in members} <= set(record_ids) and {m["group_id"] for m in members} == group_ids
+    in_scope = {s["record_id"] for s in sites if s["in_scope"] == "true"}
+    assert sorted(m["record_id"] for m in members) == sorted(in_scope)
+    for g in groups:
+        assert int(g["n_sites"]) == sum(m["group_id"] == g["group_id"] for m in members)
+    assert {g["k"] for g in groups} == {"2"} and len(groups) == 12  # as in test_two_tools_agree_on_micro_java
+
+    micro = {r["tool"]: r for r in _read_csv(out / "micro-run1.csv")}
+    assert set(micro) == {"cbomkit", "cipherradar"} and micro["cbomkit"]["language"] == "java"
+    assert json.loads((out / "tables-run1.json").read_text())["rows"]["runs.csv"] == 3
