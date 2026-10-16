@@ -237,3 +237,5 @@ ruff.toml
 
 .idea/
 notes.md
+
+exports/*.zip
