@@ -139,7 +139,11 @@ def extract_sites(
         name = str(comp.get("name") or "")
         rule_text = next((rule_id_to_text(props[k]) for k in _RULE_PROPS if props.get(k)), None)
         ap = cp.get("algorithmProperties") or {}
-        families = table.classify(name, rule_text, ap.get("curve"), ap.get("parameterSetIdentifier"))
+        # algorithmFamily: CycloneDX 1.7; tools that name a component after the API call (`GCMParameterSpec`)
+        # often state the family only there
+        families = table.classify(
+            name, rule_text, ap.get("algorithmFamily"), ap.get("curve"), ap.get("parameterSetIdentifier")
+        )
         occs = _occurrences(comp, props)
         if not occs:
             stats.no_location += 1

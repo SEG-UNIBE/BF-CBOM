@@ -1,0 +1,51 @@
+# syntax=docker/dockerfile:1.7
+# docker/Dockerfile.worker-crypsy-bfcbom
+# Crypsy, BF-CBOM adaptation: Crypsy 0.2.0 by Näther & Hirsch (arXiv 2608.04857) with Java and Python
+# discovery added for BF-CBOM, built from our public GitHub repo at a pinned commit (CRYPSY_REPO,
+# CRYPSY_COMMIT; bump deliberately, see notes.md "Crypsy").
+ARG BASE_IMAGE=base
+ARG BASE_TAG=latest
+
+# ---- build stage: install the tool exactly as it was tested, then run its own selfcheck
+FROM ${BASE_IMAGE}:${BASE_TAG} AS crypsy
+ARG CRYPSY_REPO=
+ARG CRYPSY_COMMIT=
+
+USER root
+RUN set -eu; \
+    if [ -z "${CRYPSY_REPO}" ] || [ -z "${CRYPSY_COMMIT}" ]; then \
+      echo "CRYPSY_REPO / CRYPSY_COMMIT are not set in docker/Dockerfile.worker-crypsy-bfcbom (notes.md, Crypsy)" >&2; \
+      exit 1; \
+    fi; \
+    git clone --quiet "${CRYPSY_REPO}" /opt/crypsy; \
+    git -C /opt/crypsy checkout --quiet "${CRYPSY_COMMIT}"; \
+    rm -rf /opt/crypsy/.git
+# requirements.lock = the exact versions the tool was tested with; editable install as in its scripts/install.sh
+RUN --mount=type=cache,target=/root/.cache/uv set -eu; \
+    uv venv --quiet --python /usr/local/bin/python3 /opt/crypsy/venv; \
+    uv pip install --quiet --python /opt/crypsy/venv/bin/python -r /opt/crypsy/requirements.lock; \
+    uv pip install --quiet --python /opt/crypsy/venv/bin/python --no-deps -e /opt/crypsy/crypsy
+# The tool's own check (unit tests, fixture scans, the authors' Cryben benchmark at P >= 0.857 / R >= 0.670):
+# no image unless it ends with SELFCHECK OK, so this install reproduces the tested one.
+RUN /opt/crypsy/scripts/selfcheck.sh \
+ && /opt/crypsy/venv/bin/python -m compileall -q /opt/crypsy/crypsy/src
+
+# ---- runtime
+FROM ${BASE_IMAGE}:${BASE_TAG}
+ARG CRYPSY_COMMIT=
+COPY --from=crypsy /opt/crypsy /opt/crypsy
+# the commit goes into the recorded tool version (provenance of every run)
+ENV CRYPSY_HOME=/opt/crypsy CRYPSY_COMMIT=${CRYPSY_COMMIT}
+
+USER appuser
+WORKDIR /app
+ENV PYTHONPATH=/app
+
+COPY --chown=appuser:appuser pyproject.toml uv.lock ./
+COPY --chown=appuser:appuser common/ ./common/
+RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=1000,gid=1000 \
+    uv sync --frozen --no-dev
+
+COPY --chown=appuser:appuser workers/crypsy-bfcbom/ ./workers/crypsy-bfcbom/
+
+ENTRYPOINT ["tini", "-g", "--", "uv", "run", "--frozen", "--no-dev", "workers/crypsy-bfcbom/main.py"]

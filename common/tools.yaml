@@ -5,7 +5,8 @@
 # only for those; for the others our adapter produces the CBOM). `languages` is the tool's declared
 # scope: a repo in another language is "not supported", never "failed" (pilot recommendation).
 # `status`: integrated (worker exists) | candidate (passed the pilot's inclusion bar, worker pending)
-#          | blocked (needs access, see CLAUDE.md) | excluded (failed the bar; kept for RQ1/RQ2 only).
+#          | blocked (needs access, see CLAUDE.md) | excluded (failed the bar; kept for RQ1/RQ2 only)
+#          | prepared (worker ready, but kept out of AVAILABLE_WORKERS and the specs until its source is public).
 # Pilot verdicts (2026-10-08, docs/pilot-2026-10-08/README.md): pass/borderline/fail per language.
 # `memory_gb`: the worker's compose memory limit (docker-compose.yml, kept equal by a test); the batch
 #   runner sums it over the tools it feeds at once to stay within EXPERIMENT_MEMORY_BUDGET_GB (waves).
@@ -117,7 +118,7 @@ tools:
     pilot: {java: pass, python: pass, go: fail, c: fail, javascript: fail}
     notes: must run offline (online it fetches extra rules from semgrep.dev, which changes results); its cdxgen layer is broken with cdxgen 12
   cipherradar:
-    micro_2026-10-15: {java: 11/11, python: 8/11, go: 9/11, javascript: 9/11, c: 2/11 strict (6 lenient)}
+    micro_2026-10-15: {java: 11/11, python: 8/11, go: 9/11, javascript: 9/11, c: 4/11}   # c was 2 strict / 6 lenient before the analysis read algorithmFamily (2026-10-16); its C families are guesses
     engine: opengrep-rules          # github.com/nk-sentinel/cipherradar efa5d9d, opengrep rules + tree-sitter + YARA
     memory_gb: 4
     approach: patterns (opengrep) + syntax tree
@@ -127,6 +128,24 @@ tools:
     status: integrated             # workers/cipherradar
     pilot: {java: borderline, python: pass, go: pass, javascript: pass, c: fail}
     notes: very noisy solo findings (17-31 % precise when alone in the pilot); needs writable XDG_* dirs or opengrep dies silently
+
+  # ---- prepared 2026-10-16, inactive until our adaptation's public GitHub repo exists (notes.md "Crypsy")
+  crypsy-bfcbom:
+    micro_2026-10-16: {java: 11/11, python: 11/11, go: 11/11}   # tailored on these projects, see tailored_on
+    engine: crypsy                  # Crypsy 0.2.0 (Näther & Hirsch, arXiv 2608.04857) + our adaptation 0.2.0+bfcbom.1 (public GitHub repo, commit pinned in the Dockerfile), rule registry Crypistry kb 0.9.2
+    memory_gb: 4
+    approach: syntax tree (tree-sitter) + rule registry (Crypistry YAML rules, one per primitive/family/variant)
+    native_cyclonedx: true          # CycloneDX 1.7, family in algorithmProperties.algorithmFamily
+    languages: [java, python, go, ruby]
+    voter_group: crypsy
+    status: prepared                # workers/crypsy-bfcbom; report it as "Crypsy (BF-CBOM adaptation)", not as the authors' Crypsy
+    tailored_on: [corpus/micro, corpus/pilot-2026-10-08]   # its last fixes were chosen from failures on these: no held-out data for it
+    notes: >
+      Java/Python parsers and rules were written by Claude agents (as were the micro projects and their ground
+      truth). Colleague's benchmark (BENCHMARK.md in the bundle): micro 11/11 for Java, Python and Go; authors'
+      Cryben P 0.857 / R 0.670 (original 0.844 / 0.629). Reports non-crypto PRNG use as related-crypto-material
+      (dropped by the analysis), unresolved algorithm strings as *.unresolved without a family, dependencies and
+      key files without a line. No inter-procedural data flow.
 
   # ---- blocked on access (CLAUDE.md, Phase 2)
   scanoss:

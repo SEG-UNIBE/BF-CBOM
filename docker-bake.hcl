@@ -175,3 +175,12 @@ target "worker-xgrep" {
   dockerfile = "docker/Dockerfile.worker-xgrep"
   tags       = ["bf-cbom/worker-xgrep:${VERSION}"]
 }
+
+# Crypsy, BF-CBOM adaptation, built from our public GitHub repo at a pinned commit (notes.md, "Crypsy").
+# Outside the default group only until CRYPSY_REPO / CRYPSY_COMMIT are set in its Dockerfile; then it
+# joins the default group (and the compose service the prod profile).
+target "worker-crypsy-bfcbom" {
+  inherits   = ["_from-base"]
+  dockerfile = "docker/Dockerfile.worker-crypsy-bfcbom"
+  tags       = ["bf-cbom/worker-crypsy-bfcbom:${VERSION}"]
+}

@@ -24,6 +24,7 @@ import tempfile
 import time
 from pathlib import Path
 
+from common.cbom_adapters import strip_location_prefixes
 from common.models import JobInstruction, Trace
 from common.utils import clone_repo
 from common.worker import build_handle_instruction, run_worker
@@ -55,19 +56,7 @@ def indexing_risk(repo_path: Path) -> bool:
 
 def relativize_locations(cbom: dict, repo_path: Path) -> int:
     """The jar writes locations relative to its working directory (`repo/src/...`); make them repo-relative."""
-    prefixes = (f"{repo_path.name}/", str(repo_path).rstrip("/") + "/")
-    fixed = 0
-    for comp in cbom.get("components") or []:
-        for occ in ((comp.get("evidence") or {}).get("occurrences") or []) if isinstance(comp, dict) else []:
-            loc = occ.get("location") if isinstance(occ, dict) else None
-            if not isinstance(loc, str):
-                continue
-            for prefix in prefixes:
-                if loc.startswith(prefix):
-                    occ["location"] = loc[len(prefix) :]
-                    fixed += 1
-                    break
-    return fixed
+    return strip_location_prefixes(cbom, (f"{repo_path.name}/", str(repo_path).rstrip("/") + "/"))
 
 
 def run_action_jar(repo_path: Path, work: Path, languages: str, trace: Trace, *, timeout: float) -> Path:
