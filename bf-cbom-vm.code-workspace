@@ -1,0 +1,25 @@
+{
+  // Open this file on the VM (File > Open Workspace from File...) to get brick red bars there.
+  // Locally, open the folder itself: .vscode/settings.json gives the bright red.
+  "folders": [{ "path": "." }],
+  "settings": {
+    "workbench.colorCustomizations": {
+      "titleBar.activeBackground": "#b71c1c",
+      "titleBar.activeForeground": "#ffffff",
+      "titleBar.inactiveBackground": "#8f1a1a",
+      "titleBar.inactiveForeground": "#ffffffcc",
+      "titleBar.border": "#7f1515",
+      "commandCenter.background": "#ffffff26",
+      "commandCenter.foreground": "#ffffff",
+      "commandCenter.activeBackground": "#ffffff40",
+      "commandCenter.border": "#ffffff66",
+      "activityBar.background": "#b71c1c",
+      "activityBar.foreground": "#ffffff",
+      "activityBar.inactiveForeground": "#ffffffb3",
+      "activityBar.activeBorder": "#ffffff",
+      "activityBar.border": "#7f1515",
+      "activityBarBadge.background": "#ffffff",
+      "activityBarBadge.foreground": "#b71c1c"
+    }
+  }
+}

@@ -1,6 +1,23 @@
 {
-      "workbench.colorCustomizations": {
-        "activityBar.background": "#f52929",
-        "titleBar.activeBackground": "#f52929",
-    },
+  // Local workstation: bright red bars. On the VM, open bf-cbom-vm.code-workspace instead of the folder:
+  // a workspace file's colors replace these (folder-level window settings are ignored in a workspace).
+  "workbench.colorCustomizations": {
+    "titleBar.activeBackground": "#f52929",
+    "titleBar.activeForeground": "#ffffff",
+    "titleBar.inactiveBackground": "#c42121",
+    "titleBar.inactiveForeground": "#ffffffcc",
+    "titleBar.border": "#a51b1b",
+    // darker translucent box behind the command center keeps its text readable on the bright red
+    "commandCenter.background": "#00000040",
+    "commandCenter.foreground": "#ffffff",
+    "commandCenter.activeBackground": "#00000059",
+    "commandCenter.border": "#00000026",
+    "activityBar.background": "#f52929",
+    "activityBar.foreground": "#ffffff",
+    "activityBar.inactiveForeground": "#ffffffcc",
+    "activityBar.activeBorder": "#ffffff",
+    "activityBar.border": "#a51b1b",
+    "activityBarBadge.background": "#ffffff",
+    "activityBarBadge.foreground": "#c42121"
+  }
 }
