@@ -100,7 +100,16 @@ tree-sitter and data-flow scanner for Java, Python, Go and JS/TS, CycloneDX 1.6.
 **🚩 1. Docker**
 
 BF-CBOM is a multi-container environment (Redis, the coordinator UI, and one container per CBOM generation tool), so Docker must be installed locally.
-Install **Docker Desktop** using the official guide for [macOS](https://docs.docker.com/desktop/setup/install/mac-install/) or [Windows](https://docs.docker.com/desktop/setup/install/windows-install/).
+
+- **macOS / Windows:** install **Docker Desktop** using the official guide for [macOS](https://docs.docker.com/desktop/setup/install/mac-install/) or [Windows](https://docs.docker.com/desktop/setup/install/windows-install/).
+- **Linux (Ubuntu, Debian, …):** install **Docker Engine** with the Compose and Buildx plugins. Docker's convenience script does all three; afterwards add yourself to the `docker` group and log out and in again:
+
+  ```bash
+  curl -fsSL https://get.docker.com | sudo sh
+  sudo usermod -aG docker $USER
+  ```
+
+  Avoid the distribution package `docker.io`: it often lacks the Compose plugin (`docker compose`, without hyphen) that BF-CBOM needs. The [official apt repository](https://docs.docker.com/engine/install/ubuntu/) is the alternative to the script.
 
 After installation, open a new terminal and run the following command to confirm that Docker and Docker Compose are available.
 If everything is set up correctly, you will see two version strings.
@@ -150,7 +159,7 @@ make up-prod-pull
 ```
 
 Open [http://localhost:8501](http://localhost:8501) once the containers are up, and stop the stack anytime with `Ctrl+C`.
-The images need roughly 20 GB of disk space.
+The images need roughly 30 GB of disk space. Plan for at least 100 GB free if you build images yourself (see [Disk Space](#disk-space)).
 
 ### Building the Images Yourself
 
@@ -211,8 +220,8 @@ In this option, you will build and compose the docker compose environment direct
 **🚩 4. Build using Makefile**
 
 The project uses [GNU Make](https://www.gnu.org/software/make/) to simplify container orchestration.
-Most Linux distributions include `make` by default.
-On macOS, it comes with the *Xcode command line tools*, which you can install by running `xcode-select --install` in a terminal if not already present.
+- **Linux:** desktop distributions usually include it; minimal and server images (e.g. Ubuntu Server, cloud VMs) often do not: `sudo apt install -y make`.
+- **macOS:** it comes with the *Xcode command line tools*, which you can install by running `xcode-select --install` in a terminal if not already present.
 
 From the repository's root folder, start the full stack of services with:
 
@@ -223,15 +232,10 @@ make up-prod
 Note that it can take up to 20 minutes, depending on your hardware and internet speed.
 
 Docker Compose will launch and manage all containers. Stop the stack anytime with `Ctrl+C`.
+The command stays attached to the terminal.
+Run further commands (e.g. `make experiment`) in a second terminal.
 
-**🚩 5. Local CLI (optional)**
-
-If `make up-prod` completed successfully and the containers are running, you can also interact with BF-CBOM through its command-line interface (CLI).
-From the repository's root folder, run:
-
-```bash
-uv run misc/cli/cli.py
-```
+For the command-line interface, see [Local CLI](#local-cli-optional) below.
 
 #### Windows
 
@@ -264,23 +268,38 @@ Because the CLI runs locally, a minimal Python setup is required before invoking
 
 **🎏 1. Python and `uv`**
 
-Install Python 3.12 and `uv`, the dependency manager used by BF-CBOM.
+Install `uv`, the dependency manager used by BF-CBOM. It downloads a matching Python 3.12 by itself when none is installed.
 
-- For Python, download at least the version 3.12 from the [official site](https://www.python.org/downloads/).
-- To install `uv`, follow the `curl` instructions on [uv's webpage](https://docs.astral.sh/uv/#installation).
+- **macOS:** `brew install uv`
+- **Linux:** Ubuntu and Debian do not package `uv`; use the official installer and open a new shell afterwards:
 
-> [!NOTE]
-> Using a package manager is often easiest: `brew install python@3.12 uv` on macOS, or `sudo apt-get install python3.12 uv` on Linux.
+  ```bash
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  ```
+
+- **Windows:** see the [installation options on uv's webpage](https://docs.astral.sh/uv/#installation).
 
 **🎏 2. Launch CLI**
 
-From the repository's root folder, run:
+From the repository's root folder, create the environment once and run the CLI:
 
 ```bash
+uv sync
 uv run misc/cli/cli.py
 ```
 
 The command prints the CLI's commands and options in the terminal.
+The host CLI reaches the running stack through Redis on `127.0.0.1:6379`.
+Batch experiments, corpus building and analysis are different: they need the Docker volumes and the internal git server, so always start them with `make experiment`, `make corpus` and `make analysis`, which run the same CLI inside the `runner` container.
+
+### Disk Space
+
+Every image rebuild leaves the previous version behind as an untagged image, and the build cache grows with each build. When Docker's disk fills up, Redis can no longer write its snapshot and rejects all writes with `MISCONF ... unable to persist to disk`. Check with `docker system df` and clean up after a series of rebuilds; this keeps tagged images and all volumes (results, git mirrors):
+
+```bash
+docker image prune -f
+docker builder prune -f --keep-storage 10GB
+```
 
 ## Developer Notes
 
