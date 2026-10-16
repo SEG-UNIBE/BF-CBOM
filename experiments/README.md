@@ -10,7 +10,24 @@ make experiment-export NAME=e0-smoke               # exports/e0-smoke.zip (only 
 make corpus ARGS="--per-language 100"              # stratified corpus -> results volume corpus/corpus.yaml
 ```
 
-Spec format (`experiments/<name>.yaml`):
+## Specs in this folder
+
+| Spec | Tools | Repos | Purpose |
+|---|---|---|---|
+| `e0-smoke.yaml` | cdxgen, cryptobomforge | 2 | first pipeline test: pin, mirror to the git server, run, persist |
+| `e0-cbomkit-smoke.yaml` | cbomkit | 1 | CBOMkit (server image) through the local git server over TLS |
+| `e0-llm-smoke.yaml` | deepseek | 1 | the code-reading LLM worker on its own (needs `DEEPSEEK_API_KEY`) |
+| `e0-phase2-smoke.yaml` | deepseek, cryptoscan | 2 | the Phase 2 workers together |
+| `e0-micro.yaml` | all eleven generators | 5 micro projects (`corpus/micro`) | inclusion check against the hand-written ground truth; analyse with `make analysis ARGS="micro e0-micro"` |
+| `e1-pilot-corpus.yaml` | all eleven generators | 16 real projects (`corpus/pilot-2026-10-08.yaml`) | first real workload: location-aware agreement on the pilot's pinned projects; large repos (Kafka, Keycloak) push CBOMkit towards its timeout |
+
+The smoke tests are quick checks after changing a single worker. The plan's main experiments (E0 stability
+with three repetitions, E1 on the full ~200-repo corpus, E4 on mutants; see `CLAUDE.md`, Phase 5) have no
+specs yet; E1 needs the corpus from `make corpus` first.
+
+## Spec format
+
+Each spec is one `experiments/<name>.yaml`. An example with every field:
 
 ```yaml
 name: e1-corpus            # [A-Za-z0-9._-]
@@ -50,9 +67,53 @@ enqueued and stored in the experiment's Redis status (`waves`, `wave`). `--no-wa
 first wave; after `experiment collect` rerun `run` for the next one. Jobs left pending by an interrupted
 run are already in the queues and are collected in wave 1 regardless of the budget.
 
-Offline analysis of a stored experiment (`analysis/`, no Redis), results under `<exp>/analysis/` on the volume:
+## Analysis
+
+The analysis (`analysis/`) works offline: it reads the stored CBOMs from the results volume and needs neither Redis
+nor running workers. It uses only runs with status `ok` (failed, timed-out and `unsupported` runs are skipped) and,
+by default, only algorithm assets and repetition 1.
 
 ```
-make analysis ARGS="micro e0-micro"   # recall/precision per tool on the micro projects (corpus/micro/ground_truth.yaml)
-make analysis ARGS="sites e0-micro"   # call-site clusters across tools: k distribution, confirmed/solo per tool
+make analysis ARGS="micro e0-micro"   # score each tool against the micro projects' ground truth
+make analysis ARGS="sites e0-micro"   # match call sites across tools and count how many agree
 ```
+
+**`micro <exp>`** scores every tool on the micro projects (`corpus/micro`, repos named `<owner>/micro-<language>`)
+against `corpus/micro/ground_truth.yaml`, 11 known crypto assets per project. It prints one row per project and tool:
+
+| Column | Meaning |
+|---|---|
+| strict | assets found at their ground-truth line with a compatible algorithm family, out of 11 |
+| lenient | assets found at the right line, family compatible or unknown |
+| precision | correct sites out of all sites the tool reported in the micro source file; a site is correct on an asset line or a line the ground truth marks as related or accepted |
+| bar | `pass` when lenient recall is at least 50 % (the pilot's inclusion bar) |
+| missed | ids of the assets the tool did not find |
+
+**`sites <exp>`** extracts every reported location (file, line, algorithm family) and clusters sites of different
+tools that lie in the same file within ±2 lines and share a family. Per repository it prints the number of sites and
+clusters, the distribution of k (how many tools agree on a cluster) and per tool how many of its clusters are
+confirmed by at least one other tool or solo. Options: `--window N` for the line distance, `--match-unknown` to let
+sites of unknown family join clusters (off: it inflates weak tools), `--all-assets` to keep keys, certificates and
+protocols, `--run K` for another repetition (also available for `micro`).
+
+Both commands write to the experiment's folder on the volume:
+
+```
+<exp>/analysis/
+├── micro-run1.json                       # micro: one object per (project, tool): recalls, hits, missed, precision, false sites, passes_bar
+├── sites-run1.json                       # sites: settings, per repo extraction counts + agreement summary, overall k distribution
+└── <owner>__<repo>@<sha12>/<variant>/
+    └── clusters.jsonl                    # sites: one cluster per line: file, line range, k, tools, families, member sites
+```
+
+In `sites-run1.json`, `extraction` explains what was dropped per tool (components, occurrences, sites without a
+location, out-of-scope files, unknown families with the 25 most frequent unknown names), and `agreement` holds the k
+distribution, per-tool confirmed/solo counts and pairwise Jaccard similarity between tools.
+
+**Export.** The analysis files live inside the experiment folder, so the normal export takes them along together with
+the spec, `lock.json`, every CBOM and its meta file:
+
+```
+make experiment-export NAME=e0-micro   # -> exports/e0-micro.zip on the host
+```
+
