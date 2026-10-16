@@ -1,7 +1,7 @@
 {
-  // Open this file on the VM (File > Open Workspace from File...) to get brick red bars there.
+  // Lives in .vscode/, so the folder path is "..", the repo root. Open this file on the VM (File > Open Workspace from File...) to get brick red bars there.
   // Locally, open the folder itself: .vscode/settings.json gives the bright red.
-  "folders": [{ "path": "." }],
+  "folders": [{ "path": ".." }],
   "settings": {
     "workbench.colorCustomizations": {
       "titleBar.activeBackground": "#b71c1c",
