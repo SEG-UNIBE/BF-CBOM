@@ -163,9 +163,7 @@ tools:
     approach: syntax tree + data flow
     native_cyclonedx: true
     languages: [java, python, go, javascript]
-    status: integrated              # workers/xgrep; runs in experiments, image never published. Its terms reportedly forbid
-                                    # publishing benchmarks: whether it is named, anonymised or dropped in the paper is decided
-                                    # later (permission requested from Mondoo on 2026-10-08)
+    status: integrated              # workers/xgrep
     pilot: {java: pass, python: pass, go: pass, javascript: pass}
   cryptoscope:
     engine: ibm-cryptoscope

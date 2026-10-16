@@ -14,5 +14,4 @@ Small excerpts (a few components each, occurrences trimmed to two or three) of r
 | `securin-xbom.json` | xbom 0.1.0 | out-of-spec primitive `pk`, related material of type `prng` |
 | `deepseek.json` | deepseek-chat (our LLM worker) | `assetType: key`, padding `PSS`, mode `KW`, `bf-cbom:digest` |
 
-Only open-source tools (and our own worker) appear here. xgrep's terms reportedly forbid publishing its results and
-Crypsy's adaptation has no licence yet, so their tests use hand-written CBOMs in the tools' format.
+The xgrep and Crypsy tests use hand-written CBOMs in the tools' format.

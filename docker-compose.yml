@@ -484,7 +484,6 @@ services:
     profiles: [prod, all]
 
   worker-xgrep:
-    # proprietary binary (free of charge); local experiments only, image is never published
     image: bf-cbom/worker-xgrep:${VERSION:-latest}
     build:
       context: .

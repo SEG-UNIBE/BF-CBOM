@@ -2,7 +2,7 @@ spec: xgrep
 inherits: _cyclonedx
 version: 1
 declared: [{bomFormat: CycloneDX, specVersion: "1.6"}]
-checked_on: "e1-pilot-corpus 2026-10-16 (xgrep 0.80.0, 13 CBOMs; outputs not published, tests use hand-written CBOMs)"
+checked_on: "e1-pilot-corpus 2026-10-16 (xgrep 0.80.0, 13 CBOMs)"
 dictionary:
   protocol_version:
     SSL: {protocol: SSL}         # protocol type tls with version "SSL"

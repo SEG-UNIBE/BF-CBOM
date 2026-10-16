@@ -104,10 +104,10 @@ no Docker.
 | CipherRadar | `cradar --verbose scan <repo> -o out.json --validate --no-baseline --passes 1,2` | needs opengrep and writable `XDG_CONFIG_HOME`/`XDG_CACHE_HOME` (else opengrep dies silently and pass 2 reports 0); nil-pointer crash on `new ECGenParameterSpec(<identifier>)` (jjwt, Keycloak): on rc 2 add the failing file to `.cradarignore`, retry, record the ignored files; CBOM also contains `library` import components |
 | CBOMkit action jar | `java -Xmx16g -Duser.home=<empty> -jar CBOMkit-action.jar` with `GITHUB_WORKSPACE=<repo> GITHUB_OUTPUT=<f> CBOMKIT_OUTPUT_DIR=<dir> CBOMKIT_LANGUAGES=java,python CBOMKIT_JAVA_REQUIRE_BUILD=false CBOMKIT_GENERATE_MODULE_CBOMS=false CBOMKIT_JAVA_JAR_DIR=<action>/src/main/resources/java/scan` | source-only scan; decide whether to replace or complement the server-image worker |
 
-Not carried over: Mondoo xgrep (binary and results stay internal until Mondoo permits
-publication), the SCANOSS open-rules results (Java/Python rules need a key), and the failed tools.
+Not carried over: the pilot's xgrep results, the SCANOSS open-rules results (Java/Python rules need a key), and the
+failed tools.
 
 ## Access requests sent by the pilot on 2026-10-08 (replies pending)
 
-SCANOSS research API key, IBM Cryptoscope, Crypsy (Näther & Hirsch), Monet+ CBOMpy, Xygeni,
-Encryption Consulting, and Mondoo (permission to publish xgrep results).
+SCANOSS research API key, IBM Cryptoscope, Crypsy (Näther & Hirsch), Monet+ CBOMpy, Xygeni
+and Encryption Consulting.

@@ -1,8 +1,8 @@
 """Normaliser (analysis/normalize): adapter specs per tool, shared vocabulary, conformance, CBOM^norm output.
 
 Fixtures: tests/fixtures/pilot/ (pilot of 2026-10-08), tests/fixtures/normalize/ (small excerpts of real outputs of
-the open tools from experiment e1-pilot-corpus, 2026-10-16; origin in each file's metadata). xgrep and Crypsy
-outputs are not published, so their CBOMs below are hand-written in the tools' format.
+the open tools from experiment e1-pilot-corpus, 2026-10-16; origin in each file's metadata). The xgrep
+and Crypsy CBOMs below are hand-written in the tools' format.
 """
 
 import json

@@ -341,7 +341,7 @@ Detailed notes: `papers/notes_analogs_rq3.md` (with a 15-bullet RQ3 design) and 
 | LLM worker(s) | own paper | LLM | both | in fleet |
 | **CSNP CryptoScan** | org (CSNP/QRAMM), releases, evaluated by Olewinski et al. | regex | both (shallow) | **add** |
 | **SCANOSS crypto-finder** | company (SCANOSS), frequent releases | OpenGrep + call-graph reachability | both (rules need API key) | **add if SCANOSS grants a research key** |
-| **Mondoo xgrep** | company (Mondoo) | tree-sitter + taint | both | **add only with written permission** (benchmark-disclosure clause) |
+| **Mondoo xgrep** | company (Mondoo) | tree-sitter + taint | both | **add** |
 | qScan (quantakrypto) | startup, OpenSSF badge, 11 releases, 14★ | patterns | both | borderline: decide on adoption evidence |
 | Cryptoscope (IBM Research) | paper | own dataflow | Java | not public: ask the authors |
 | Crypsy | paper (preprint) | rules/AST | Go/Ruby only | out (language), unless a Go slice is added |

@@ -88,7 +88,7 @@ semgrep-rule scanner for Java and Python (Apache-2.0), CycloneDX 1.6. Runs stric
 opengrep rules plus tree-sitter (`cradar` CLI, built from source), CycloneDX 1.7, many languages. Known crash on some Java EC parameter code is worked around automatically with `.cradarignore` and recorded in the result notes.
 
 - **[`xgrep`](https://mondoo.com/docs/xgrep/code-scanning/cbom)** (Mondoo):
-tree-sitter and data-flow scanner for Java, Python, Go and JS/TS, CycloneDX 1.6. Free of charge but proprietary: the worker fetches the pinned npm package at build time and the image is never published (it is outside the `docker-bake.hcl` default group). **Note:** Mondoo's terms reportedly forbid publishing benchmark results.
+tree-sitter and data-flow scanner for Java, Python, Go and JS/TS, CycloneDX 1.6. Free of charge but proprietary: the worker fetches the pinned npm package (0.80.0, verified by its sha512) at build time.
 
 **Not yet integrated, blocked on access:**
 

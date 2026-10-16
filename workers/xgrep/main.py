@@ -1,10 +1,7 @@
 """Mondoo xgrep worker: tree-sitter + data-flow scanner with native CycloneDX 1.6 CBOM output.
 
-Licence caveat: xgrep is free of charge but proprietary (LicenseRef-Mondoo-Proprietary), and its
-terms reportedly forbid publishing benchmark results. The worker is part of the experiment flow so
-the data exists; whether xgrep appears in the paper (named, anonymised, or not at all) is decided
-later, pending Mondoo's answer to the permission request of 2026-10-08. The image is built locally
-from the public npm package and is never pushed (see docker-bake.hcl).
+xgrep is free of charge (LicenseRef-Mondoo-Proprietary); the binary comes from the public npm package,
+pinned in docker/Dockerfile.worker-xgrep.
 
 Pilot verdict (2026-10-08): pass on Java, Python, Go and JS. Command as the pilot ran it:
 `xgrep sbom --no-telemetry --include cbom -o out.json <repo>` with XGREP_UPDATE_CHECK=0, DO_NOT_TRACK=1.

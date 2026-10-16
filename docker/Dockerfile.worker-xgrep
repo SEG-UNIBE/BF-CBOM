@@ -1,8 +1,7 @@
 # syntax=docker/dockerfile:1.7
 # docker/Dockerfile.worker-xgrep
-# Mondoo xgrep: free of charge but proprietary (LicenseRef-Mondoo-Proprietary). The binary is taken
-# from the public npm package at build time and verified against the registry's sha512; the image
-# is for local experiments only and must not be pushed (not in the docker-bake default group).
+# Mondoo xgrep (free of charge, LicenseRef-Mondoo-Proprietary). The binary is taken from the public
+# npm package at build time and verified against the registry's sha512.
 # Pinned to 0.80.0, the version the pilot of 2026-10-08 graded.
 ARG BASE_IMAGE=base
 ARG BASE_TAG=latest

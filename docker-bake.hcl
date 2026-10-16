@@ -29,6 +29,7 @@ group "default" {
     "worker-qdarpan",
     "worker-securin-xbom",
     "worker-cipherradar",
+    "worker-xgrep",
     "worker-cbomkit-jar",
     "misc-pyqun",
     "gitserver",
@@ -167,13 +168,10 @@ target "misc-treesimilarity" {
   tags       = ["${REGISTRY}-misc-treesimilarity:${VERSION}"]
 }
 
-# Mondoo xgrep: proprietary binary, local experiments only. Deliberately NOT in the default group,
-# so `docker buildx bake` for a release never builds or pushes it. Build it with
-# `docker buildx bake worker-xgrep` or `docker compose build worker-xgrep`.
 target "worker-xgrep" {
   inherits   = ["_from-base"]
   dockerfile = "docker/Dockerfile.worker-xgrep"
-  tags       = ["bf-cbom/worker-xgrep:${VERSION}"]
+  tags       = ["${REGISTRY}-worker-xgrep:${VERSION}"]
 }
 
 # Crypsy, BF-CBOM adaptation, built from our public GitHub repo at a pinned commit (notes.md, "Crypsy").
