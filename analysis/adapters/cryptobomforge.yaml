@@ -1,0 +1,9 @@
+spec: cryptobomforge
+inherits: _ibm-cbom-draft
+version: 1
+declared: [{bomFormat: CBOM, specVersion: 1.4-cbom-1.0}, {bomFormat: CycloneDX, specVersion: "1.6"}]
+checked_on: "e1-pilot-corpus 2026-10-16 (CodeQL 2.23.0 + cyclonedx-python-lib 4.2.2, 6 CBOMs)"
+notes: >
+  Writes IBM's draft 1.4-cbom-1.0 (4 of 6 CBOMs) or CycloneDX 1.6. Most components are named UNKNOWN with
+  variant UNKNOWN and primitive/padding `unknown`; locations only in detectionContext (5-9-line windows, often on
+  unrelated code such as pom.xml or print statements). analysis/sites.py reads none of these locations.

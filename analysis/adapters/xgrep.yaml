@@ -1,0 +1,14 @@
+spec: xgrep
+inherits: _cyclonedx
+version: 1
+declared: [{bomFormat: CycloneDX, specVersion: "1.6"}]
+checked_on: "e1-pilot-corpus 2026-10-16 (xgrep 0.80.0, 13 CBOMs; outputs not published, tests use hand-written CBOMs)"
+dictionary:
+  protocol_version:
+    SSL: {protocol: SSL}         # protocol type tls with version "SSL"
+notes: >
+  Registry-style names (SHA-256, RSA-2048, EC-secp384r1, 3DES-168, ChaCha20-Poly1305-256) and semantic bom-refs
+  (crypto/algorithm/...). When it cannot resolve the algorithm it reports the variable or expression as the name
+  (parseCsvMap, getJavaAlgorithm, `SHA-" + this.strength`, curve `curve_class`); these stay unmapped, and the API in
+  additionalContext (java.security.Signature#getInstance, golang.org/x/crypto/chacha20poly1305) still gives the
+  primitive or algorithm. Dependencies are only the root inventory.

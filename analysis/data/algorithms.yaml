@@ -1,0 +1,559 @@
+# Shared vocabulary of the normaliser (analysis/normalize/vocab.py): synonyms that are NOT specific to one tool.
+#
+# Canonical names come from the CycloneDX 1.7 cryptography registry (analysis/data/cyclonedx/cryptography-defs.json):
+# `family` is a registry family (AES, RSAES-OAEP, ECDSA, SHA-2, ...) or one of the `additions` below, `curve` is a
+# registry curve name (OID-equal names are aliases: secp256r1 = P-256 = prime256v1). Everything here is reviewed by
+# hand and published with the paper (it is the per-field mapping table of RQ3). Rule: a spelling only one tool uses
+# goes into that tool's dictionary (analysis/adapters/<tool>.yaml); once two tools use it, it moves here.
+#
+# Seeded on 2026-10-16 from the distinct values of 124 CBOMs of 11 tools (experiment e1-pilot-corpus).
+version: "2026-10-16.1"
+
+# Coarse groups (the family names of analysis/data/families.yaml, used by the call-site matcher and the micro ground
+# truth) -> the registry families and additions they contain. Every registry family must appear exactly once.
+groups:
+  RSA: [RSA, RSASSA-PKCS1, RSASSA-PSS, RSA-X931, RSAES-PKCS1, RSAES-OAEP]
+  EC: [EC, ECDSA, EdDSA, ECDH, ECIES, MQV, SM2, SM9, BLS, X3DH, HPKE]
+  DSA: [DSA]
+  DH: [FFDH, ElGamal, SRP, J-PAKE, SPAKE2, SPAKE2PLUS, OPAQUE]
+  PQC: [ML-KEM, ML-DSA, SLH-DSA, XMSS, LMS, FN-DSA, NTRU-Prime, Hybrid-KEM]
+  AES: [AES]
+  DES: [DES, 3DES]
+  ChaCha: [ChaCha, ChaCha20, Salsa20, Poly1305]
+  CIPHER-other: [RC2, RC4, RC5, RC6, IDEA, ARIA, CAMELLIA, Twofish, Blowfish, Skipjack, SEED, SM4, Serpent, CAST5, CAST6,
+                 HC, RABBIT, Ascon, ZUC, SNOW3G, A5/1, A5/2, CMEA, GOST, MILENAGE, TUAK, 3GPP-XOR]
+  SHA-1: [SHA-1]
+  SHA-2: [SHA-2]
+  SHA-3: [SHA-3]
+  MD5: [MD5]
+  HASH-other: [MD2, MD4, RIPEMD, Whirlpool, BLAKE2, BLAKE3, SM3]
+  HMAC: [HMAC, CMAC, UMAC, SipHash, PBMAC1]
+  PBKDF: [PBKDF1, PBKDF2, PBES1, PBES2, PBE]
+  KDF-other: [HKDF, Argon2, bcrypt, scrypt, yescrypt, ANSI-KDF, SSH-KDF, TLS-PRF, IKE-PRF, SP800-108, SP800-56C, crypt]
+  RANDOM: [CTR_DRBG, Hash_DRBG, HMAC_DRBG, Fortuna, Yarrow, CSPRNG, PRNG]
+
+# Families the registry has no entry for, but tools report.
+additions:
+  RSA: {primitive: pke, note: "an RSA key pair or RSA use without a scheme (keygen, `KeyPairGenerator.getInstance(\"RSA\")`)"}
+  EC: {primitive: pke, note: "an EC key pair or curve without a scheme (ECDSA, ECDH, ...)"}
+  CSPRNG: {primitive: drbg, note: "a cryptographically secure random generator without a named DRBG (SecureRandom, crypto/rand, os.urandom)"}
+  PRNG: {primitive: drbg, note: "a NON-cryptographic random generator (math/rand, java.util.Random, Math.random)"}
+  PBE: {primitive: other, note: "password-based encryption without a scheme"}
+  FN-DSA: {primitive: signature, note: "Falcon (FIPS 206 draft)"}
+  NTRU-Prime: {primitive: kem, note: "sntrup761 (OpenSSH hybrid key exchange)"}
+  Hybrid-KEM: {primitive: kem, note: "a hybrid of a classical and a post-quantum key exchange"}
+  crypt: {primitive: kdf, note: "Unix crypt(3) password hashing schemes (MD5-crypt, SHA-256-crypt, ...)"}
+
+# What `parameterSetIdentifier` means per family (CycloneDX: "in AES128, '128' identifies the key length in bits, in
+# SHA256, '256' identifies the digest length"). Families not listed: kept as `param_set` (raw), never as key size.
+param:
+  key: [AES, DES, 3DES, RSA, RSASSA-PKCS1, RSASSA-PSS, RSA-X931, RSAES-PKCS1, RSAES-OAEP, DSA, FFDH, ElGamal, Blowfish,
+        RC2, RC4, RC5, RC6, IDEA, CAMELLIA, ARIA, SEED, SM4, Twofish, Serpent, CAST5, CAST6, Skipjack, ChaCha,
+        ChaCha20, Salsa20]
+  curve: [EC, ECDSA, ECDH, ECIES, SM2, MQV]
+  digest: [SHA-1, SHA-2, SHA-3, MD2, MD4, MD5, RIPEMD, BLAKE2, BLAKE3, Whirlpool, SM3]
+
+# Specific variants inside a family. `aliases` are extra spellings (case and separators never matter);
+# `hash: true` marks hash functions, which become the `digest` of a composite (HMAC-SHA-256, SHA256withECDSA).
+algorithms:
+  SHA-1: {family: SHA-1, hash: true, aliases: [SHA1, SHA-160]}
+  SHA-224: {family: SHA-2, hash: true, aliases: [SHA224, SHA2-224]}
+  SHA-256: {family: SHA-2, hash: true, aliases: [SHA256, SHA2-256]}
+  SHA-384: {family: SHA-2, hash: true, aliases: [SHA384, SHA2-384]}
+  SHA-512: {family: SHA-2, hash: true, aliases: [SHA512, SHA2-512]}
+  SHA-512/224: {family: SHA-2, hash: true, aliases: [SHA512-224, SHA-512-224]}
+  SHA-512/256: {family: SHA-2, hash: true, aliases: [SHA512-256, SHA-512-256]}
+  SHA-2: {family: SHA-2, hash: true, aliases: [SHA2]}
+  SHA3-224: {family: SHA-3, hash: true, aliases: [SHA3_224]}
+  SHA3-256: {family: SHA-3, hash: true, aliases: [SHA3_256]}
+  SHA3-384: {family: SHA-3, hash: true, aliases: [SHA3_384]}
+  SHA3-512: {family: SHA-3, hash: true, aliases: [SHA3_512]}
+  SHA-3: {family: SHA-3, hash: true, aliases: [SHA3]}
+  SHAKE128: {family: SHA-3, hash: true, primitive: xof}
+  SHAKE256: {family: SHA-3, hash: true, primitive: xof}
+  SHAKE: {family: SHA-3, hash: true, primitive: xof}
+  MD2: {family: MD2, hash: true}
+  MD4: {family: MD4, hash: true}
+  MD5: {family: MD5, hash: true}
+  RIPEMD-160: {family: RIPEMD, hash: true, aliases: [RIPEMD160, RMD160]}
+  BLAKE2b: {family: BLAKE2, hash: true, aliases: [BLAKE2B]}
+  BLAKE2s: {family: BLAKE2, hash: true}
+  BLAKE2: {family: BLAKE2, hash: true}
+  BLAKE3: {family: BLAKE3, hash: true}
+  Whirlpool: {family: Whirlpool, hash: true}
+  SM3: {family: SM3, hash: true}
+  Ed25519: {family: EdDSA, curve: Ed25519, aliases: [PureEd25519, Ed25519ph, Ed25519ctx]}
+  Ed448: {family: EdDSA, curve: Ed448, aliases: [Ed448ph]}
+  X25519: {family: ECDH, curve: Curve25519}
+  X448: {family: ECDH, curve: Curve448}
+  ML-KEM-512: {family: ML-KEM, param_set: "512", aliases: [MLKEM512, Kyber512]}
+  ML-KEM-768: {family: ML-KEM, param_set: "768", aliases: [MLKEM768, Kyber768]}
+  ML-KEM-1024: {family: ML-KEM, param_set: "1024", aliases: [MLKEM1024, Kyber1024]}
+  ML-DSA-44: {family: ML-DSA, param_set: "44", aliases: [MLDSA44, Dilithium2]}
+  ML-DSA-65: {family: ML-DSA, param_set: "65", aliases: [MLDSA65, Dilithium3]}
+  ML-DSA-87: {family: ML-DSA, param_set: "87", aliases: [MLDSA87, Dilithium5]}
+  sntrup761: {family: NTRU-Prime, aliases: [SNTRUP761, sntrup761x25519-sha512]}
+  ChaCha20-Poly1305: {family: ChaCha20, primitive: ae, aliases: [ChaCha20Poly1305, CHACHA20_POLY1305]}
+  XChaCha20-Poly1305: {family: ChaCha20, primitive: ae}
+  XSalsa20-Poly1305: {family: Salsa20, primitive: ae, aliases: [NaCl-SecretBox, secretbox]}
+  Argon2id: {family: Argon2}
+  Argon2i: {family: Argon2}
+  Argon2d: {family: Argon2}
+  TOTP: {family: HMAC}
+  HOTP: {family: HMAC}
+  SHA1PRNG: {family: CSPRNG}
+  MGF1: {family: null, secondary: true, note: "mask generation function of OAEP/PSS; only used when a name has nothing else"}
+
+# Extra spellings of families (registry and addition names are recognised as themselves).
+families:
+  3DES: [DESede, TripleDES, TDEA, TDES, 3DES-EDE, DES-EDE3, DESede-EDE, Triple-DES]
+  EC: [ECC, elliptic, EllipticCurve, elliptic-curve]
+  FFDH: [DH, DHE, Diffie-Hellman, DiffieHellman, FFDHE]
+  ECDH: [ECDHE, ECDH-ES]
+  EdDSA: [Ed-DSA]
+  RSASSA-PKCS1: [RSASSA-PKCS1-v1_5, RSASSA-PKCS1-v1-5, RSASSA-PKCS1v15]
+  RSASSA-PSS: [RSA-PSS, RSAPSS]
+  RSAES-OAEP: [RSA-OAEP, RSAOAEP]
+  RSAES-PKCS1: [RSAES-PKCS1-v1_5]
+  ChaCha20: [CHACHA20, ChaCha-20]
+  Blowfish: [BF]
+  RC4: [ARCFOUR, ARC4, Arcfour]
+  CAMELLIA: [Camellia]
+  Whirlpool: [WHIRLPOOL]
+  bcrypt: [BCRYPT, bcrypt_pbkdf]
+  scrypt: [SCRYPT]
+  HKDF: [HKDF]
+  SP800-56C: [ConcatenationKDF, ConcatKDF, Concat-KDF]
+  CSPRNG: [DRBG, SecureRandom, CSPRNG, csprng]
+  PRNG: [rand, insecure-random, weak-random, PRNG]
+  ML-KEM: [MLKEM, Kyber, ML_KEM]
+  ML-DSA: [MLDSA, Dilithium, ML_DSA]
+  SLH-DSA: [SLHDSA, SPHINCS, SPHINCS+, SPHINCSPlus]
+  FN-DSA: [Falcon]
+  Hybrid-KEM: [hybrid]
+
+curves:   # extra spellings; the registry's OID-equal names are aliases already
+  secp256r1: [nistp256, NIST-P-256, P256, prime-256-v1]
+  secp384r1: [nistp384, NIST-P-384, P384]
+  secp521r1: [nistp521, NIST-P-521, P521]
+  secp224r1: [nistp224, P224]
+  Ed25519: [Edwards25519, edwards-25519]
+  Ed448: [Edwards448, edwards-448]
+  Curve25519: [X25519, curve-25519]
+  Curve448: [X448]
+
+modes:
+  ECB: []
+  CBC: []
+  CFB: [CFB1, CFB8, CFB64, CFB128]
+  OFB: []
+  CTR: []
+  GCM: []
+  CCM: [CCM8, CCM-8]
+  XTS: []
+  CTS: []
+  KW: [Wrap, KeyWrap]
+  KWP: [KeyWrapPad, WrapPad]
+  OCB: []
+  SIV: []
+  GCM-SIV: [GCMSIV]
+  EAX: []
+
+paddings:
+  NONE: [NoPadding, raw, none]
+  PKCS5: [PKCS5Padding, PKCS-5]
+  PKCS7: [PKCS7Padding, PKCS-7]
+  PKCS1v15: [PKCS1, PKCS1Padding, PKCS1-1.5, PKCS1v1.5, PKCS1-v1_5, PKCS1-v1-5, PKCS-1]
+  OAEP: [OAEPPadding]
+  PSS: [PSSPadding]
+  ISO10126: [ISO10126Padding]
+  X923: [X9.23, X923Padding]
+  ZERO: [ZeroPadding, ZeroBytePadding]
+
+primitives:   # CycloneDX 1.7 enum values (1.6 lacks key-wrap); `other` and `unknown` carry no information
+  drbg: []
+  mac: []
+  block-cipher: [blockcipher, block_cipher, blockCipher]
+  stream-cipher: [streamcipher, stream_cipher, streamCipher]
+  signature: [sig]
+  hash: [digest, hashing]
+  pke: [public-key-encryption, asymmetric-encryption]
+  xof: []
+  kdf: []
+  key-agree: [keyagree, key-agreement, keyagreement, keyexchange, key-exchange, kex]
+  kem: []
+  ae: [aead, authenticated-encryption]
+  combiner: []
+  key-wrap: [keywrap, key_wrap]
+
+functions:    # CycloneDX cryptoFunctions enum values
+  generate: []
+  keygen: [key-generation, keygeneration]
+  encrypt: [encryption]
+  decrypt: [decryption]
+  digest: [hash]
+  tag: [mac]
+  keyderive: [key-derivation, derive]
+  sign: [signing]
+  verify: [verification]
+  encapsulate: []
+  decapsulate: []
+
+materials:    # CycloneDX relatedCryptoMaterialProperties.type enum values
+  private-key: [privatekey, private_key, privateKey, private-key-info]
+  public-key: [publickey, public_key, publicKey]
+  secret-key: [secretkey, secret_key, secretKey, symmetric-key, secret]
+  key: []
+  ciphertext: []
+  signature: []
+  digest: []
+  initialization-vector: [iv, IV, initializationvector, initialization_vector]
+  nonce: []
+  seed: []
+  salt: []
+  shared-secret: [sharedsecret]
+  tag: []
+  additional-data: [aad]
+  password: [passphrase]
+  credential: []
+  token: []
+
+asset_types:  # CycloneDX assetType enum values, plus `library` for library components
+  algorithm: []
+  certificate: []
+  protocol: []
+  related-crypto-material: [relatedCryptoMaterial, related_crypto_material]
+  library: []
+
+protocols:    # CycloneDX protocolProperties.type values (TLS etc. upper case here)
+  TLS: []
+  SSL: []
+  DTLS: []
+  SSH: [SFTP, ssh-protocol, OpenSSH]
+  IPsec: [IPSEC]
+  IKE: [IKEv2]
+  QUIC: []
+  SSTP: []
+  WPA: []
+
+# Tokens naming a protocol version: token -> [protocol, version]
+protocol_versions:
+  tls10: [TLS, "1.0"]
+  tlsv1: [TLS, "1.0"]
+  tlsv10: [TLS, "1.0"]
+  tls11: [TLS, "1.1"]
+  tlsv11: [TLS, "1.1"]
+  tls12: [TLS, "1.2"]
+  tlsv12: [TLS, "1.2"]
+  tls13: [TLS, "1.3"]
+  tlsv13: [TLS, "1.3"]
+  sslv2: [SSL, "2.0"]
+  sslv3: [SSL, "3.0"]
+  ssl3: [SSL, "3.0"]
+  dtls12: [DTLS, "1.2"]
+  dtls13: [DTLS, "1.3"]
+
+# Key and certificate containers: inside a name they set group CERT (when nothing names an algorithm).
+keystores: [JKS, JCEKS, BKS, PKCS12, PKCS#12, P12, PFX, keystore, truststore, key-store, trust-store]
+
+# Encodings and file formats: carry no algorithm, never reported as unmapped (also as multi-token sequences).
+formats: [PEM, DER, CER, CRT, PKCS8, PKCS#8-encoded, PKCS10, OpenSSL, ASN1, ASN.1, Base64, JSON, JWK-set]
+
+# Whole names (compared without case and separators) that the token parser cannot read: JOSE, SSH and JCA identifiers,
+# APIs used as names. An empty mapping means "known, carries no algorithm" (never reported as unmapped).
+names:
+  # JOSE (RFC 7518)
+  HS256: {family: HMAC, digest: SHA-256}
+  HS384: {family: HMAC, digest: SHA-384}
+  HS512: {family: HMAC, digest: SHA-512}
+  RS256: {family: RSASSA-PKCS1, digest: SHA-256}
+  RS384: {family: RSASSA-PKCS1, digest: SHA-384}
+  RS512: {family: RSASSA-PKCS1, digest: SHA-512}
+  PS256: {family: RSASSA-PSS, digest: SHA-256}
+  PS384: {family: RSASSA-PSS, digest: SHA-384}
+  PS512: {family: RSASSA-PSS, digest: SHA-512}
+  ES256: {family: ECDSA, curve: secp256r1, digest: SHA-256}
+  ES384: {family: ECDSA, curve: secp384r1, digest: SHA-384}
+  ES512: {family: ECDSA, curve: secp521r1, digest: SHA-512}
+  ES256K: {family: ECDSA, curve: secp256k1, digest: SHA-256}
+  RSA-OAEP-256: {family: RSAES-OAEP, padding: OAEP, digest: SHA-256}
+  RSA1_5: {family: RSAES-PKCS1, padding: PKCS1v15}
+  ECDH-ES+A128KW: {family: ECDH}
+  ECDH-ES+A192KW: {family: ECDH}
+  ECDH-ES+A256KW: {family: ECDH}
+  A128KW: {family: AES, key_size: 128, mode: KW, primitive: key-wrap}
+  A192KW: {family: AES, key_size: 192, mode: KW, primitive: key-wrap}
+  A256KW: {family: AES, key_size: 256, mode: KW, primitive: key-wrap}
+  A128GCMKW: {family: AES, key_size: 128, mode: GCM}
+  A192GCMKW: {family: AES, key_size: 192, mode: GCM}
+  A256GCMKW: {family: AES, key_size: 256, mode: GCM}
+  A128GCM: {family: AES, key_size: 128, mode: GCM, primitive: ae}
+  A192GCM: {family: AES, key_size: 192, mode: GCM, primitive: ae}
+  A256GCM: {family: AES, key_size: 256, mode: GCM, primitive: ae}
+  A128CBC-HS256: {family: AES, key_size: 128, mode: CBC, digest: SHA-256, primitive: ae}
+  A192CBC-HS384: {family: AES, key_size: 192, mode: CBC, digest: SHA-384, primitive: ae}
+  A256CBC-HS512: {family: AES, key_size: 256, mode: CBC, digest: SHA-512, primitive: ae}
+  PBES2-HS256+A128KW: {family: PBES2, digest: SHA-256}
+  PBES2-HS384+A192KW: {family: PBES2, digest: SHA-384}
+  PBES2-HS512+A256KW: {family: PBES2, digest: SHA-512}
+  dir: {}
+  none: {}
+  JWT: {}
+  JWS: {}
+  JWE: {}
+  JWK: {}
+  JSON Web Key: {}
+  # SSH (RFC 4253, 5656, 8332, 8709)
+  ssh-rsa: {family: RSASSA-PKCS1, digest: SHA-1}
+  rsa-sha2-256: {family: RSASSA-PKCS1, digest: SHA-256}
+  rsa-sha2-512: {family: RSASSA-PKCS1, digest: SHA-512}
+  ssh-dss: {family: DSA, digest: SHA-1}
+  ssh-ed25519: {algorithm: Ed25519}
+  ssh-ed448: {algorithm: Ed448}
+  ecdsa-sha2-nistp256: {family: ECDSA, curve: secp256r1, digest: SHA-256}
+  ecdsa-sha2-nistp384: {family: ECDSA, curve: secp384r1, digest: SHA-384}
+  ecdsa-sha2-nistp521: {family: ECDSA, curve: secp521r1, digest: SHA-512}
+  curve25519-sha256: {algorithm: X25519, digest: SHA-256}
+  diffie-hellman-group1-sha1: {family: FFDH, key_size: 1024, digest: SHA-1}
+  diffie-hellman-group14-sha1: {family: FFDH, key_size: 2048, digest: SHA-1}
+  diffie-hellman-group14-sha256: {family: FFDH, key_size: 2048, digest: SHA-256}
+  diffie-hellman-group16-sha512: {family: FFDH, key_size: 4096, digest: SHA-512}
+  Diffie-Hellman Group 1: {family: FFDH, key_size: 1024}
+  Diffie-Hellman Group 14: {family: FFDH, key_size: 2048}
+  Diffie-Hellman Group 16: {family: FFDH, key_size: 4096}
+  Diffie-Hellman Group Exchange: {family: FFDH}
+  mlkem768x25519-sha256: {family: Hybrid-KEM, algorithm: X25519MLKEM768}
+  X25519MLKEM768: {family: Hybrid-KEM}
+  MLKEM768-X25519: {family: Hybrid-KEM, algorithm: X25519MLKEM768}
+  kex-strict-c-v00@openssh.com: {}
+  ext-info-c: {}
+  # JCA identifiers the token parser cannot read
+  PBEWithMD5AndDES: {family: PBES1, digest: MD5}
+  PBEWithSHA1AndDESede: {family: PBES1, digest: SHA-1}
+  PBE-SHA1-3DES: {family: PBES1, digest: SHA-1}
+  NativePRNG: {family: CSPRNG}
+  NativePRNGBlocking: {family: CSPRNG}
+  NativePRNGNonBlocking: {family: CSPRNG}
+  Windows-PRNG: {family: CSPRNG}
+  JKS: {group: CERT}
+  JCEKS: {group: CERT}
+  PKCS12: {group: CERT}
+  PKCS#12: {group: CERT}
+  KeyStore: {group: CERT}
+  TrustStore: {group: CERT}
+  key: {material: key}
+  # random generators named by their API
+  crypto/rand: {family: CSPRNG}
+  math/rand: {family: PRNG}
+  math-rand: {family: PRNG}
+  math-random: {family: PRNG}
+  math-random-security: {family: PRNG}
+  Math.random: {family: PRNG}
+  java.util.Random: {family: PRNG}
+  random.Random: {family: PRNG}
+  random.SystemRandom: {family: CSPRNG}
+  os.urandom: {family: CSPRNG}
+  secrets: {family: CSPRNG}
+  secrets.token_hex: {family: CSPRNG}
+  secrets.token_bytes: {family: CSPRNG}
+  secrets.token_urlsafe: {family: CSPRNG}
+  arc4random: {family: CSPRNG}
+  randombytes: {family: CSPRNG}
+  RAND_bytes: {family: CSPRNG}
+  RAND_status: {family: CSPRNG}
+  RAND: {family: CSPRNG}
+  /dev/urandom: {family: CSPRNG}
+  weak-rand: {family: PRNG}
+  Weak PRNG: {family: PRNG}
+  # other identifiers
+  Fernet: {family: AES, key_size: 128, mode: CBC, digest: SHA-256, primitive: ae}
+  MD5-crypt: {family: crypt, algorithm: MD5-crypt, digest: MD5}
+  MD5 crypt: {family: crypt, algorithm: MD5-crypt, digest: MD5}
+  SHA-256-crypt: {family: crypt, algorithm: SHA-256-crypt, digest: SHA-256}
+  SHA-256 crypt: {family: crypt, algorithm: SHA-256-crypt, digest: SHA-256}
+  SHA-512-crypt: {family: crypt, algorithm: SHA-512-crypt, digest: SHA-512}
+  SHA-512 crypt: {family: crypt, algorithm: SHA-512-crypt, digest: SHA-512}
+  crypt16: {family: crypt}
+  MessageDigest: {primitive: hash}
+  Signature: {primitive: signature}
+  Mac: {primitive: mac}
+  KeyAgreement: {primitive: key-agree}
+  SSLContext: {protocol: TLS}
+  SSLSocketFactory: {protocol: TLS}
+  KeyManagerFactory: {protocol: TLS}
+  TrustManagerFactory: {protocol: TLS}
+  X509TrustManager: {protocol: TLS}
+  OCSP: {group: CERT}
+  PKIX: {group: CERT}
+  X.509: {group: CERT}
+  X509: {group: CERT}
+  X509Certificate: {group: CERT}
+  Certificate: {group: CERT}
+  Base64: {}
+  Cipher: {}
+  CRL: {group: CERT}
+  CSR: {group: CERT}
+  X.509 CRL: {group: CERT}
+  X.509 CSR: {group: CERT}
+  Certificate Signing Request: {group: CERT}
+  PKCS#8: {material: private-key}
+  PKCS8: {material: private-key}
+  Entropy: {material: seed}
+  PSA random: {family: CSPRNG}
+  ECH: {protocol: TLS}
+  SNI: {protocol: TLS}
+  ALPN: {protocol: TLS}
+  GSS-API: {}
+  HTTP Basic Authentication: {}
+  HTTP Digest Authentication: {}
+
+# Tokens without information of their own (never reported as unmapped).
+noise: [with, and, or, using, use, for, by, of, the, a, an, to, in, on, via, from, algorithm, algorithms, alg, algo,
+        crypto, cryptography, crypt0, cipher, ciphers, encryption, mode, padding, scheme, function, impl, default,
+        get, instance, getinstance, new, init, create, detected, usage, used, call, api, lib, library, import, module,
+        weak, insecure, deprecated, legacy, hardcoded, hard, coded, generic, standard, unknown, other, none, null,
+        evp, openssl, jca, jce, pyca, bc, bouncycastle, golang, go, java, javax, python, node, js, security, spec,
+        parameter, parameters, param, params, generator, factory, engine, provider, context, object, instance,
+        key, keys, pair, keypair, material, value, data, bytes, bit, bits, bitlength, length, size, len,
+        begin, end, pem, der, crt, cer, pub, file, block, check, enforcement, version, versions, inventory,
+        mac, hash, digest, sign, signature, verify, encrypt, decrypt, keygen, kdf, derive, derived, random,
+        curve, curves, host, session, ticket, identity, exchange, authentication, auth, derivation, early, client,
+        server, chain, root, ca, cert, certs, header, pattern, reference, path, list, suite, suites, protocols,
+        negotiated, type, post, handshake, binding, channel, keylog, enc, encrypted, bypass, validation, disabled,
+        pinning, pinned, unpinned, request, signing, signed, self, revocation, expiration, alternative, subject,
+        issuer, name, container, parsing, kx, install, prediction, resistance, support, utility, util, utils,
+        helper, test, tests, example, sample, demo, foo, bar, internal, primitives, hazmat, asymmetric, symmetric,
+        kty]
+
+# Tokens that announce a number: the next number becomes the dimension.
+number_keywords:
+  key_size: [keysize, key_size, keylength, keylen, keybits, modulus, modulussize, bitlength, bit_length]
+  iterations: [iterations, iteration, iter, iters, rounds, cost, workfactor]
+
+# Qualified API identifiers (prefix match; they never set `material`: an algorithm component's context is often
+# the key spec it is used with; `.`, `/`, `#` and `:` are interchangeable, case does not matter), used as
+# the lowest-priority evidence when a tool names the API call or package (xgrep, CBOMkit, Crypsy contexts).
+apis:
+  # Java (JCA/JCE)
+  java.security.MessageDigest: {primitive: hash}
+  java.security.Signature: {primitive: signature}
+  java.security.KeyPairGenerator: {functions: [keygen]}
+  java.security.SecureRandom: {family: CSPRNG}
+  java.security.cert: {group: CERT}
+  java.security.KeyStore: {group: CERT}
+  java.security.spec.ECGenParameterSpec: {family: EC}
+  java.security.spec.PSSParameterSpec: {padding: PSS}
+  javax.crypto.Mac: {primitive: mac}
+  javax.crypto.KeyGenerator: {functions: [keygen]}
+  javax.crypto.KeyAgreement: {primitive: key-agree}
+  javax.crypto.spec.GCMParameterSpec: {mode: GCM}
+  javax.crypto.spec.OAEPParameterSpec: {padding: OAEP}
+  javax.net.ssl: {protocol: TLS}
+  org.bouncycastle.crypto.engines.AESWrapEngine: {family: AES, mode: KW}
+  org.bouncycastle.crypto.agreement.kdf.ConcatenationKDFGenerator: {family: SP800-56C}
+  # Go standard library and x/crypto
+  crypto.sha1: {algorithm: SHA-1}
+  crypto.sha256: {algorithm: SHA-256}
+  crypto.sha224: {algorithm: SHA-224}
+  crypto.sha384: {algorithm: SHA-384}
+  crypto.sha512: {algorithm: SHA-512}
+  crypto.md5: {algorithm: MD5}
+  crypto.hmac: {family: HMAC}
+  crypto.aes: {family: AES}
+  crypto.des.NewTripleDESCipher: {family: 3DES}
+  crypto.des: {family: DES}
+  crypto.rc4: {family: RC4}
+  crypto.rsa.EncryptOAEP: {family: RSAES-OAEP, padding: OAEP}
+  crypto.rsa.DecryptOAEP: {family: RSAES-OAEP, padding: OAEP}
+  crypto.rsa.SignPSS: {family: RSASSA-PSS, padding: PSS}
+  crypto.rsa.VerifyPSS: {family: RSASSA-PSS, padding: PSS}
+  crypto.rsa.SignPKCS1v15: {family: RSASSA-PKCS1, padding: PKCS1v15}
+  crypto.rsa.VerifyPKCS1v15: {family: RSASSA-PKCS1, padding: PKCS1v15}
+  crypto.rsa: {family: RSA}
+  crypto.dsa: {family: DSA}
+  crypto.ecdsa: {family: ECDSA}
+  crypto.ecdh: {family: ECDH}
+  crypto.ed25519: {algorithm: Ed25519}
+  crypto.elliptic: {family: EC}
+  crypto.rand: {family: CSPRNG}
+  crypto.x509: {group: CERT}
+  crypto.tls: {protocol: TLS}
+  crypto.cipher.NewGCM: {mode: GCM, primitive: ae}
+  crypto.cipher.NewCBCEncrypter: {mode: CBC}
+  crypto.cipher.NewCBCDecrypter: {mode: CBC}
+  crypto.cipher.NewCTR: {mode: CTR}
+  crypto.cipher.NewCFBEncrypter: {mode: CFB}
+  crypto.cipher.NewCFBDecrypter: {mode: CFB}
+  crypto.cipher.NewOFB: {mode: OFB}
+  math.rand: {family: PRNG}
+  golang.org.x.crypto.chacha20poly1305: {algorithm: ChaCha20-Poly1305}
+  golang.org.x.crypto.chacha20: {family: ChaCha20}
+  golang.org.x.crypto.poly1305: {family: Poly1305}
+  golang.org.x.crypto.curve25519: {algorithm: X25519}
+  golang.org.x.crypto.hkdf: {family: HKDF}
+  golang.org.x.crypto.pbkdf2: {family: PBKDF2}
+  golang.org.x.crypto.scrypt: {family: scrypt}
+  golang.org.x.crypto.bcrypt: {family: bcrypt}
+  golang.org.x.crypto.argon2: {family: Argon2}
+  golang.org.x.crypto.sha3: {family: SHA-3}
+  golang.org.x.crypto.blake2b: {algorithm: BLAKE2b}
+  golang.org.x.crypto.blake2s: {algorithm: BLAKE2s}
+  golang.org.x.crypto.nacl.secretbox: {algorithm: XSalsa20-Poly1305}
+  golang.org.x.crypto.ssh: {protocol: SSH}
+  golang.org.x.crypto.ed25519: {algorithm: Ed25519}
+  # Python
+  hashlib.sha1: {algorithm: SHA-1}
+  hashlib.sha224: {algorithm: SHA-224}
+  hashlib.sha256: {algorithm: SHA-256}
+  hashlib.sha384: {algorithm: SHA-384}
+  hashlib.sha512: {algorithm: SHA-512}
+  hashlib.sha3_256: {algorithm: SHA3-256}
+  hashlib.sha3_512: {algorithm: SHA3-512}
+  hashlib.md5: {algorithm: MD5}
+  hashlib.blake2b: {algorithm: BLAKE2b}
+  hashlib.blake2s: {algorithm: BLAKE2s}
+  hashlib.pbkdf2_hmac: {family: PBKDF2}
+  hashlib.scrypt: {family: scrypt}
+  hashlib: {primitive: hash}
+  hmac: {family: HMAC}
+  secrets: {family: CSPRNG}
+  bcrypt: {family: bcrypt}
+  cryptography.hazmat.primitives.hashes: {primitive: hash}
+  cryptography.hazmat.primitives.hmac: {family: HMAC}
+  cryptography.hazmat.primitives.cmac: {family: CMAC}
+  cryptography.hazmat.primitives.asymmetric.ec.ECDSA: {family: ECDSA}
+  cryptography.hazmat.primitives.asymmetric.ec.ECDH: {family: ECDH}
+  cryptography.hazmat.primitives.asymmetric.ec: {family: EC}
+  cryptography.hazmat.primitives.asymmetric.rsa: {family: RSA}
+  cryptography.hazmat.primitives.asymmetric.dsa: {family: DSA}
+  cryptography.hazmat.primitives.asymmetric.dh: {family: FFDH}
+  cryptography.hazmat.primitives.asymmetric.ed25519: {algorithm: Ed25519}
+  cryptography.hazmat.primitives.asymmetric.ed448: {algorithm: Ed448}
+  cryptography.hazmat.primitives.asymmetric.x25519: {algorithm: X25519}
+  cryptography.hazmat.primitives.asymmetric.x448: {algorithm: X448}
+  cryptography.hazmat.primitives.ciphers.aead: {primitive: ae}
+  cryptography.hazmat.primitives.kdf.pbkdf2: {family: PBKDF2}
+  cryptography.hazmat.primitives.kdf.hkdf: {family: HKDF}
+  cryptography.hazmat.primitives.kdf.scrypt: {family: scrypt}
+  cryptography.fernet: {family: AES, mode: CBC, key_size: 128, primitive: ae}
+  cryptography.x509: {group: CERT}
+  Crypto.Cipher.AES: {family: AES}
+  Crypto.Cipher.DES3: {family: 3DES}
+  Crypto.Cipher.DES: {family: DES}
+  Crypto.Cipher.ChaCha20_Poly1305: {algorithm: ChaCha20-Poly1305}
+  Crypto.Cipher.PKCS1_OAEP: {family: RSAES-OAEP, padding: OAEP}
+  Crypto.PublicKey.RSA: {family: RSA}
+  Crypto.PublicKey.ECC: {family: EC}
+  Crypto.Hash.SHA256: {algorithm: SHA-256}
+  Crypto.Hash.MD5: {algorithm: MD5}
+  Crypto.Random: {family: CSPRNG}
+  ssl: {protocol: TLS}
+  # Node.js
+  crypto.createHash: {primitive: hash}
+  crypto.createHmac: {family: HMAC}
+  crypto.createSign: {primitive: signature}
+  crypto.createVerify: {primitive: signature}
+  crypto.generateKeyPair: {functions: [keygen]}
+  crypto.randomBytes: {family: CSPRNG}
+  crypto.pbkdf2: {family: PBKDF2}
+  crypto.scrypt: {family: scrypt}

@@ -1,0 +1,148 @@
+{
+ "bomFormat": "CycloneDX",
+ "specVersion": "1.6",
+ "metadata": {
+  "tools": {
+   "components": [
+    {
+     "name": "deepseek",
+     "type": "application",
+     "version": "deepseek-chat"
+    }
+   ]
+  },
+  "properties": [
+   {
+    "name": "bf-cbom:fixture-origin",
+    "value": "e1-pilot-corpus 2026-10-16: FiloSottile__age@b74dce4cdbe3, golang-jwt__jwt@7ceae619e739, jwtk__jjwt@0df975627c2c"
+   }
+  ]
+ },
+ "components": [
+  {
+   "bom-ref": "deepseek:2667c333-f8cd-42ed-bcef-5a1191e383e8",
+   "cryptoProperties": {
+    "assetType": "key"
+   },
+   "evidence": {
+    "occurrences": [
+     {
+      "line": 66,
+      "location": "agessh/agessh.go"
+     }
+    ]
+   },
+   "name": "RSA",
+   "properties": [
+    {
+     "name": "bf-cbom:confidence",
+     "value": "high"
+    },
+    {
+     "name": "bf-cbom:evidence",
+     "value": "if r.pubKey.N.BitLen() < 2048 {"
+    }
+   ],
+   "type": "cryptographic-asset"
+  },
+  {
+   "bom-ref": "deepseek:2173c1fc-7b16-4127-926b-8aeeffab56bc",
+   "cryptoProperties": {
+    "algorithmProperties": {
+     "padding": "PSS",
+     "primitive": "signature"
+    },
+    "assetType": "algorithm"
+   },
+   "evidence": {
+    "occurrences": [
+     {
+      "line": 32,
+      "location": "rsa_pss.go"
+     }
+    ]
+   },
+   "name": "RSA-PSS",
+   "properties": [
+    {
+     "name": "bf-cbom:confidence",
+     "value": "high"
+    },
+    {
+     "name": "bf-cbom:digest",
+     "value": "SHA-256"
+    },
+    {
+     "name": "bf-cbom:evidence",
+     "value": "Hash: crypto.SHA256"
+    }
+   ],
+   "type": "cryptographic-asset"
+  },
+  {
+   "bom-ref": "deepseek:3d052340-1f39-4134-8081-2903b8ca72d9",
+   "cryptoProperties": {
+    "algorithmProperties": {
+     "primitive": "mac"
+    },
+    "assetType": "algorithm"
+   },
+   "evidence": {
+    "occurrences": [
+     {
+      "line": 323,
+      "location": "parser_test.go"
+     }
+    ]
+   },
+   "name": "HS256",
+   "properties": [
+    {
+     "name": "bf-cbom:confidence",
+     "value": "high"
+    },
+    {
+     "name": "bf-cbom:digest",
+     "value": "SHA-256"
+    },
+    {
+     "name": "bf-cbom:evidence",
+     "value": "jwt.NewParser(jwt.WithValidMethods([]string{\"HS256\"}))"
+    }
+   ],
+   "type": "cryptographic-asset"
+  },
+  {
+   "bom-ref": "deepseek:dec42b80-ecd2-463b-9760-0821c9bb8d0a",
+   "cryptoProperties": {
+    "algorithmProperties": {
+     "mode": "KW",
+     "parameterSetIdentifier": "128",
+     "primitive": "ae"
+    },
+    "assetType": "algorithm"
+   },
+   "evidence": {
+    "occurrences": [
+     {
+      "line": 815,
+      "location": "api/src/main/java/io/jsonwebtoken/Jwts.java"
+     }
+    ]
+   },
+   "name": "A128KW",
+   "properties": [
+    {
+     "name": "bf-cbom:confidence",
+     "value": "high"
+    },
+    {
+     "name": "bf-cbom:evidence",
+     "value": "Encrypts this newly-generated SecretKey with the A128KW key wrap algorithm"
+    }
+   ],
+   "type": "cryptographic-asset"
+  }
+ ],
+ "dependencies": []
+}

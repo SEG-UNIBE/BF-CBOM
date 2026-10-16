@@ -1,0 +1,18 @@
+spec: pqcheck
+inherits: _cyclonedx
+version: 1
+declared: [{bomFormat: CycloneDX, specVersion: "1.6"}]
+checked_on: "e1-pilot-corpus 2026-10-16 (pqcheck 0.1.0, 8 CBOMs); pilot fixture micro-python"
+sources:
+  - fields: standard
+  - property: {pqcheck:confidence: confidence}
+  - parse: name
+dictionary:
+  name:
+    KEYGEN: {functions: [keygen]}
+notes: >
+  Lists every declared dependency as a library component (pqcheck:declared_in go.mod / requirements.txt); these
+  are an inventory, not findings, and are skipped. Findings carry pqcheck:detector_id (go-types, go-tree-sitter,
+  python-ast, key-material) and pqcheck:confidence (0.30-1.00). Generic names: ECC, MATH-RAND, CSPRNG, CIPHER;
+  primitive `unknown` is frequent (mostly ECC). Certificates and keys are named after their key algorithm (RSA,
+  ECDSA).

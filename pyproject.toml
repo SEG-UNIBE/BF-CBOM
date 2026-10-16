@@ -57,6 +57,7 @@ package = true
 [dependency-groups]
 dev = [
     "black>=25.1.0",
+    "jsonschema>=4.25.1",
     "pytest>=8.4.1",
     "ruff>=0.12.11",
     "watchdog>=6.0.0",

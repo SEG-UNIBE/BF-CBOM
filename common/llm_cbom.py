@@ -7,6 +7,10 @@ of them use identical prompts and file selection and differ in the model alone.
 
 Determinism knobs: temperature 0, deterministic file order, PROMPT_VERSION recorded in the CBOM.
 Cost knobs (env): LLM_MAX_FILES, LLM_MAX_CHUNK_CHARS, LLM_MAX_CHUNKS, LLM_MAX_FILE_BYTES.
+
+The model answers in free text ("GCM", "PSS", assetType "key"); `assemble_cbom` maps every value onto the
+CycloneDX 1.6 enums so the CBOM is valid. A value without an enum equivalent becomes `other` and the model's
+original is kept in a `bf-cbom:<field>` property, so nothing is lost (ASSEMBLY_VERSION, recorded in the CBOM).
 """
 
 from __future__ import annotations
@@ -27,6 +31,7 @@ from .models import RepoInfo, Trace
 logger = logging.getLogger(__name__)
 
 PROMPT_VERSION = "2026-10-15.2"  # prompt + file-selection version (recorded in the CBOM metadata)
+ASSEMBLY_VERSION = "2026-10-16.1"  # how answers become CycloneDX: enum mapping (recorded in the CBOM metadata)
 
 LLM_MAX_FILES = int(os.getenv("LLM_MAX_FILES", "40"))
 LLM_MAX_CHUNK_CHARS = int(os.getenv("LLM_MAX_CHUNK_CHARS", "40000"))  # ~10k tokens of code per request
@@ -350,19 +355,85 @@ def _str_or_none(v) -> str | None:
     return str(v).strip() if v not in (None, "", "null") else None
 
 
-_ASSET_TYPES = {"algorithm", "key", "certificate", "protocol", "related-crypto-material"}
+_ASSET_TYPES = {"algorithm", "key", "certificate", "protocol", "related-crypto-material"}  # what the prompt allows
+
+# CycloneDX 1.6 enum values the model's free text is mapped to (`other`/`unknown` are valid too)
+CDX_PRIMITIVES = ("drbg", "mac", "block-cipher", "stream-cipher", "signature", "hash", "pke", "xof", "kdf",
+                  "key-agree", "kem", "ae", "combiner")  # fmt: skip
+CDX_MODES = ("cbc", "ecb", "ccm", "gcm", "cfb", "ofb", "ctr")
+CDX_PADDINGS = ("pkcs5", "pkcs7", "pkcs1v15", "oaep", "raw")
+_SYNONYMS = {
+    "primitive": {
+        "blockcipher": "block-cipher",
+        "streamcipher": "stream-cipher",
+        "digest": "hash",
+        "aead": "ae",
+        "keyagreement": "key-agree",
+        "keyexchange": "key-agree",
+        "kex": "key-agree",
+        "rng": "drbg",
+        "prng": "drbg",
+        "csprng": "drbg",
+        "keyderivation": "kdf",
+    },  # fmt: skip
+    "mode": {"cfb1": "cfb", "cfb8": "cfb", "cfb64": "cfb", "cfb128": "cfb"},
+    "padding": {
+        "pkcs5padding": "pkcs5",
+        "pkcs7padding": "pkcs7",
+        "pkcs1": "pkcs1v15",
+        "pkcs1padding": "pkcs1v15",
+        "pkcs1v15padding": "pkcs1v15",
+        "pkcs115": "pkcs1v15",
+        "nopadding": "raw",
+        "none": "raw",
+        "oaeppadding": "oaep",
+    },  # fmt: skip
+}
+# related-crypto-material type from the asset name ("RSA private key" -> private-key), first match wins
+_MATERIAL_WORDS = (("private", "private-key"), ("public", "public-key"), ("secret", "secret-key"),
+                   ("symmetric", "secret-key"), ("salt", "salt"), ("nonce", "nonce"), ("password", "password"),
+                   ("passphrase", "password"), ("seed", "seed"), ("token", "token"))  # fmt: skip
+_OAEP_DIGEST = re.compile(r"OAEPWith(.+?)AndMGF1", re.IGNORECASE)
+
+
+def _fold(value: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", value.lower())
+
+
+def to_cdx_enum(field_name: str, value: str | None, allowed: tuple[str, ...]) -> tuple[str | None, str | None]:
+    """(CycloneDX 1.6 value, the model's original when it had to become `other`) for a free-text value."""
+    if value is None:
+        return None, None
+    key = _fold(value)
+    if key in ("other", "unknown"):
+        return key, None
+    for a in allowed:
+        if _fold(a) == key:
+            return a, None
+    if key in _SYNONYMS.get(field_name, {}):
+        return _SYNONYMS[field_name][key], None
+    if field_name == "padding" and key.startswith("oaepwith"):
+        return "oaep", None
+    return "other", value
+
+
+def material_type(name: str) -> str | None:
+    text = name.lower()
+    if re.search(r"(^|[^a-z])ivs?([^a-z]|$)|initiali[sz]ation vector", text):
+        return "initialization-vector"
+    return next((t for word, t in _MATERIAL_WORDS if word in text), None)
 
 
 def _normalize_asset(a: dict) -> dict | None:
     name = _str_or_none(a.get("name"))
     if not name:
         return None
-    asset_type = (_str_or_none(a.get("assetType")) or "algorithm").lower()
-    if asset_type not in _ASSET_TYPES:
-        asset_type = "related-crypto-material"
+    raw_type = _str_or_none(a.get("assetType")) or "algorithm"
+    asset_type = raw_type.lower() if raw_type.lower() in _ASSET_TYPES else "related-crypto-material"
     return {
         "name": name,
         "assetType": asset_type,
+        "assetTypeRaw": raw_type,
         "primitive": _str_or_none(a.get("primitive")),
         "keySize": _int_or_none(a.get("keySize")),
         "curve": _str_or_none(a.get("curve")),
@@ -408,6 +479,7 @@ class GenerationStats:
     chunks_split: int = 0  # chunks re-sent as two halves after an unparsable answer
     locations_verified: int = 0
     locations_unverified: int = 0
+    values_not_in_enum: int = 0  # model values kept in bf-cbom:<field> because CycloneDX 1.6 has no such value
     notes: list[str] = field(default_factory=list)
 
 
@@ -440,25 +512,48 @@ def assemble_cbom(
         if key in seen:
             continue
         seen.add(key)
+        primitive, primitive_raw = to_cdx_enum("primitive", a["primitive"], CDX_PRIMITIVES)
+        mode, mode_raw = to_cdx_enum("mode", a["mode"], CDX_MODES)
+        padding, padding_raw = to_cdx_enum("padding", a["padding"], CDX_PADDINGS)
+        digest = a["digest"]
+        if not digest and a["padding"] and (m := _OAEP_DIGEST.search(a["padding"])):
+            digest = m.group(1)  # "OAEPWithSHA-256AndMGF1Padding" -> SHA-256
+        asset_type = a["assetType"]
+        material = None
+        if asset_type == "key":  # not a CycloneDX asset type: keys are related crypto material
+            asset_type, material = "related-crypto-material", material_type(a["name"]) or "key"
+        elif asset_type == "related-crypto-material":
+            material = material_type(a["name"])
         algo = {
             k: v
             for k, v in {
-                "primitive": a["primitive"],
+                "primitive": primitive,
                 "parameterSetIdentifier": str(a["keySize"]) if a["keySize"] else None,
                 "curve": a["curve"],
-                "mode": a["mode"],
-                "padding": a["padding"],
+                "mode": mode,
+                "padding": padding,
             }.items()
             if v
         }
-        crypto: dict = {"assetType": a["assetType"]}
-        if a["assetType"] == "algorithm" and algo:
+        crypto: dict = {"assetType": asset_type}
+        if asset_type == "algorithm" and algo:
             crypto["algorithmProperties"] = algo
+        elif asset_type == "related-crypto-material" and (material or a["keySize"]):
+            crypto["relatedCryptoMaterialProperties"] = {
+                k: v for k, v in {"type": material, "size": a["keySize"]}.items() if v
+            }
         props = [{"name": "bf-cbom:confidence", "value": a["confidence"]}]
-        if a["digest"]:
-            props.append({"name": "bf-cbom:digest", "value": a["digest"]})
+        if digest:
+            props.append({"name": "bf-cbom:digest", "value": digest})
         if a["evidence"]:
             props.append({"name": "bf-cbom:evidence", "value": a["evidence"]})
+        originals = {"asset-type": a["assetTypeRaw"] if asset_type != a["assetTypeRaw"].lower() else None}
+        if asset_type == "algorithm":  # the other fields are only written for algorithms
+            originals.update({"primitive": primitive_raw, "mode": mode_raw, "padding": padding_raw})
+        for name, value in originals.items():
+            if value:
+                props.append({"name": f"bf-cbom:{name}", "value": value})
+                stats.values_not_in_enum += 1
         comp: dict = {
             "type": "cryptographic-asset",
             "bom-ref": f"{tool_name}:{uuid.uuid4()}",
@@ -485,6 +580,7 @@ def assemble_cbom(
         "properties": [
             {"name": "bf-cbom:llm-model", "value": model},
             {"name": "bf-cbom:prompt-version", "value": PROMPT_VERSION},
+            {"name": "bf-cbom:assembly-version", "value": ASSEMBLY_VERSION},
             {"name": "bf-cbom:files-candidates", "value": str(stats.files_candidates)},
             {"name": "bf-cbom:files-matched", "value": str(stats.files_matched)},
             {"name": "bf-cbom:files-sent", "value": str(stats.files_sent)},
@@ -493,6 +589,7 @@ def assemble_cbom(
             {"name": "bf-cbom:chunks-split", "value": str(stats.chunks_split)},
             {"name": "bf-cbom:prompt-tokens", "value": str(stats.prompt_tokens)},
             {"name": "bf-cbom:completion-tokens", "value": str(stats.completion_tokens)},
+            {"name": "bf-cbom:values-not-in-enum", "value": str(stats.values_not_in_enum)},
         ],
     }
     if repo_info is not None:

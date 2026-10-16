@@ -68,6 +68,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "black" },
+    { name = "jsonschema" },
     { name = "pytest" },
     { name = "ruff" },
     { name = "watchdog" },
@@ -88,6 +89,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "black", specifier = ">=25.1.0" },
+    { name = "jsonschema", specifier = ">=4.25.1" },
     { name = "pytest", specifier = ">=8.4.1" },
     { name = "ruff", specifier = ">=0.12.11" },
     { name = "watchdog", specifier = ">=6.0.0" },

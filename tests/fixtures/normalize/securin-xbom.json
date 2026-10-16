@@ -1,0 +1,239 @@
+{
+ "bomFormat": "CycloneDX",
+ "specVersion": "1.6",
+ "metadata": {
+  "tools": {
+   "components": [
+    {
+     "description": "Unified xBOM generator",
+     "name": "xbom",
+     "type": "application",
+     "version": "0.1.0"
+    }
+   ]
+  },
+  "properties": [
+   {
+    "name": "bf-cbom:fixture-origin",
+    "value": "e1-pilot-corpus 2026-10-16: ansible__ansible@a26c0f7b504b, keycloak__keycloak@632f214aa2d6"
+   }
+  ]
+ },
+ "components": [
+  {
+   "cryptoProperties": {
+    "algorithmProperties": {
+     "nistQuantumSecurityLevel": 1,
+     "parameterSetIdentifier": "256",
+     "primitive": "hash"
+    },
+    "assetType": "algorithm"
+   },
+   "description": "SHA-256 hash usage",
+   "evidence": {
+    "occurrences": [
+     {
+      "line": 154,
+      "location": "hacking/azp/incidental.py"
+     }
+    ]
+   },
+   "name": "SHA-256",
+   "properties": [
+    {
+     "name": "xbom:crypto:detected",
+     "value": "true"
+    },
+    {
+     "name": "xbom:crypto:scanner",
+     "value": "semgrep"
+    },
+    {
+     "name": "xbom:crypto:rule_id",
+     "value": "opt.xbom.lib.python3.12.site-packages.xbom.modules.cbom.rules.xbom-python-hash-sha256"
+    },
+    {
+     "name": "xbom:crypto:source_file",
+     "value": "hacking/azp/incidental.py"
+    },
+    {
+     "name": "xbom:crypto:source_line",
+     "value": "154"
+    },
+    {
+     "name": "xbom:crypto:severity",
+     "value": "low"
+    },
+    {
+     "name": "xbom:crypto:evidence",
+     "value": "requires login"
+    },
+    {
+     "name": "xbom:crypto:quantum_safe",
+     "value": "true"
+    },
+    {
+     "name": "xbom:crypto:quantum_status",
+     "value": "safe"
+    },
+    {
+     "name": "xbom:crypto:quantum_reason",
+     "value": "128-bit preimage resistance under Grover's — adequate"
+    }
+   ],
+   "type": "cryptographic-asset"
+  },
+  {
+   "cryptoProperties": {
+    "assetType": "related-crypto-material",
+    "relatedCryptoMaterialProperties": {
+     "type": "prng"
+    }
+   },
+   "description": "Use of non-cryptographic random number generator. Use secrets or os.urandom() for security-sensitive values.\n",
+   "evidence": {
+    "occurrences": [
+     {
+      "line": 143,
+      "location": "lib/ansible/cli/pull.py"
+     }
+    ]
+   },
+   "name": "PRNG",
+   "properties": [
+    {
+     "name": "xbom:crypto:detected",
+     "value": "true"
+    },
+    {
+     "name": "xbom:crypto:scanner",
+     "value": "semgrep"
+    },
+    {
+     "name": "xbom:crypto:rule_id",
+     "value": "opt.xbom.lib.python3.12.site-packages.xbom.modules.cbom.rules.xbom-python-insecure-random"
+    },
+    {
+     "name": "xbom:crypto:source_file",
+     "value": "lib/ansible/cli/pull.py"
+    },
+    {
+     "name": "xbom:crypto:source_line",
+     "value": "143"
+    },
+    {
+     "name": "xbom:crypto:severity",
+     "value": "low"
+    },
+    {
+     "name": "xbom:crypto:weakness",
+     "value": "weak_algorithm"
+    },
+    {
+     "name": "xbom:crypto:evidence",
+     "value": "requires login"
+    },
+    {
+     "name": "xbom:crypto:quantum_safe",
+     "value": "unknown"
+    },
+    {
+     "name": "xbom:crypto:quantum_status",
+     "value": "unknown"
+    },
+    {
+     "name": "xbom:crypto:risk_score",
+     "value": "25"
+    },
+    {
+     "name": "xbom:crypto:risk_severity",
+     "value": "low"
+    },
+    {
+     "name": "xbom:crypto:risk_factors",
+     "value": "weak_algorithm (+25)"
+    }
+   ],
+   "type": "cryptographic-asset"
+  },
+  {
+   "cryptoProperties": {
+    "algorithmProperties": {
+     "nistQuantumSecurityLevel": 0,
+     "primitive": "pk"
+    },
+    "assetType": "algorithm"
+   },
+   "description": "Elliptic curve key generation detected. All ECC is broken by Shor's algorithm. Migrate to ML-DSA (FIPS 204) for signatures or ML-KEM (FIPS 203) for key exchange.\n",
+   "evidence": {
+    "occurrences": [
+     {
+      "line": 132,
+      "location": "crypto/default/src/main/java/org/keycloak/crypto/def/BCEcdhEsAlgorithmProvider.java"
+     }
+    ]
+   },
+   "name": "ECDSA",
+   "properties": [
+    {
+     "name": "xbom:crypto:detected",
+     "value": "true"
+    },
+    {
+     "name": "xbom:crypto:scanner",
+     "value": "semgrep"
+    },
+    {
+     "name": "xbom:crypto:rule_id",
+     "value": "opt.xbom.lib.python3.12.site-packages.xbom.modules.cbom.rules.xbom-java-pqc-vulnerable-ec-keygen"
+    },
+    {
+     "name": "xbom:crypto:source_file",
+     "value": "crypto/default/src/main/java/org/keycloak/crypto/def/BCEcdhEsAlgorithmProvider.java"
+    },
+    {
+     "name": "xbom:crypto:source_line",
+     "value": "132"
+    },
+    {
+     "name": "xbom:crypto:severity",
+     "value": "medium"
+    },
+    {
+     "name": "xbom:crypto:weakness",
+     "value": "quantum_vulnerable"
+    },
+    {
+     "name": "xbom:crypto:evidence",
+     "value": "requires login"
+    },
+    {
+     "name": "xbom:crypto:quantum_safe",
+     "value": "false"
+    },
+    {
+     "name": "xbom:crypto:quantum_status",
+     "value": "vulnerable"
+    },
+    {
+     "name": "xbom:crypto:quantum_reason",
+     "value": "ECDSA broken by Shor's algorithm on elliptic curves"
+    },
+    {
+     "name": "xbom:crypto:risk_score",
+     "value": "20"
+    },
+    {
+     "name": "xbom:crypto:risk_severity",
+     "value": "low"
+    },
+    {
+     "name": "xbom:crypto:risk_factors",
+     "value": "quantum_vulnerable (+20)"
+    }
+   ],
+   "type": "cryptographic-asset"
+  }
+ ],
+ "dependencies": []
+}

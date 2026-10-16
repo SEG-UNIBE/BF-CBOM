@@ -1,0 +1,6 @@
+spec: cbomkit
+inherits: _cbomkit
+version: 1
+checked_on: "e1-pilot-corpus 2026-10-16 (server image 2.1.10, 6 CBOMs); pilot fixtures micro-java/python/go"
+notes: >
+  CBOMkit server image. Curves are spelled Curve25519, Edwards25519, Curve448, Edwards448.

@@ -328,6 +328,18 @@ def ensure_scan_repo(
     return scan
 
 
+def snapshot_files(full_name: str, commit: str | None, *, mirror_dir: Path = GIT_MIRROR_DIR) -> frozenset[str] | None:
+    """Paths of all files of a snapshot (from the base mirror), or None when the mirror is not mounted
+    (e.g. an exported copy on the host). Used by the normaliser for `file_exists` and path resolution."""
+    bare = mirror_path(full_name, mirror_dir)
+    if not commit or not (bare / "HEAD").exists():
+        return None
+    proc = _git(["-C", str(bare), "ls-tree", "-r", "--name-only", "-z", commit], timeout=120)
+    if proc.returncode != 0:
+        return None
+    return frozenset(p for p in proc.stdout.split("\0") if p)
+
+
 def variant_commit(spec: RepoSpec, variant: str, base_commit: str, *, mirror_dir: Path = GIT_MIRROR_DIR) -> str:
     """Commit of a variant branch in the mirror (mutants are created there by the mutation harness)."""
     if variant == ORIGINAL_VARIANT:

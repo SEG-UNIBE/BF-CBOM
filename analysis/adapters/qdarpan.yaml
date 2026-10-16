@@ -1,0 +1,25 @@
+spec: qdarpan
+inherits: _cyclonedx
+version: 1
+declared: [{bomFormat: CycloneDX, specVersion: "1.7"}]
+checked_on: "e1-pilot-corpus 2026-10-16 (qdarpan 0.1.0, 10 CBOMs)"
+findings:
+  libraries: all            # crypto libraries it detected (crypto/rsa, jca, bouncycastle, openssl), with locations
+locations: [evidence_occurrences, property_locations]
+sources:
+  - fields: standard
+  - property: {qdarpan:family: family, qdarpan:confidence: confidence}
+  - parse: name
+  - refs
+  - dependencies
+context: [property:qdarpan:matchers]
+dictionary:
+  name:
+    jca: {}                     # the Java crypto API as a whole, no algorithm (library and algorithm components)
+    openssl: {}
+    bouncycastle: {}
+notes: >
+  One component per algorithm with up to 30+ locations; Q-DARPAN itself writes them only into the properties
+  qdarpan:location.N (absolute paths), which the worker copies into evidence.occurrences (property_locations is the
+  fallback for CBOMs written without the worker). qdarpan:family is its family statement (registry style, also TLS
+  and DH); qdarpan:matchers names the API rule (go.rsa.encryptoaep). `jca` appears as an algorithm name.

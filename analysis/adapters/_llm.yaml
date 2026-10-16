@@ -1,0 +1,24 @@
+# Shared base of the LLM workers (common/llm_cbom.py assembles the CBOM from the model's answer; same prompt and
+# file selection for every provider).
+spec: _llm
+inherits: _cyclonedx
+version: 2
+declared: [{bomFormat: CycloneDX, specVersion: "1.6"}]
+sources:
+  - fields: standard
+  - property: {bf-cbom:digest: digest, bf-cbom:confidence: confidence, bf-cbom:primitive: primitive,
+               bf-cbom:mode: mode, bf-cbom:padding: padding}
+  - parse: name
+dictionary:
+  asset_type:
+    key: {asset_type: related-crypto-material, material: key}    # CBOMs assembled before 2026-10-16
+context: [property:bf-cbom:evidence]
+notes: >
+  One component per reported site (file and line verified against the clone where possible, see
+  bf-cbom:location-unverified). Names are whatever the model writes: JOSE (HS256, RS256, ES256, RSA-OAEP-256),
+  SSH (ssh-rsa), APIs (crypto/rand, SecureRandom, os.urandom), prose (SHA-256 with RSA, ECDSA with SHA-512).
+  Since ASSEMBLY_VERSION 2026-10-16.1 the worker maps the model's values onto the CycloneDX 1.6 enums (GCM -> gcm,
+  NoPadding -> raw, assetType key -> related-crypto-material with a material type); a value without an enum
+  equivalent is written as `other` and the model's original kept in bf-cbom:primitive/mode/padding/asset-type,
+  which this spec reads (PSS, KW, key-wrap). CBOMs assembled earlier pass the model's values through and carry
+  `enum` spec issues (assetType key, padding PSS, upper-case modes and paddings).

@@ -1,0 +1,37 @@
+spec: cipherradar
+inherits: _cyclonedx
+version: 1
+declared: [{bomFormat: CycloneDX, specVersion: "1.7"}]
+checked_on: "e1-pilot-corpus 2026-10-16 (CipherRadar efa5d9d, 11 CBOMs); pilot fixture micro-java"
+findings:
+  libraries: all            # crypto library imports (crypto-library-import, bouncycastle-or-jca-or-...), located
+sources:
+  - fields: standard
+  - property: {confidence: confidence}
+  - {parse: name, when: {asset_type: [algorithm, certificate, protocol, related-crypto-material]}}
+  - {parse: "rule:ruleId", quiet: true}
+  - refs
+  - dependencies
+dictionary:
+  name:
+    Hardcoded secret:*: {material: credential}
+    Weak keystore password: {material: password}
+    cipher-spec-inventory: {protocol: TLS}
+    tls-version-enforcement: {protocol: TLS}
+    Unpinned crypto library install: {}
+    Certificate Validation Disabled: {protocol: TLS}
+    X.509 Certificate: {group: CERT}
+    X.509 Certificate (unparseable): {group: CERT}
+    Certificate (unparsed): {group: CERT}
+    ecb-mode-usage: {mode: ECB}
+    jca-cipher-getinstance: {}
+    jca-keygenerator-getinstance: {functions: [keygen]}
+    ec-curve-from-ecgenparameterspec: {family: EC}
+    crypto-provider-registration: {}
+notes: >
+  CycloneDX 1.7 with algorithmFamily on most algorithms, but not always consistent with the name
+  (RSA-ECB/OAEPWithSHA-256AndMGF1Padding is labelled RSASSA-PKCS1): the structured field wins, the name's value is
+  kept as a conflict. Locations are absolute paths of the scan's temp clone (/tmp/cradar-*/repo/...). Rule-like
+  names (weak-rand, elliptic-p-256, pyca-curve-p-256-secp256r1, 0) and rule ids (cbom-go-weak-rand) are parsed;
+  certificates, keys and protocols are detailed (signatureAlgorithmRef/algorithmRef point to components named
+  crypto/alg/rsa-2048). Library components are crypto library imports and become records without algorithm.

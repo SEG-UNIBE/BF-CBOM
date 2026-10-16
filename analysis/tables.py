@@ -2,8 +2,8 @@
 
 Three layers, so that later steps (the normaliser, further n-way matchers) only add files:
 - runs:    one row per stored run (`run<k>.meta.json`), all repetitions;
-- records: one row per extracted item with a stable `record_id`; today the call sites
-           (`analysis/sites.py`), later also the normalised records;
+- records: one row per extracted item with a stable `record_id`: the call sites (`analysis/sites.py`) and the
+           normalised records (`analysis/normalize/`, joined to the call sites by `site_id`);
 - matches: per matcher a groups table and a long membership table (group_id <-> record_id).
 
 Join keys: records on (snapshot, variant, run, record_id), groups on (snapshot, variant, run, group_id);
@@ -21,6 +21,7 @@ from common.experiment import iter_results
 
 from .groundtruth import TruthScore
 from .match import Cluster
+from .normalize.record import RECORD_COLUMNS, NormRecord
 from .sites import ASSET_COMPONENT_TYPES, Site
 
 LIST_SEP = ";"
@@ -28,7 +29,7 @@ LIST_SEP = ";"
 RUNS_COLUMNS = [
     "repo", "snapshot", "commit", "variant", "variant_commit", "language", "tool", "run",
     "status", "duration_sec", "size_bytes", "error",
-    "tool_version", "image_ref", "received_at",
+    "tool_version", "image_ref", "received_at", "bom_format", "spec_version",
     "components", "crypto_assets", "algorithm_assets",
     "requests", "prompt_tokens", "completion_tokens",
 ]  # fmt: skip
@@ -36,6 +37,7 @@ SITES_COLUMNS = [
     "repo", "snapshot", "commit", "variant", "language", "tool", "run",
     "record_id", "file", "line", "families", "raw", "asset_types", "in_scope",
 ]  # fmt: skip
+RECORDS_COLUMNS = ["repo", "snapshot", "commit", "variant", "language", "tool", "run"] + RECORD_COLUMNS
 GROUP_KEY_COLUMNS = ["matcher", "repo", "snapshot", "commit", "variant", "run", "group_id", "k", "tools"]
 CALLSITE_GROUP_COLUMNS = GROUP_KEY_COLUMNS + ["file", "line_min", "line_max", "n_sites", "families"]
 MEMBERS_COLUMNS = ["matcher", "snapshot", "variant", "run", "group_id", "record_id", "tool"]
@@ -98,7 +100,13 @@ def _cbom_counts(cbom: dict) -> dict:
         for p in (cbom.get("metadata") or {}).get("properties") or []
         if isinstance(p, dict)
     }
-    out = {"components": len(comps), "crypto_assets": len(crypto), "algorithm_assets": len(algos)}
+    out = {
+        "bom_format": cbom.get("bomFormat"),
+        "spec_version": cbom.get("specVersion"),
+        "components": len(comps),
+        "crypto_assets": len(crypto),
+        "algorithm_assets": len(algos),
+    }
     out.update({col: props.get(name) for col, name in _LLM_PROPS.items()})
     return out
 
@@ -167,6 +175,24 @@ def site_rows(
         }
         for s in sorted(sites, key=lambda s: (s.file, s.line, s.tool))
     ]
+
+
+# ----- records (normalised) -----
+
+
+def record_rows(
+    records: list[NormRecord], *, snapshot: str, variant: str, run: int, commit: str | None, language: str | None
+) -> list[dict]:
+    """Normalised records (analysis/normalize/) of one CBOM; `site_id` joins `sites-run<k>.csv`."""
+    base = {
+        "repo": full_name(snapshot),
+        "snapshot": snapshot,
+        "commit": commit,
+        "variant": variant,
+        "language": language,
+        "run": run,
+    }
+    return [{**base, "tool": r.tool, **r.csv_row()} for r in records]
 
 
 # ----- matches (generic over matchers) -----

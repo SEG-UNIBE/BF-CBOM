@@ -1,12 +1,14 @@
 """`bf-cbom analysis ...`: offline analysis of stored experiment results (no Redis).
 
 Reads RESULTS_DIR/<exp>/... written by `bf-cbom experiment run` and writes derived data next to
-it under RESULTS_DIR/<exp>/analysis/: JSON reports (`sites`, `micro`) and flat CSV tables (`tables`,
-see analysis/tables.py). Everything stays on the results-data volume; use `experiment export` to get it out.
+it under RESULTS_DIR/<exp>/analysis/: JSON reports (`sites`, `micro`, `normalize`) and flat CSV tables (`tables`,
+see analysis/tables.py). `normalize` also writes the normalised CBOM `run<k>.norm.json` next to each stored
+`run<k>.json`. Everything stays on the results-data volume; use `experiment export` to get it out.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections import defaultdict
 from dataclasses import dataclass
@@ -15,14 +17,16 @@ from pathlib import Path
 import typer
 import yaml
 
-from analysis import tables as tbl
+from analysis import levels as lv, tables as tbl
 from analysis.groundtruth import TruthScore, load_ground_truth, project_for_repo, score_sites
 from analysis.match import AgreementSummary, Cluster, cluster_sites, summarize_clusters
+from analysis.normalize import VOCAB_COLUMNS, Report, normalize_cbom
 from analysis.sites import ExtractionStats, Site, extract_sites
-from common.experiment import RESULTS_DIR, experiment_dir, iter_results
+from common.experiment import RESULTS_DIR, experiment_dir, iter_results, snapshot_files
+from common.tools_registry import load_tools
 
 analysis_app = typer.Typer(
-    help="Offline analysis of stored experiments (call-site matching, micro ground truth, CSV tables)",
+    help="Offline analysis of stored experiments (normalisation, call-site matching, micro ground truth, CSV tables)",
     add_completion=False,
     no_args_is_help=True,
     context_settings={"help_option_names": ["-h", "--help"]},
@@ -209,6 +213,107 @@ def micro(name: str = EXP_ARG, run: int = RUN_OPT, all_assets: bool = ALL_ASSETS
     )
 
 
+def norm_path(cbom_path: Path) -> Path:
+    """`run<k>.json` -> `run<k>.norm.json` (the normalised CBOM sits next to the original)."""
+    return cbom_path.with_name(cbom_path.name[: -len(".json")] + ".norm.json")
+
+
+def _normalize_runs(exp_dir: Path, *, run: int | None = None):
+    """Yield (meta, cbom path, NormalizedCbom) for every stored ok CBOM (all repetitions, or only `run`)."""
+    languages = _languages(exp_dir)
+    files_cache: dict[tuple[str, str | None], frozenset[str] | None] = {}
+    for meta, cbom_path in iter_results(exp_dir):
+        if meta.get("status") != "ok" or not cbom_path.exists():
+            continue
+        if run is not None and cbom_path.name != f"run{run}.json":
+            continue
+        body = cbom_path.read_bytes()
+        try:
+            cbom = json.loads(body)
+        except json.JSONDecodeError:
+            typer.secho(f"skipping unparsable {cbom_path}", fg=typer.colors.YELLOW, err=True)
+            continue
+        repo_dir, variant = cbom_path.parents[2].name, cbom_path.parents[1].name
+        full = tbl.full_name(repo_dir)
+        commit = meta.get("variant_commit") or meta.get("base_commit")
+        if (full, commit) not in files_cache:
+            files_cache[(full, commit)] = snapshot_files(full, commit)
+        tool = meta.get("worker") or cbom_path.parent.name
+        source = {
+            "file": cbom_path.name,
+            "sha256": hashlib.sha256(body).hexdigest(),
+            "snapshot": repo_dir,
+            "variant": variant,
+            "run": meta.get("run_index"),
+            "tool_version": meta.get("tool_version"),
+        }
+        n = normalize_cbom(
+            cbom, tool, language=languages.get(full), repo_files=files_cache[(full, commit)], source=source
+        )
+        yield meta, cbom_path, n
+
+
+def _write_json(path: Path, data) -> None:
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(data, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    tmp.replace(path)
+
+
+@analysis_app.command("normalize")
+def normalize(name: str = EXP_ARG):
+    """Normalise every stored CBOM with its tool's adapter spec (analysis/adapters/<tool>.yaml).
+
+    Writes run<k>.norm.json next to each run<k>.json, analysis/normalize.json (coverage per tool: fill rates,
+    sources, spec issues, conflicts, unmapped values) and analysis/vocab.csv (what every raw value mapped to).
+    """
+    exp_dir = _experiment(name)
+    report = Report()
+    written = 0
+    fallback: set[str] = set()
+    for _, cbom_path, n in _normalize_runs(exp_dir):
+        _write_json(norm_path(cbom_path), n.to_dict())
+        report.add(n)
+        written += 1
+        if n.adapter.get("fallback"):
+            fallback.add(n.tool)
+    if not written:
+        _err(f"no ok results in {exp_dir}")
+    out_dir = exp_dir / "analysis"
+    out_dir.mkdir(exist_ok=True)
+    _write_json(out_dir / "normalize.json", report.to_dict())
+    n_vocab = tbl.write_csv(out_dir / "vocab.csv", report.vocab_rows(), VOCAB_COLUMNS)
+    typer.echo("algorithm records with a value reported by the tool (not derived):")
+    for line in report.summary_lines():
+        typer.echo("  " + line)
+    if fallback:
+        typer.secho(f"no adapter spec, generic CycloneDX reader used: {sorted(fallback)}", fg=typer.colors.YELLOW)
+    typer.echo(f"{written} CBOMs normalised (run<k>.norm.json next to each), vocab.csv {n_vocab} rows, in {out_dir}")
+
+
+@analysis_app.command("levels")
+def levels(name: str = EXP_ARG, run: int = RUN_OPT):
+    """How much agreement normalisation creates: share of each tool's algorithms (per repository) that another
+    voter group also reports, at levels L0 (raw names) to L4 (full adapter specs). See analysis/levels.py."""
+    exp_dir = _experiment(name)
+    records: dict[tuple[str, str], list] = {}
+    for _, cbom_path, n in _normalize_runs(exp_dir, run=run):
+        snapshot = f"{cbom_path.parents[2].name}/{cbom_path.parents[1].name}"
+        records[(snapshot, n.tool)] = n.records
+    if not records:
+        _err(f"no ok results for run{run} in {exp_dir}")
+    voter_of = {t: str(info.get("voter_group") or t) for t, info in load_tools().items()}
+    rows = lv.ladder(records, voter_of)
+    for level in lv.LEVELS:
+        typer.echo(f"  {level}: {lv.LEVEL_NAMES[level]}")
+    typer.echo("share of a tool's algorithms (per repository) that another voter group also reports:")
+    for line in lv.table_lines(rows):
+        typer.echo("  " + line)
+    out_dir = exp_dir / "analysis"
+    out_dir.mkdir(exist_ok=True)
+    tbl.write_csv(out_dir / f"levels-run{run}.csv", [r.to_dict() for r in rows], lv.LEVEL_COLUMNS)
+    typer.echo(f"written to {out_dir / f'levels-run{run}.csv'}")
+
+
 @analysis_app.command("tables")
 def tables(
     name: str = EXP_ARG,
@@ -217,7 +322,7 @@ def tables(
     match_unknown: bool = MATCH_UNKNOWN_OPT,
     all_assets: bool = ALL_ASSETS_OPT,
 ):
-    """Flat CSV tables for pandas/R: runs, call sites (records), call-site matcher groups + members, micro scores."""
+    """Flat CSV tables for pandas/R: runs, call sites and normalised records, call-site groups + members, micro."""
     exp_dir = _experiment(name)
     out_dir = exp_dir / "analysis"
     languages = _languages(exp_dir)
@@ -238,6 +343,17 @@ def tables(
         group_rows += g
         member_rows += mem
     write(f"sites-run{run}.csv", site_rows, tbl.SITES_COLUMNS)
+    norm_rows: list[dict] = []
+    for meta, cbom_path, n in _normalize_runs(exp_dir, run=run):
+        norm_rows += tbl.record_rows(
+            n.records,
+            snapshot=cbom_path.parents[2].name,
+            variant=cbom_path.parents[1].name,
+            run=run,
+            commit=meta.get("base_commit"),
+            language=languages.get(tbl.full_name(cbom_path.parents[2].name)),
+        )
+    write(f"records-run{run}.csv", norm_rows, tbl.RECORDS_COLUMNS)
     write(f"groups-callsite-run{run}.csv", group_rows, tbl.CALLSITE_GROUP_COLUMNS)
     write(f"members-callsite-run{run}.csv", member_rows, tbl.MEMBERS_COLUMNS)
     scores, micro_languages = _micro_scores(exp_dir, run, all_assets)

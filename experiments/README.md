@@ -67,6 +67,91 @@ enqueued and stored in the experiment's Redis status (`waves`, `wave`). `--no-wa
 first wave; after `experiment collect` rerun `run` for the next one. Jobs left pending by an interrupted
 run are already in the queues and are collected in wave 1 regardless of the budget.
 
+## Normalisation
+
+**Why.** Generators describe the same crypto asset in different ways, so their CBOMs cannot be compared as they are.
+The example of the paper figure (`context/fig-cbom-normalization_cyclonedx.pdf`): three tools report AES-CBC with a
+256-bit key in `src/KdbxFile.cs` line 120:
+
+| Tool | What it writes |
+|---|---|
+| tool 1 | name `AES-256-CBC`, primitive `block-cipher`, occurrence `src/KdbxFile.cs`, line 120 |
+| tool 2 | name `AES`, custom properties `t2:mode = CBC`, `t2:file = KdbxFile.cs`, `t2:line = 120` |
+| tool 3 | name `aes`, `parameterSetIdentifier: "256"`, occurrence `./src/KdbxFile.cs:121` |
+
+Compared raw, the three share almost nothing. Normalised, they agree on the family (AES), the file and partly on mode
+and key size, and differ by one line. Normalisation translates every CBOM into one record format (CBOM^norm), so that
+the n-way matchers compare like with like, per dimension (algorithm, parameters, location).
+
+**Three kinds of files.**
+
+| What | Where | Holds |
+|---|---|---|
+| one adapter spec per tool | `analysis/adapters/<tool>.yaml` | the format the tool declares, which components count as findings, where each dimension sits in the tool's output (sources in order of precedence), the tool's own spellings (dictionary), notes on its quirks. Specs inherit from `_cyclonedx.yaml` (standard CycloneDX 1.6/1.7 paths), `_ibm-cbom-draft.yaml`, `_cbomkit.yaml`, `_llm.yaml` and state only their differences. Every integrated tool needs one (a test enforces it). |
+| one shared vocabulary | `analysis/data/algorithms.yaml` + `analysis/data/cyclonedx/` | canonical names from the vendored CycloneDX 1.7 cryptography registry (families such as `AES`, `RSAES-OAEP`, `ECDSA`, `SHA-2`; curves with their OID-equal aliases, `secp256r1` = `P-256` = `prime256v1`), enum spellings, JOSE/SSH/JCA identifiers, an API table, the meaning of `parameterSetIdentifier` per family. A spelling only one tool uses goes into that tool's spec; once two tools use it, it moves here. |
+| one target format | `analysis/data/cbom-norm.schema.json` | the shape of a normalised file and record, the same for every tool; every output validates against it |
+
+*Worker adapters* (`common/cbom_adapters.py`, `workers/*`) are something else: they make a tool's raw output usable
+CycloneDX at scan time. Adapter specs read CycloneDX into records, offline.
+
+**From a CBOM to records.**
+
+1. *Findings.* The spec decides which components count: crypto assets always; libraries only when the tool marks
+   them as findings (CipherRadar's library imports); dependency inventories (cdxgen, pqcheck) are skipped.
+2. *Locations.* One record per (component, occurrence); `path:line`, `path#line`, absolute temp-clone paths and
+   IBM-draft line windows (`line` ... `line_end`) become a repo-relative file and line. A component without a
+   location gives one record without location.
+3. *Values.* The spec's sources are read in order of precedence: occurrence evidence (CryptoScan's matched `symbol`),
+   standard fields, tool properties, the component name, refs and dependencies between components, the API in an
+   occurrence's context. Each yields canonical values through the vocabulary; composite names are parsed
+   (`AES-256-GCM` -> AES, 256, GCM; `HmacSHA512` -> HMAC, digest SHA-512; `RSA/ECB/OAEPWithSHA-256AndMGF1Padding` ->
+   RSAES-OAEP, OAEP, digest SHA-256).
+4. *Merge.* The first value per dimension wins. A later, more specific value of the same kind refines it (EC -> ECDSA,
+   SHA-2 -> SHA-256); a different one is kept as a conflict (CipherRadar's `algorithmFamily` SHA-2 on a component named
+   SHA-1). Supporting evidence (API context, rule ids, dependencies) only fills gaps.
+5. *Nothing is guessed.* Unknown spellings and code fragments (`parseCsvMap`, `SHA-" + this.strength`) stay unmapped,
+   a name listing several algorithms (`RSA, ECC, AES`) is marked ambiguous, and our own derivations (group from
+   family, key size from curve, default primitive) are tagged `derived:<dim>`.
+
+**What a record keeps.** The canonical values (`group`, `family`, `algorithm`, `primitive`, `functions`, `mode`,
+`padding`, `curve`, `key_size`, `digest`, `param_set`, `iterations`, `oid`, `protocol`, `protocol_version`,
+`material`, `asset_type`, `purl`, `confidence`), the location (`file`, `line`, `line_end`, `in_scope`, and
+`file_exists` when the git mirror is mounted), the occurrence `context`, and per dimension `raw` (the value as found,
+or the whole text that was parsed), `src` (the exact JSON path) and `via` (field, parse, dictionary, api, dependency,
+ref, derived). So matchability can be measured with and without normalisation, and it stays visible where a tool puts
+its information (structured field, custom property, only the name).
+
+**Format conformance.** Reading is lenient (any version, the IBM draft, fields of later versions), but every value
+read from a standard field is checked against the official JSON schema of the CycloneDX version the CBOM declares.
+Deviations become `spec_issues` on the record: `field` (the version does not define the field, e.g. 1.7
+`algorithmFamily` in a 1.6 CBOM), `enum` (`padding: PSS`, `assetType: key`), `type`, `deprecated` (1.6 `curve` in a
+1.7 CBOM); per document `dialect` (not CycloneDX) and `version`. This feeds the RQ1 questions "which tool reports in
+what, and where does it violate its declared standard"; a full validation of whole documents is a separate step.
+
+**How much agreement does normalisation create?** A normaliser developed on the outputs it evaluates could manufacture
+agreement and work against our own hypothesis that tools report heterogeneous things. So agreement is reported as a
+ladder (`levels`, below; CLAUDE.md method refinement 14):
+
+| Level | Information allowed |
+|---|---|
+| L0 | the component name exactly as reported |
+| L1 | case and separators ignored (`SHA-256` = `sha256`) |
+| L2 | the standard vocabulary: whole names and CycloneDX 1.7 `algorithmFamily` through the registry and JOSE/SSH/JCA identifiers (`DESede` -> 3DES, `HS256` -> HMAC) |
+| L3 | composite names parsed (`AES-256-GCM` -> AES) |
+| L4 | everything tool-specific: spec sources (symbols, properties, refs, dependencies), tool dictionaries, API context |
+
+Hypotheses are tested at L2/L3, the L0 -> L4 gap is reported as representational heterogeneity, and rankings are
+checked for stability across levels. On e1-pilot-corpus (2026-10-16) the pooled share of a tool's algorithms that
+another voter group confirms was 48 % (L0), 53 %, 60 %, 75 % (L3) and 75 % (L4): the tool-specific part adds nothing
+overall. The vocabulary and spec versions (recorded in every `.norm.json`) are frozen before E1, with the pilot corpus
+as the development set and the main corpus held out; two raters review `vocab.csv`.
+
+**Curating and extending.** After `normalize`, read the `unmapped` and `partial` rows of `analysis/vocab.csv`. A real
+spelling goes into the shared vocabulary when it is a standard identifier or used by two tools, otherwise into the
+tool's dictionary; garbage stays unmapped. Bump `version` in the edited file and rerun. A new tool gets
+`analysis/adapters/<tool>.yaml` (inherit `_cyclonedx`, state its quirks), a small fixture in
+`tests/fixtures/normalize/` (open-source tools only) and a test in `tests/test_normalize.py`.
+
 ## Analysis
 
 The analysis (`analysis/`) works offline: it reads the stored CBOMs from the results volume and needs neither Redis
@@ -74,10 +159,26 @@ nor running workers. It uses only runs with status `ok` (failed, timed-out and `
 by default, only algorithm assets and repetition 1.
 
 ```
-make analysis ARGS="micro e0-micro"   # score each tool against the micro projects' ground truth
-make analysis ARGS="sites e0-micro"   # match call sites across tools and count how many agree
-make analysis ARGS="tables e0-micro"  # flat CSV tables of all of the above for pandas/R
+make analysis ARGS="normalize e0-micro"  # every CBOM -> normalised records (run<k>.norm.json next to it)
+make analysis ARGS="levels e0-micro"     # how much agreement normalisation creates: L0 (raw) to L4 (tool specs)
+make analysis ARGS="micro e0-micro"      # score each tool against the micro projects' ground truth
+make analysis ARGS="sites e0-micro"      # match call sites across tools and count how many agree
+make analysis ARGS="tables e0-micro"     # flat CSV tables of all of the above for pandas/R
 ```
+
+**`normalize <exp>`** reads every stored ok CBOM (all repetitions) into normalised records with its tool's adapter
+spec, as described in [Normalisation](#normalisation). It writes:
+
+| File | Content |
+|---|---|
+| `<snapshot>/<variant>/<tool>/run<k>.norm.json` | next to `run<k>.json`: declared format/version, adapter spec and versions, the original's sha256 (detects a stale file), stats, the records |
+| `analysis/normalize.json` | per tool: formats declared, records per asset type, fill rate per dimension (reported vs derived), where values came from (standard field, property, occurrence, name, API context), spec issues, conflicts, top unmapped values |
+| `analysis/vocab.csv` | one row per (tool, source, raw value): status (`mapped`, `partial`, `unmapped`, `ambiguous`, `known`), what it mapped to, leftover tokens, count; the reviewable mapping table |
+
+**`levels <exp>`** computes the normalisation ladder (L0-L4, see [Normalisation](#normalisation)): per repository the
+algorithms each tool reports, and the share that a tool of another voter group (`voter_group` in `common/tools.yaml`)
+also reports. It prints a tools x levels table and writes `analysis/levels-run<k>.csv` (level, tool, voter_group,
+algorithms, confirmed, share; tool `all` pools all tools). Use `--run K` for another repetition.
 
 **`micro <exp>`** scores every tool on the micro projects (`corpus/micro`, repos named `<owner>/micro-<language>`)
 against `corpus/micro/ground_truth.yaml`, 11 known crypto assets per project. It prints one row per project and tool:
@@ -90,14 +191,15 @@ against `corpus/micro/ground_truth.yaml`, 11 known crypto assets per project. It
 | bar | `pass` when lenient recall is at least 50 % (the pilot's inclusion bar) |
 | missed | ids of the assets the tool did not find |
 
-**`sites <exp>`** extracts every reported location (file, line, algorithm family) and clusters sites of different
+**`sites <exp>`** (legacy: its own extraction, to be retired in favour of matchers on the normalised records) extracts
+every reported location (file, line, algorithm family) and clusters sites of different
 tools that lie in the same file within ±2 lines and share a family. Per repository it prints the number of sites and
 clusters, the distribution of k (how many tools agree on a cluster) and per tool how many of its clusters are
 confirmed by at least one other tool or solo. Options: `--window N` for the line distance, `--match-unknown` to let
 sites of unknown family join clusters (off: it inflates weak tools), `--all-assets` to keep keys, certificates and
 protocols, `--run K` for another repetition (also available for `micro`).
 
-Both commands write to the experiment's folder on the volume:
+The commands write to the experiment's folder on the volume:
 
 ```
 <exp>/analysis/
@@ -108,7 +210,11 @@ Both commands write to the experiment's folder on the volume:
 ├── groups-callsite-run1.csv              # tables: one row per call-site cluster
 ├── members-callsite-run1.csv             # tables: one row per (cluster, site) pair
 ├── micro-run1.csv                        # tables: one row per (micro project, tool); only with micro projects
+├── records-run1.csv                      # tables: one row per normalised record (joins sites-run1.csv on site_id)
 ├── tables-run1.json                      # tables: settings used (run, window, match_unknown, all_assets) and row counts
+├── normalize.json                        # normalize: coverage per tool (fill rates, sources, spec issues, conflicts)
+├── levels-run1.csv                       # levels: confirmed share per tool at normalisation levels L0-L4
+├── vocab.csv                             # normalize: what every raw value mapped to, per tool and source
 └── <owner>__<repo>@<sha12>/<variant>/
     └── clusters.jsonl                    # sites: one cluster per line: file, line range, k, tools, families, member sites
 ```
@@ -119,13 +225,14 @@ distribution, per-tool confirmed/solo counts and pairwise Jaccard similarity bet
 
 **`tables <exp>`** writes the same results as flat, long-format CSV files (UTF-8, comma-separated, lists inside a
 cell joined with `;`). It takes the same options as `sites` and records them in `tables-run<k>.json`. The tables come in
-three layers, so later analysis steps (a normaliser producing simplified records per CBOM, further n-way matchers) only
-add files and never change these:
+three layers, so further analysis steps (more n-way matchers on the normalised records) only add files and never
+change these:
 
 | File | Layer | One row per | Main columns |
 |---|---|---|---|
-| `runs.csv` | runs | stored run, every repetition, incl. failed, timed-out and `unsupported` | repo, snapshot, commit, variant, tool, run, status, duration_sec, size_bytes, error, tool_version, image_ref, components, crypto_assets, algorithm_assets; for LLM workers requests, prompt_tokens, completion_tokens |
+| `runs.csv` | runs | stored run, every repetition, incl. failed, timed-out and `unsupported` | repo, snapshot, commit, variant, tool, run, status, duration_sec, size_bytes, error, tool_version, image_ref, bom_format, spec_version (as the CBOM declares), components, crypto_assets, algorithm_assets; for LLM workers requests, prompt_tokens, completion_tokens |
 | `sites-run<k>.csv` | records | call site of one tool (file, line) | snapshot, variant, tool, run, record_id (`<tool>:<file>:<line>`), file, line, families, raw, asset_types, in_scope |
+| `records-run<k>.csv` | records | normalised record: one (component, occurrence) of one tool | snapshot, variant, tool, run, record_id (`<tool>:<component>:<occurrence>`), site_id (= the sites' record_id), every record dimension, `raw_*`, `src_*`, unmapped, conflicts, spec_issues |
 | `groups-callsite-run<k>.csv` | matches | cluster of the call-site matcher | matcher, snapshot, variant, run, group_id, k, tools, file, line_min, line_max, n_sites, families (`name:count`) |
 | `members-callsite-run<k>.csv` | matches | (cluster, site) pair | matcher, snapshot, variant, run, group_id, record_id, tool |
 | `micro-run<k>.csv` | ground truth | micro project and tool | project, language, tool, strict, lenient, recall_strict, recall_lenient, sites_in_file, sites_correct, precision, passes_bar, missed |

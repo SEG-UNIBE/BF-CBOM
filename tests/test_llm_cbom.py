@@ -112,7 +112,7 @@ def test_generate_cbom_assembles_cyclonedx_and_verifies_locations(repo: Path):
     assert aes["cryptoProperties"]["algorithmProperties"] == {
         "primitive": "ae",
         "parameterSetIdentifier": "256",
-        "mode": "GCM",
+        "mode": "gcm",  # the model's "GCM" as the CycloneDX enum value
     }
     assert aes["evidence"]["occurrences"] == [{"location": "pkg/crypto_util.py", "line": 8}]
     rsa = cbom["components"][2]
@@ -222,3 +222,81 @@ def test_select_files_covers_all_micro_languages():
     ):
         sel = select_files(root / sub, lang)
         assert [p.name for p in sel.files] == [expected], lang
+
+
+def _cyclonedx_16_validator():
+    """Official CycloneDX 1.6 JSON schema (vendored in analysis/data/cyclonedx/) with its local references."""
+    jsonschema = pytest.importorskip("jsonschema")
+    from referencing import Registry, Resource
+
+    schema_dir = Path(__file__).resolve().parents[1] / "analysis" / "data" / "cyclonedx"
+    docs = {n: json.loads((schema_dir / n).read_text(encoding="utf-8")) for n in
+            ("bom-1.6.schema.json", "spdx.schema.json", "jsf-0.82.schema.json")}  # fmt: skip
+    registry = Registry().with_resources((d["$id"], Resource.from_contents(d)) for d in docs.values())
+    return jsonschema.Draft7Validator(docs["bom-1.6.schema.json"], registry=registry)
+
+
+def test_model_values_become_valid_cyclonedx_16(repo: Path):
+    answer = json.dumps(
+        {
+            "assets": [
+                {
+                    "name": "RSA private key",
+                    "assetType": "key",
+                    "keySize": 2048,
+                    "file": "pkg/crypto_util.py",
+                    "line": 1,
+                },
+                {"name": "RSA", "assetType": "key", "file": "pkg/crypto_util.py", "line": 2},
+                {"name": "RSA-PSS", "assetType": "algorithm", "primitive": "signature", "padding": "PSS"},
+                {
+                    "name": "RSA-OAEP",
+                    "assetType": "algorithm",
+                    "primitive": "pke",
+                    "padding": "OAEPWithSHA-256AndMGF1Padding",
+                },  # fmt: skip
+                {
+                    "name": "AES",
+                    "assetType": "algorithm",
+                    "primitive": "blockcipher",
+                    "mode": "CBC",
+                    "padding": "NoPadding",
+                },
+                {"name": "A128KW", "assetType": "algorithm", "primitive": "key-wrap", "mode": "KW"},
+                {"name": "salt", "assetType": "related-crypto-material"},
+                {"name": "crypto-js", "assetType": "library"},
+            ]
+        }
+    )
+    cbom, stats = llm.generate_cbom(FakeProvider([answer]), repo, language="Python")
+    errors = [f"{list(e.absolute_path)}: {e.message}" for e in _cyclonedx_16_validator().iter_errors(cbom)]
+    assert errors == []
+    comps = {c["name"]: c for c in cbom["components"]}
+
+    def props(name):
+        return {p["name"]: p["value"] for p in comps[name]["properties"]}
+
+    assert comps["RSA private key"]["cryptoProperties"] == {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {"type": "private-key", "size": 2048},
+    }
+    assert props("RSA private key")["bf-cbom:asset-type"] == "key"
+    assert comps["RSA"]["cryptoProperties"]["relatedCryptoMaterialProperties"] == {"type": "key"}
+    assert comps["RSA-PSS"]["cryptoProperties"]["algorithmProperties"]["padding"] == "other"
+    assert props("RSA-PSS")["bf-cbom:padding"] == "PSS"
+    oaep = comps["RSA-OAEP"]
+    assert oaep["cryptoProperties"]["algorithmProperties"]["padding"] == "oaep"
+    assert props("RSA-OAEP")["bf-cbom:digest"] == "SHA-256" and "bf-cbom:padding" not in props("RSA-OAEP")
+    assert comps["AES"]["cryptoProperties"]["algorithmProperties"] == {
+        "primitive": "block-cipher", "mode": "cbc", "padding": "raw"}  # fmt: skip
+    kw = comps["A128KW"]["cryptoProperties"]["algorithmProperties"]
+    assert (kw["primitive"], kw["mode"]) == ("other", "other")
+    assert (props("A128KW")["bf-cbom:primitive"], props("A128KW")["bf-cbom:mode"]) == ("key-wrap", "KW")
+    assert comps["salt"]["cryptoProperties"]["relatedCryptoMaterialProperties"] == {"type": "salt"}
+    assert comps["crypto-js"]["cryptoProperties"] == {"assetType": "related-crypto-material"}
+    assert props("crypto-js")["bf-cbom:asset-type"] == "library"
+    meta = {p["name"]: p["value"] for p in cbom["metadata"]["properties"]}
+    assert meta["bf-cbom:assembly-version"] == llm.ASSEMBLY_VERSION
+    assert (
+        meta["bf-cbom:values-not-in-enum"] == str(stats.values_not_in_enum) == "6"
+    )  # key x2, PSS, key-wrap, KW, library

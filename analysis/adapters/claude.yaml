@@ -1,0 +1,4 @@
+spec: claude
+inherits: _llm
+version: 1
+checked_on: "not yet run (needs an API key); same assembly as deepseek"

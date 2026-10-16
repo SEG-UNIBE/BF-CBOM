@@ -391,9 +391,11 @@ make experiment-status NAME=e0-smoke
 make experiment-export NAME=e0-smoke            # -> exports/e0-smoke.zip, the only path to the host
 make corpus ARGS="--per-language 100"           # stratified GitHub corpus with pinned commits
 make experiment EXP=experiments/e0-micro.yaml   # every tool on the hand-written micro projects (corpus/micro)
+make analysis ARGS="normalize e0-micro"         # every CBOM -> normalised records, one adapter spec per tool (analysis/adapters/)
+make analysis ARGS="levels e0-micro"            # how much agreement normalisation creates (levels L0 raw to L4 tool specs)
 make analysis ARGS="micro e0-micro"             # recall/precision per tool against corpus/micro/ground_truth.yaml
 make analysis ARGS="sites e0-micro"             # location-aware agreement between tools (analysis/match.py)
-make analysis ARGS="tables e0-micro"            # flat CSV tables (runs, sites, clusters, micro) for pandas/R
+make analysis ARGS="tables e0-micro"            # flat CSV tables (runs, sites, records, clusters, micro) for pandas/R
 ```
 
 #### Parallelism and Memory

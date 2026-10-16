@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/SEG-UNIBE/BF-CBOM/analysis/data/cbom-norm.schema.json",
+  "title": "BF-CBOM normalised CBOM (CBOM^norm), version bf-cbom-norm/1",
+  "description": "One file per stored CBOM (run<k>.norm.json next to run<k>.json), the same shape for every tool. Written by analysis/normalize (adapter spec per tool in analysis/adapters/). Canonical values come from analysis/data/algorithms.yaml and the CycloneDX 1.7 registry; every value keeps its raw form and the path it was read from.",
+  "type": "object",
+  "required": ["schema", "tool", "adapter", "vocabulary", "source", "declared", "reader", "document_issues", "spec_issues", "stats", "records"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "bf-cbom-norm/1"},
+    "tool": {"type": "string", "description": "worker name, e.g. cbomkit-jar"},
+    "adapter": {
+      "type": "object",
+      "required": ["spec", "fallback"],
+      "additionalProperties": false,
+      "properties": {
+        "spec": {"type": "string", "description": "inheritance chain with versions, e.g. 'cryptoscan@1 < _cyclonedx@1'"},
+        "fallback": {"type": "boolean", "description": "true: the tool has no spec, the generic CycloneDX reader was used"}
+      }
+    },
+    "vocabulary": {
+      "type": "object",
+      "required": ["algorithms", "registry"],
+      "additionalProperties": false,
+      "properties": {
+        "algorithms": {"type": "string", "description": "version of analysis/data/algorithms.yaml"},
+        "registry": {"type": "string", "description": "lastUpdated of the vendored CycloneDX cryptography registry"}
+      }
+    },
+    "source": {
+      "type": "object",
+      "description": "the original CBOM: file name next to this file, its sha256 (detects a stale normalisation), snapshot, variant, run",
+      "properties": {
+        "file": {"type": "string"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "snapshot": {"type": "string"},
+        "variant": {"type": "string"},
+        "run": {"type": ["integer", "null"]},
+        "tool_version": {"type": ["string", "null"]}
+      }
+    },
+    "declared": {
+      "type": "object",
+      "description": "what the CBOM itself declares",
+      "required": ["bomFormat", "specVersion", "tools"],
+      "additionalProperties": false,
+      "properties": {
+        "bomFormat": {"type": ["string", "null"]},
+        "specVersion": {"type": ["string", "null"]},
+        "tools": {"type": "array", "items": {"type": "object"}}
+      }
+    },
+    "reader": {"type": "string", "description": "cyclonedx, or the bomFormat of a non-CycloneDX dialect (CBOM)"},
+    "checked_against": {"type": ["string", "null"], "description": "official schema the values were checked against, e.g. 'CycloneDX 1.6'; null when none applies"},
+    "document_issues": {"type": "array", "items": {"type": "string", "pattern": "^(dialect|version):"}},
+    "spec_issues": {"type": "object", "additionalProperties": {"type": "integer"}, "description": "issue count per kind (field, enum, type, deprecated, dialect, version)"},
+    "stats": {"type": "object", "additionalProperties": {"type": ["integer", "object"]}},
+    "records": {"type": "array", "items": {"$ref": "#/$defs/record"}}
+  },
+  "$defs": {
+    "record": {
+      "type": "object",
+      "required": ["record_id", "component_index", "occurrence_index"],
+      "additionalProperties": false,
+      "properties": {
+        "record_id": {"type": "string", "description": "<tool>:<component index>:<occurrence index>; stable for a stored CBOM"},
+        "site_id": {"type": "string", "description": "<tool>:<file>:<line>; joins sites-run<k>.csv"},
+        "component": {"type": "string", "description": "bom-ref of the component"},
+        "component_index": {"type": "integer", "minimum": 0},
+        "occurrence_index": {"type": "integer", "minimum": 0},
+        "name": {"type": "string", "description": "component name as reported"},
+        "group": {"type": "string", "description": "coarse family (analysis/data/families.yaml names): RSA, EC, AES, SHA-2, RANDOM, TLS, CERT, ..."},
+        "asset_type": {"enum": ["algorithm", "certificate", "protocol", "related-crypto-material", "library"]},
+        "material": {"type": "string", "description": "CycloneDX related-crypto-material type: private-key, salt, ..."},
+        "family": {"type": "string", "description": "CycloneDX 1.7 registry family (AES, RSAES-OAEP, ECDSA, SHA-2, ...) or a documented addition (RSA, EC, CSPRNG, PRNG, ...)"},
+        "algorithm": {"type": "string", "description": "specific variant (SHA-256, Ed25519, ML-KEM-768); otherwise equal to family"},
+        "primitive": {"type": "string", "description": "CycloneDX primitive enum value"},
+        "functions": {"type": "array", "items": {"type": "string"}, "description": "CycloneDX cryptoFunctions enum values"},
+        "mode": {"type": "string"},
+        "padding": {"type": "string"},
+        "curve": {"type": "string", "description": "registry curve name (secp256r1, Curve25519, Ed25519, ...)"},
+        "key_size": {"type": "integer"},
+        "digest": {"type": "string", "description": "hash of a composite (HMAC-SHA-256 -> SHA-256)"},
+        "param_set": {"type": "string", "description": "parameter identifier that is neither a key size nor a digest"},
+        "iterations": {"type": "integer"},
+        "oid": {"type": "string"},
+        "protocol": {"type": "string"},
+        "protocol_version": {"type": "string"},
+        "purl": {"type": "string"},
+        "confidence": {"type": ["string", "number"], "description": "as reported; scales differ per tool"},
+        "file": {"type": "string", "description": "repo-relative path"},
+        "line": {"type": "integer"},
+        "line_end": {"type": "integer", "description": "end of a reported line window (IBM draft detectionContext)"},
+        "location": {"type": "string", "description": "location as reported, before relativizing"},
+        "in_scope": {"type": "boolean", "description": "a source file of the repository's language"},
+        "file_exists": {"type": "boolean", "description": "the path exists at the scanned commit (absent without the git mirror)"},
+        "context": {"type": "string", "description": "occurrence evidence: API call, matched symbol, code line or snippet (shortened)"},
+        "ambiguous": {"type": "string", "description": "a name listing several algorithms that no other source resolved"},
+        "raw": {"type": "object", "description": "per dimension the value as found (a field value or the whole text that was parsed)"},
+        "src": {"type": "object", "additionalProperties": {"type": "string"}, "description": "per dimension the JSON path or source it came from; derived:<dim> for our derivations"},
+        "via": {"type": "object", "additionalProperties": {"type": "string"}, "description": "per dimension: field, parse, dictionary, api, dependency, ref or derived"},
+        "unmapped": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["src", "raw"],
+            "additionalProperties": false,
+            "properties": {"src": {"type": "string"}, "raw": {"type": "string"}, "tokens": {"type": "array", "items": {"type": "string"}}}
+          }
+        },
+        "conflicts": {
+          "type": "object",
+          "description": "per dimension a lower-precedence value that contradicts the kept one",
+          "additionalProperties": {"type": "object", "required": ["value", "src"], "properties": {"value": {}, "src": {"type": "string"}}}
+        },
+        "spec_issues": {"type": "array", "items": {"type": "string", "pattern": "^(field|enum|type|deprecated):"}}
+      }
+    }
+  }
+}

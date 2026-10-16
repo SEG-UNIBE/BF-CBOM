@@ -1,0 +1,16 @@
+# Reader spec for IBM's pre-standard CBOM draft `1.4-cbom-1.0` (bomFormat CBOM, component type crypto-asset,
+# locations in cryptoProperties.detectionContext). Also reads CycloneDX documents (it only adds paths), so a tool
+# that writes either format can inherit it. Draft documents are not checked value by value; they get the document
+# issue `dialect:CBOM/1.4-cbom-1.0`.
+spec: _ibm-cbom-draft
+inherits: _cyclonedx
+version: 1
+findings:
+  component_types: [cryptographic-asset, crypto-asset]
+fields:
+  cryptoProperties.algorithmProperties.variant: parse                  # the draft's algorithm name, e.g. AES128-CBC
+  cryptoProperties.relatedCryptoMaterialProperties.relatedCryptoMaterialType: material
+locations: [detection_context, base]
+notes: >
+  detectionContext[].lineNumbers is a window of 5-9 lines around the finding (with the code snippet in
+  additionalContext), so records get line (first) and line_end (last).

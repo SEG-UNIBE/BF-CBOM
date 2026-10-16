@@ -1,0 +1,19 @@
+spec: securin-xbom
+inherits: _cyclonedx
+version: 1
+declared: [{bomFormat: CycloneDX, specVersion: "1.6"}]
+checked_on: "e1-pilot-corpus 2026-10-16 (xbom 0.1.0, 8 CBOMs)"
+sources:
+  - fields: standard
+  - parse: name
+  - {parse: "rule:xbom:crypto:rule_id", quiet: true}
+dictionary:
+  primitive:
+    pk: pke
+    dsa: signature
+  material:
+    prng: {family: PRNG}       # random generators reported as related-crypto-material of type prng/csprng
+    csprng: {family: CSPRNG}
+notes: >
+  One component per semgrep finding. Out-of-spec primitives `pk` and `dsa` and related-material types `prng` and
+  `csprng` (random generators); the rule id (xbom-python-hash-sha256) is the fallback name.

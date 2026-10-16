@@ -1,0 +1,33 @@
+spec: cryptoscan
+inherits: _cyclonedx
+version: 1
+declared: [{bomFormat: CycloneDX, specVersion: "1.6"}]
+checked_on: "e1-pilot-corpus 2026-10-16 (CryptoScan 1.4.0, 15 CBOMs)"
+sources:
+  - {parse: "occurrence:symbol", when: {asset_type: [algorithm, protocol]}, quiet: true}
+  - base
+dictionary:
+  name:
+    Weak PBKDF Usage: {group: PBKDF}
+    Hardcoded Key Size: {}
+    Certificate Validation Bypass: {protocol: TLS}
+    Weak Cipher Suite: {protocol: TLS}
+    AWS KMS Key Reference: {}
+    GCP KMS Reference: {}
+    HashiCorp Vault Path: {}
+    Composite-Signature: {primitive: signature}
+    Subject Alternative Name: {group: CERT}
+    Certificate Subject/Issuer: {group: CERT}
+    Certificate Revocation Check: {group: CERT}
+    Certificate Pinning: {group: CERT}
+    ACME/Let's Encrypt: {group: CERT}
+    Mutual TLS: {protocol: TLS}
+    Hardcoded Encryption Key: {material: secret-key}
+    HMAC Secret Pattern: {family: HMAC, material: secret-key}
+context: [occurrence:symbol]
+notes: >
+  One component per category (RSA, ECC, HMAC-SHA2, Weak PBKDF Usage, `RSA, ECC, AES, ChaCha20`) with all matches
+  as occurrences; each occurrence's `symbol` is the matched text (rsa-2048, HmacSHA512, ed25519, TLSv1.2,
+  `KeySize = 2048`, `iterations = 5`), so it is read first, per occurrence, for algorithm and protocol components;
+  matched code that names no algorithm (VAULT_ADDR, `cipher == NULL`) is not a curation gap (quiet). Certificate
+  components are checks (expiry, key usage), not certificates.

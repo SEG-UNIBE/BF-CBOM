@@ -1,0 +1,4 @@
+spec: deepseek
+inherits: _llm
+version: 1
+checked_on: "e1-pilot-corpus 2026-10-16 (deepseek-chat, 15 CBOMs)"

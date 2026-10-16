@@ -167,3 +167,54 @@ def score_sites(sites: list[Site], project: TruthProject, tool: str) -> TruthSco
         else:
             score.false_sites.append({"line": s.line, "families": sorted(s.families), "raw": list(s.raw)})
     return score
+
+
+# ----- normalised records vs the expected canonical record (per dimension) -----
+
+# ground-truth key -> record dimension; `family` in the ground truth is the coarse group, `variant` the family/algorithm
+_EXPECTED_DIMS = {"family": "group", "keysize": "key_size", "mode": "mode", "padding": "padding", "digest": "digest",
+                  "curve": "curve", "iterations": "iterations"}  # fmt: skip
+
+
+def expected_agreement(records, project: TruthProject, vocab=None) -> dict[str, dict[str, tuple]]:
+    """Field by field: per ground-truth asset, (expected, reported) for every dimension `expected` names.
+
+    The reported record is the algorithm record at one of the asset's lines (in the project's file) whose group
+    matches the expected family; with several, the one agreeing on most dimensions. `variant` (SHA-256, ECDSA,
+    PBKDF2) is compared with the record's algorithm or family. Expected values are canonicalised with the same
+    vocabulary as the records (P-256 -> secp256r1). Assets without a record get `reported` None everywhere.
+    """
+    from .normalize.vocab import load_vocabulary  # local import: keeps groundtruth usable without the normaliser
+
+    vocab = vocab or load_vocabulary()
+    out: dict[str, dict[str, tuple]] = {}
+    for asset in project.assets:
+        expected = {}
+        for key, value in asset.expected.items():
+            if key in _EXPECTED_DIMS:
+                dim = _EXPECTED_DIMS[key]
+                expected[dim] = value if dim in ("group", "key_size", "iterations") else vocab.canonical(dim, value)
+            elif key == "variant":
+                expected["variant"] = vocab.canonical("algorithm", value) or vocab.canonical("family", value) or value
+        candidates = [
+            r
+            for r in records
+            if r.file == project.file and r.line in asset.lines and r.values.get("asset_type") in ("algorithm", None)
+        ]
+
+        best = max(
+            (r for r in candidates if r.group == expected.get("group")),
+            key=lambda r, exp=expected: sum(_reported(r, d, exp) == v for d, v in exp.items()),
+            default=None,
+        )
+        out[asset.id] = {d: (v, _reported(best, d, expected)) for d, v in expected.items()}
+    return out
+
+
+def _reported(r, dim: str, expected: dict):
+    if r is None:
+        return None
+    if dim == "variant":  # matches when either the algorithm or the family names the expected variant
+        want = expected.get("variant")
+        return want if want in (r.get("algorithm"), r.get("family")) else (r.get("algorithm") or r.get("family"))
+    return r.get(dim)

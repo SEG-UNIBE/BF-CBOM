@@ -1,0 +1,6 @@
+spec: cbomkit-jar
+inherits: _cbomkit
+version: 1
+checked_on: "e1-pilot-corpus 2026-10-16 (cbomkit-action v2.3.0, 12 CBOMs)"
+notes: >
+  CBOMkit action jar; same output shape as the server image, plus protocol components (TLS) and Go scans.
