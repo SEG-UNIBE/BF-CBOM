@@ -19,12 +19,13 @@ ENV PYTHONPATH="/opt:${PYTHONPATH}"
 RUN find /opt/RaQuN_Lab -type d -exec touch {}/__init__.py \;
 RUN touch /opt/RaQuN_Lab/__init__.py
 
-COPY common/ ./common/
 # Deps pinned in misc/pyqun/requirements.txt (regenerate from requirements.in with uv pip compile)
 COPY misc/pyqun/requirements.txt /tmp/requirements.txt
 RUN --mount=type=cache,target=/root/.cache/pip \
     python3 -m pip install --timeout 120 -r /tmp/requirements.txt
 
+# our code last: editing it never invalidates the torch layer above
+COPY common/ ./common/
 COPY misc/pyqun/main.py /opt/RaQuN_Lab/main.py
 COPY misc/pyqun/Stopwatch.py /opt/RaQuN_Lab/utils/Stopwatch.py
 # COPY misc/pyqun/*.json /opt/RaQuN_Lab/
