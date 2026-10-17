@@ -198,6 +198,53 @@ def test_micro_scores_reproduce_pilot(fixture, tool, project, strict, lenient):
     assert score.passes_bar is (lenient >= 6)
 
 
+@pytest.mark.parametrize(
+    "fixture, tool, project, strict, lenient, repo",
+    [
+        ("cbomkit_micro-java", "cbomkit", "micro-java", 11, 11, 11),
+        ("cbomkit_micro-python", "cbomkit", "micro-python", 5, 5, 9),  # misses MD5 and HMAC anywhere
+        ("pqcheck_micro-python", "pqcheck", "micro-python", 8, 8, 11),
+        ("cipherradar_micro-java", "cipherradar", "micro-java", 11, 11, 11),
+        ("cbomkit_micro-go", "cbomkit", "micro-go", 8, 8, 11),
+    ],
+)
+def test_score_records_matches_call_sites_and_adds_repo_level(fixture, tool, project, strict, lenient, repo):
+    """The record-based scorer reproduces the call-site numbers of score_sites (same fixtures) and adds the repo
+    level, which is at least the call-site level (assets sharing a family are found together)."""
+    from analysis.groundtruth import score_records
+    from analysis.normalize import normalize_cbom
+
+    truth = load_ground_truth()[project]
+    score = score_records(normalize_cbom(_cbom(fixture), tool, language=truth.language).records, truth, tool)
+    assert (len(score.hits_strict), len(score.hits_lenient), len(score.hits_repo)) == (strict, lenient, repo)
+    assert score.false_sites == [] and score.precision == 1.0 and score.repo_extra == []
+    assert set(score.hits_lenient) <= set(score.hits_repo)
+
+
+def test_score_records_windows_location_free_records_and_extra_families():
+    from analysis.groundtruth import score_records
+    from analysis.normalize import NormRecord
+
+    truth = load_ground_truth()["micro-python"]
+    rsa_line = next(a for a in truth.assets if a.id == "rsa-2048-keygen").lines[0]
+
+    def rec(i, group, *, file=truth.file, line=None, line_end=None, name="x"):
+        values = {"asset_type": "algorithm"}
+        return NormRecord(f"t:{i}:0", "t", i, 0, name=name, group=group, values=values, file=file, line=line,
+                          line_end=line_end)  # fmt: skip
+
+    records = [
+        rec(0, "RSA", line=rsa_line - 2, line_end=rsa_line + 2),  # a 5-line window around the call
+        rec(1, "MD5", file=None),  # no location: repository level only
+        rec(2, "SHA-2", file=None),  # SHA-256 asset, but not HMAC-SHA512 (its own family is HMAC)
+        rec(3, "ChaCha", file=None),  # not in the project
+    ]
+    score = score_records(records, truth, "t")
+    assert score.hits_strict == ["rsa-2048-keygen"] and score.sites == 1 and score.precision == 1.0
+    assert set(score.hits_repo) == {"rsa-2048-keygen", "rsa-oaep-sha256", "md5", "sha-256"}
+    assert score.repo_extra == ["ChaCha"] and "hmac-sha512" in score.repo_missed
+
+
 def test_score_sites_lenient_and_false_positives():
     truth = load_ground_truth()["micro-python"]
     sites = [
@@ -297,5 +344,80 @@ def test_tables_command_writes_joinable_tables(tmp_path, monkeypatch):
     assert {g["k"] for g in groups} == {"2"} and len(groups) == 12  # as in test_two_tools_agree_on_micro_java
 
     micro = {r["tool"]: r for r in _read_csv(out / "micro-run1.csv")}
-    assert set(micro) == {"cbomkit", "cipherradar"} and micro["cbomkit"]["language"] == "java"
+    assert set(micro) == {"cbomkit", "cipherradar", "pqcheck"} and micro["cbomkit"]["language"] == "java"
+    cbomkit = micro["cbomkit"]
+    assert (cbomkit["status"], cbomkit["verdict"], cbomkit["lenient"], cbomkit["repo"]) == ("ok", "pass", "11", "11")
+    assert (micro["pqcheck"]["verdict"], micro["pqcheck"]["lenient"]) == ("unsupported", "")
+    assets = _read_csv(out / "micro-assets-run1.csv")
+    assert list(assets[0]) == tbl.MICRO_ASSET_COLUMNS and len(assets) == 2 * 11  # scored runs only
     assert json.loads((out / "tables-run1.json").read_text())["rows"]["runs.csv"] == 3
+
+
+def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+
+    from analysis import levels as lv
+    from analysis.normalize import CONFORMANCE_COLUMNS, COVERAGE_COLUMNS
+    from misc.cli import analysis_cmd
+
+    exp = _fake_experiment(tmp_path)
+    monkeypatch.setattr(analysis_cmd, "experiment_dir", lambda name: tmp_path / name)
+    result = CliRunner().invoke(analysis_cmd.analysis_app, ["report", "exp-tables"])
+    assert result.exit_code == 0, result.output
+    out = exp / "analysis"
+    for f in ("normalize.json", "vocab.csv", "levels-run1.csv", "records-run1.csv", "micro-run1.csv"):
+        assert (out / f).exists(), f
+    assert list(_read_csv(out / "coverage.csv")[0]) == COVERAGE_COLUMNS
+    assert (out / "conformance.csv").read_text(encoding="utf-8").startswith(",".join(CONFORMANCE_COLUMNS))
+    algos = _read_csv(out / "algorithms-run1.csv")
+    assert list(algos[0]) == lv.ALGORITHM_COLUMNS and {a["level"] for a in algos} == set(lv.LEVELS)
+    assert {a["tool"] for a in algos} == {"cbomkit", "cipherradar"} and algos[0]["language"] == "Java"
+    info = json.loads((out / "tables-run1.json").read_text())
+    assert info["rows"]["algorithms-run1.csv"] == len(algos) and info["vocabulary"]["algorithms"]
+    summary = (out / "SUMMARY.md").read_text(encoding="utf-8")
+    assert summary.startswith("# exp-tables: analysis summary (run 1)")
+    for section in ("## Runs", "## Micro projects", "## Normalisation", "## Agreement ladder", "## Files"):
+        assert section in summary
+    assert "| cbomkit | pass 11 |" in summary and "| pqcheck | – |" in summary
+    assert "| cbomkit | 11 / 11 · 11 |" in summary
+
+
+def test_export_runs_the_report_and_zips_the_summary(tmp_path, monkeypatch):
+    import zipfile
+
+    from typer.testing import CliRunner
+
+    from misc.cli import analysis_cmd, experiment_cmd
+
+    exp = _fake_experiment(tmp_path)
+    monkeypatch.setattr(analysis_cmd, "experiment_dir", lambda name: tmp_path / name)
+    monkeypatch.setattr(experiment_cmd, "experiment_dir", lambda name: tmp_path / name)
+    dest = tmp_path / "out"
+    result = CliRunner().invoke(experiment_cmd.experiment_app, ["export", "exp-tables", "--dest", str(dest)])
+    assert result.exit_code == 0, result.output
+    names = zipfile.ZipFile(dest / "exp-tables.zip").namelist()
+    assert "exp-tables/analysis/SUMMARY.md" in names and "exp-tables/analysis/micro-run1.csv" in names
+    assert (exp / "analysis" / "SUMMARY.md").exists()
+
+    (exp / "analysis" / "SUMMARY.md").unlink()
+    result = CliRunner().invoke(
+        experiment_cmd.experiment_app, ["export", "exp-tables", "--dest", str(dest), "--no-report"]
+    )
+    assert result.exit_code == 0 and not (exp / "analysis" / "SUMMARY.md").exists()
+
+
+def test_summary_markdown_from_csv_rows():
+    from analysis import summary as sm
+
+    assert sm.md_table(["a", "b"], [["x|y", 1]]) == ["| a | b |", "| --- | ---: |", "| x\\|y | 1 |"]
+    base = {"n_assets": "11"}
+    rows = [
+        {**base, "language": "java", "tool": "weak", "verdict": "fail", "strict": "0", "lenient": "2", "repo": "7"},
+        {**base, "language": "go", "tool": "weak", "verdict": "error"},
+        {**base, "language": "java", "tool": "good", "verdict": "pass", "strict": "9", "lenient": "11", "repo": "11"},
+        {**base, "language": "go", "tool": "good", "verdict": "unsupported"},
+    ]
+    lines = sm._micro(rows, [])
+    assert "| tool | java | go |" in lines  # paper languages first
+    assert lines.index("| good | pass 11 | – |") < lines.index("| weak | fail 2 | error |")  # passes first
+    assert "| weak | 0 / 2 · 7 |  |" in lines

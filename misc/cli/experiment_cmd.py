@@ -439,11 +439,20 @@ def list_experiments():
 def export(
     name: str = NAME_ARG,
     dest: Path = DEST_OPT,
+    no_report: bool = typer.Option(False, "--no-report", help="Zip as stored, without running `analysis report`"),
 ):
-    """Zip one experiment (spec, lock, all CBOMs and meta files). The only way data leaves the volume."""
+    """Zip one experiment (spec, lock, all CBOMs and meta files, analysis/ with SUMMARY.md). The only way data
+    leaves the volume. Runs `analysis report` first, so the CSV tables and SUMMARY.md in the zip are current."""
     exp_dir = experiment_dir(name)
     if not exp_dir.exists():
         _err(f"no experiment '{name}' under {RESULTS_DIR}")
+    if not no_report:
+        from misc.cli.analysis_cmd import run_report  # local import: the analysis is not needed for the runs
+
+        try:
+            run_report(exp_dir)
+        except Exception as e:  # incl. typer.Exit; an export must never fail because the analysis did
+            typer.secho(f"analysis report failed ({e!r}); exporting the stored files only", fg=typer.colors.YELLOW)
     dest.mkdir(parents=True, exist_ok=True)
     out = dest / f"{name}.zip"
     with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED) as zf:

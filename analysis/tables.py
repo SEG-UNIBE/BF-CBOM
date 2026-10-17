@@ -15,11 +15,12 @@ from __future__ import annotations
 import csv
 import json
 from collections.abc import Iterable
+from dataclasses import dataclass
 from pathlib import Path
 
 from common.experiment import iter_results
 
-from .groundtruth import TruthScore
+from .groundtruth import TruthProject, TruthScore
 from .match import Cluster
 from .normalize.record import RECORD_COLUMNS, NormRecord
 from .sites import ASSET_COMPONENT_TYPES, Site
@@ -42,8 +43,13 @@ GROUP_KEY_COLUMNS = ["matcher", "repo", "snapshot", "commit", "variant", "run", 
 CALLSITE_GROUP_COLUMNS = GROUP_KEY_COLUMNS + ["file", "line_min", "line_max", "n_sites", "families"]
 MEMBERS_COLUMNS = ["matcher", "snapshot", "variant", "run", "group_id", "record_id", "tool"]
 MICRO_COLUMNS = [
-    "project", "language", "tool", "run", "n_assets", "strict", "lenient", "recall_strict", "recall_lenient",
-    "sites_in_file", "sites_correct", "precision", "passes_bar", "missed",
+    "project", "language", "tool", "run", "status", "verdict", "n_assets",
+    "strict", "lenient", "repo", "recall_strict", "recall_lenient", "recall_repo",
+    "sites_in_file", "sites_correct", "precision", "passes_bar", "missed", "repo_missed", "repo_extra",
+]  # fmt: skip
+MICRO_ASSET_COLUMNS = [
+    "project", "language", "tool", "run", "asset", "families", "insertion_style",
+    "callsite_strict", "callsite_lenient", "repo",
 ]  # fmt: skip
 
 _LLM_PROPS = {
@@ -249,24 +255,80 @@ def callsite_groups(clusters: list[Cluster]) -> list[tuple[str, list[tuple[str, 
 # ----- micro ground truth -----
 
 
-def micro_rows(scores: list[TruthScore], *, run: int, languages: dict[str, str] | None = None) -> list[dict]:
-    languages = languages or {}
-    return [
-        {
-            "project": s.project,
-            "language": languages.get(s.project),
-            "tool": s.tool,
+@dataclass
+class MicroEntry:
+    """One (micro project, tool) cell of an experiment: the run's status and, for a readable ok run, its score."""
+
+    project: TruthProject
+    tool: str
+    status: str  # status of the run (meta file); `missing` when the tool has no stored run on the project
+    score: TruthScore | None = None
+
+
+def micro_verdict(status: str, score: TruthScore | None) -> str:
+    """pass/fail (inclusion bar: lenient call-site recall) for a scored run; otherwise why there is no grade:
+    unsupported (outside the tool's languages), missing (not run), error (failed, timed out, cancelled, unreadable)."""
+    if score is not None:
+        return "pass" if score.passes_bar else "fail"
+    return status if status in ("unsupported", "missing") else "error"
+
+
+def micro_rows(entries: list[MicroEntry], *, run: int) -> list[dict]:
+    rows = []
+    for e in entries:
+        s = e.score
+        row = {
+            "project": e.project.name,
+            "language": e.project.language,
+            "tool": e.tool,
             "run": run,
-            "n_assets": s.n_assets,
-            "strict": len(s.hits_strict),
-            "lenient": len(s.hits_lenient),
-            "recall_strict": round(s.recall_strict, 3),
-            "recall_lenient": round(s.recall_lenient, 3),
-            "sites_in_file": s.sites_in_file,
-            "sites_correct": s.sites_correct,
-            "precision": round(s.precision, 3),
-            "passes_bar": s.passes_bar,
-            "missed": s.missed,
+            "status": e.status,
+            "verdict": micro_verdict(e.status, s),
+            "n_assets": len(e.project.assets),
         }
-        for s in scores
-    ]
+        if s is not None:
+            recall_repo = s.recall_repo
+            row.update(
+                {
+                    "strict": len(s.hits_strict),
+                    "lenient": len(s.hits_lenient),
+                    "repo": None if s.hits_repo is None else len(s.hits_repo),
+                    "recall_strict": round(s.recall_strict, 3),
+                    "recall_lenient": round(s.recall_lenient, 3),
+                    "recall_repo": None if recall_repo is None else round(recall_repo, 3),
+                    "sites_in_file": s.sites_in_file,
+                    "sites_correct": s.sites_correct,
+                    "precision": round(s.precision, 3),
+                    "passes_bar": s.passes_bar,
+                    "missed": s.missed,
+                    "repo_missed": s.repo_missed,
+                    "repo_extra": s.repo_extra,
+                }
+            )
+        rows.append(row)
+    return rows
+
+
+def micro_asset_rows(entries: list[MicroEntry], *, run: int) -> list[dict]:
+    """Long format: one row per (project, tool, asset) of every scored run, which level found the asset."""
+    rows = []
+    for e in entries:
+        s = e.score
+        if s is None:
+            continue
+        for a in e.project.assets:
+            rows.append(
+                {
+                    "project": e.project.name,
+                    "language": e.project.language,
+                    "tool": e.tool,
+                    "run": run,
+                    "asset": a.id,
+                    "families": sorted(a.families),
+                    "insertion_style": a.insertion_style,
+                    "callsite_strict": a.id in s.hits_strict,
+                    "callsite_lenient": a.id in s.hits_lenient,
+                    "repo": None if s.hits_repo is None else a.id in s.hits_repo,
+                }
+            )
+    return rows

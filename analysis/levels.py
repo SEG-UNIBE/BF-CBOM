@@ -20,11 +20,12 @@ are tested at a conservative level (L2/L3), rankings checked for stability acros
 
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 
 from .normalize.record import NormRecord
 from .normalize.vocab import Vocabulary, fold, load_vocabulary
+from .tables import full_name
 
 LEVELS = ("L0", "L1", "L2", "L3", "L4")
 LEVEL_NAMES = {
@@ -35,6 +36,9 @@ LEVEL_NAMES = {
     "L4": "tool specs (tool-specific sources, dictionaries, context)",
 }
 LEVEL_COLUMNS = ["level", "tool", "voter_group", "algorithms", "confirmed", "share"]
+ALGORITHM_COLUMNS = [
+    "repo", "snapshot", "variant", "run", "language", "level", "tool", "voter_group", "algorithm", "records",
+]  # fmt: skip
 _FAMILY_FIELD = "cryptoProperties.algorithmProperties.algorithmFamily"
 
 
@@ -88,6 +92,18 @@ class LevelRow:
         }
 
 
+def algorithms_at(records: list[NormRecord], level: str, vocab: Vocabulary | None = None) -> Counter:
+    """{algorithm as seen at `level`: number of records} over the algorithm records of one CBOM."""
+    vocab = vocab or load_vocabulary()
+    out: Counter = Counter()
+    for r in records:
+        if r.values.get("asset_type") == "algorithm":
+            key = identity(r, level, vocab)
+            if key:
+                out[key] += 1
+    return out
+
+
 def ladder(
     records: dict[tuple[str, str], list[NormRecord]], voter_of: dict[str, str], vocab: Vocabulary | None = None
 ) -> list[LevelRow]:
@@ -99,8 +115,7 @@ def ladder(
     for level in LEVELS:
         sets: dict[tuple[str, str], set[str]] = {}
         for (snap, tool), recs in records.items():
-            keys = {identity(r, level, vocab) for r in recs if r.values.get("asset_type") == "algorithm"}
-            sets[(snap, tool)] = {k for k in keys if k}
+            sets[(snap, tool)] = set(algorithms_at(recs, level, vocab))
         by_snap: dict[str, dict[str, set[str]]] = defaultdict(dict)
         for (snap, tool), keys in sets.items():
             by_snap[snap][tool] = keys
@@ -117,6 +132,39 @@ def ladder(
             total_alg += n
             total_conf += conf
         rows.append(LevelRow(level, "all", "-", total_alg, total_conf))
+    return rows
+
+
+def algorithm_rows(
+    records: dict[tuple[str, str, str], list[NormRecord]],
+    voter_of: dict[str, str],
+    *,
+    run: int,
+    languages: dict[str, str | None] | None = None,
+    vocab: Vocabulary | None = None,
+) -> list[dict]:
+    """Which algorithms each tool reports per repository, at every level: one row per (snapshot, variant, level,
+    tool, algorithm) with the number of records behind it. `records`: {(snapshot, variant, tool): records}.
+    Location-free, so every tool takes part; the basis for UpSet plots, the tools-per-algorithm distribution and
+    the confirmation shares of `ladder`."""
+    vocab = vocab or load_vocabulary()
+    languages = languages or {}
+    rows = []
+    for (snapshot, variant, tool), recs in sorted(records.items()):
+        repo = full_name(snapshot)
+        base = {"repo": repo, "snapshot": snapshot, "variant": variant, "run": run, "language": languages.get(repo)}
+        for level in LEVELS:
+            for algorithm, n in sorted(algorithms_at(recs, level, vocab).items()):
+                rows.append(
+                    {
+                        **base,
+                        "level": level,
+                        "tool": tool,
+                        "voter_group": voter_of.get(tool, tool),
+                        "algorithm": algorithm,
+                        "records": n,
+                    }
+                )
     return rows
 
 

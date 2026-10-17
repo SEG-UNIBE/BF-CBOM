@@ -16,7 +16,12 @@ from collections import Counter, defaultdict
 from .record import ASSET_DIMS, NormalizedCbom, unmapped_text
 
 VOCAB_COLUMNS = ["tool", "source", "raw", "status", "mapped", "unmapped_tokens", "via", "count"]
+COVERAGE_COLUMNS = [
+    "tool", "cboms", "algorithm_records", "dimension", "reported", "derived", "reported_share", "derived_share",
+]  # fmt: skip
+CONFORMANCE_COLUMNS = ["tool", "cboms", "scope", "kind", "count"]
 FILL_DIMS = ("family", "algorithm", "primitive", "functions", "mode", "padding", "curve", "key_size", "digest")
+COVERAGE_DIMS = FILL_DIMS + ("protocol", "location")
 
 
 def source_kind(src: str | None) -> str:
@@ -126,7 +131,7 @@ class Report:
                         "reported": round(t["fill"][d] / algos, 3) if algos else 0.0,
                         "derived": round(t["fill_derived"][d] / algos, 3) if algos else 0.0,
                     }
-                    for d in FILL_DIMS + ("protocol", "location")
+                    for d in COVERAGE_DIMS
                 },
                 "sources": {d: dict(c) for d, c in t["sources"].items()},
                 "spec_issues": dict(t["spec_issue_kinds"]),
@@ -135,6 +140,41 @@ class Report:
                 "unmapped_top": dict(t["unmapped"].most_common(25)),
             }
         return out
+
+    def coverage_rows(self) -> list[dict]:
+        """Fill rates of the algorithm records, long format: one row per (tool, dimension). `reported` counts values
+        the tool gave (any source but derivation), `derived` values we derived (key size from the curve, ...)."""
+        rows = []
+        for tool, t in sorted(self.tools.items()):
+            algos = t["counts"]["algorithm_records"]
+            for d in COVERAGE_DIMS:
+                reported, derived = t["fill"][d], t["fill_derived"][d]
+                rows.append(
+                    {
+                        "tool": tool,
+                        "cboms": t["cboms"],
+                        "algorithm_records": algos,
+                        "dimension": d,
+                        "reported": reported,
+                        "derived": derived,
+                        "reported_share": round(reported / algos, 3) if algos else 0.0,
+                        "derived_share": round(derived / algos, 3) if algos else 0.0,
+                    }
+                )
+        return rows
+
+    def conformance_rows(self) -> list[dict]:
+        """Spec issues per tool and kind: `record` scope counts values (field, enum, type, deprecated), `document`
+        scope counts CBOMs (dialect, version). Tools without issues have no row."""
+        rows = []
+        for tool, t in sorted(self.tools.items()):
+            base = {"tool": tool, "cboms": t["cboms"]}
+            for kind, n in sorted(t["spec_issue_kinds"].items()):
+                rows.append({**base, "scope": "record", "kind": kind, "count": n})
+            docs = Counter(i.split(":", 1)[0] for i in t["document_issues"].elements())
+            for kind, n in sorted(docs.items()):
+                rows.append({**base, "scope": "document", "kind": kind, "count": n})
+        return rows
 
     def vocab_rows(self) -> list[dict]:
         rows = []
@@ -189,4 +229,4 @@ class Report:
         return lines
 
 
-__all__ = ["ASSET_DIMS", "Report", "VOCAB_COLUMNS", "source_kind"]
+__all__ = ["ASSET_DIMS", "CONFORMANCE_COLUMNS", "COVERAGE_COLUMNS", "Report", "VOCAB_COLUMNS", "source_kind"]
