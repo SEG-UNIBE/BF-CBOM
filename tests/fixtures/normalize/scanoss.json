@@ -1,0 +1,384 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.7",
+  "metadata": {
+    "tools": {
+      "components": [
+        {
+          "type": "application",
+          "group": "SCANOSS",
+          "name": "crypto-finder",
+          "version": "0.37.1"
+        }
+      ]
+    },
+    "properties": [
+      {
+        "name": "bf-cbom:fixture-origin",
+        "value": "SCANOSS crypto-finder 0.37.1 with open-crypto-rules@c5f32b7b (offline) on corpus/micro go and c, 2026-10-17; components picked from both CBOMs, occurrences trimmed to two"
+      }
+    ]
+  },
+  "components": [
+    {
+      "bom-ref": "a79b43ca-f688-4cb3-a1cd-0a2789eadfc0",
+      "type": "cryptographic-asset",
+      "name": "AES",
+      "properties": [
+        {
+          "name": "scanoss:cryptoFunction",
+          "value": "keygen"
+        }
+      ],
+      "evidence": {
+        "identity": [
+          {
+            "field": "name",
+            "confidence": 1,
+            "methods": [
+              {
+                "technique": "source-code-analysis",
+                "confidence": 1,
+                "value": "scanoss:ruleid,run-1041516916.go.crypto.algorithm.aes.go.crypto.aes.key-generation"
+              }
+            ]
+          }
+        ],
+        "occurrences": [
+          {
+            "location": "main.go",
+            "line": 29,
+            "additionalContext": "scanoss:match,aesKey := make([]byte, 32) rand.Read(aesKey) block, _ := aes.NewCipher(aesKey)"
+          },
+          {
+            "location": "main.go",
+            "line": 31,
+            "additionalContext": "scanoss:match,block, _ := aes.NewCipher(aesKey)"
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "block-cipher",
+          "parameterSetIdentifier": "32",
+          "executionEnvironment": "software-plain-ram",
+          "implementationPlatform": "x86_64",
+          "cryptoFunctions": [
+            "keygen"
+          ]
+        }
+      }
+    },
+    {
+      "bom-ref": "e27df677-a24a-47a5-8014-9eadfe7b6913",
+      "type": "cryptographic-asset",
+      "name": "AES-GCM",
+      "evidence": {
+        "identity": [
+          {
+            "field": "name",
+            "confidence": 1,
+            "methods": [
+              {
+                "technique": "source-code-analysis",
+                "confidence": 1,
+                "value": "scanoss:ruleid,run-1041516916.go.crypto.algorithm.aes.go.crypto.aes.gcm-mode"
+              }
+            ]
+          }
+        ],
+        "occurrences": [
+          {
+            "location": "main.go",
+            "line": 31,
+            "additionalContext": "scanoss:match,block, _ := aes.NewCipher(aesKey) gcm, _ := cipher.NewGCM(block)"
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "ae",
+          "executionEnvironment": "software-plain-ram",
+          "implementationPlatform": "x86_64",
+          "mode": "gcm"
+        }
+      }
+    },
+    {
+      "bom-ref": "bc76830a-4491-49c7-b01f-8546d7b9c57e",
+      "type": "cryptographic-asset",
+      "name": "ECDSA-P256",
+      "properties": [
+        {
+          "name": "scanoss:cryptoFunction",
+          "value": "keygen"
+        }
+      ],
+      "evidence": {
+        "identity": [
+          {
+            "field": "name",
+            "confidence": 1,
+            "methods": [
+              {
+                "technique": "source-code-analysis",
+                "confidence": 1,
+                "value": "scanoss:ruleid,run-1041516916.go.crypto.algorithm.ecdsa.go.crypto.ecdsa.key-generation"
+              }
+            ]
+          }
+        ],
+        "occurrences": [
+          {
+            "location": "main.go",
+            "line": 27,
+            "additionalContext": "scanoss:match,ecKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)"
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "signature",
+          "parameterSetIdentifier": "256",
+          "executionEnvironment": "software-plain-ram",
+          "implementationPlatform": "x86_64",
+          "cryptoFunctions": [
+            "keygen"
+          ]
+        }
+      }
+    },
+    {
+      "bom-ref": "d40999a9-d243-4152-ae32-726f549e0740",
+      "type": "cryptographic-asset",
+      "name": "HMAC-sha512",
+      "properties": [
+        {
+          "name": "scanoss:cryptoFunction",
+          "value": "tag"
+        }
+      ],
+      "evidence": {
+        "identity": [
+          {
+            "field": "name",
+            "confidence": 1,
+            "methods": [
+              {
+                "technique": "source-code-analysis",
+                "confidence": 1,
+                "value": "scanoss:ruleid,run-1041516916.go.crypto.algorithm.hmac.go.crypto.hmac.usage"
+              }
+            ]
+          }
+        ],
+        "occurrences": [
+          {
+            "location": "main.go",
+            "line": 44,
+            "additionalContext": "scanoss:match,mac := hmac.New(sha512.New, []byte(\"key\"))"
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "mac",
+          "executionEnvironment": "software-plain-ram",
+          "implementationPlatform": "x86_64",
+          "cryptoFunctions": [
+            "tag"
+          ]
+        },
+        "oid": "1.2.840.113549.2.11"
+      }
+    },
+    {
+      "bom-ref": "4fd1952d-5ec1-4485-aa4e-3d4942c097ea",
+      "type": "cryptographic-asset",
+      "name": "PBKDF2---",
+      "properties": [
+        {
+          "name": "scanoss:cryptoFunction",
+          "value": "keyderive"
+        }
+      ],
+      "evidence": {
+        "identity": [
+          {
+            "field": "name",
+            "confidence": 1,
+            "methods": [
+              {
+                "technique": "source-code-analysis",
+                "confidence": 1,
+                "value": "scanoss:ruleid,run-1041516916.go.crypto.algorithm.pbkdf2.go.crypto.pbkdf2.key-derivation"
+              }
+            ]
+          }
+        ],
+        "occurrences": [
+          {
+            "location": "main.go",
+            "line": 56,
+            "additionalContext": "scanoss:match,derived := pbkdf2.Key([]byte(\"pw\"), salt, 600000, 32, sha256.New)"
+          },
+          {
+            "location": "main.go",
+            "line": 56,
+            "additionalContext": "scanoss:match,derived := pbkdf2.Key([]byte(\"pw\"), salt, 600000, 32, sha256.New)"
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "kdf",
+          "parameterSetIdentifier": "-",
+          "executionEnvironment": "software-plain-ram",
+          "implementationPlatform": "x86_64",
+          "cryptoFunctions": [
+            "keyderive"
+          ]
+        },
+        "oid": "1.2.840.113549.1.5.12"
+      }
+    },
+    {
+      "bom-ref": "6a22edd3-0cba-449f-b57c-c8251f7e237f",
+      "type": "cryptographic-asset",
+      "name": "RSA-OAEP-sha256",
+      "properties": [
+        {
+          "name": "scanoss:cryptoFunction",
+          "value": "encrypt"
+        }
+      ],
+      "evidence": {
+        "identity": [
+          {
+            "field": "name",
+            "confidence": 1,
+            "methods": [
+              {
+                "technique": "source-code-analysis",
+                "confidence": 1,
+                "value": "scanoss:ruleid,run-1041516916.go.crypto.algorithm.rsa.go.crypto.rsa.encrypt-oaep"
+              }
+            ]
+          }
+        ],
+        "occurrences": [
+          {
+            "location": "main.go",
+            "line": 52,
+            "additionalContext": "scanoss:match,enc, _ := rsa.EncryptOAEP(sha256.New(), rand.Reader, &rsaKey.PublicKey, data, nil)"
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "pke",
+          "executionEnvironment": "software-plain-ram",
+          "implementationPlatform": "x86_64",
+          "cryptoFunctions": [
+            "encrypt"
+          ]
+        }
+      }
+    },
+    {
+      "bom-ref": "cbb6abf2-8075-4d86-bce3-e8aadd82346f",
+      "type": "cryptographic-asset",
+      "name": "OpenSSL-RAND",
+      "properties": [
+        {
+          "name": "scanoss:cryptoFunction",
+          "value": "generate"
+        }
+      ],
+      "evidence": {
+        "identity": [
+          {
+            "field": "name",
+            "confidence": 1,
+            "methods": [
+              {
+                "technique": "source-code-analysis",
+                "confidence": 1,
+                "value": "scanoss:ruleid,run-1024524414.c.openssl.algorithm.drbg.openssl-rand.c.openssl.algorithm.drbg.rand"
+              }
+            ]
+          }
+        ],
+        "occurrences": [
+          {
+            "location": "crypto_demo.c",
+            "line": 21,
+            "additionalContext": "scanoss:match,RAND_bytes(aes_key, sizeof(aes_key)); RAND_bytes(iv, sizeof(iv));"
+          },
+          {
+            "location": "crypto_demo.c",
+            "line": 45,
+            "additionalContext": "scanoss:match,RAND_bytes(salt, sizeof(salt));"
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "drbg",
+          "executionEnvironment": "software-plain-ram",
+          "implementationPlatform": "x86_64",
+          "cryptoFunctions": [
+            "generate"
+          ]
+        }
+      }
+    },
+    {
+      "bom-ref": "fa89d01f-2108-4569-8cfc-b3a1e3c1b42e",
+      "type": "cryptographic-asset",
+      "name": "des_ede3_cbc",
+      "evidence": {
+        "identity": [
+          {
+            "field": "name",
+            "confidence": 1,
+            "methods": [
+              {
+                "technique": "source-code-analysis",
+                "confidence": 1,
+                "value": "scanoss:ruleid,run-1024524414.c.openssl.algorithm.block-cipher.des.c.openssl.algorithm.block-cipher.3des"
+              }
+            ]
+          }
+        ],
+        "occurrences": [
+          {
+            "location": "crypto_demo.c",
+            "line": 27,
+            "additionalContext": "scanoss:match,EVP_EncryptInit_ex(des, EVP_des_ede3_cbc(), NULL, aes_key, iv);"
+          },
+          {
+            "location": "crypto_demo.c",
+            "line": 27,
+            "additionalContext": "scanoss:match,EVP_EncryptInit_ex(des, EVP_des_ede3_cbc(), NULL, aes_key, iv);"
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "block-cipher",
+          "executionEnvironment": "software-plain-ram",
+          "implementationPlatform": "x86_64"
+        }
+      }
+    }
+  ]
+}

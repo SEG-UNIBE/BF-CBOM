@@ -5,7 +5,7 @@
 #   make analysis ARGS="micro e0-micro"      # recall/precision per tool against corpus/micro/ground_truth.yaml
 #   make analysis ARGS="sites e0-micro"      # call-site agreement between the tools
 name: e0-micro
-tools: [cbomkit, cdxgen, cryptobomforge, cryptoscan, deepseek, pqcheck, qdarpan, securin-xbom, cipherradar, xgrep, cbomkit-jar, ciphersift]
+tools: [cbomkit, cdxgen, cryptobomforge, cryptoscan, deepseek, pqcheck, qdarpan, securin-xbom, cipherradar, xgrep, cbomkit-jar, ciphersift, scanoss]
 repetitions: 1
 repos:
   - full_name: bfcbom/micro-java

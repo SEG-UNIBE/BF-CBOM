@@ -8,7 +8,8 @@
 #          | blocked (needs access, see CLAUDE.md) | excluded (failed the bar; kept for RQ1/RQ2 only)
 #          | prepared (worker ready, but kept out of AVAILABLE_WORKERS and the specs until its source is public).
 # Pilot verdicts (2026-10-08, docs/pilot-2026-10-08/README.md): pass/borderline/fail per language.
-# `micro_<date>`: lenient recall on e0-micro (`make analysis ARGS="micro e0-micro"`; the inclusion bar is 6/11).
+# `micro_<date>`: lenient call-site recall on e0-micro (`make analysis ARGS="micro e0-micro"`; the inclusion bar is 6/11);
+#   scored from the normalised records since 2026-10-18.
 # `memory_gb`: the worker's compose memory limit (docker-compose.yml, kept equal by a test); the batch
 #   runner sums it over the tools it feeds at once to stay within EXPERIMENT_MEMORY_BUDGET_GB (waves).
 tools:
@@ -54,7 +55,7 @@ tools:
       key/certificate files.
     pilot: {java: fail, python: fail}   # no file/line for crypto findings; RQ1/RQ2 only
   cryptobomforge:
-    micro_2026-10-17: {python: 0/11, c: 0/11}   # scorer gap: `micro` does not read its IBM-draft locations (14 / 10 algorithm records at the right windows)
+    micro_2026-10-17: {python: 8/11, c: 8/11}   # read from its IBM-draft windows since 2026-10-18 (before: 0/11, the call-site extraction did not read them)
     engine: codeql                  # Santander cryptobom-forge on CodeQL crypto queries
     memory_gb: 6
     approach: data flow (CodeQL)
@@ -95,7 +96,7 @@ tools:
     native_cyclonedx: true          # `--format cbom` emits CycloneDX 1.6 with evidence.occurrences
     languages: [java, python, go, javascript, typescript, c, cpp, rust, csharp, ruby, php]
     status: integrated
-    micro_2026-10-17: {java: 9/11, python: 10/11, go: 10/11, javascript: 10/11, c: 1/11}   # strict 7/6/6/6/0; 2026-10-15 (0/0/5/6/0) was our setup error (no --include-quantum-safe, demo/ folder)
+    micro_2026-10-17: {java: 9/11, python: 10/11, go: 10/11, javascript: 9/11, c: 1/11}   # record-based scoring (2026-10-18), strict the same; 2026-10-15 (0/0/5/6/0) was our setup error (no --include-quantum-safe, demo/ folder)
 
   # ---- passed the pilot's inclusion bar (2026-10-08); workers added 2026-10-15 (recipes: docs/pilot-2026-10-08/README.md)
   pqcheck:
@@ -155,15 +156,22 @@ tools:
       Non-crypto PRNGs are reported only with --weakness-indicators (off here); unresolved Java algorithm strings
       give *.unresolved components without a family. No inter-procedural data flow beyond constants and wrappers.
 
-  # ---- blocked on access (CLAUDE.md, Phase 2)
+  # ---- integrated 2026-10-17 with its public open rules; its full rule set (Java, Python) needs a SCANOSS API key
   scanoss:
-    engine: opengrep-rules          # SCANOSS crypto-finder v0.36.0 on opengrep; Java/Python rules need an API key
+    micro_2026-10-17: {go: 10/11, javascript: 3/11, c: 7/11}   # open rules (2 JavaScript rule files); Java/Python unsupported without a key
+    engine: opengrep-rules          # SCANOSS crypto-finder 0.37.1 on opengrep 1.22.0, rules scanoss/open-crypto-rules@c5f32b7b
+    memory_gb: 4
     approach: patterns (opengrep) + call graph
-    native_cyclonedx: false         # proprietary JSON by default; CycloneDX via adapter/flag to be checked
-    languages: [go, c, java, python]
+    native_cyclonedx: true          # `--format cyclonedx`; declares CycloneDX 1.7 (its docs still say 1.6)
+    languages: [go, c, javascript, rust]   # what the open rules cover; Java/Python rules only through the API with a key
     voter_group: grep-rules
-    status: blocked
+    status: integrated              # workers/scanoss; binary, opengrep and rules commit pinned in docker/Dockerfile.worker-scanoss
     pilot: {go: pass, c: pass, javascript: fail, java: "?", python: "?"}   # open rules only; Java/Python rules not available
+    notes: >
+      Offline with --no-remote-rules --rules-dir (the documented mode without a key), otherwise its defaults: test
+      sources and vendor dirs excluded, call graph built. Rules detect terminal crypto operations only. AES
+      parameterSetIdentifier is the key length in bytes (32 for AES-256), not bits as CycloneDX defines it. A
+      committed scanoss.json in a scanned repo sets skip patterns (recorded in the run notes).
   xgrep:
     micro_2026-10-17: {java: 11/11, python: 10/11, go: 10/11, javascript: 9/11}
     engine: mondoo-xgrep            # proprietary binary (free of charge) from the public npm package, pinned 0.86.0
@@ -173,6 +181,7 @@ tools:
     languages: [java, python, go, javascript]
     status: integrated              # workers/xgrep
     pilot: {java: pass, python: pass, go: pass, javascript: pass}
+  # ---- blocked on access (CLAUDE.md, Phase 2)
   cryptoscope:
     engine: ibm-cryptoscope
     approach: data flow
@@ -182,4 +191,7 @@ tools:
 
   # ---- failed the pilot's inclusion bar on every language tested (kept for the landscape table only)
   # qelens (borderline Java, fail elsewhere: import lines), pqc-mat (fail; systematic -2 line offset),
-  # OQS Scanner, cryptarium, qScan (fail)
+  # cryptarium, qScan (fail)
+  # ---- not integrated by decision (2026-10-17)
+  # OQS Scanner (jimbo111/open-quantum-secure, MIT): an orchestrator over third-party engines (semgrep, ast-grep,
+  # cipherscope; optionally CryptoScan and cdxgen); failed the pilot, passed the coworker's audit (micro 11/9/11)

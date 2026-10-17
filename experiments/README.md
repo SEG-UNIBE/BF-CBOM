@@ -18,8 +18,8 @@ make corpus ARGS="--per-language 100"              # stratified corpus -> result
 | `e0-cbomkit-smoke.yaml` | cbomkit | 1 | CBOMkit (server image) through the local git server over TLS |
 | `e0-llm-smoke.yaml` | deepseek | 1 | the code-reading LLM worker on its own (needs `DEEPSEEK_API_KEY`) |
 | `e0-phase2-smoke.yaml` | deepseek, cryptoscan | 2 | the Phase 2 workers together |
-| `e0-micro.yaml` | all twelve generators | 5 micro projects (`corpus/micro`) | inclusion check against the hand-written ground truth; analyse with `make analysis ARGS="micro e0-micro"` |
-| `e1-pilot-corpus.yaml` | all twelve generators | 16 real projects (`corpus/pilot-2026-10-08.yaml`) | first real workload: location-aware agreement on the pilot's pinned projects; large repos (Kafka, Keycloak) push CBOMkit towards its timeout |
+| `e0-micro.yaml` | all thirteen generators | 5 micro projects (`corpus/micro`) | inclusion check against the hand-written ground truth; analyse with `make analysis ARGS="report e0-micro"` (or only `"micro e0-micro"`) |
+| `e1-pilot-corpus.yaml` | all thirteen generators | 16 real projects (`corpus/pilot-2026-10-08.yaml`) | first real workload: location-aware agreement on the pilot's pinned projects; large repos (Kafka, Keycloak) push CBOMkit towards its timeout |
 
 The smoke tests are quick checks after changing a single worker. The plan's main experiments (E0 stability
 with three repetitions, E1 on the full ~200-repo corpus, E4 on mutants; see `CLAUDE.md`, Phase 5) have no
@@ -159,12 +159,20 @@ nor running workers. It uses only runs with status `ok` (failed, timed-out and `
 by default, only algorithm assets and repetition 1.
 
 ```
+make analysis ARGS="report e0-micro"     # all of the below in one pass, plus analysis/SUMMARY.md (Markdown tables)
 make analysis ARGS="normalize e0-micro"  # every CBOM -> normalised records (run<k>.norm.json next to it)
 make analysis ARGS="levels e0-micro"     # how much agreement normalisation creates: L0 (raw) to L4 (tool specs)
-make analysis ARGS="micro e0-micro"      # score each tool against the micro projects' ground truth
-make analysis ARGS="sites e0-micro"      # match call sites across tools and count how many agree
-make analysis ARGS="tables e0-micro"     # flat CSV tables of all of the above for pandas/R
+make analysis ARGS="micro e0-micro"      # score each tool against the micro projects' ground truth, two levels
+make analysis ARGS="sites e0-micro"      # legacy: match call sites across tools and count how many agree
+make analysis ARGS="tables e0-micro"     # flat CSV tables (runs, records, call sites, micro) for pandas/R
 ```
+
+**`report <exp>`** normalises every CBOM once and writes everything the commands below write, then
+`analysis/SUMMARY.md`: Markdown tables for a first look (runs per tool, the micro inclusion matrix and recall at two
+levels, who finds each micro asset, fill rates and spec issues, the L0-L4 ladder, how many voter groups report each
+algorithm per repository, LLM token counts, the list of files). The summary is rendered only from the CSV files, so
+it never shows anything they don't hold; `python -m analysis.summary <exp>/analysis` rebuilds it from an export.
+`experiment export` runs `report` first (skip with `--no-report`), so every zip carries current tables.
 
 **`normalize <exp>`** reads every stored ok CBOM (all repetitions) into normalised records with its tool's adapter
 spec, as described in [Normalisation](#normalisation). It writes:
@@ -174,22 +182,32 @@ spec, as described in [Normalisation](#normalisation). It writes:
 | `<snapshot>/<variant>/<tool>/run<k>.norm.json` | next to `run<k>.json`: declared format/version, adapter spec and versions, the original's sha256 (detects a stale file), stats, the records |
 | `analysis/normalize.json` | per tool: formats declared, records per asset type, fill rate per dimension (reported vs derived), where values came from (standard field, property, occurrence, name, API context), spec issues, conflicts, top unmapped values |
 | `analysis/vocab.csv` | one row per (tool, source, raw value): status (`mapped`, `partial`, `unmapped`, `ambiguous`, `known`), what it mapped to, leftover tokens, count; the reviewable mapping table |
+| `analysis/coverage.csv` | one row per (tool, dimension): algorithm records, values the tool reported vs values we derived, as counts and shares (fill-rate heatmaps) |
+| `analysis/conformance.csv` | one row per (tool, scope, issue kind): `record` scope counts values read from standard fields that break the declared version's schema (field, enum, type, deprecated), `document` scope counts CBOMs (dialect, version); tools without issues have no row |
 
 **`levels <exp>`** computes the normalisation ladder (L0-L4, see [Normalisation](#normalisation)): per repository the
 algorithms each tool reports, and the share that a tool of another voter group (`voter_group` in `common/tools.yaml`)
 also reports. It prints a tools x levels table and writes `analysis/levels-run<k>.csv` (level, tool, voter_group,
-algorithms, confirmed, share; tool `all` pools all tools). Use `--run K` for another repetition.
+algorithms, confirmed, share; tool `all` pools all tools) and `analysis/algorithms-run<k>.csv`: one row per
+(snapshot, variant, level, tool, algorithm) with the tool's voter group, the repo's language and the number of records
+behind it. That table is location-free, so every tool takes part; it is the basis for UpSet plots and the
+tools-per-algorithm distribution. Use `--run K` for another repetition.
 
 **`micro <exp>`** scores every tool on the micro projects (`corpus/micro`, repos named `<owner>/micro-<language>`)
-against `corpus/micro/ground_truth.yaml`, 11 known crypto assets per project. It prints one row per project and tool:
+against `corpus/micro/ground_truth.yaml`, 11 known crypto assets per project, from the normalised records
+(`analysis/groundtruth.py:score_records`) at two levels (CLAUDE.md, refinement 1). It prints one row per project and
+tool, including tools that did not run there (unsupported, failed):
 
 | Column | Meaning |
 |---|---|
-| strict | assets found at their ground-truth line with a compatible algorithm family, out of 11 |
-| lenient | assets found at the right line, family compatible or unknown |
-| precision | correct sites out of all sites the tool reported in the micro source file; a site is correct on an asset line or a line the ground truth marks as related or accepted |
+| strict | call site: assets found at one of their ground-truth lines with a compatible algorithm family, out of 11 (a family the asset's name contains counts: SHA-2 for HMAC-SHA512) |
+| lenient | call site: assets found at the right line, family compatible or unknown |
+| repo | repository level: assets whose own family (HMAC for HMAC-SHA512) the tool reports anywhere in the project, location ignored; assets sharing a family are found together. Needs a known family, so it can be lower than lenient |
+| precision | correct locations out of all the tool reported in the micro source file; one is correct on an asset line or a line the ground truth marks as related or accepted |
 | bar | `pass` when lenient recall is at least 50 % (the pilot's inclusion bar) |
-| missed | ids of the assets the tool did not find |
+| missed | ids of the assets the tool did not find (lenient) |
+
+A location window (CryptobomForge's IBM-draft `detectionContext`, the finding ±2 lines) counts at every line it spans.
 
 **`sites <exp>`** (legacy: its own extraction, to be retired in favour of matchers on the normalised records) extracts
 every reported location (file, line, algorithm family) and clusters sites of different
@@ -203,17 +221,22 @@ The commands write to the experiment's folder on the volume:
 
 ```
 <exp>/analysis/
-├── micro-run1.json                       # micro: one object per (project, tool): recalls, hits, missed, precision, false sites, passes_bar
+├── SUMMARY.md                            # report: Markdown tables of everything below, for reading
+├── micro-run1.json                       # micro: one object per (project, tool): status, verdict, recalls at both levels, hits, missed, precision, false sites
 ├── sites-run1.json                       # sites: settings, per repo extraction counts + agreement summary, overall k distribution
 ├── runs.csv                              # tables: one row per stored run (all repetitions)
 ├── sites-run1.csv                        # tables: one row per extracted call site (record)
 ├── groups-callsite-run1.csv              # tables: one row per call-site cluster
 ├── members-callsite-run1.csv             # tables: one row per (cluster, site) pair
 ├── micro-run1.csv                        # tables: one row per (micro project, tool); only with micro projects
+├── micro-assets-run1.csv                 # tables: one row per (micro project, tool, asset)
 ├── records-run1.csv                      # tables: one row per normalised record (joins sites-run1.csv on site_id)
 ├── tables-run1.json                      # tables: settings used (run, window, match_unknown, all_assets) and row counts
 ├── normalize.json                        # normalize: coverage per tool (fill rates, sources, spec issues, conflicts)
 ├── levels-run1.csv                       # levels: confirmed share per tool at normalisation levels L0-L4
+├── algorithms-run1.csv                   # levels: which algorithms each tool reports per repository and level
+├── coverage.csv                          # normalize: fill rates per tool and dimension
+├── conformance.csv                       # normalize: spec issues per tool and kind
 ├── vocab.csv                             # normalize: what every raw value mapped to, per tool and source
 └── <owner>__<repo>@<sha12>/<variant>/
     └── clusters.jsonl                    # sites: one cluster per line: file, line range, k, tools, families, member sites
@@ -235,7 +258,8 @@ change these:
 | `records-run<k>.csv` | records | normalised record: one (component, occurrence) of one tool | snapshot, variant, tool, run, record_id (`<tool>:<component>:<occurrence>`), site_id (= the sites' record_id), every record dimension, `raw_*`, `src_*`, unmapped, conflicts, spec_issues |
 | `groups-callsite-run<k>.csv` | matches | cluster of the call-site matcher | matcher, snapshot, variant, run, group_id, k, tools, file, line_min, line_max, n_sites, families (`name:count`) |
 | `members-callsite-run<k>.csv` | matches | (cluster, site) pair | matcher, snapshot, variant, run, group_id, record_id, tool |
-| `micro-run<k>.csv` | ground truth | micro project and tool | project, language, tool, strict, lenient, recall_strict, recall_lenient, sites_in_file, sites_correct, precision, passes_bar, missed |
+| `micro-run<k>.csv` | ground truth | micro project and tool of the spec, also unsupported and failed runs | project, language, tool, status (of the run, `missing` without one), verdict (`pass`, `fail`, `unsupported`, `error`, `missing`), strict, lenient, repo, recall_strict, recall_lenient, recall_repo, sites_in_file, sites_correct, precision, passes_bar, missed, repo_missed, repo_extra (families reported that the project does not contain) |
+| `micro-assets-run<k>.csv` | ground truth | (micro project, tool, asset) of every scored run | project, language, tool, asset, families, insertion_style (`direct`, `constant`), callsite_strict, callsite_lenient, repo |
 
 Join keys: records on `(snapshot, variant, run, record_id)`, groups on `(snapshot, variant, run, group_id)`. Group ids
 (`C00000`, ...) restart per snapshot and variant. Out-of-scope sites (`in_scope=false`, e.g. config files) are listed
@@ -250,12 +274,18 @@ groups = pd.read_csv("analysis/groups-callsite-run1.csv")
 keys = ["snapshot", "variant", "run"]
 df = sites.merge(members, on=keys + ["record_id", "tool"]).merge(groups, on=keys + ["group_id"], suffixes=("", "_group"))
 groups["tools"].str.split(";")          # list cells
+
+micro = pd.read_csv("analysis/micro-run1.csv")
+micro.pivot(index="tool", columns="language", values="lenient")      # the inclusion matrix
+algos = pd.read_csv("analysis/algorithms-run1.csv").query("level == 'L3'")
+algos.groupby(["snapshot", "variant", "algorithm"])["voter_group"].nunique().value_counts()   # tools per algorithm
 ```
 
 **Export.** The analysis files live inside the experiment folder, so the normal export takes them along together with
-the spec, `lock.json`, every CBOM and its meta file:
+the spec, `lock.json`, every CBOM and its meta file. The export runs `analysis report` first, so the tables and
+`analysis/SUMMARY.md` in the zip match the stored runs (`ARGS=--no-report` skips it):
 
 ```
-make experiment-export NAME=e0-micro   # -> exports/e0-micro.zip on the host
+make experiment-export NAME=e0-micro   # -> exports/e0-micro.zip on the host, open e0-micro/analysis/SUMMARY.md
 ```
 

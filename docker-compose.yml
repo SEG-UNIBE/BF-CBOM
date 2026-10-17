@@ -541,6 +541,35 @@ services:
     security_opt: [no-new-privileges:true]
     profiles: [prod, all]
 
+  worker-scanoss:
+    # SCANOSS crypto-finder with its public open rules (no API key): Go, C, JavaScript; no Java/Python rules
+    image: bf-cbom/worker-scanoss:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-scanoss
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-scanoss:${VERSION:-latest}
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=1800
+    env_file: docker/env/worker-scanoss.env
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    profiles: [prod, all]
+
   worker-cbomkit-jar:
     # same engine as worker-cbomkit, packaged as the standalone action jar (one voter in RQ4, two tools otherwise)
     image: bf-cbom/worker-cbomkit-jar:${VERSION:-latest}

@@ -13,6 +13,7 @@ Small excerpts (a few components each, occurrences trimmed to two or three) of r
 | `qdarpan.json` | qdarpan 0.1.0 | `qdarpan:family`, crypto library components (`jca`, `crypto/rsa`) |
 | `securin-xbom.json` | xbom 0.1.0 | out-of-spec primitive `pk`, related material of type `prng` |
 | `ciphersift.json` | CipherSift v1.1.1 (on `corpus/micro`, 2026-10-17) | family from `ciphersift:family` where `algorithmFamily` is absent, API names (`crypto/ecdsa.GenerateKey`, `hmac.new`), a Go module library |
+| `scanoss.json` | crypto-finder 0.37.1, open rules (on `corpus/micro` go and c, 2026-10-17) | registry and API spellings (`HMAC-sha512`, `RSA-OAEP-sha256`, `des_ede3_cbc`, `OpenSSL-RAND`, `PBKDF2---`), AES key length in bytes |
 | `deepseek.json` | deepseek-chat (our LLM worker) | `assetType: key`, padding `PSS`, mode `KW`, `bf-cbom:digest` |
 
 The xgrep test uses hand-written CBOMs in the tool's format.

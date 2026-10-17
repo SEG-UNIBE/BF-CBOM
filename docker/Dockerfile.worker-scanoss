@@ -1,0 +1,75 @@
+# syntax=docker/dockerfile:1.7
+# docker/Dockerfile.worker-scanoss
+# SCANOSS crypto-finder (GPL-2.0-only): the unmodified release binary, the opengrep release SCANOSS's own image
+# ships, and the public open rule set scanoss/open-crypto-rules (GPL-3.0) frozen at a pinned commit; all
+# checksum- or commit-pinned. Without an API key there is no remote rule set, so the worker scans offline with the
+# open rules (Go, C, JavaScript, Rust; no Java or Python). Sources: github.com/scanoss/crypto-finder,
+# github.com/opengrep/opengrep, github.com/scanoss/open-crypto-rules.
+ARG BASE_IMAGE=base
+ARG BASE_TAG=latest
+FROM ${BASE_IMAGE}:${BASE_TAG}
+
+ARG CRYPTO_FINDER_VERSION=0.37.1
+# sha256 of crypto-finder_<version>_linux_<arch>.tar.gz from the release's checksums file
+ARG CRYPTO_FINDER_SHA256_AMD64=afc1465aa97669c886053f68b54016d692f7657495fb607598244fb43d080ad5
+ARG CRYPTO_FINDER_SHA256_ARM64=b2634d6818bd94aa74badebeabdb2f28505bc40450724453bd438361e8277eae
+# The opengrep version crypto-finder's own Dockerfile pins (sha256 of opengrep_manylinux_<arch>, release digests)
+ARG OPENGREP_VERSION=1.22.0
+ARG OPENGREP_SHA256_X86=45bcd58440e397ed52c50e953ccf5948909ea77087c9186fc7d277216f62e319
+ARG OPENGREP_SHA256_AARCH64=8df71670e20336646687c6f4ddf9b4532f1a7fcd8a8ea7bfa4ea46747f61e088
+# The open rule set has no tags: pinned by commit (bump recipe in notes.md)
+ARG OPEN_RULES_REPO=https://github.com/scanoss/open-crypto-rules
+ARG OPEN_RULES_COMMIT=c5f32b7bbd07f53acd0820cda1d0f3425d0da7ee
+ARG TARGETARCH
+
+USER root
+RUN set -eu; \
+    case "${TARGETARCH}" in \
+      amd64) cf_sum="${CRYPTO_FINDER_SHA256_AMD64}"; og_arch=x86; og_sum="${OPENGREP_SHA256_X86}";; \
+      arm64) cf_sum="${CRYPTO_FINDER_SHA256_ARM64}"; og_arch=aarch64; og_sum="${OPENGREP_SHA256_AARCH64}";; \
+      *) echo "unsupported arch ${TARGETARCH}" >&2; exit 1;; \
+    esac; \
+    url="https://github.com/scanoss/crypto-finder/releases/download/v${CRYPTO_FINDER_VERSION}/crypto-finder_${CRYPTO_FINDER_VERSION}_linux_${TARGETARCH}.tar.gz"; \
+    curl -fsSL --retry 5 --retry-delay 5 -o /tmp/cf.tgz "$url"; \
+    echo "${cf_sum}  /tmp/cf.tgz" | sha256sum -c -; \
+    mkdir -p /tmp/cf && tar -xzf /tmp/cf.tgz -C /tmp/cf; \
+    install -m 0755 /tmp/cf/crypto-finder /usr/local/bin/crypto-finder; \
+    install -d /usr/share/doc/crypto-finder && install -m 0644 /tmp/cf/LICENSE /usr/share/doc/crypto-finder/LICENSE; \
+    rm -rf /tmp/cf /tmp/cf.tgz; \
+    url="https://github.com/opengrep/opengrep/releases/download/v${OPENGREP_VERSION}/opengrep_manylinux_${og_arch}"; \
+    curl -fsSL --retry 5 --retry-delay 5 -o /usr/local/bin/opengrep "$url"; \
+    echo "${og_sum}  /usr/local/bin/opengrep" | sha256sum -c -; \
+    chmod 0755 /usr/local/bin/opengrep; \
+    crypto-finder version
+# Only the rule files and the licence are kept; the build fails if the pinned commit holds no rules
+RUN set -eu; \
+    git init --quiet /tmp/rules; \
+    git -C /tmp/rules fetch --quiet --depth 1 "${OPEN_RULES_REPO}" "${OPEN_RULES_COMMIT}"; \
+    git -C /tmp/rules checkout --quiet FETCH_HEAD; \
+    install -d /opt/scanoss-rules; \
+    cp -r /tmp/rules/semgrep-rules /tmp/rules/LICENSE /opt/scanoss-rules/; \
+    rm -rf /tmp/rules; \
+    n=$(find /opt/scanoss-rules/semgrep-rules -name '*.yaml' -o -name '*.yml' | wc -l); \
+    echo "open-crypto-rules@${OPEN_RULES_COMMIT}: ${n} rule files"; \
+    test "$n" -gt 0; \
+    chmod -R a+rX /opt/scanoss-rules
+ENV SCANOSS_RULES_DIR=/opt/scanoss-rules/semgrep-rules \
+    OPENGREP_VERSION=${OPENGREP_VERSION} \
+    OPEN_RULES_COMMIT=${OPEN_RULES_COMMIT} \
+    TOOL_VERSION="crypto-finder ${CRYPTO_FINDER_VERSION} (opengrep ${OPENGREP_VERSION}, open-crypto-rules@${OPEN_RULES_COMMIT})" \
+    SEMGREP_SEND_METRICS=off OPENGREP_SEND_METRICS=off DO_NOT_TRACK=1
+
+USER appuser
+# the first opengrep run unpacks its core into the user's cache; doing it here keeps every scan in core mode
+RUN opengrep --version
+WORKDIR /app
+ENV PYTHONPATH=/app
+
+COPY --chown=appuser:appuser pyproject.toml uv.lock ./
+COPY --chown=appuser:appuser common/ ./common/
+RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=1000,gid=1000 \
+    uv sync --frozen --no-dev
+
+COPY --chown=appuser:appuser workers/scanoss/ ./workers/scanoss/
+
+ENTRYPOINT ["tini", "-g", "--", "uv", "run", "--frozen", "--no-dev", "workers/scanoss/main.py"]

@@ -383,3 +383,15 @@ def test_llm_cbom_assembled_valid_keeps_the_models_values():
     key = recs["RSA private key"]
     assert (key.values["asset_type"], key.values["material"], key.values["key_size"]) == (
         "related-crypto-material", "private-key", 2048)  # fmt: skip
+
+
+def test_scanoss_registry_and_api_spellings_and_byte_key_length():
+    recs = normalize_cbom(_load("fixtures/normalize/scanoss.json"), "scanoss").records
+    by = {r.name: r for r in recs}
+    assert (by["HMAC-sha512"].values["family"], by["HMAC-sha512"].values["digest"]) == ("HMAC", "SHA-512")
+    assert (by["RSA-OAEP-sha256"].values["family"], by["RSA-OAEP-sha256"].values["digest"]) == ("RSAES-OAEP", "SHA-256")
+    assert by["ECDSA-P256"].values["curve"] == "secp256r1" and by["des_ede3_cbc"].values["mode"] == "CBC"
+    assert (by["OpenSSL-RAND"].values["family"], by["PBKDF2---"].values["family"]) == ("CSPRNG", "PBKDF2")
+    assert by["AES"].values["key_size"] == 32  # the tool's byte length, read as reported (not corrected)
+    assert all(r.file in ("main.go", "crypto_demo.c") and r.line for r in recs)
+    assert not any(r.unmapped or r.spec_issues for r in recs)

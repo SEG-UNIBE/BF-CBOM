@@ -50,7 +50,7 @@ It also offers **benchmarking capabilities** to orchestrate batch CBOM generatio
 
 ### CBOM Generators Under Scrutiny
 
-BF-CBOM currently integrates twelve CBOM generator workers (plus two opt-in LLM providers) to enable side-by-side comparisons.
+BF-CBOM currently integrates thirteen CBOM generator workers (plus two opt-in LLM providers) to enable side-by-side comparisons.
 Each generator brings a unique methodology for detecting and cataloging cryptographic assets:
 
 - **[`CBOMKit`](https://github.com/PQCA/cbomkit)**:
@@ -81,7 +81,7 @@ tree-sitter scanner for Python and Go (Apache-2.0) with a bundled go/types analy
 tree-sitter scanner for Java, Go and C/C++ (Apache-2.0), CycloneDX 1.7. Its locations live in custom properties; the worker copies them into `evidence.occurrences`.
 
 - **[`securin-xbom`](https://github.com/securin-public/securin-xbom)**:
-semgrep-rule scanner for Java and Python (Apache-2.0), CycloneDX 1.6. Runs strictly offline with its bundled rules so results do not depend on the semgrep registry.
+semgrep-rule scanner for Java and Python (Apache-2.0), CycloneDX 1.6. Runs offline: the semgrep registry rule sets it would fetch online are frozen in the image at a pinned semgrep-rules commit, unfiltered.
 
 - **[`CipherRadar`](https://github.com/nk-sentinel/cipherradar)**:
 opengrep rules plus tree-sitter (`cradar` CLI, built from source), CycloneDX 1.7, many languages. Known crash on some Java EC parameter code is worked around automatically with `.cradarignore` and recorded in the result notes.
@@ -92,9 +92,11 @@ tree-sitter and data-flow scanner for Java, Python, Go and JS/TS, CycloneDX 1.6.
 - **[`CipherSift`](https://github.com/SEG-UNIBE/ciphersift)** (Apache-2.0):
 tree-sitter and YAML-rule scanner for Java, Python and Go source and their dependency manifests, CycloneDX 1.7; a clean-room reimplementation of the approach of Crypsy ([Näther & Hirsch, 2026](https://arxiv.org/abs/2608.04857)). The worker builds the pinned release (v1.1.1, source archive verified by its sha256) with Maven, which runs the tool's test and conformance suite.
 
+- **[`SCANOSS crypto-finder`](https://github.com/scanoss/crypto-finder)** (GPL-2.0-only):
+opengrep rules plus call-graph reachability, CycloneDX 1.7 with file and line per asset. Its full rule set comes from the SCANOSS API and needs a key; without one the worker runs the documented offline mode with the public open rules ([`open-crypto-rules`](https://github.com/scanoss/open-crypto-rules), GPL-3.0), which cover Go, C, JavaScript and Rust but not Java or Python. The image holds the unmodified release binary (0.37.1), the opengrep release SCANOSS's own image ships (1.22.0) and the rules at a pinned commit, all checksum- or commit-verified; the Dockerfile names their sources. A research key for the Java and Python rules has been requested.
+
 **Not yet integrated, blocked on access:**
 
-- **[`SCANOSS crypto-finder`](https://github.com/scanoss/crypto-finder)** (GPL-2.0, opengrep-based): the openly published rule set contains almost no Java or Python rules (0/11 on the Java micro project in the pilot), so a worker built on it would say nothing about the tool for the languages BF-CBOM studies. The full rule set is served through the SCANOSS API and needs a key; a research key has been requested. The worker follows the same pattern as the others once the key is available.
 - **IBM Cryptoscope** ([Moffie et al., 2025](https://arxiv.org/abs/2503.19531)): a data-flow based CBOM generator for Java described in a paper; the implementation is not public. The artifact has been requested from the authors.
 
 ## Setup
@@ -390,13 +392,14 @@ Reproducible, resumable batch runs for the research agenda described in `CLAUDE.
 ```bash
 make experiment EXP=experiments/e0-smoke.yaml   # pin, mirror, enqueue, collect (resumable)
 make experiment-status NAME=e0-smoke
-make experiment-export NAME=e0-smoke            # -> exports/e0-smoke.zip, the only path to the host
+make experiment-export NAME=e0-smoke            # -> exports/e0-smoke.zip (runs the analysis report first), the only path to the host
 make corpus ARGS="--per-language 100"           # stratified GitHub corpus with pinned commits
 make experiment EXP=experiments/e0-micro.yaml   # every tool on the hand-written micro projects (corpus/micro)
+make analysis ARGS="report e0-micro"            # everything below in one pass + analysis/SUMMARY.md (Markdown tables)
 make analysis ARGS="normalize e0-micro"         # every CBOM -> normalised records, one adapter spec per tool (analysis/adapters/)
 make analysis ARGS="levels e0-micro"            # how much agreement normalisation creates (levels L0 raw to L4 tool specs)
-make analysis ARGS="micro e0-micro"             # recall/precision per tool against corpus/micro/ground_truth.yaml
-make analysis ARGS="sites e0-micro"             # location-aware agreement between tools (analysis/match.py)
+make analysis ARGS="micro e0-micro"             # recall (call site and repo level) and precision per tool against corpus/micro/ground_truth.yaml
+make analysis ARGS="sites e0-micro"             # legacy: location-aware agreement between tools (analysis/match.py)
 make analysis ARGS="tables e0-micro"            # flat CSV tables (runs, sites, records, clusters, micro) for pandas/R
 ```
 
@@ -404,8 +407,8 @@ make analysis ARGS="tables e0-micro"            # flat CSV tables (runs, sites, 
 
 - **One job per worker container.** Each worker pops one job from its Redis queue, runs the tool in a subprocess, pushes the result and only then takes the next job. A batch therefore has as many jobs in flight as there are worker containers: with `make up-prod` that is one per generator, each working on a different repository. Queued jobs cost nothing but a Redis list entry, so the size of a batch never affects memory.
 - **More throughput: replicas.** Workers are stateless, so a tool can be scaled to several containers that share the same queue: `docker compose up -d --scale worker-cryptoscan=3`. The runner needs no change. Each replica has the full memory limit of its service.
-- **Memory limits are caps, not reservations.** Every worker has a memory limit in `docker-compose.yml` (8 GiB for the two CBOMkit workers, 6 GiB for CryptobomForge, 4 GiB for most others). They sum to roughly 53 GiB for the twelve generators, far more than a laptop's Docker VM (Docker Desktop defaults to a fraction of the host RAM). Idle workers use little, but on large repositories the JVM and CodeQL based tools grow towards their caps, and if the VM itself runs out of memory the kernel kills arbitrary containers.
-- **Memory budget (waves).** `EXPERIMENT_MEMORY_BUDGET_GB` in the `Makefile` (default 14, meant for a Docker VM of about 20 GiB) caps the summed limits of the tools a batch feeds at the same time. The runner packs the tools into waves, largest first, runs one wave to completion, then starts the next; the plan is printed before anything is enqueued. With all twelve generators the default gives four waves. On a machine with enough RAM set the budget to 0 (one wave, everything in parallel), either per call or once in the `Makefile`:
+- **Memory limits are caps, not reservations.** Every worker has a memory limit in `docker-compose.yml` (8 GiB for the two CBOMkit workers, 6 GiB for CryptobomForge, 4 GiB for most others). They sum to roughly 57 GiB for the thirteen generators, far more than a laptop's Docker VM (Docker Desktop defaults to a fraction of the host RAM). Idle workers use little, but on large repositories the JVM and CodeQL based tools grow towards their caps, and if the VM itself runs out of memory the kernel kills arbitrary containers.
+- **Memory budget (waves).** `EXPERIMENT_MEMORY_BUDGET_GB` in the `Makefile` (default 14, meant for a Docker VM of about 20 GiB) caps the summed limits of the tools a batch feeds at the same time. The runner packs the tools into waves, largest first, runs one wave to completion, then starts the next; the plan is printed before anything is enqueued. With all thirteen generators the default gives five waves. On a machine with enough RAM set the budget to 0 (one wave, everything in parallel), either per call or once in the `Makefile`:
 
   ```bash
   make experiment EXP=experiments/e1-pilot-corpus.yaml EXPERIMENT_MEMORY_BUDGET_GB=0

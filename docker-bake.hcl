@@ -32,6 +32,7 @@ group "default" {
     "worker-xgrep",
     "worker-cbomkit-jar",
     "worker-ciphersift",
+    "worker-scanoss",
     "misc-pyqun",
     "gitserver",
     "runner",
@@ -179,4 +180,10 @@ target "worker-ciphersift" {
   inherits   = ["_from-base"]
   dockerfile = "docker/Dockerfile.worker-ciphersift"
   tags       = ["${REGISTRY}-worker-ciphersift:${VERSION}"]
+}
+
+target "worker-scanoss" {
+  inherits   = ["_from-base"]
+  dockerfile = "docker/Dockerfile.worker-scanoss"
+  tags       = ["${REGISTRY}-worker-scanoss:${VERSION}"]
 }

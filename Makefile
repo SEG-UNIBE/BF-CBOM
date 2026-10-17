@@ -2,7 +2,7 @@
 VERSION := $(shell cat VERSION 2>/dev/null || echo "0.0.0")
 BASE_IMAGE := bf-cbom/base
 # Comma-separated list of all workers available in the repo
-AVAILABLE_WORKERS := skeleton,testing,mssbomtool,cbomkit,cdxgen,cryptobomforge,deepseek,cryptoscan,chatgpt,claude,pqcheck,qdarpan,securin-xbom,cipherradar,xgrep,cbomkit-jar,ciphersift
+AVAILABLE_WORKERS := skeleton,testing,mssbomtool,cbomkit,cdxgen,cryptobomforge,deepseek,cryptoscan,chatgpt,claude,pqcheck,qdarpan,securin-xbom,cipherradar,xgrep,cbomkit-jar,ciphersift,scanoss
 # Comma-separated list of dev-only workers
 DEV_WORKERS := skeleton,testing,mssbomtool
 # Batch runs (make experiment): memory budget in GiB = sum of the compose memory limits of the workers
@@ -99,10 +99,11 @@ experiment-status:
 experiment-list:
 	docker compose run --rm runner experiment list
 
-# make experiment-export NAME=e0-smoke  -> exports/<name>.zip (the only path from the volume to the host)
+# make experiment-export NAME=e0-smoke  -> exports/<name>.zip (the only path from the volume to the host);
+# runs `analysis report` first (ARGS=--no-report skips it)
 experiment-export:
 	mkdir -p exports
-	docker compose run --rm -v "$(CURDIR)/exports:/export" runner experiment export $(NAME) --dest /export
+	docker compose run --rm -v "$(CURDIR)/exports:/export" runner experiment export $(NAME) --dest /export $(ARGS)
 
 # make corpus ARGS="--per-language 100"  -> results volume: corpus/corpus.yaml (export with experiment-export-corpus)
 corpus: ensure-env
