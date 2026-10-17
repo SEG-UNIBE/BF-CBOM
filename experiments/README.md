@@ -20,6 +20,7 @@ make corpus ARGS="--per-language 100"              # stratified corpus -> result
 | `e0-phase2-smoke.yaml` | deepseek, cryptoscan | 2 | the Phase 2 workers together |
 | `e0-micro.yaml` | all thirteen generators | 5 micro projects (`corpus/micro`) | inclusion check against the hand-written ground truth; analyse with `make analysis ARGS="report e0-micro"` (or only `"micro e0-micro"`) |
 | `e1-pilot-corpus.yaml` | all thirteen generators | 16 real projects (`corpus/pilot-2026-10-08.yaml`) | first real workload: location-aware agreement on the pilot's pinned projects; large repos (Kafka, Keycloak) push CBOMkit towards its timeout |
+| `e1-icpc-corpus.yaml` | all thirteen generators | 23 projects of the ICPC 2026 paper (`corpus/icpc-2026.yaml`, HEAD of 2026-10-18) | held-out counterpart of the pilot corpus: none of these repos was used to tune the vocabulary, the specs or CipherSift; six are marked `expect_crypto: low` (negative cases) |
 
 The smoke tests are quick checks after changing a single worker. The plan's main experiments (E0 stability
 with three repetitions, E1 on the full ~200-repo corpus, E4 on mutants; see `CLAUDE.md`, Phase 5) have no

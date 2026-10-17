@@ -1,0 +1,109 @@
+# The 23 real projects of the ICPC 2026 paper (11 Python, 12 Java), pinned to their default-branch HEAD on
+# 2026-10-18 (git ls-remote), not to the commits the paper scanned. Held out: none of them was used to tune the
+# vocabulary, the adapter specs or CipherSift (unlike corpus/pilot-2026-10-08.yaml, the development set).
+# Format as corpus/pilot-2026-10-08.yaml; `expect_crypto` is metadata for the analysis, ignored by the runner:
+# `low` = probably little or no crypto in first-party source (negative cases; refinement 11 would exclude them
+# from the main corpus).
+built_at: "2026-10-18"
+source: ICPC 2026 paper repositories (pinned at today's HEAD)
+repos:
+  # ---- Python
+  - full_name: authlib/authlib
+    language: Python
+    branch: main
+    commit: 8a308fc39c378c1090608903a09318a4267f418a
+  - full_name: katanaml/sparrow
+    language: Python
+    branch: main
+    commit: 5771ead1360fb446dd311c89237a3cff31d18931
+  - full_name: AutoGPTQ/AutoGPTQ
+    language: Python
+    branch: main
+    commit: 9f7d37072917ab3a7545835f23e808294a542153
+  - full_name: ludwig-ai/ludwig
+    language: Python
+    branch: main
+    commit: 0e84ffa776d5707c9200fb475611834250343d2e
+  - full_name: khoj-ai/khoj
+    language: Python
+    branch: master
+    commit: ae229ca894c0b80ad84664afcfdde523b5e87057
+  - full_name: paperless-ngx/paperless-ngx
+    language: Python
+    branch: dev
+    commit: 0cb2cdbfdd91a2078236f8851cd310261284591c
+  - full_name: opendatalab/MinerU
+    language: Python
+    branch: master
+    commit: b7f3dd0c5f6e6d66a298239ffd02b328b873918e
+  - full_name: docling-project/docling
+    language: Python
+    branch: main
+    commit: 0e54294231b69bc2cf7a39873235495788f76b57
+  - full_name: hankcs/HanLP
+    language: Python
+    branch: master
+    commit: f785de1a9374c835a407577e35d233d63cf52b9b
+    expect_crypto: low
+  - full_name: coqui-ai/TTS
+    language: Python
+    branch: dev
+    commit: dbf1a08a0d4e47fdad6172e433eeb34bc6b13b4e
+    expect_crypto: low
+  - full_name: binary-husky/gpt_academic
+    language: Python
+    branch: master
+    commit: d6bde0fa54373309bd05823a49bda8da019d2c77
+  # ---- Java
+  - full_name: killme2008/aviatorscript
+    language: Java
+    branch: master
+    commit: 20eaaff8e4550ec25130620987dc8d0a9e143e2a
+  - full_name: allure-framework/allure2
+    language: Java
+    branch: main
+    commit: b2c4f3635fde6b4f142492f5400539850ac502db
+  - full_name: Yalantis/uCrop
+    language: Java
+    branch: develop
+    commit: f788b534b48c144edf786c8cddbf0e029e637804
+    expect_crypto: low
+  - full_name: doocs/jvm
+    language: Java
+    branch: main
+    commit: 9e2fe9376f97a2458ae2ebddd653ccc0d91cff34
+    expect_crypto: low
+  - full_name: asLody/VirtualApp
+    language: Java
+    branch: master
+    commit: 29b1b5258f8adfbbb4362f70eb0532794c8715c7
+  - full_name: bumptech/glide
+    language: Java
+    branch: master
+    commit: 28fbcf2647ebba928b67cde289b31bcf6b2fc1fd
+    expect_crypto: low
+  - full_name: bisq-network/bisq
+    language: Java
+    branch: master
+    commit: 972e347ed46c5c38717d15eaae6524abf27deba7
+  - full_name: bisq-network/bisq2
+    language: Java
+    branch: main
+    commit: 212498f9db37e083bbdca58f8225120ce368d5e8
+  - full_name: CodePhiliaX/Chat2DB
+    language: Java
+    branch: main
+    commit: a0aadb004a84b6bcc2144fb431ff1d0701639a1c
+  - full_name: alibaba/Sentinel
+    language: Java
+    branch: 1.8
+    commit: a3f40ba8e900c8489bd520274739f17235a7721c
+  - full_name: dromara/Sa-Token
+    language: Java
+    branch: dev
+    commit: cb191342372cec5045a8c26f38c61a6ea2147ff8
+  - full_name: airbnb/lottie-android
+    language: Java
+    branch: master
+    commit: 05ea92e90381eb8a8ae06855ea2b74f322bebbec
+    expect_crypto: low
