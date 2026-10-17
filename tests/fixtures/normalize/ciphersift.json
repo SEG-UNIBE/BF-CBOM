@@ -1,0 +1,326 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.7",
+  "version": 1,
+  "metadata": {
+    "tools": {
+      "components": [
+        {
+          "type": "application",
+          "name": "ciphersift",
+          "version": "1.1.1"
+        }
+      ]
+    },
+    "properties": [
+      {
+        "name": "bf-cbom:fixture-origin",
+        "value": "CipherSift v1.1.1 on corpus/micro java, go, python, 2026-10-17; components picked from the three CBOMs"
+      }
+    ]
+  },
+  "components": [
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "algorithm:ca94eed234d977f1",
+      "name": "EC",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "unknown"
+        }
+      },
+      "properties": [
+        {
+          "name": "ciphersift:ruleId",
+          "value": "java.asym.ec"
+        },
+        {
+          "name": "ciphersift:language",
+          "value": "java"
+        },
+        {
+          "name": "ciphersift:family",
+          "value": "EC"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 16,
+            "symbol": "java.security.KeyPairGenerator.getInstance",
+            "additionalContext": "{\"ruleId\":\"java.asym.ec\",\"snippet\":\"KeyPairGenerator.getInstance(\\\"EC\\\")\"}"
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "algorithm:0f7becf1db15e5e2",
+      "name": "SHA256withECDSA",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "signature",
+          "algorithmFamily": "ECDSA"
+        }
+      },
+      "properties": [
+        {
+          "name": "ciphersift:ruleId",
+          "value": "java.asym.ecdsa"
+        },
+        {
+          "name": "ciphersift:language",
+          "value": "java"
+        },
+        {
+          "name": "ciphersift:primitive",
+          "value": "signature"
+        },
+        {
+          "name": "ciphersift:family",
+          "value": "EC"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 34,
+            "symbol": "java.security.Signature.getInstance",
+            "additionalContext": "{\"ruleId\":\"java.asym.ecdsa\",\"snippet\":\"Signature.getInstance(SIG_ALG)\"}"
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "algorithm:310d0bda93ac2b84",
+      "name": "AES/GCM/NoPadding",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "block-cipher",
+          "algorithmFamily": "AES",
+          "mode": "gcm"
+        }
+      },
+      "properties": [
+        {
+          "name": "ciphersift:ruleId",
+          "value": "java.sym.aes.gcm"
+        },
+        {
+          "name": "ciphersift:language",
+          "value": "java"
+        },
+        {
+          "name": "ciphersift:primitive",
+          "value": "block-cipher"
+        },
+        {
+          "name": "ciphersift:family",
+          "value": "AES"
+        },
+        {
+          "name": "ciphersift:variant",
+          "value": "GCM"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 24,
+            "symbol": "javax.crypto.Cipher.getInstance",
+            "additionalContext": "{\"ruleId\":\"java.sym.aes.gcm\",\"snippet\":\"Cipher.getInstance(\\\"AES/GCM/NoPadding\\\")\"}"
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "related-crypto-material:9074e805f854a1b6",
+      "name": "Static IV / nonce in Java",
+      "cryptoProperties": {
+        "assetType": "related-crypto-material",
+        "relatedCryptoMaterialProperties": {
+          "type": "initialization-vector"
+        }
+      },
+      "properties": [
+        {
+          "name": "ciphersift:ruleId",
+          "value": "java.sym.iv.static"
+        },
+        {
+          "name": "ciphersift:language",
+          "value": "java"
+        },
+        {
+          "name": "ciphersift:subtype",
+          "value": "static-iv"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/main/java/demo/CryptoDemo.java",
+            "line": 25,
+            "symbol": "javax.crypto.spec.GCMParameterSpec",
+            "additionalContext": "{\"ruleId\":\"java.sym.iv.static\",\"snippet\":\"new GCMParameterSpec(128, new byte[12])\"}"
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "algorithm:bc078f6e3041a975",
+      "name": "crypto/ecdsa.GenerateKey",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "signature",
+          "algorithmFamily": "ECDSA",
+          "parameterSetIdentifier": "P-256",
+          "ellipticCurve": "nist/P-256"
+        }
+      },
+      "properties": [
+        {
+          "name": "ciphersift:ruleId",
+          "value": "go.asym.ecdsa"
+        },
+        {
+          "name": "ciphersift:language",
+          "value": "go"
+        },
+        {
+          "name": "ciphersift:primitive",
+          "value": "signature"
+        },
+        {
+          "name": "ciphersift:family",
+          "value": "EC"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "main.go",
+            "line": 27,
+            "symbol": "crypto/ecdsa.GenerateKey",
+            "additionalContext": "{\"ruleId\":\"go.asym.ecdsa\",\"snippet\":\"ecdsa.GenerateKey(elliptic.P256(), rand.Reader)\",\"param\":\"P-256\"}"
+          }
+        ]
+      }
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/golang.org/x/crypto@v0.17.0",
+      "name": "golang.org/x/crypto",
+      "version": "v0.17.0",
+      "purl": "pkg:golang/golang.org/x/crypto@v0.17.0",
+      "properties": [
+        {
+          "name": "ciphersift:ruleId",
+          "value": "dep.golang"
+        },
+        {
+          "name": "ciphersift:ecosystem",
+          "value": "golang"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "go.mod",
+            "additionalContext": "{\"ruleId\":\"dep.golang\",\"snippet\":\"golang.org/x/crypto@v0.17.0\",\"manifest\":\"go-mod\"}"
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "algorithm:063f6f03cc21ad2f",
+      "name": "hmac.new",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "hash",
+          "algorithmFamily": "SHA-2"
+        }
+      },
+      "properties": [
+        {
+          "name": "ciphersift:ruleId",
+          "value": "python.hash.sha2"
+        },
+        {
+          "name": "ciphersift:language",
+          "value": "python"
+        },
+        {
+          "name": "ciphersift:primitive",
+          "value": "hash"
+        },
+        {
+          "name": "ciphersift:family",
+          "value": "SHA2"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "demo/crypto_demo.py",
+            "line": 26,
+            "symbol": "hmac.new",
+            "additionalContext": "{\"ruleId\":\"python.hash.sha2\",\"snippet\":\"hmac.new(b\\\"key\\\", b\\\"data\\\", hashlib.sha512)\"}"
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "algorithm:4bd53a506bc95dbe",
+      "name": "hmac.new",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "mac",
+          "algorithmFamily": "HMAC"
+        }
+      },
+      "properties": [
+        {
+          "name": "ciphersift:ruleId",
+          "value": "python.mac.hmac"
+        },
+        {
+          "name": "ciphersift:language",
+          "value": "python"
+        },
+        {
+          "name": "ciphersift:primitive",
+          "value": "mac"
+        },
+        {
+          "name": "ciphersift:family",
+          "value": "HMAC"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "demo/crypto_demo.py",
+            "line": 26,
+            "symbol": "hmac.new",
+            "additionalContext": "{\"ruleId\":\"python.mac.hmac\",\"snippet\":\"hmac.new(b\\\"key\\\", b\\\"data\\\", hashlib.sha512)\"}"
+          }
+        ]
+      }
+    }
+  ]
+}

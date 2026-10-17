@@ -1,7 +1,7 @@
 """Adapters that workers apply to a tool's native CBOM. Each one is minimal and recorded in the run notes.
 
 Kept here so that workers apply the same fix in the same way (e.g. repo-relative locations for
-`workers/cbomkit-jar` and `workers/crypsy-bfcbom`).
+`workers/cbomkit-jar`).
 """
 
 from __future__ import annotations

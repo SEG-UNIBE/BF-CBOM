@@ -12,6 +12,7 @@ Small excerpts (a few components each, occurrences trimmed to two or three) of r
 | `cipherradar.json` | CipherRadar efa5d9d | `algorithmFamily` contradicting the name (SHA-1 labelled SHA-2), `algorithmRef` / `signatureAlgorithmRef`, a crypto library import |
 | `qdarpan.json` | qdarpan 0.1.0 | `qdarpan:family`, crypto library components (`jca`, `crypto/rsa`) |
 | `securin-xbom.json` | xbom 0.1.0 | out-of-spec primitive `pk`, related material of type `prng` |
+| `ciphersift.json` | CipherSift v1.1.1 (on `corpus/micro`, 2026-10-17) | family from `ciphersift:family` where `algorithmFamily` is absent, API names (`crypto/ecdsa.GenerateKey`, `hmac.new`), a Go module library |
 | `deepseek.json` | deepseek-chat (our LLM worker) | `assetType: key`, padding `PSS`, mode `KW`, `bf-cbom:digest` |
 
-The xgrep and Crypsy tests use hand-written CBOMs in the tools' format.
+The xgrep test uses hand-written CBOMs in the tool's format.

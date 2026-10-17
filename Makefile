@@ -2,7 +2,7 @@
 VERSION := $(shell cat VERSION 2>/dev/null || echo "0.0.0")
 BASE_IMAGE := bf-cbom/base
 # Comma-separated list of all workers available in the repo
-AVAILABLE_WORKERS := skeleton,testing,mssbomtool,cbomkit,cdxgen,cryptobomforge,deepseek,cryptoscan,chatgpt,claude,pqcheck,qdarpan,securin-xbom,cipherradar,xgrep,cbomkit-jar
+AVAILABLE_WORKERS := skeleton,testing,mssbomtool,cbomkit,cdxgen,cryptobomforge,deepseek,cryptoscan,chatgpt,claude,pqcheck,qdarpan,securin-xbom,cipherradar,xgrep,cbomkit-jar,ciphersift
 # Comma-separated list of dev-only workers
 DEV_WORKERS := skeleton,testing,mssbomtool
 # Batch runs (make experiment): memory budget in GiB = sum of the compose memory limits of the workers

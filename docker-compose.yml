@@ -96,7 +96,7 @@ services:
     depends_on:
       - redis
     environment:
-      - AVAILABLE_WORKERS=${AVAILABLE_WORKERS:-cdxgen,cbomkit,deepseek,cryptobomforge,cryptoscan,chatgpt,claude,pqcheck,qdarpan,securin-xbom,cipherradar,xgrep,cbomkit-jar}
+      - AVAILABLE_WORKERS=${AVAILABLE_WORKERS:-cdxgen,cbomkit,deepseek,cryptobomforge,cryptoscan,chatgpt,claude,pqcheck,qdarpan,securin-xbom,cipherradar,xgrep,cbomkit-jar,ciphersift}
       - AVAILABLE_LANGUAGES=python,java
       - EXPERIMENT_MEMORY_BUDGET_GB=${EXPERIMENT_MEMORY_BUDGET_GB:-14}  # UI batches run in waves like the runner
       - GITHUB_CACHE_TTL_SEC=86400
@@ -511,13 +511,11 @@ services:
     security_opt: [no-new-privileges:true]
     profiles: [prod, all]
 
-  worker-crypsy-bfcbom:
-    # Crypsy, BF-CBOM adaptation: prepared, NOT active until our public repo exists (CRYPSY_REPO / CRYPSY_COMMIT
-    # in its Dockerfile); not in AVAILABLE_WORKERS or any spec until then (notes.md, "Crypsy")
-    image: bf-cbom/worker-crypsy-bfcbom:${VERSION:-latest}
+  worker-ciphersift:
+    image: bf-cbom/worker-ciphersift:${VERSION:-latest}
     build:
       context: .
-      dockerfile: ./docker/Dockerfile.worker-crypsy-bfcbom
+      dockerfile: ./docker/Dockerfile.worker-ciphersift
       args:
         BASE_IMAGE: ${BASE_IMAGE:-base}
         BASE_TAG: ${VERSION:-latest}
@@ -528,10 +526,10 @@ services:
         condition: service_healthy
     environment:
       - REDIS_HOST=redis
-      - BF_CBOM_IMAGE=bf-cbom/worker-crypsy-bfcbom:${VERSION:-latest}
+      - BF_CBOM_IMAGE=bf-cbom/worker-ciphersift:${VERSION:-latest}
       - REDIS_PORT=6379
       - WORKER_TIMEOUT_SEC=1800
-    env_file: docker/env/worker-crypsy-bfcbom.env
+    env_file: docker/env/worker-ciphersift.env
     restart: on-failure:3
     deploy:
       resources:
@@ -539,9 +537,7 @@ services:
           memory: 4g
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
-    # opt-in (EXTRA_PROFILES=crypsy) only until CRYPSY_REPO / CRYPSY_COMMIT are pinned in the Dockerfile;
-    # then [prod, all] like every other worker
-    profiles: [crypsy]
+    profiles: [prod, all]
 
   worker-cbomkit-jar:
     # same engine as worker-cbomkit, packaged as the standalone action jar (one voter in RQ4, two tools otherwise)

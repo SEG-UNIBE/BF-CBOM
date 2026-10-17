@@ -104,7 +104,7 @@ def test_extract_sites_custom_property_locations():
 
 
 def test_extract_sites_reads_cyclonedx_17_algorithm_family():
-    """Components named after the API call (Crypsy, CipherRadar) carry the family in algorithmFamily."""
+    """Components named after the API call (CipherSift, CipherRadar) carry the family in algorithmFamily."""
 
     def comp(name, line, family=None):
         ap = {"algorithmFamily": family} if family else {}
@@ -116,7 +116,7 @@ def test_extract_sites_reads_cyclonedx_17_algorithm_family():
         }
 
     cbom = {"components": [comp("GCMParameterSpec", 10, "AES"), comp("Cipher.getInstance", 20)]}
-    sites, stats = extract_sites(cbom, "crypsy-bfcbom", language="java")
+    sites, stats = extract_sites(cbom, "ciphersift", language="java")
     assert [(s.line, set(s.families)) for s in sites] == [(10, {"AES"}), (20, set())]
     assert stats.unknown_family == 1  # an unresolved algorithm string stays unknown
 

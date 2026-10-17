@@ -651,7 +651,7 @@ _JSON_KEYS = {
 
 
 def _json_context(r: _Reader, comp: dict, occ: dict | None, props: dict) -> list[Val]:
-    """An occurrence `additionalContext` holding a JSON object (Crypsy): known keys become values."""
+    """An occurrence `additionalContext` holding a JSON object : known keys become values."""
     raw = (occ or {}).get("additionalContext")
     if not isinstance(raw, str) or not raw.lstrip().startswith("{"):
         return []

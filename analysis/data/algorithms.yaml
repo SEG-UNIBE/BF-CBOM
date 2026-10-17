@@ -432,7 +432,7 @@ number_keywords:
 
 # Qualified API identifiers (prefix match; they never set `material`: an algorithm component's context is often
 # the key spec it is used with; `.`, `/`, `#` and `:` are interchangeable, case does not matter), used as
-# the lowest-priority evidence when a tool names the API call or package (xgrep, CBOMkit, Crypsy contexts).
+# the lowest-priority evidence when a tool names the API call or package (xgrep, CBOMkit, CipherSift contexts).
 apis:
   # Java (JCA/JCE)
   java.security.MessageDigest: {primitive: hash}

@@ -2,7 +2,7 @@
 
 Fixtures: tests/fixtures/pilot/ (pilot of 2026-10-08), tests/fixtures/normalize/ (small excerpts of real outputs of
 the open tools from experiment e1-pilot-corpus, 2026-10-16; origin in each file's metadata). The xgrep
-and Crypsy CBOMs below are hand-written in the tools' format.
+CBOMs below are hand-written in the tool's format.
 """
 
 import json
@@ -222,11 +222,26 @@ def test_xgrep_code_names_stay_unmapped_but_api_context_helps():
     assert r.unmapped == [{"src": "name", "raw": "getJavaAlgorithm"}]
 
 
-def test_crypsy_family_field_and_json_context():
+def test_json_context_extractor(tmp_path):
+    (tmp_path / "t.yaml").write_text("spec: t\ninherits: _cyclonedx\nsources: [base, {extract: json_context}]\n")
     occ = [{"location": "a.py", "line": 3, "additionalContext": json.dumps({"mode": "GCM", "keySize": 256})}]
     bom = _bom(_comp("GCMParameterSpec", ap={"algorithmFamily": "AES", "primitive": "ae"}, occ=occ), version="1.7")
-    r = normalize_cbom(bom, "crypsy-bfcbom").records[0]
+    r = normalize_cbom(bom, "t", spec=load_adapter("t", str(tmp_path))).records[0]
     assert (r.values["family"], r.values["mode"], r.values["key_size"], r.spec_issues) == ("AES", "GCM", 256, [])
+
+
+def test_ciphersift_rule_family_fills_the_gap_and_api_names_stay_quiet():
+    recs = normalize_cbom(_load("fixtures/normalize/ciphersift.json"), "ciphersift").records
+    by = {(r.name, r.values.get("family")): r for r in recs}
+    ec = by[("EC", "EC")]  # plain EC key generation: no algorithmFamily, the rule's family fills it
+    assert ec.src["family"] == "properties[ciphersift:family]" and ec.line == 16
+    assert by[("crypto/ecdsa.GenerateKey", "ECDSA")].values["curve"] == "secp256r1"
+    assert by[("AES/GCM/NoPadding", "AES")].values["mode"] == "GCM"
+    lib = next(r for r in recs if r.values["asset_type"] == "library")
+    assert (lib.file, lib.values["purl"]) == ("go.mod", "pkg:golang/golang.org/x/crypto@v0.17.0")
+    assert not any(r.unmapped or r.spec_issues for r in recs)
+    # hmac.new names the API, not the algorithm: the SHA-2 component keeps its field, the name is a recorded conflict
+    assert by[("hmac.new", "SHA-2")].conflicts["family"]["value"] == "HMAC"
 
 
 @pytest.mark.parametrize(

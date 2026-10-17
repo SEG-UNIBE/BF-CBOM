@@ -50,7 +50,7 @@ It also offers **benchmarking capabilities** to orchestrate batch CBOM generatio
 
 ### CBOM Generators Under Scrutiny
 
-BF-CBOM currently integrates eleven CBOM generator workers (plus two opt-in LLM providers) to enable side-by-side comparisons.
+BF-CBOM currently integrates twelve CBOM generator workers (plus two opt-in LLM providers) to enable side-by-side comparisons.
 Each generator brings a unique methodology for detecting and cataloging cryptographic assets:
 
 - **[`CBOMKit`](https://github.com/PQCA/cbomkit)**:
@@ -89,6 +89,9 @@ opengrep rules plus tree-sitter (`cradar` CLI, built from source), CycloneDX 1.7
 
 - **[`xgrep`](https://mondoo.com/docs/xgrep/code-scanning/cbom)** (Mondoo):
 tree-sitter and data-flow scanner for Java, Python, Go and JS/TS, CycloneDX 1.6. Free of charge but proprietary: the worker fetches the pinned npm package (0.80.0, verified by its sha512) at build time.
+
+- **[`CipherSift`](https://github.com/SEG-UNIBE/ciphersift)** (Apache-2.0):
+tree-sitter and YAML-rule scanner for Java, Python and Go source and their dependency manifests, CycloneDX 1.7; a clean-room reimplementation of the approach of Crypsy ([Näther & Hirsch, 2026](https://arxiv.org/abs/2608.04857)). The worker builds the pinned release (v1.1.1, source archive verified by its sha256) with Maven, which runs the tool's test and conformance suite.
 
 **Not yet integrated, blocked on access:**
 
@@ -402,8 +405,8 @@ make analysis ARGS="tables e0-micro"            # flat CSV tables (runs, sites, 
 
 - **One job per worker container.** Each worker pops one job from its Redis queue, runs the tool in a subprocess, pushes the result and only then takes the next job. A batch therefore has as many jobs in flight as there are worker containers: with `make up-prod` that is one per generator, each working on a different repository. Queued jobs cost nothing but a Redis list entry, so the size of a batch never affects memory.
 - **More throughput: replicas.** Workers are stateless, so a tool can be scaled to several containers that share the same queue: `docker compose up -d --scale worker-cryptoscan=3`. The runner needs no change. Each replica has the full memory limit of its service.
-- **Memory limits are caps, not reservations.** Every worker has a memory limit in `docker-compose.yml` (8 GiB for the two CBOMkit workers, 6 GiB for CryptobomForge, 4 GiB for most others). They sum to roughly 49 GiB for the eleven generators, far more than a laptop's Docker VM (Docker Desktop defaults to a fraction of the host RAM). Idle workers use little, but on large repositories the JVM and CodeQL based tools grow towards their caps, and if the VM itself runs out of memory the kernel kills arbitrary containers.
-- **Memory budget (waves).** `EXPERIMENT_MEMORY_BUDGET_GB` in the `Makefile` (default 14, meant for a Docker VM of about 20 GiB) caps the summed limits of the tools a batch feeds at the same time. The runner packs the tools into waves, largest first, runs one wave to completion, then starts the next; the plan is printed before anything is enqueued. With all eleven generators the default gives four waves. On a machine with enough RAM set the budget to 0 (one wave, everything in parallel), either per call or once in the `Makefile`:
+- **Memory limits are caps, not reservations.** Every worker has a memory limit in `docker-compose.yml` (8 GiB for the two CBOMkit workers, 6 GiB for CryptobomForge, 4 GiB for most others). They sum to roughly 53 GiB for the twelve generators, far more than a laptop's Docker VM (Docker Desktop defaults to a fraction of the host RAM). Idle workers use little, but on large repositories the JVM and CodeQL based tools grow towards their caps, and if the VM itself runs out of memory the kernel kills arbitrary containers.
+- **Memory budget (waves).** `EXPERIMENT_MEMORY_BUDGET_GB` in the `Makefile` (default 14, meant for a Docker VM of about 20 GiB) caps the summed limits of the tools a batch feeds at the same time. The runner packs the tools into waves, largest first, runs one wave to completion, then starts the next; the plan is printed before anything is enqueued. With all twelve generators the default gives four waves. On a machine with enough RAM set the budget to 0 (one wave, everything in parallel), either per call or once in the `Makefile`:
 
   ```bash
   make experiment EXP=experiments/e1-pilot-corpus.yaml EXPERIMENT_MEMORY_BUDGET_GB=0

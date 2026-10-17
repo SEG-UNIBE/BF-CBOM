@@ -18,8 +18,8 @@ make corpus ARGS="--per-language 100"              # stratified corpus -> result
 | `e0-cbomkit-smoke.yaml` | cbomkit | 1 | CBOMkit (server image) through the local git server over TLS |
 | `e0-llm-smoke.yaml` | deepseek | 1 | the code-reading LLM worker on its own (needs `DEEPSEEK_API_KEY`) |
 | `e0-phase2-smoke.yaml` | deepseek, cryptoscan | 2 | the Phase 2 workers together |
-| `e0-micro.yaml` | all eleven generators | 5 micro projects (`corpus/micro`) | inclusion check against the hand-written ground truth; analyse with `make analysis ARGS="micro e0-micro"` |
-| `e1-pilot-corpus.yaml` | all eleven generators | 16 real projects (`corpus/pilot-2026-10-08.yaml`) | first real workload: location-aware agreement on the pilot's pinned projects; large repos (Kafka, Keycloak) push CBOMkit towards its timeout |
+| `e0-micro.yaml` | all twelve generators | 5 micro projects (`corpus/micro`) | inclusion check against the hand-written ground truth; analyse with `make analysis ARGS="micro e0-micro"` |
+| `e1-pilot-corpus.yaml` | all twelve generators | 16 real projects (`corpus/pilot-2026-10-08.yaml`) | first real workload: location-aware agreement on the pilot's pinned projects; large repos (Kafka, Keycloak) push CBOMkit towards its timeout |
 
 The smoke tests are quick checks after changing a single worker. The plan's main experiments (E0 stability
 with three repetitions, E1 on the full ~200-repo corpus, E4 on mutants; see `CLAUDE.md`, Phase 5) have no
@@ -55,7 +55,7 @@ compose memory limits of the workers that have jobs queued (`memory_gb` in `comm
 to `docker-compose.yml` by a test). `EXPERIMENT_MEMORY_BUDGET_GB` (Makefile, default 14 for a laptop whose
 Docker Desktop VM has ~20 GiB) caps that sum: the runner packs the tools into waves (largest first), feeds
 one wave, collects it, then feeds the next; workers of later waves sit idle meanwhile. With the default and
-all eleven workers that is four waves. On a machine with enough RAM set it to 0 (one wave, everything in
+all twelve workers that is four waves. On a machine with enough RAM set it to 0 (one wave, everything in
 parallel):
 
 ```
