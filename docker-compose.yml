@@ -97,7 +97,7 @@ services:
       - redis
     environment:
       - AVAILABLE_WORKERS=${AVAILABLE_WORKERS:-cdxgen,cbomkit,deepseek,cryptobomforge,cryptoscan,chatgpt,claude,pqcheck,qdarpan,securin-xbom,cipherradar,xgrep,cbomkit-jar,ciphersift}
-      - AVAILABLE_LANGUAGES=python,java
+      - AVAILABLE_LANGUAGES=python,java,go
       - EXPERIMENT_MEMORY_BUDGET_GB=${EXPERIMENT_MEMORY_BUDGET_GB:-14}  # UI batches run in waves like the runner
       - GITHUB_CACHE_TTL_SEC=86400
       - COMPONENT_MATCH_WAIT_SEC=420
@@ -194,7 +194,7 @@ services:
       - REDIS_HOST=redis
       - BF_CBOM_IMAGE=bf-cbom/worker-cbomkit:${VERSION:-latest}
       - REDIS_PORT=6379
-      - WORKER_TIMEOUT_SEC=600
+      - WORKER_TIMEOUT_SEC=2700  # keycloak 469-551 s, kafka 363 s (2.3.0); pilot used 45 min
       - CBOMKIT_HEALTH_WAIT_SEC=20
       - JAVA_OPTS=-Xms1g -Xmx6g -XX:+ExitOnOutOfMemoryError
     env_file: docker/env/worker-cbomkit.env
@@ -256,13 +256,14 @@ services:
       - REDIS_HOST=redis
       - BF_CBOM_IMAGE=bf-cbom/worker-deepseek:${VERSION:-latest}
       - REDIS_PORT=6379
-      - WORKER_TIMEOUT_SEC=900
+      - WORKER_TIMEOUT_SEC=7200
       # code-reading LLM budget (common/llm_cbom.py): files sent, chars per request, requests per repo
-      - LLM_MAX_FILES=40
+      - LLM_MAX_FILES=1000
       - LLM_MAX_CHUNK_CHARS=40000
-      - LLM_MAX_CHUNKS=16
+      - LLM_MAX_CHUNKS=100
       - LLM_MAX_OUTPUT_TOKENS=8192
-      - LLM_API_TIMEOUT_SEC=180
+      - LLM_API_TIMEOUT_SEC=300
+      - LLM_TEMPERATURE=0  # deepseek-chat accepts it; keeps answers as stable as possible
     env_file: docker/env/worker-deepseek.env
     restart: on-failure:3
     deploy:
@@ -290,13 +291,14 @@ services:
       - REDIS_HOST=redis
       - BF_CBOM_IMAGE=bf-cbom/worker-chatgpt:${VERSION:-latest}
       - REDIS_PORT=6379
-      - WORKER_TIMEOUT_SEC=900
+      - WORKER_TIMEOUT_SEC=7200
       # code-reading LLM budget (common/llm_cbom.py): files sent, chars per request, requests per repo
-      - LLM_MAX_FILES=40
+      - LLM_MAX_FILES=1000
       - LLM_MAX_CHUNK_CHARS=40000
-      - LLM_MAX_CHUNKS=16
-      - LLM_MAX_OUTPUT_TOKENS=8192
-      - LLM_API_TIMEOUT_SEC=180
+      - LLM_MAX_CHUNKS=100
+      - LLM_MAX_OUTPUT_TOKENS=16000
+      - LLM_API_TIMEOUT_SEC=300
+      - OPENAI_MAX_TOKENS_PARAM=max_completion_tokens  # gpt-5 is a reasoning model (rejects max_tokens and temperature)
     env_file: docker/env/worker-chatgpt.env
     restart: on-failure:3
     deploy:
@@ -325,13 +327,13 @@ services:
       - REDIS_HOST=redis
       - BF_CBOM_IMAGE=bf-cbom/worker-claude:${VERSION:-latest}
       - REDIS_PORT=6379
-      - WORKER_TIMEOUT_SEC=900
+      - WORKER_TIMEOUT_SEC=7200
       # code-reading LLM budget (common/llm_cbom.py): files sent, chars per request, requests per repo
-      - LLM_MAX_FILES=40
+      - LLM_MAX_FILES=1000
       - LLM_MAX_CHUNK_CHARS=40000
-      - LLM_MAX_CHUNKS=16
-      - LLM_MAX_OUTPUT_TOKENS=8192
-      - LLM_API_TIMEOUT_SEC=180
+      - LLM_MAX_CHUNKS=100
+      - LLM_MAX_OUTPUT_TOKENS=16000
+      - LLM_API_TIMEOUT_SEC=300
     env_file: docker/env/worker-claude.env
     restart: on-failure:3
     deploy:
@@ -616,7 +618,7 @@ services:
       - BF_CBOM_IMAGE=bf-cbom/worker-cryptobomforge:${VERSION:-latest}
       - REDIS_PORT=6379
       - WORKER_TIMEOUT_SEC=600
-      - AVAILABLE_LANGUAGES=python,java
+      - AVAILABLE_LANGUAGES=python,c  # crypto queries exist for Python and C/C++ only
       - CODEQL_RAM_MB=4096
     env_file: docker/env/worker-cryptobomforge.env
     restart: on-failure:3

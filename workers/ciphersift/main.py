@@ -31,8 +31,9 @@ TIMEOUT_SEC = int(os.getenv("WORKER_TIMEOUT_SEC", "1800"))
 JAVA = str(Path(os.getenv("JAVA_HOME", "/opt/java/openjdk")) / "bin" / "java")
 JAR = os.getenv("CIPHERSIFT_JAR", "/opt/ciphersift/ciphersift.jar")
 RELEASE = os.getenv("CIPHERSIFT_RELEASE", "")  # set by the Dockerfile: the pinned release tag
-# the JVM's default heap is a quarter of the container limit; the scan is the only process in the container
-JAVA_OPTS = os.getenv("CIPHERSIFT_JAVA_OPTS", "-XX:MaxRAMPercentage=75").split()
+# the JVM default heap is a quarter of the container limit (the scan is the only process); an OOM ends the JVM
+# instead of leaving it running half-dead
+JAVA_OPTS = os.getenv("CIPHERSIFT_JAVA_OPTS", "-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError").split()
 EXTRA_ARGS = os.getenv("CIPHERSIFT_ARGS", "").split()
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")

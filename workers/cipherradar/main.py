@@ -2,11 +2,16 @@
 
 Pilot verdict (2026-10-08): pass on Python, Go and JavaScript; borderline on Java because the Java
 pass crashes (nil pointer in constant propagation) on `new ECGenParameterSpec(<identifier>)`
-(jjwt, Keycloak). The pilot worked around it by listing the crashing files in a `.cradarignore`;
-this worker does the same automatically: on a crash it reads the failing file from the output,
-appends it to `.cradarignore` in the clone and retries (bounded), and records the ignored files in
-the result notes. Command as the pilot ran it:
+(jjwt, Keycloak, santuario). The tool is run as released (no source patch). Before the first run the
+worker lists every `*.java` file containing the crash trigger (`new ECGenParameterSpec(<identifier>)`)
+in `.cradarignore` (CRADAR_PREFILTER, default on; this reproduces the pilot's hand-made ignore lists
+exactly, and the crash output names no file, so reading the culprit from the output cannot work); the
+output-based retry is kept as a last fallback. Excluded files are recorded in the result notes.
+Command as the pilot ran it:
 `cradar --verbose scan <repo> -o out.json --validate --no-baseline --passes 1,2`.
+
+cradar runs with its working directory outside the clone, so a `.cradar.yml` committed in a scanned
+repository cannot change the scan.
 """
 
 import json
@@ -27,6 +32,9 @@ TIMEOUT_SEC = int(os.getenv("WORKER_TIMEOUT_SEC", "1800"))
 BINARY = os.getenv("CRADAR_BIN", "cradar")
 EXTRA_ARGS = os.getenv("CRADAR_ARGS", "").split()
 MAX_IGNORE_RETRIES = int(os.getenv("CRADAR_MAX_IGNORE_RETRIES", "20"))
+PREFILTER = os.getenv("CRADAR_PREFILTER", "1") == "1"  # pre-exclude Java files with the known crash trigger
+# cradar 1.x crashes in the Java pass on `new ECGenParameterSpec(<identifier>)` (nil constant propagator)
+EC_CRASH = re.compile(r"new\s+ECGenParameterSpec\s*\(\s*[A-Za-z_$][\w$]*\s*[,)]")
 # Go panics print the goroutine stack; the scanned file shows up in the "scanning"/"processing" lines
 # that --verbose emits before the crash, so the last mentioned source file is the culprit.
 _FILE_RE = re.compile(r"(?:scanning|processing|parsing|file)\s+[\"']?([^\s\"']+\.[A-Za-z0-9]+)", re.IGNORECASE)
@@ -64,6 +72,21 @@ def _crashed_file(output: str, repo_path: Path) -> str | None:
     return None
 
 
+def prefilter_crashers(repo_path: Path) -> list[str]:
+    """Repo-relative paths of Java files that contain the known crash trigger, sorted."""
+    bad = []
+    for path in repo_path.rglob("*.java"):
+        if not path.is_file() or path.is_symlink():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        if EC_CRASH.search(text):
+            bad.append(path.relative_to(repo_path).as_posix())
+    return sorted(bad)
+
+
 def run_cradar(repo_path: Path, out_file: Path, home: Path, trace: Trace, *, deadline: float) -> list[str]:
     """Run cradar, retrying with a growing .cradarignore on crashes. Returns the ignored files."""
     env = os.environ.copy()
@@ -78,7 +101,11 @@ def run_cradar(repo_path: Path, out_file: Path, home: Path, trace: Trace, *, dea
             "DO_NOT_TRACK": "1",
         }
     )
-    ignored: list[str] = []
+    ignored = prefilter_crashers(repo_path) if PREFILTER else []
+    if ignored:
+        with (repo_path / ".cradarignore").open("a", encoding="utf-8") as fh:
+            fh.write("".join(f + "\n" for f in ignored))
+        trace.add(f"cradar: {len(ignored)} Java files with the known crash trigger added to .cradarignore")
     cmd = [BINARY, "--verbose", "scan", str(repo_path), "-o", str(out_file), "--validate", "--no-baseline"]
     cmd += ["--passes", "1,2", *EXTRA_ARGS]
     trace.add(f"cradar cmd: {' '.join(cmd)}")
@@ -89,7 +116,7 @@ def run_cradar(repo_path: Path, out_file: Path, home: Path, trace: Trace, *, dea
         out_file.unlink(missing_ok=True)
         try:
             proc = subprocess.run(
-                cmd, cwd=str(repo_path), capture_output=True, text=True, timeout=remaining, check=False, env=env
+                cmd, cwd=str(home), capture_output=True, text=True, timeout=remaining, check=False, env=env
             )
         except subprocess.TimeoutExpired as exc:
             raise TimeoutError("cradar_timeout") from exc
@@ -134,7 +161,7 @@ def _produce(instr: JobInstruction, trace: Trace) -> tuple[str, float]:
         ignored = run_cradar(Path(cloned), out_file, home, trace, deadline=deadline)
         raw = out_file.read_text(encoding="utf-8")
     if ignored:
-        trace.add(f"files excluded via .cradarignore after crashes: {', '.join(ignored)}")
+        trace.add(f"files excluded via .cradarignore (known crash trigger / crashes): {', '.join(ignored)}")
     cbom = json.loads(raw)  # fail early on malformed output
     logger.info("%s: %d components", instr.repo_info.full_name, len(cbom.get("components") or []))
     return raw, time.monotonic() - start

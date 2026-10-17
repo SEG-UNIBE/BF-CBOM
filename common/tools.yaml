@@ -8,18 +8,19 @@
 #          | blocked (needs access, see CLAUDE.md) | excluded (failed the bar; kept for RQ1/RQ2 only)
 #          | prepared (worker ready, but kept out of AVAILABLE_WORKERS and the specs until its source is public).
 # Pilot verdicts (2026-10-08, docs/pilot-2026-10-08/README.md): pass/borderline/fail per language.
+# `micro_<date>`: lenient recall on e0-micro (`make analysis ARGS="micro e0-micro"`; the inclusion bar is 6/11).
 # `memory_gb`: the worker's compose memory limit (docker-compose.yml, kept equal by a test); the batch
 #   runner sums it over the tools it feeds at once to stay within EXPERIMENT_MEMORY_BUDGET_GB (waves).
 tools:
   cbomkit:
-    micro_2026-10-15: {java: 11/11, python: 5/11, go: 0/11}
+    micro_2026-10-17: {java: 11/11, python: 5/11, go: 8/11}
     engine: sonar-cryptography      # IBM/PQCA sonar-cryptography plugin; the action jar and the server image share it
     memory_gb: 8
     approach: syntax tree + resolution of provider strings (JCA, BouncyCastle, pyca/cryptography, Go std)
     native_cyclonedx: true
-    languages: [java, python]       # the server image found nothing on micro-go (e0-micro); the pilot's action jar scanned Go with CBOMKIT_LANGUAGES=go
+    languages: [java, python, go]   # 2.1.10 had no Go analyser (0/11 on micro-go); 2.3.0 has the action jar's engine
     voter_group: cbomkit            # one voter together with cbomkit-jar (same sonar-cryptography engine)
-    status: integrated              # server image ghcr.io/pqca/cbomkit 2.1.10
+    status: integrated              # server image ghcr.io/cbomkit/cbomkit 2.3.0 (sonar-cryptography 1.7.0, same engine as cbomkit-jar)
     pilot: {java: pass, python: pass, go: pass}
     notes: >
       Python support is pyca/cryptography only (hashlib/hmac/ssl out of scope by design). Module indexing
@@ -27,7 +28,7 @@ tools:
       handful of files (pilot added an empty src/). Invents key sizes ("AES-128", "RSA-2048") and sometimes
       labels PEM headers as algorithms. Pilot runs used 45 min and -Xmx16g.
   cbomkit-jar:
-    micro_2026-10-15: {java: 11/11, python: 5/11, go: 8/11}
+    micro_2026-10-17: {java: 11/11, python: 5/11, go: 8/11}
     engine: sonar-cryptography      # cbomkit-action v2.3.0 jar (cbomkit-lib 1.3.0, sonar-cryptography 1.7.0): the packaging the pilot graded
     memory_gb: 8
     approach: syntax tree + resolution of provider strings (JCA, BouncyCastle, pyca/cryptography, Go std)
@@ -37,23 +38,32 @@ tools:
     status: integrated              # workers/cbomkit-jar; source-only scan (CBOMKIT_JAVA_REQUIRE_BUILD=false), CBOMKIT_LANGUAGES from the repo language
     pilot: {java: pass, python: pass, go: pass}
   cdxgen:
+    micro_2026-10-17: {java: 0/11, python: 0/11, go: 0/11, javascript: 4/11}
     engine: cdxgen
     memory_gb: 4
-    approach: dependency manifests + evidence; crypto output is mostly libraries and certificates
+    approach: dependency manifests + evidence (atom); crypto output is mostly libraries and certificates
     native_cyclonedx: true
-    languages: [java, python, javascript, go]
-    status: integrated
+    languages: [java, python, javascript, go]   # source-level crypto with locations: JS/TS only (12.8.x, run without -t)
+    status: integrated              # image 12.8.5 (11.7.0 found nothing on any micro project)
+    notes: >
+      Algorithms with file/line only for JS/TS (and only without -t). Java: atom reports crypto only on reachable
+      flows (input source -> sink), so constants passed to getInstance give nothing (micro-java: 0 components with
+      any invocation). Python and Go: the worker passes -t python / -t go (without -t the code analysis falls back
+      to Java); cdxgen then reports algorithms without locations (micro-python 5, micro-go 6), which count at
+      repository level but not in location-based scoring. --include-crypto itself means crypto libraries and
+      key/certificate files.
     pilot: {java: fail, python: fail}   # no file/line for crypto findings; RQ1/RQ2 only
   cryptobomforge:
+    micro_2026-10-17: {python: 0/11, c: 0/11}   # scorer gap: `micro` does not read its IBM-draft locations (14 / 10 algorithm records at the right windows)
     engine: codeql                  # Santander cryptobom-forge on CodeQL crypto queries
     memory_gb: 6
     approach: data flow (CodeQL)
     native_cyclonedx: false         # emits IBM's pre-standard draft `1.4-cbom-1.0` (bomFormat CBOM, type crypto-asset), not CycloneDX 1.6
-    languages: [java, python]
-    status: integrated
+    languages: [python, c]          # upstream CodeQL crypto queries exist for Python and C/C++ only (no Java query)
+    status: integrated              # runs experimental/cryptography/inventory/new_models (before 2026-10-17: CodeQL's default security suite by mistake)
     pilot: {java: fail, python: fail}   # exact line lost, algorithms relabelled; RQ1 (non-conformance example) and RQ2 only
   deepseek:
-    micro_2026-10-15: {java: 11/11, python: 8/11, go: 11/11, javascript: 11/11, c: 11/11}
+    micro_2026-10-17: {java: 11/11, python: 11/11, go: 11/11, javascript: 11/11, c: 9/11}
     engine: llm                     # provider adapters share prompts and file selection (common/llm_cbom.py, Phase 2)
     memory_gb: 1
     approach: LLM reading pre-filtered source files
@@ -85,11 +95,11 @@ tools:
     native_cyclonedx: true          # `--format cbom` emits CycloneDX 1.6 with evidence.occurrences
     languages: [java, python, go, javascript, typescript, c, cpp, rust, csharp, ruby, php]
     status: integrated
-    micro_2026-10-15: {java: 0/11, python: 0/11, go: 5/11, javascript: 6/11, c: 0/11}   # e0-micro: fails the inclusion bar on Java and Python
+    micro_2026-10-17: {java: 9/11, python: 10/11, go: 10/11, javascript: 10/11, c: 1/11}   # strict 7/6/6/6/0; 2026-10-15 (0/0/5/6/0) was our setup error (no --include-quantum-safe, demo/ folder)
 
   # ---- passed the pilot's inclusion bar (2026-10-08); workers added 2026-10-15 (recipes: docs/pilot-2026-10-08/README.md)
   pqcheck:
-    micro_2026-10-15: {python: 8/11, go: 8/11}
+    micro_2026-10-17: {python: 8/11, go: 8/11}
     engine: pqcheck                 # github.com/Rafael-Ryu/pqcheck 0.1.0 (Apache-2.0), tree-sitter + go/types
     memory_gb: 4
     approach: syntax tree (tree-sitter), Go via go/types when a Go toolchain is present
@@ -98,7 +108,7 @@ tools:
     status: integrated             # workers/pqcheck
     pilot: {python: pass, go: pass}
   qdarpan:
-    micro_2026-10-15: {java: 10/11, go: 9/11, c: 7/11}
+    micro_2026-10-17: {java: 11/11, go: 9/11, c: 7/11}
     engine: q-darpan                # github.com/RohanExploit/q-darpan 72a4edd (Apache-2.0), tree-sitter
     memory_gb: 4
     approach: syntax tree (tree-sitter)
@@ -107,7 +117,7 @@ tools:
     status: integrated             # workers/qdarpan
     pilot: {java: pass, go: pass, c: pass}
   securin-xbom:
-    micro_2026-10-15: {java: 6/11, python: 7/11, go: 4/11, javascript: 4/11, c: 2/11}
+    micro_2026-10-17: {java: 9/11, python: 8/11}   # with the frozen registry rule sets (2026-10-15 without them: 6/11, 7/11)
     engine: semgrep-rules           # github.com/securin-public/securin-xbom a270c5f (Apache-2.0), ~13 semgrep rule files
     memory_gb: 4
     approach: patterns (semgrep)
@@ -116,20 +126,21 @@ tools:
     voter_group: grep-rules         # semgrep/opengrep rule tools share the matching engine; rules differ (sensitivity analysis)
     status: integrated             # workers/securin-xbom
     pilot: {java: pass, python: pass, go: fail, c: fail, javascript: fail}
-    notes: must run offline (online it fetches extra rules from semgrep.dev, which changes results); its cdxgen layer is broken with cdxgen 12
+    notes: runs offline with the semgrep.dev rule sets it fetches online (r/java.lang.security, r/python.cryptography) frozen at a pinned semgrep-rules commit, unfiltered; before 2026-10-17 offline mode silently dropped them. Its cdxgen layer is broken with cdxgen 12
   cipherradar:
-    micro_2026-10-15: {java: 11/11, python: 8/11, go: 9/11, javascript: 9/11, c: 4/11}   # c was 2 strict / 6 lenient before the analysis read algorithmFamily (2026-10-16); its C families are guesses
+    micro_2026-10-17: {java: 11/11, python: 8/11, go: 9/11, javascript: 9/11}   # its C families are guesses (C is outside its languages)
     engine: opengrep-rules          # github.com/nk-sentinel/cipherradar efa5d9d, opengrep rules + tree-sitter + YARA
     memory_gb: 4
     approach: patterns (opengrep) + syntax tree
     native_cyclonedx: true          # CycloneDX 1.7
-    languages: [java, python, go, javascript]   # Java: nil-pointer crash on `new ECGenParameterSpec(<identifier>)` (jjwt, Keycloak) is worked around in the worker (.cradarignore retry, recorded in the notes)
+    languages: [java, python, go, javascript]   # Java: nil-pointer crash on `new ECGenParameterSpec(<identifier>)` (jjwt, Keycloak) is worked around in the worker (files with the trigger pre-excluded via .cradarignore, recorded in the notes; the tool itself is not patched)
     voter_group: grep-rules
     status: integrated             # workers/cipherradar
     pilot: {java: borderline, python: pass, go: pass, javascript: pass, c: fail}
     notes: very noisy solo findings (17-31 % precise when alone in the pilot); needs writable XDG_* dirs or opengrep dies silently
 
   ciphersift:
+    micro_2026-10-17: {java: 11/11, python: 11/11, go: 11/11}   # tailored on these projects, see tailored_on
     engine: ciphersift              # CipherSift v1.1.1 (SEG-UNIBE, Apache-2.0): clean-room reimplementation of the approach of Crypsy (Näther & Hirsch, arXiv 2608.04857) for Java, Python and Go
     memory_gb: 4
     approach: syntax tree (tree-sitter) + YAML rules (name and constant resolution, wrapper propagation)
@@ -154,8 +165,8 @@ tools:
     status: blocked
     pilot: {go: pass, c: pass, javascript: fail, java: "?", python: "?"}   # open rules only; Java/Python rules not available
   xgrep:
-    micro_2026-10-15: {java: 11/11, python: 8/11, go: 10/11, javascript: 9/11}
-    engine: mondoo-xgrep            # proprietary binary (free of charge) from the public npm package, pinned 0.80.0
+    micro_2026-10-17: {java: 11/11, python: 10/11, go: 10/11, javascript: 9/11}
+    engine: mondoo-xgrep            # proprietary binary (free of charge) from the public npm package, pinned 0.86.0
     memory_gb: 4
     approach: syntax tree + data flow
     native_cyclonedx: true

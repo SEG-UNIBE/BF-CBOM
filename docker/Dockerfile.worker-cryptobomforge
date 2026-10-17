@@ -69,11 +69,16 @@ RUN mkdir -p /opt/codeql \
 # (see github/codeql tag codeql-cli/v<CODEQL_VERSION>, <lang>/ql/src/qlpack.yml).
 ARG CODEQL_PYTHON_QUERIES=1.6.4
 ARG CODEQL_JAVA_QUERIES=1.7.0
+ARG CODEQL_CPP_QUERIES=1.4.7
+# The worker runs experimental/cryptography/inventory/new_models (Python, C/C++); fail the build if absent.
 RUN /usr/local/bin/codeql pack download \
         codeql/python-queries@${CODEQL_PYTHON_QUERIES} \
         codeql/java-queries@${CODEQL_JAVA_QUERIES} \
+        codeql/cpp-queries@${CODEQL_CPP_QUERIES} \
     && codeql resolve packs \
-    && codeql resolve languages
+    && codeql resolve languages \
+    && codeql resolve queries codeql/python-queries:experimental/cryptography/inventory/new_models | grep -q AllCryptoAlgorithms \
+    && codeql resolve queries codeql/cpp-queries:experimental/cryptography/inventory/new_models | grep -q AllCryptoAlgorithms
 
 # Copy the application code. This should be the final step to benefit from caching.
 COPY common/ ./common/
@@ -81,7 +86,7 @@ COPY workers/cryptobomforge/ ./workers/cryptobomforge/
 
 # Define the entrypoint for the application.
 # Reported in every JobResult.tool_version
-ENV TOOL_VERSION="cryptobom-forge ${CRYPTOBOM_FORGE_VERSION}; codeql ${CODEQL_VERSION}; codeql-java-queries ${CODEQL_JAVA_QUERIES}; codeql-python-queries ${CODEQL_PYTHON_QUERIES}"
+ENV TOOL_VERSION="cryptobom-forge ${CRYPTOBOM_FORGE_VERSION}; codeql ${CODEQL_VERSION}; codeql-java-queries ${CODEQL_JAVA_QUERIES}; codeql-python-queries ${CODEQL_PYTHON_QUERIES}; codeql-cpp-queries ${CODEQL_CPP_QUERIES}; crypto queries experimental/cryptography/inventory/new_models"
 
 ENTRYPOINT ["tini", "--", "python", "-m", "workers.cryptobomforge.main"]
 

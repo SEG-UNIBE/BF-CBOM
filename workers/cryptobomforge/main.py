@@ -51,8 +51,25 @@ CODEQL_LANGUAGE_MAP = {
 }
 
 
-# Compiled languages that CodeQL 2.23 can extract without building (Python/JS/Ruby need no build).
-_BUILD_MODE_NONE_LANGUAGES = {"java", "csharp"}
+# The crypto queries cryptobom-forge is built for (its README: "the CodeQL cryptography experimental
+# queries"). Without a query argument `codeql database analyze` runs the default security suite, which
+# finds no crypto (micro-python: empty CBOM; paramiko: security alerts turned into fake assets; config
+# audit 2026-10-17). Upstream has these for Python and C/C++ only; Java's crypto InventorySlices are
+# `@kind table`, which `analyze` cannot write as SARIF, so Java has no query and is not supported.
+# CRYPTOBOMFORGE_QUERIES_<LANG> (e.g. _JAVA) overrides or adds a query/suite spec for one language.
+CRYPTO_QUERIES = {
+    "python": "codeql/python-queries:experimental/cryptography/inventory/new_models",
+    "cpp": "codeql/cpp-queries:experimental/cryptography/inventory/new_models",
+}
+
+
+def crypto_query_for(lang: str) -> str | None:
+    return os.getenv(f"CRYPTOBOMFORGE_QUERIES_{lang.upper()}") or CRYPTO_QUERIES.get(lang)
+
+
+# Compiled languages that CodeQL 2.23 can extract without building (Python/JS/Ruby need no build). Without it,
+# C/C++ falls back to autobuild, which fails on sources without a build system (micro-c, 2026-10-17).
+_BUILD_MODE_NONE_LANGUAGES = {"java", "csharp", "cpp"}
 
 # File extensions per CodeQL language, used when repo metadata carries no language.
 _LANGUAGE_EXTENSIONS = {
@@ -222,6 +239,10 @@ class CryptobomForgeClient:
             logger.warning("CodeQL scan skipped: unsupported language '%s'", language)
             return False
 
+        if not crypto_query_for(codeql_lang):
+            trace.add(f"codeql: no crypto query for '{codeql_lang}' (upstream has Python and C/C++ only)")
+            raise RuntimeError(f"unsupported_language: no crypto query for {codeql_lang}")
+
         db_path = os.path.join(repo_path, f"codeql-db-{codeql_lang}")
         if not self._codeql_create_db(repo_path, db_path, codeql_lang, trace):
             return False
@@ -244,7 +265,7 @@ class CryptobomForgeClient:
             repo_path,
         ]
         if lang in _BUILD_MODE_NONE_LANGUAGES:
-            # Extract from source without running the project's build (Maven/Gradle). Faster,
+            # Extract from source without running the project's build (Maven/Gradle/make). Faster,
             # works for repos whose build fails or needs network, and never executes repo code.
             cmd += ["--build-mode", "none"]
         logger.info("Running CodeQL create for %s: %s", lang, " ".join(cmd))
@@ -323,6 +344,7 @@ class CryptobomForgeClient:
             "database",
             "analyze",
             db_path,
+            crypto_query_for(lang),
             "--format",
             "sarifv2.1.0",
             "--sarif-add-snippets",

@@ -4,7 +4,8 @@ ARG BASE_IMAGE=base
 ARG BASE_TAG=latest
 
 # --- Upstream stage: use prebuilt CBOMkit backend image (pinned) ---
-FROM ghcr.io/pqca/cbomkit:2.1.10@sha256:a8a85e6e8d705a5c24e7bbc4c5a5a4590ef4152ba41f0396e82b8841226fc482 AS cbomkit-upstream
+# 2.3.0 = sonar-cryptography 1.7.0, cbomkit-lib 1.3.0, sonar-go 1.32 (2.1.10 had 1.4.5 and no Go: 0/11 on micro-go)
+FROM ghcr.io/cbomkit/cbomkit:2.3.0@sha256:20d37926b979d7c901d130fe8a4178c3f87601df4a69e66e366710f767f6b007 AS cbomkit-upstream
 
 # --- Runtime stage: single worker container running DB + backend + worker ---
 FROM ${BASE_IMAGE}:${BASE_TAG}
@@ -13,7 +14,7 @@ USER appuser
 WORKDIR /app
 ENV PYTHONPATH=/app
 # Reported in every JobResult.tool_version (keep in sync with the FROM line above)
-ENV TOOL_VERSION="cbomkit 2.1.10"
+ENV TOOL_VERSION="cbomkit 2.3.0 (sonar-cryptography 1.7.0)"
 
 # 1) Deps first for better caching
 COPY --chown=appuser:appuser pyproject.toml uv.lock ./

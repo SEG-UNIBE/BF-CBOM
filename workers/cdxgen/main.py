@@ -14,9 +14,41 @@ from common.worker import build_handle_instruction, run_worker
 NAME = os.path.basename(os.path.dirname(__file__))
 TIMEOUT_SEC = int(os.getenv("WORKER_TIMEOUT_SEC", "120"))  # default 120s for repo scan
 
+# cdxgen's code-level crypto analysis (the evidence step, atom) runs for the project types given with -t and
+# falls back to Java without one, so Python and Go repos need their -t (micro-python: 0 -> 5 algorithms,
+# micro-go: 0 -> 6, 2026-10-17). JavaScript/TypeScript must run without -t: its source-level crypto
+# inventory (the only one with file/line) runs only in the default all-types mode. Java: the same either way.
+_PROJECT_TYPE = {"python": "python", "go": "go"}
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(NAME)
+
+
+def project_type_for(main_language: str | None) -> str | None:
+    """The -t value for a repo's main language, or None (all project types, cdxgen's default)."""
+    return _PROJECT_TYPE.get((main_language or "").strip().lower())
+
+
+def build_command(
+    repo_dir: Path, out_file: Path, *, evidence: bool = True, project_type: str | None = None, binary: str = "cdxgen"
+) -> list[str]:
+    cmd = [
+        binary,
+        "--json-pretty",
+        "--include-crypto",
+        # never run pip/npm/maven for arbitrary repos (also off for reproducibility)
+        "--no-install-deps",
+        "-o",
+        str(out_file),
+        str(repo_dir),
+    ]
+    if evidence:
+        # file/line occurrences for components and the code-level crypto analysis; off by default in cdxgen
+        cmd.insert(3, "--evidence")
+    if project_type:
+        cmd[1:1] = ["-t", project_type]
+    return cmd
 
 
 class CdxgenClient:
@@ -32,20 +64,10 @@ class CdxgenClient:
         except Exception as e:
             raise RuntimeError(f"failed_prepare_workdir: {e}") from e
 
-    def _run_cdxgen(self, repo_dir: Path, out_file: Path, trace: Trace, *, evidence: bool = True) -> None:
-        cmd = [
-            self.binary,
-            "--json-pretty",
-            "--include-crypto",
-            # never run pip/npm/maven for arbitrary repos (also off for reproducibility)
-            "--no-install-deps",
-            "-o",
-            str(out_file),
-            str(repo_dir),
-        ]
-        if evidence:
-            # file/line occurrences for components; off by default in cdxgen
-            cmd.insert(3, "--evidence")
+    def _run_cdxgen(
+        self, repo_dir: Path, out_file: Path, trace: Trace, *, evidence: bool = True, project_type: str | None = None
+    ) -> None:
+        cmd = build_command(repo_dir, out_file, evidence=evidence, project_type=project_type, binary=self.binary)
         logger.info("Running cdxgen: %s", " ".join(cmd))
         trace.add(f"cdxgen cmd: {' '.join(cmd)}")
         try:
@@ -102,9 +124,15 @@ class CdxgenClient:
             )
 
     def generate_cbom(
-        self, git_url: str, branch: str = "main", trace: Trace | None = None, commit: str | None = None
+        self,
+        git_url: str,
+        branch: str = "main",
+        trace: Trace | None = None,
+        commit: str | None = None,
+        main_language: str | None = None,
     ) -> str:
         trace = trace or Trace()
+        project_type = project_type_for(main_language)
         work_root = Path("/tmp") / f"cdxgen-{int(time.time() * 1000)}"
         repo_dir = work_root / "repo"
         out_file = work_root / "bom.json"
@@ -115,7 +143,7 @@ class CdxgenClient:
                 trace.add("git clone failed")
                 raise RuntimeError("git_clone_failed")
             try:
-                self._run_cdxgen(Path(cloned_path), out_file, trace)
+                self._run_cdxgen(Path(cloned_path), out_file, trace, project_type=project_type)
             except RuntimeError as exc:
                 if not str(exc).startswith("cdxgen_no_output rc=0"):
                     raise
@@ -124,7 +152,7 @@ class CdxgenClient:
                 # recorded in the result notes (no occurrences in this output).
                 logger.warning("cdxgen wrote no output with --evidence; retrying without it")
                 trace.add("fallback: --evidence produced no output, reran without --evidence")
-                self._run_cdxgen(Path(cloned_path), out_file, trace, evidence=False)
+                self._run_cdxgen(Path(cloned_path), out_file, trace, evidence=False, project_type=project_type)
             return out_file.read_text(encoding="utf-8")
         finally:
             # Best-effort cleanup
@@ -140,6 +168,7 @@ def _produce(instr: JobInstruction, trace: Trace) -> str:
         branch=instr.repo_info.branch,
         trace=trace,
         commit=instr.repo_info.commit,
+        main_language=instr.repo_info.main_language,
     )
 
 

@@ -79,7 +79,7 @@ def test_extract_sites_merges_per_line_and_drops_material():
     by_line = {s.line: s for s in sites}
     assert by_line[32].families == {"HMAC", "SHA-2"}  # HMAC-SHA-512 and its SHA-512 component on one line
     assert by_line[12].raw == ["RSA-2048"]
-    assert all(s.file == "src/main/java/demo/CryptoDemo.java" for s in sites)
+    assert all(s.file == "src/main/java/app/CryptoDemo.java" for s in sites)
 
 
 def test_extract_sites_keeps_all_assets_on_request():
@@ -175,7 +175,7 @@ def test_ground_truth_loads_and_maps_repo_names():
     assert set(truth) == {"micro-java", "micro-python", "micro-go", "micro-javascript", "micro-c"}
     for p in truth.values():
         assert len(p.assets) == 11
-    assert project_for_repo("bfcbom/micro-java").file == "src/main/java/demo/CryptoDemo.java"
+    assert project_for_repo("bfcbom/micro-java").file == "src/main/java/app/CryptoDemo.java"
     assert project_for_repo("x/other") is None
 
 

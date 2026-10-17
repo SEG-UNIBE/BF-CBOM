@@ -139,6 +139,35 @@ def test_generate_cbom_survives_bad_chunk_answers(repo: Path):
     assert stats.assets_unparsable_chunks == len(chunks) - n_splittable + 2 * n_splittable
 
 
+class FailingProvider:
+    name = "fake"
+    model = "fake-1"
+
+    def __init__(self, fail_first: int | None = None):
+        self.fail_first, self.n = fail_first, 0
+
+    def complete(self, system, user):
+        self.n += 1
+        if self.fail_first is None or self.n <= self.fail_first:
+            raise RuntimeError("anthropic api 400: temperature is not supported")
+        return '{"assets": []}', {"prompt_tokens": 1, "completion_tokens": 1}
+
+
+def test_generate_cbom_fails_when_every_request_fails(repo: Path):
+    # an empty "ok" CBOM would look like a tool that found nothing
+    with pytest.raises(
+        RuntimeError, match="all .* requests to fake-1 failed; last error: RuntimeError: anthropic api 400"
+    ):
+        llm.generate_cbom(FailingProvider(), repo, language="python", max_chunk_chars=120)
+
+
+def test_generate_cbom_keeps_partial_results_and_counts_failures(repo: Path):
+    cbom, stats = llm.generate_cbom(FailingProvider(fail_first=1), repo, language="python", max_chunk_chars=120)
+    assert stats.requests_failed >= 1 and stats.chunks_sent >= 1
+    props = {p["name"]: p["value"] for p in cbom["metadata"]["properties"]}
+    assert props["bf-cbom:requests-failed"] == str(stats.requests_failed)
+
+
 def test_truncated_answer_is_retried_in_halves(repo: Path):
     files = llm.select_files(repo, "python").files
     chunk = llm.render_chunks(repo, files, max_chars=10_000)[0]
@@ -185,16 +214,80 @@ def test_anthropic_provider_request_and_usage():
     assert text == '{"assets": []}' and usage == {"prompt_tokens": 7, "completion_tokens": 3}
     url, headers, body, timeout = calls[0]
     assert url.endswith("/v1/messages") and headers["x-api-key"] == "k" and timeout == 9
-    assert (
-        body["model"] == "claude-sonnet-5-5" and body["temperature"] == 0 and body["messages"][0]["content"] == "USER"
-    )
+    assert body["model"] == "claude-sonnet-5-5" and body["messages"][0]["content"] == "USER"
+    assert "temperature" not in body  # not sent unless configured (Sonnet 5.5 rejects non-default sampling)
     assert body["system"].startswith("SYS")
+
+    p0 = llm.AnthropicProvider(name="claude", model="claude-sonnet-4-6", api_key="k", post=fake_post, temperature=0.0)
+    p0.complete("SYS", "USER")
+    assert calls[-1][2]["temperature"] == 0.0
 
     def failing_post(url, headers, json, timeout):
         return _Resp(429, {"error": "rate limited"})
 
     with pytest.raises(RuntimeError, match="anthropic api 429"):
         llm.AnthropicProvider(name="claude", model="m", api_key="k", post=failing_post).complete("S", "U")
+
+
+def test_openai_provider_temperature_and_max_tokens_param():
+    class _Completions:
+        def __init__(self):
+            self.kwargs = []
+
+        def create(self, **kwargs):
+            self.kwargs.append(kwargs)
+
+            class _Msg:
+                content = '{"assets": []}'
+
+            class _Choice:
+                message = _Msg()
+
+            class _Usage:
+                prompt_tokens, completion_tokens = 5, 2
+
+            class _R:
+                choices = [_Choice()]
+                usage = _Usage()
+
+            return _R()
+
+    comp = _Completions()
+    client = type("C", (), {"chat": type("Chat", (), {"completions": comp})()})()
+
+    llm.OpenAICompatProvider(
+        name="chatgpt",
+        model="gpt-5",
+        api_key="k",
+        client=client,
+        temperature=None,
+        max_tokens_param="max_completion_tokens",
+    ).complete("S", "U")
+    kw = comp.kwargs[-1]
+    assert (
+        "temperature" not in kw and "max_tokens" not in kw and kw["max_completion_tokens"] == llm.LLM_MAX_OUTPUT_TOKENS
+    )
+
+    text, usage = llm.OpenAICompatProvider(
+        name="deepseek",
+        model="deepseek-chat",
+        api_key="k",
+        client=client,
+        temperature=0.0,
+        max_tokens_param="max_tokens",
+    ).complete("S", "U")
+    kw = comp.kwargs[-1]
+    assert kw["temperature"] == 0.0 and kw["max_tokens"] == llm.LLM_MAX_OUTPUT_TOKENS
+    assert text == '{"assets": []}' and usage == {"prompt_tokens": 5, "completion_tokens": 2}
+
+
+def test_temperature_from_env(monkeypatch):
+    monkeypatch.delenv("LLM_TEMPERATURE", raising=False)
+    assert llm._temperature_from_env() is None
+    monkeypatch.setenv("LLM_TEMPERATURE", " ")
+    assert llm._temperature_from_env() is None
+    monkeypatch.setenv("LLM_TEMPERATURE", "0")
+    assert llm._temperature_from_env() == 0.0
 
 
 def test_has_api_key_rejects_placeholders():

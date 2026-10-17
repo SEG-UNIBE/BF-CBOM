@@ -5,7 +5,11 @@ require file and line per reported asset -> assemble a CycloneDX 1.6 CBOM. Provi
 (`workers/deepseek`, later `workers/chatgpt`, `workers/claude`) only supply an `LLMProvider`, so all
 of them use identical prompts and file selection and differ in the model alone.
 
-Determinism knobs: temperature 0, deterministic file order, PROMPT_VERSION recorded in the CBOM.
+Determinism knobs: deterministic file order, PROMPT_VERSION recorded in the CBOM, and the sampling
+temperature from LLM_TEMPERATURE (unset: the parameter is not sent, as current Claude and OpenAI reasoning
+models reject non-default values; the value is recorded in the CBOM as bf-cbom:temperature).
+Request knobs (env): LLM_TEMPERATURE, OPENAI_MAX_TOKENS_PARAM (max_tokens, or max_completion_tokens for
+OpenAI reasoning models).
 Cost knobs (env): LLM_MAX_FILES, LLM_MAX_CHUNK_CHARS, LLM_MAX_CHUNKS, LLM_MAX_FILE_BYTES.
 
 The model answers in free text ("GCM", "PSS", assetType "key"); `assemble_cbom` maps every value onto the
@@ -33,11 +37,21 @@ logger = logging.getLogger(__name__)
 PROMPT_VERSION = "2026-10-15.2"  # prompt + file-selection version (recorded in the CBOM metadata)
 ASSEMBLY_VERSION = "2026-10-16.1"  # how answers become CycloneDX: enum mapping (recorded in the CBOM metadata)
 
-LLM_MAX_FILES = int(os.getenv("LLM_MAX_FILES", "40"))
+LLM_MAX_FILES = int(os.getenv("LLM_MAX_FILES", "1000"))
 LLM_MAX_CHUNK_CHARS = int(os.getenv("LLM_MAX_CHUNK_CHARS", "40000"))  # ~10k tokens of code per request
 LLM_MAX_OUTPUT_TOKENS = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "8192"))  # long asset lists must not be cut off
-LLM_MAX_CHUNKS = int(os.getenv("LLM_MAX_CHUNKS", "12"))
+LLM_MAX_CHUNKS = int(os.getenv("LLM_MAX_CHUNKS", "100"))
 LLM_MAX_FILE_BYTES = int(os.getenv("LLM_MAX_FILE_BYTES", "400000"))
+
+
+def _temperature_from_env() -> float | None:
+    """LLM_TEMPERATURE: a number to send as `temperature`; unset or empty: the parameter is omitted."""
+    value = os.getenv("LLM_TEMPERATURE", "").strip()
+    return float(value) if value else None
+
+
+LLM_TEMPERATURE = _temperature_from_env()
+OPENAI_MAX_TOKENS_PARAM = os.getenv("OPENAI_MAX_TOKENS_PARAM", "max_tokens").strip() or "max_tokens"
 
 SOURCE_EXTENSIONS: dict[str, set[str]] = {
     "python": {".py"},
@@ -250,7 +264,8 @@ class LLMProvider(Protocol):
 
 
 class OpenAICompatProvider:
-    """Any OpenAI-compatible chat API (DeepSeek, OpenAI, ...). Temperature 0, JSON mode."""
+    """Any OpenAI-compatible chat API (DeepSeek, OpenAI, ...), JSON mode. `temperature` is sent only when set;
+    `max_tokens_param` names the output-limit parameter (OpenAI reasoning models need max_completion_tokens)."""
 
     def __init__(
         self,
@@ -260,20 +275,29 @@ class OpenAICompatProvider:
         base_url: str | None = None,
         timeout: float = 180.0,
         max_output_tokens: int = LLM_MAX_OUTPUT_TOKENS,
+        temperature: float | None = LLM_TEMPERATURE,
+        max_tokens_param: str = OPENAI_MAX_TOKENS_PARAM,
+        client=None,
     ):
+        self.name, self.model, self.max_output_tokens = name, model, max_output_tokens
+        self.temperature, self.max_tokens_param = temperature, max_tokens_param
+        if client is not None:
+            self._client = client
+            return
         from openai import OpenAI  # imported lazily so the module stays importable without the SDK
 
-        self.name, self.model, self.max_output_tokens = name, model, max_output_tokens
         self._client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout, max_retries=1)
 
     def complete(self, system: str, user: str) -> tuple[str, dict]:
-        resp = self._client.chat.completions.create(
-            model=self.model,
-            temperature=0,
-            max_tokens=self.max_output_tokens,
-            response_format={"type": "json_object"},
-            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-        )
+        kwargs: dict = {
+            "model": self.model,
+            self.max_tokens_param: self.max_output_tokens,
+            "response_format": {"type": "json_object"},
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+        }
+        if self.temperature is not None:
+            kwargs["temperature"] = self.temperature
+        resp = self._client.chat.completions.create(**kwargs)
         usage = getattr(resp, "usage", None)
         return resp.choices[0].message.content or "", {
             "prompt_tokens": getattr(usage, "prompt_tokens", 0) or 0,
@@ -282,7 +306,8 @@ class OpenAICompatProvider:
 
 
 class AnthropicProvider:
-    """Anthropic Messages API over HTTPS (requests), temperature 0. JSON is requested in the prompt and the
+    """Anthropic Messages API over HTTPS (requests); `temperature` is sent only when set (Claude Sonnet 5.5 and
+    Opus 5.5 reject non-default sampling parameters). JSON is requested in the prompt and the
     answer is parsed by `parse_assets`, which tolerates code fences."""
 
     API_URL = "https://api.anthropic.com/v1/messages"
@@ -296,10 +321,12 @@ class AnthropicProvider:
         timeout: float = 180.0,
         max_output_tokens: int = LLM_MAX_OUTPUT_TOKENS,
         post=None,
+        temperature: float | None = LLM_TEMPERATURE,
     ):
         import requests
 
         self.name, self.model, self.timeout, self.max_output_tokens = name, model, timeout, max_output_tokens
+        self.temperature = temperature
         self._headers = {
             "x-api-key": api_key,
             "anthropic-version": self.API_VERSION,
@@ -311,10 +338,11 @@ class AnthropicProvider:
         payload = {
             "model": self.model,
             "max_tokens": self.max_output_tokens,
-            "temperature": 0,
             "system": system + "\nAnswer with the JSON object only, no prose, no code fences.",
             "messages": [{"role": "user", "content": user}],
         }
+        if self.temperature is not None:
+            payload["temperature"] = self.temperature
         resp = self._post(self.API_URL, headers=self._headers, json=payload, timeout=self.timeout)
         if resp.status_code != 200:
             raise RuntimeError(f"anthropic api {resp.status_code}: {resp.text[:300]}")
@@ -470,7 +498,8 @@ class GenerationStats:
     files_candidates: int = 0
     files_matched: int = 0
     files_sent: int = 0
-    chunks_sent: int = 0
+    chunks_sent: int = 0  # successful requests
+    requests_failed: int = 0  # requests that raised (network / API errors)
     chunks_total: int = 0
     prompt_tokens: int = 0
     completion_tokens: int = 0
@@ -580,12 +609,14 @@ def assemble_cbom(
         "properties": [
             {"name": "bf-cbom:llm-model", "value": model},
             {"name": "bf-cbom:prompt-version", "value": PROMPT_VERSION},
+            {"name": "bf-cbom:temperature", "value": "default" if LLM_TEMPERATURE is None else str(LLM_TEMPERATURE)},
             {"name": "bf-cbom:assembly-version", "value": ASSEMBLY_VERSION},
             {"name": "bf-cbom:files-candidates", "value": str(stats.files_candidates)},
             {"name": "bf-cbom:files-matched", "value": str(stats.files_matched)},
             {"name": "bf-cbom:files-sent", "value": str(stats.files_sent)},
             {"name": "bf-cbom:chunks-total", "value": str(stats.chunks_total)},
             {"name": "bf-cbom:requests", "value": str(stats.chunks_sent)},
+            {"name": "bf-cbom:requests-failed", "value": str(stats.requests_failed)},
             {"name": "bf-cbom:chunks-split", "value": str(stats.chunks_split)},
             {"name": "bf-cbom:prompt-tokens", "value": str(stats.prompt_tokens)},
             {"name": "bf-cbom:completion-tokens", "value": str(stats.completion_tokens)},
@@ -639,6 +670,7 @@ def generate_cbom(
         chunks = chunks[:max_chunks]
     assets: list[dict] = []
     project = repo_info.full_name if repo_info else repo_path.name
+    last_error: list[str] = [""]
 
     def ask(label: str, chunk: str) -> list[dict] | None:
         """One request; None when the answer could not be parsed (API errors are recorded and count as None)."""
@@ -646,7 +678,9 @@ def generate_cbom(
         try:
             text, usage = provider.complete(SYSTEM_PROMPT, user)
         except Exception as e:  # network / API errors: keep what we have, record the failure
-            trace.add(f"llm: {label} failed: {type(e).__name__}: {str(e)[:200]}")
+            stats.requests_failed += 1
+            last_error[0] = f"{type(e).__name__}: {str(e)[:300]}"
+            trace.add(f"llm: {label} failed: {last_error[0][:200]}")
             return None
         stats.chunks_sent += 1
         stats.prompt_tokens += int(usage.get("prompt_tokens") or 0)
@@ -681,12 +715,19 @@ def generate_cbom(
         assets.extend(found)
         if on_progress:
             on_progress()
+    if stats.requests_failed and stats.chunks_sent == 0:
+        # Every request failed (wrong model, rejected parameters, auth, quota, network): an empty CBOM would look
+        # like a tool that found nothing, so fail the job instead.
+        raise RuntimeError(
+            f"llm: all {stats.requests_failed} requests to {provider.model} failed; last error: {last_error[0]}"
+        )
     cbom = assemble_cbom(
         assets, tool_name=provider.name, model=provider.model, repo_info=repo_info, repo_path=repo_path, stats=stats
     )
     trace.add(
         f"llm: files {stats.files_sent}/{stats.files_matched} matched of {stats.files_candidates}; "
-        f"requests {stats.chunks_sent} for {stats.chunks_total} chunks ({stats.chunks_split} split); "
+        f"requests {stats.chunks_sent} ok, {stats.requests_failed} failed, for {stats.chunks_total} chunks "
+        f"({stats.chunks_split} split); "
         f"tokens {stats.prompt_tokens}+{stats.completion_tokens}; "
         f"assets {len(cbom['components'])} (raw {stats.assets_raw}); "
         f"locations verified {stats.locations_verified}, unverified {stats.locations_unverified}"

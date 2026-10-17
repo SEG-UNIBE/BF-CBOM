@@ -16,6 +16,8 @@ from common.worker import build_handle_instruction, run_worker
 NAME = os.getenv("WORKER_NAME") or os.path.basename(os.path.dirname(__file__))
 TIMEOUT_SEC = int(os.getenv("WORKER_TIMEOUT_SEC", "600"))
 BINARY = os.getenv("CRYPTOSCAN_BIN", "cryptoscan")
+# without it CryptoScan leaves classical algorithms (AES, SHA-2, HMAC, PBKDF2) out of the CBOM
+BASE_ARGS = ["--include-quantum-safe"]
 EXTRA_ARGS = os.getenv("CRYPTOSCAN_ARGS", "").split()
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -34,7 +36,7 @@ def cryptoscan_version() -> str | None:
 
 
 def run_cryptoscan(repo_path: Path, out_file: Path, trace: Trace, *, timeout: float) -> None:
-    cmd = [BINARY, "scan", str(repo_path), "--format", "cbom", "--output", str(out_file), *EXTRA_ARGS]
+    cmd = [BINARY, "scan", str(repo_path), "--format", "cbom", "--output", str(out_file), *BASE_ARGS, *EXTRA_ARGS]
     trace.add(f"cryptoscan cmd: {' '.join(cmd)}")
     try:
         proc = subprocess.run(cmd, cwd=str(repo_path), capture_output=True, text=True, timeout=timeout, check=False)

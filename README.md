@@ -61,19 +61,18 @@ Uses SonarQube for static analysis and supports compliance policy checks.
 the same sonar-cryptography engine packaged as a standalone jar, run without the server and database and with the languages (Java, Python, Go) chosen per repository. Kept as a second worker so differences between the two packagings are measured; in agreement-based scoring both count as one voter (`voter_group` in `common/tools.yaml`).
 
 - **[`cdxgen`](https://github.com/CycloneDX/cdxgen)**:
-CycloneDX's official generator, primarily for SBOMs but with CBOM extensions since April 2024.
-CBOM generation currently limited to Python and Java projects.
+CycloneDX's official generator, primarily for SBOMs but with CBOM extensions since April 2024. Its crypto output is mostly crypto libraries and key/certificate files; algorithms come with file and line only for JavaScript/TypeScript. For Python and Go repos the worker passes `-t python` / `-t go`, since otherwise cdxgen's code analysis falls back to Java.
 
 - **[`CryptobomForge`](https://github.com/Santandersecurityresearch/cryptobom-forge)**:
-Santander Security Research's CLI tool that processes CodeQL SARIF outputs rather than source code directly, making it language-agnostic.
+Santander Security Research's CLI tool that turns CodeQL SARIF output into a CBOM (IBM's pre-standard draft format). The worker runs CodeQL's experimental crypto queries, which exist for Python and C/C++ only.
 
 - **[`DeepSeek`](https://www.deepseek.com/)**:
-LLM-based approach: the worker clones the repository, selects source files that reference crypto APIs, sends them with line numbers to DeepSeek's model (temperature 0) and assembles a CycloneDX 1.6 CBOM with file and line per asset (`common/llm_cbom.py`; other providers plug in as thin adapters).
+LLM-based approach: the worker clones the repository, selects source files that reference crypto APIs, sends them with line numbers to DeepSeek's model (temperature 0; for models that reject it, no temperature is sent) and assembles a CycloneDX 1.6 CBOM with file and line per asset (`common/llm_cbom.py`; other providers plug in as thin adapters).
 
 - **`ChatGPT` / `Claude`** (prepared, opt-in): the same code-reading pipeline with OpenAI or Anthropic models. Put the API key into `docker/env/worker-chatgpt.env` or `docker/env/worker-claude.env` and start with `make up-prod EXTRA_PROFILES=llm`; without keys these workers are not started.
 
 - **[`CryptoScan`](https://github.com/csnp/cryptoscan)**:
-CyberSecurity NonProfit's pattern-based scanner (Apache-2.0) with a catalogue of 90+ crypto patterns across 15+ languages; emits CycloneDX 1.6 CBOMs with code locations.
+CyberSecurity NonProfit's pattern-based scanner (Apache-2.0) with a catalogue of 90+ crypto patterns across 15+ languages; emits CycloneDX 1.6 CBOMs with code locations. Run with `--include-quantum-safe`, since it otherwise leaves out AES, SHA-2, HMAC and PBKDF2.
 
 - **[`pqcheck`](https://github.com/Rafael-Ryu/pqcheck)**:
 tree-sitter scanner for Python and Go (Apache-2.0) with a bundled go/types analyser; native CycloneDX 1.6 with file and line per asset.
@@ -88,7 +87,7 @@ semgrep-rule scanner for Java and Python (Apache-2.0), CycloneDX 1.6. Runs stric
 opengrep rules plus tree-sitter (`cradar` CLI, built from source), CycloneDX 1.7, many languages. Known crash on some Java EC parameter code is worked around automatically with `.cradarignore` and recorded in the result notes.
 
 - **[`xgrep`](https://mondoo.com/docs/xgrep/code-scanning/cbom)** (Mondoo):
-tree-sitter and data-flow scanner for Java, Python, Go and JS/TS, CycloneDX 1.6. Free of charge but proprietary: the worker fetches the pinned npm package (0.80.0, verified by its sha512) at build time.
+tree-sitter and data-flow scanner for Java, Python, Go and JS/TS, CycloneDX 1.6. Free of charge but proprietary: the worker fetches the pinned npm package (0.86.0, verified by its sha512) at build time.
 
 - **[`CipherSift`](https://github.com/SEG-UNIBE/ciphersift)** (Apache-2.0):
 tree-sitter and YAML-rule scanner for Java, Python and Go source and their dependency manifests, CycloneDX 1.7; a clean-room reimplementation of the approach of Crypsy ([Näther & Hirsch, 2026](https://arxiv.org/abs/2608.04857)). The worker builds the pinned release (v1.1.1, source archive verified by its sha256) with Maven, which runs the tool's test and conformance suite.
@@ -379,7 +378,7 @@ Workers mark a job running the moment they take it (`common/jobs.py`), using the
 
 Every inspection resolves each repository's branch to a commit SHA when it starts (`git ls-remote`, no token needed) and stores it with the repo snapshot.
 Workers that clone check out exactly that commit (`common/utils.py:clone_repo`), so re-executing or retrying an inspection scans the same bytes.
-Each `JobResult` records `tool_version` (reported by the worker, e.g. `cdxgen 11.7.0`), `image_ref` (the image it ran in) and `run_index`, plus `notes` for non-fatal fallbacks such as cdxgen rerunning without `--evidence`.
+Each `JobResult` records `tool_version` (reported by the worker, e.g. `cdxgen 12.8.5`), `image_ref` (the image it ran in) and `run_index`, plus `notes` for non-fatal fallbacks such as cdxgen rerunning without `--evidence`.
 
 ### Batch experiments (journal extension)
 

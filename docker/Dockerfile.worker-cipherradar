@@ -21,10 +21,10 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
 # ---- runtime
 FROM ${BASE_IMAGE}:${BASE_TAG}
 ARG CRADAR_COMMIT=efa5d9d
-ARG OPENGREP_VERSION=1.12.1
-# sha256 of opengrep_manylinux_<arch> from the v1.12.1 release (computed 2026-10-15)
-ARG OPENGREP_SHA256_X86=f18f3c7012070dec9ac612e1d6715a3d9d34e966e8c5f67c190c5f6ac8d63963
-ARG OPENGREP_SHA256_AARCH64=078d7b69b04e416ed4f2ebf59bdb7dae17e744e0a3af380f9f392af219aec8b8
+ARG OPENGREP_VERSION=1.29.0
+# sha256 of opengrep_manylinux_<arch> from the v1.29.0 release
+ARG OPENGREP_SHA256_X86=3365ef49d04893e01338d85d9bbd49b2bd5261ad4c9c0df0a6a0f8d44232ae13
+ARG OPENGREP_SHA256_AARCH64=db3cda6e6e53251a3874e62b7c8493c281508480b3f3b4db554be41583b21174
 ARG TARGETARCH
 
 USER root

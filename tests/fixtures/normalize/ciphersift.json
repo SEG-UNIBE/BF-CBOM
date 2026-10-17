@@ -47,7 +47,7 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "src/main/java/demo/CryptoDemo.java",
+            "location": "src/main/java/app/CryptoDemo.java",
             "line": 16,
             "symbol": "java.security.KeyPairGenerator.getInstance",
             "additionalContext": "{\"ruleId\":\"java.asym.ec\",\"snippet\":\"KeyPairGenerator.getInstance(\\\"EC\\\")\"}"
@@ -87,7 +87,7 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "src/main/java/demo/CryptoDemo.java",
+            "location": "src/main/java/app/CryptoDemo.java",
             "line": 34,
             "symbol": "java.security.Signature.getInstance",
             "additionalContext": "{\"ruleId\":\"java.asym.ecdsa\",\"snippet\":\"Signature.getInstance(SIG_ALG)\"}"
@@ -132,7 +132,7 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "src/main/java/demo/CryptoDemo.java",
+            "location": "src/main/java/app/CryptoDemo.java",
             "line": 24,
             "symbol": "javax.crypto.Cipher.getInstance",
             "additionalContext": "{\"ruleId\":\"java.sym.aes.gcm\",\"snippet\":\"Cipher.getInstance(\\\"AES/GCM/NoPadding\\\")\"}"
@@ -167,7 +167,7 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "src/main/java/demo/CryptoDemo.java",
+            "location": "src/main/java/app/CryptoDemo.java",
             "line": 25,
             "symbol": "javax.crypto.spec.GCMParameterSpec",
             "additionalContext": "{\"ruleId\":\"java.sym.iv.static\",\"snippet\":\"new GCMParameterSpec(128, new byte[12])\"}"
@@ -274,7 +274,7 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "demo/crypto_demo.py",
+            "location": "app/crypto_demo.py",
             "line": 26,
             "symbol": "hmac.new",
             "additionalContext": "{\"ruleId\":\"python.hash.sha2\",\"snippet\":\"hmac.new(b\\\"key\\\", b\\\"data\\\", hashlib.sha512)\"}"
@@ -314,7 +314,7 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "demo/crypto_demo.py",
+            "location": "app/crypto_demo.py",
             "line": 26,
             "symbol": "hmac.new",
             "additionalContext": "{\"ruleId\":\"python.mac.hmac\",\"snippet\":\"hmac.new(b\\\"key\\\", b\\\"data\\\", hashlib.sha512)\"}"

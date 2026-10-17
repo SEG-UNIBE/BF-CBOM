@@ -24,7 +24,7 @@
       "evidence" : {
         "occurrences" : [
           {
-            "location" : "demo/crypto_demo.py",
+            "location" : "app/crypto_demo.py",
             "line" : 18,
             "offset" : 14,
             "additionalContext" : "generate_key"
@@ -52,7 +52,7 @@
       "evidence" : {
         "occurrences" : [
           {
-            "location" : "demo/crypto_demo.py",
+            "location" : "app/crypto_demo.py",
             "line" : 15,
             "offset" : 14,
             "additionalContext" : "generate_private_key"
@@ -74,7 +74,7 @@
       "evidence" : {
         "occurrences" : [
           {
-            "location" : "demo/crypto_demo.py",
+            "location" : "app/crypto_demo.py",
             "line" : 18,
             "offset" : 14,
             "additionalContext" : "generate_key"
@@ -95,7 +95,7 @@
       "evidence" : {
         "occurrences" : [
           {
-            "location" : "demo/crypto_demo.py",
+            "location" : "app/crypto_demo.py",
             "line" : 35,
             "offset" : 10,
             "additionalContext" : "PBKDF2HMAC"
@@ -120,7 +120,7 @@
       "evidence" : {
         "occurrences" : [
           {
-            "location" : "demo/crypto_demo.py",
+            "location" : "app/crypto_demo.py",
             "line" : 35,
             "offset" : 10,
             "additionalContext" : "PBKDF2HMAC"
@@ -146,7 +146,7 @@
       "evidence" : {
         "occurrences" : [
           {
-            "location" : "demo/crypto_demo.py",
+            "location" : "app/crypto_demo.py",
             "line" : 16,
             "offset" : 13,
             "additionalContext" : "generate_private_key"
@@ -167,7 +167,7 @@
       "evidence" : {
         "occurrences" : [
           {
-            "location" : "demo/crypto_demo.py",
+            "location" : "app/crypto_demo.py",
             "line" : 15,
             "offset" : 14,
             "additionalContext" : "generate_private_key"
@@ -193,7 +193,7 @@
       "evidence" : {
         "occurrences" : [
           {
-            "location" : "demo/crypto_demo.py",
+            "location" : "app/crypto_demo.py",
             "line" : 28,
             "offset" : 10,
             "additionalContext" : "sign"
@@ -219,7 +219,7 @@
       "evidence" : {
         "occurrences" : [
           {
-            "location" : "demo/crypto_demo.py",
+            "location" : "app/crypto_demo.py",
             "line" : 21,
             "offset" : 13,
             "additionalContext" : "Cipher"

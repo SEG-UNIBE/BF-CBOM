@@ -30,7 +30,7 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "demo/crypto_demo.py",
+            "location": "app/crypto_demo.py",
             "line": 11
           }
         ]
@@ -79,7 +79,7 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "demo/crypto_demo.py",
+            "location": "app/crypto_demo.py",
             "line": 15
           }
         ]
@@ -133,7 +133,7 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "demo/crypto_demo.py",
+            "location": "app/crypto_demo.py",
             "line": 16
           }
         ]
@@ -183,7 +183,7 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "demo/crypto_demo.py",
+            "location": "app/crypto_demo.py",
             "line": 19
           }
         ]
@@ -232,7 +232,7 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "demo/crypto_demo.py",
+            "location": "app/crypto_demo.py",
             "line": 21
           }
         ]
@@ -282,7 +282,7 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "demo/crypto_demo.py",
+            "location": "app/crypto_demo.py",
             "line": 23
           }
         ]
@@ -331,7 +331,7 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "demo/crypto_demo.py",
+            "location": "app/crypto_demo.py",
             "line": 24
           }
         ]
@@ -380,7 +380,7 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "demo/crypto_demo.py",
+            "location": "app/crypto_demo.py",
             "line": 26
           }
         ]
@@ -429,7 +429,7 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "demo/crypto_demo.py",
+            "location": "app/crypto_demo.py",
             "line": 32
           }
         ]
@@ -483,7 +483,7 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "demo/crypto_demo.py",
+            "location": "app/crypto_demo.py",
             "line": 32
           }
         ]
@@ -532,7 +532,7 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "demo/crypto_demo.py",
+            "location": "app/crypto_demo.py",
             "line": 32
           }
         ]
@@ -581,7 +581,7 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "demo/crypto_demo.py",
+            "location": "app/crypto_demo.py",
             "line": 35
           }
         ]
@@ -630,7 +630,7 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "demo/crypto_demo.py",
+            "location": "app/crypto_demo.py",
             "line": 35
           }
         ]

@@ -65,7 +65,7 @@ projects:
   micro-java:
     path: corpus/micro/java
     language: java
-    file: src/main/java/demo/CryptoDemo.java
+    file: src/main/java/app/CryptoDemo.java
     lines:
       rsa-2048-keygen: [12, 13]
       ec-p256-keygen: [16, 17]
@@ -83,7 +83,7 @@ projects:
   micro-python:
     path: corpus/micro/python
     language: python
-    file: demo/crypto_demo.py
+    file: app/crypto_demo.py
     lines:
       rsa-2048-keygen: [15]
       ec-p256-keygen: [16]

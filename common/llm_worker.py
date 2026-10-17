@@ -19,9 +19,9 @@ from .models import JobInstruction, Trace
 from .utils import clone_repo
 from .worker import build_handle_instruction, run_worker
 
-TIMEOUT_SEC = int(os.getenv("WORKER_TIMEOUT_SEC", "900"))
+TIMEOUT_SEC = int(os.getenv("WORKER_TIMEOUT_SEC", "7200"))
 # Per-request budget; the whole job is bounded by TIMEOUT_SEC (the runner kills it) and LLM_MAX_CHUNKS.
-API_TIMEOUT_SEC = float(os.getenv("LLM_API_TIMEOUT_SEC", "180"))
+API_TIMEOUT_SEC = float(os.getenv("LLM_API_TIMEOUT_SEC", "300"))
 
 
 # Values the env templates ship with; treated as "no key" so an unconfigured worker exits instead of failing jobs.

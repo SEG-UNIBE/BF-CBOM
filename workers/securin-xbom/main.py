@@ -1,8 +1,9 @@
 """securin-xbom worker: semgrep rule scanner with native CycloneDX 1.6 CBOM output (Apache-2.0).
 
 Pilot verdict (2026-10-08): pass on Java and Python (fail on Go, C, JS). Runs strictly offline through
-`xbom_offline.py` (bundled rules only, see there); cdxgen is deliberately not installed (xbom's
-dependency layer is broken with cdxgen 12 and would only add library components).
+`xbom_offline.py`: bundled rules plus the registry rule sets frozen in the image (see there). cdxgen is
+deliberately not installed (xbom passes `-o -`, which cdxgen 11/12 treats as a file path, so that layer
+adds nothing; config audit 2026-10-17).
 """
 
 import json
@@ -37,7 +38,12 @@ def xbom_version() -> str | None:
             timeout=60,
         )
         parts = out.stdout.split()
-        return f"xbom {parts[0]} semgrep {parts[1]}" if len(parts) == 2 else None
+        if len(parts) != 2:
+            return None
+        rules_dir = os.getenv("XBOM_RULES_DIR", "/opt/xbom-registry/rules")
+        rules_commit = os.getenv("SEMGREP_RULES_COMMIT", "")[:12] or "unknown"
+        rules = f"registry rules semgrep-rules@{rules_commit}" if rules_dir else "bundled rules only"
+        return f"xbom {parts[0]} semgrep {parts[1]} ({rules})"
     except Exception as e:  # pragma: no cover - only when the venv is missing
         logger.warning("could not determine xbom version: %s", e)
         return None
@@ -69,7 +75,8 @@ def _offline_env(home: Path) -> dict[str, str]:
 
 def run_xbom(repo_path: Path, out_dir: Path, home: Path, trace: Trace, *, timeout: float) -> Path:
     cmd = [PYTHON, str(LAUNCHER), "scan", str(repo_path), "--bom-types", "cbom", "-o", str(out_dir), *EXTRA_ARGS]
-    trace.add(f"xbom cmd: {' '.join(cmd)} (offline, bundled semgrep rules)")
+    rules = os.getenv("XBOM_RULES_DIR", "/opt/xbom-registry/rules") or "none (bundled only)"
+    trace.add(f"xbom cmd: {' '.join(cmd)} (offline; frozen registry rules: {rules})")
     try:
         proc = subprocess.run(
             cmd, cwd=str(out_dir), capture_output=True, text=True, timeout=timeout, check=False, env=_offline_env(home)
