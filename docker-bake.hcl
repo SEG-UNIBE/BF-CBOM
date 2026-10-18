@@ -6,6 +6,11 @@ variable "VERSION" {
   default = "latest"
 }
 
+# Git commit the images are built from (CI passes the tag's commit; `make` passes `git describe --dirty`)
+variable "BF_CBOM_COMMIT" {
+  default = "unknown"
+}
+
 variable "REGISTRY" {
   default = "ghcr.io/seg-unibe/bf-cbom"
 }
@@ -48,7 +53,11 @@ target "base" {
 # Links each GHCR package to the repo
 target "_common" {
   labels = {
-    "org.opencontainers.image.source" = "https://github.com/SEG-UNIBE/BF-CBOM"
+    "org.opencontainers.image.source"   = "https://github.com/SEG-UNIBE/BF-CBOM"
+    "org.opencontainers.image.revision" = BF_CBOM_COMMIT
+  }
+  args = {
+    BF_CBOM_COMMIT = BF_CBOM_COMMIT
   }
 }
 

@@ -86,3 +86,18 @@ def test_runner_session_is_written_to_the_run_log(tmp_path, monkeypatch):
     assert entry["memory_budget_gb"] == 14.0 and entry["waves"] == [["a"], ["b"]]
     experiment_cmd._Session(tmp_path, "collect").finish("completed")
     assert [e["command"] for e in load_run_log(tmp_path)] == ["run", "collect"]
+
+
+def test_session_records_the_runner_commit_and_the_worker_image_ids(tmp_path, monkeypatch):
+    from common.experiment import load_run_log
+    from misc.cli import experiment_cmd
+
+    monkeypatch.setenv("BF_CBOM_COMMIT", "abc123def456-dirty")
+    ids = "bf-cbom/worker-cdxgen:1.0.3=sha256:" + "a" * 64 + ",bf-cbom/worker-cbomkit:1.0.3=sha256:" + "b" * 64
+    ids += ",bf-cbom/coordinator:1.0.3=sha256:" + "c" * 64 + ",<none>:<none>="
+    monkeypatch.setenv("EXPERIMENT_IMAGE_IDS", ids)
+    assert experiment_cmd.worker_image_ids(["cdxgen", "xgrep"]) == {"cdxgen": "sha256:" + "a" * 64}
+    experiment_cmd._Session(tmp_path, "run", tools=["cbomkit", "cdxgen"]).finish("completed")
+    (entry,) = load_run_log(tmp_path)
+    assert entry["runner_commit"] == "abc123def456-dirty"
+    assert entry["images"] == {"cbomkit": "sha256:" + "b" * 64, "cdxgen": "sha256:" + "a" * 64}

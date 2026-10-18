@@ -13,3 +13,7 @@ RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=1000,gid=1000 \
 COPY --chown=appuser:appuser workers/claude/ ./workers/claude/
 ENV PYTHONPATH=/app
 ENTRYPOINT ["tini","-g","--","uv", "run", "--frozen", "--no-dev","workers/claude/main.py"]
+
+# BF-CBOM commit this image was built from (compose/bake pass it; last, so it never invalidates the layers above)
+ARG BF_CBOM_COMMIT=unknown
+ENV BF_CBOM_COMMIT=${BF_CBOM_COMMIT}

@@ -28,3 +28,7 @@ EXPOSE 80 443
 HEALTHCHECK --interval=5s --timeout=2s --retries=5 --start-period=2s \
   CMD wget -q -O /dev/null http://127.0.0.1/healthz || exit 1
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+
+# BF-CBOM commit this image was built from (compose/bake pass it; last, so it never invalidates the layers above)
+ARG BF_CBOM_COMMIT=unknown
+ENV BF_CBOM_COMMIT=${BF_CBOM_COMMIT}

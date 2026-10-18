@@ -90,3 +90,6 @@ ENV TOOL_VERSION="cryptobom-forge ${CRYPTOBOM_FORGE_VERSION}; codeql ${CODEQL_VE
 
 ENTRYPOINT ["tini", "--", "python", "-m", "workers.cryptobomforge.main"]
 
+# BF-CBOM commit this image was built from (compose/bake pass it; last, so it never invalidates the layers above)
+ARG BF_CBOM_COMMIT=unknown
+ENV BF_CBOM_COMMIT=${BF_CBOM_COMMIT}

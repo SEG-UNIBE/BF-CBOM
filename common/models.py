@@ -14,6 +14,8 @@ class Trace:
 
     def __init__(self) -> None:
         self._items: list[str] = []
+        # Structured facts the producer wants in the JobResult (an LLM run's `usage`); kept when the job fails.
+        self.fields: dict = {}
 
     def add(self, msg: str) -> None:
         if not msg:
@@ -66,6 +68,12 @@ class JobResult(DataClassJsonMixin):
     tool_version: str | None = None
     image_ref: str | None = None
     run_index: int | None = None
+    # The BF-CBOM git commit the worker image was built from (env BF_CBOM_COMMIT, stamped by the build;
+    # `-dirty` = built from uncommitted changes).
+    bfcbom_commit: str | None = None
+    # UTC ISO timestamps of the job subprocess (common.worker.run_job_with_timeout).
+    started_at: str | None = None
+    finished_at: str | None = None
     # Non-fatal remarks from the worker (e.g. a fallback that was taken) for successful jobs.
     notes: str | None = None
     # Resources of the worker's container while the job ran (common/memory.py, filled by run_job_with_timeout):
@@ -73,6 +81,9 @@ class JobResult(DataClassJsonMixin):
     peak_memory_mb: float | None = None
     memory_limit_mb: float | None = None
     oom_kills: int | None = None
+    # Structured usage of an LLM run (common/llm_cbom.py:GenerationStats.usage): requests, tokens per kind, the
+    # model ids the provider answered with. Present on failed runs too (Trace.fields).
+    usage: dict | None = None
 
 
 @dataclass

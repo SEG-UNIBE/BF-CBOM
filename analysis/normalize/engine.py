@@ -17,12 +17,11 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass
 
-from ..families import rule_id_to_text
-from ..sites import CODE_EXT, relative_location
 from .conformance import document_issues, schema_index
+from .locations import CODE_EXT, relative_location
 from .record import NormalizedCbom, NormRecord
 from .specs import AdapterSpec, SourceDef, load_adapter
-from .vocab import NO_INFO, Parsed, Vocabulary, load_vocabulary
+from .vocab import NO_INFO, Parsed, Vocabulary, load_vocabulary, rule_id_to_text
 
 _PATH_LINE = re.compile(r"^(.*?)(?::(\d+)(?::\d+)?|#L?(\d+))$")
 CONTEXT_MAX = 300
@@ -54,7 +53,7 @@ class Val:
     value: object
     raw: object  # the value as found: a field value, or the whole text a parse read
     src: str  # JSON path or source label ("name", "evidence.occurrences[].symbol", "properties[x]")
-    via: str  # field | vocabulary | dictionary | parse | api | dependency | ref
+    via: str  # field | vocabulary | dictionary | interpretive | parse | api | dependency | ref
     issues: tuple = ()
     known: bool = False  # recognised although it carries no value (a dictionary entry `{}`)
     fill_only: bool = False  # supporting evidence: fills gaps, never conflicts
@@ -177,8 +176,11 @@ class _Reader:
 
     def _dict_vals(self, hit, raw, label: str, dim: str = "name", issues: tuple = ()) -> list[Val]:
         if isinstance(hit, dict):
-            vals = [Val(d, self._canon(d, v), raw, label, "dictionary", issues) for d, v in hit.items()]
-            return vals or [Val(dim, None, raw, label, "dictionary", issues, known=True)]
+            # `interpretive: true` marks a judgement rather than a spelling (CryptoScan's "Certificate Validation
+            # Bypass" read as protocol TLS): such values count at L4 only (analysis/levels.py)
+            via = "interpretive" if hit.get("interpretive") else "dictionary"
+            vals = [Val(d, self._canon(d, v), raw, label, via, issues) for d, v in hit.items() if d != "interpretive"]
+            return vals or [Val(dim, None, raw, label, via, issues, known=True)]
         return [Val(dim, self._canon(dim, hit), raw, label, "dictionary", issues)]
 
     def _parsed(self, p: Parsed, text, label: str, *, quiet: bool, issues: tuple = (), via: str = "parse"):

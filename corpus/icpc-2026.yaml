@@ -96,7 +96,7 @@ repos:
     commit: a0aadb004a84b6bcc2144fb431ff1d0701639a1c
   - full_name: alibaba/Sentinel
     language: Java
-    branch: 1.8
+    branch: "1.8"   # quoted: YAML would read 1.8 as a number
     commit: a3f40ba8e900c8489bd520274739f17235a7721c
   - full_name: dromara/Sa-Token
     language: Java

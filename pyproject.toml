@@ -51,13 +51,20 @@ combine-as-imports = true
 quote-style = "double"
 indent-style = "space"
 
+[project.optional-dependencies]
+# RaQuN as an analysis matcher (analysis/matchers/raqun.py): the PyQuN package (the user's fork, pinned by commit once
+# it ships a pyproject.toml; see notes.md "WP6") plus its runtime dependencies.
+raqun = ["scikit-learn>=1.5", "scipy>=1.13", "psutil>=6"]
+
 [tool.uv]
 package = true
 
 [dependency-groups]
 dev = [
+    "fakeredis>=2.26",  # the runner's integration test (tests/test_runner.py)
     "black>=25.1.0",
     "jsonschema>=4.25.1",
+    "referencing>=0.36.2",  # schema registry for the offline CycloneDX validation (analysis/schema.py)
     "pytest>=8.4.1",
     "ruff>=0.12.11",
     "watchdog>=6.0.0",

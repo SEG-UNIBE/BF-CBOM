@@ -6,9 +6,12 @@ Pure Python, no Redis, no UI. Reads the result tree written by the batch runner
 - `normalize`:   CBOM -> normalised records (CBOM^norm), one adapter spec per tool (analysis/adapters/),
                  shared vocabulary (analysis/data/algorithms.yaml + the CycloneDX 1.7 registry), conformance
                  of every value read against the CycloneDX version the CBOM declares
-- `families`:    coarse algorithm-family table (analysis/data/families.yaml), the `group` of a record
-- `sites`:       CBOM -> call sites (tool, file, line, families), the input of the call-site matcher
-- `match`:       location-aware n-way matching of call sites (same file, line +-k, compatible family)
+- `levels`:      the L0-L4 normalisation ladder (how much agreement normalisation creates) and which algorithms
+                 each tool reports per repository
+- `schema`:      RQ1: whole-document CycloneDX validation, meaningful shares, traceability (`snapshots` reads the
+                 files of a pinned commit from the git mirror or a fetched cache)
+- `matchers`:    n-way matchers over the records: `exact` (matcher (b), canonical identity, call-site subgroups)
 - `groundtruth`: scoring against the micro projects' ground truth (corpus/micro/ground_truth.yaml)
-- `tables`:      flat CSV tables (runs, call sites, normalised records, matcher groups, micro scores)
+- `tables`:      flat CSV tables (runs, normalised records, matcher groups/members/agreement, micro scores)
+- `summary`:     `_SUMMARY.md` rendered from the CSV tables; `freeze`: the frozen vocabulary and specs
 """

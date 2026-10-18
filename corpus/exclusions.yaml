@@ -1,0 +1,53 @@
+# Repositories the corpus builder never samples (CLAUDE.md refinement 11): the generators' own code and test suites,
+# CBOM benchmarks, and BF-CBOM itself. Each entry carries its reason; reviewed by hand. `patterns` are regexes on
+# the full name for whole families of repos (the builder's DEFAULT_EXCLUDE_PATTERNS live in common/corpus.py).
+# Repos a tool was tuned on (`tailored_on` in common/tools.yaml) are excluded by the builder as well.
+reviewed: "2026-10-18"
+repos:
+  - full_name: IBM/cbomkit
+    reason: generator (CBOMkit server)
+  - full_name: IBM/cbomkit-action
+    reason: generator (CBOMkit action jar)
+  - full_name: IBM/sonar-cryptography
+    reason: generator engine (CBOMkit's rules) and its test suite
+  - full_name: PQCA/sonar-cryptography
+    reason: generator engine (moved upstream)
+  - full_name: CycloneDX/cdxgen
+    reason: generator (cdxgen) and its test fixtures
+  - full_name: CycloneDX/cyclonedx-python-lib
+    reason: CycloneDX tooling with CBOM fixtures
+  - full_name: CycloneDX/specification
+    reason: CycloneDX schemas and examples (vendored in analysis/data/cyclonedx)
+  - full_name: csnp/cryptoscan
+    reason: generator (CryptoScan) and its pattern tests
+  - full_name: scanoss/crypto-finder
+    reason: generator (SCANOSS crypto-finder)
+  - full_name: scanoss/open-crypto-rules
+    reason: generator rules (SCANOSS)
+  - full_name: mondoohq/xgrep
+    reason: generator (xgrep)
+  - full_name: SEG-UNIBE/ciphersift
+    reason: generator (CipherSift, benchmark-informed)
+  - full_name: SEG-UNIBE/BF-CBOM
+    reason: this benchmark
+  - full_name: santandersecurityresearch/cryptobom-forge
+    reason: generator (CryptobomForge)
+  - full_name: github/codeql
+    reason: generator engine (CryptobomForge's CodeQL queries) and its test suite
+  - full_name: securin-io/xbom
+    reason: generator (securin-xbom)
+  - full_name: returntocorp/semgrep-rules
+    reason: generator rules (securin-xbom's registry rule sets)
+  - full_name: semgrep/semgrep-rules
+    reason: generator rules (securin-xbom's registry rule sets)
+  - full_name: pqcheck/pqcheck
+    reason: generator (pqcheck)
+  - full_name: ADPQ/cipherradar
+    reason: generator (CipherRadar)
+patterns:
+  - regex: "(^|/)(cbom|cyclonedx|crypto-?bom)"
+    reason: CBOM tooling or CBOM examples
+  - regex: "benchmark"
+    reason: benchmarks of any kind
+  - regex: "(^|/)(crypto-?scan|cryptoscope|q-?darpan|cipher-?sift|cipher-?radar|pqcheck|xgrep)"
+    reason: generator names

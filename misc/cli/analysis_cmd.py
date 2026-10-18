@@ -1,8 +1,8 @@
 """`bf-cbom analysis ...`: offline analysis of stored experiment results (no Redis).
 
 Reads RESULTS_DIR/<exp>/... written by `bf-cbom experiment run` and writes derived data next to
-it under RESULTS_DIR/<exp>/_ANALYSIS/: JSON reports (`sites`, `micro`, `normalize`) and flat CSV tables (`tables`,
-`levels`, see analysis/tables.py). `normalize` also writes the normalised CBOM `run<k>.norm.json` next to each stored
+it under RESULTS_DIR/<exp>/_ANALYSIS/: JSON reports (`micro`, `normalize`) and flat CSV tables (`tables`, `levels`,
+`schema`, see analysis/tables.py). `normalize` also writes the normalised CBOM `run<k>.norm.json` next to each stored
 `run<k>.json`. `report` does all of it in one pass and adds `_SUMMARY.md` (analysis/summary.py); `experiment export`
 runs it first. Everything stays on the results-data volume; use `experiment export` to get it out.
 """
@@ -11,18 +11,19 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from collections import defaultdict
 from collections.abc import Callable
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 import typer
 import yaml
 
-from analysis import levels as lv, summary as sm, tables as tbl
+from analysis import levels as lv, schema as sch, score as sc, summary as sm, tables as tbl
 from analysis.groundtruth import SCORED_ASSET_TYPES, load_ground_truth, project_for_repo, score_records
-from analysis.match import AgreementSummary, Cluster, cluster_sites, summarize_clusters
+from analysis.matchers import ExactMatcher, raqun as rq
+from analysis.matchers.compare import MATCHERS_COLUMNS, compare
 from analysis.normalize import (
     CONFORMANCE_COLUMNS,
     COVERAGE_COLUMNS,
@@ -31,25 +32,25 @@ from analysis.normalize import (
     Report,
     normalize_cbom,
 )
-from analysis.sites import ExtractionStats, Site, extract_sites
+from analysis.snapshots import SnapshotStore
+from analysis.stability import STABILITY_COLUMNS, stability_rows
 from common.experiment import (
     RESULTS_DIR,
     analysis_dir,
     experiment_dir,
     is_experiment,
     iter_results,
-    migrate_layout,
-    snapshot_files,
+    load_lock,
     spec_path,
 )
-from common.tools_registry import load_tools
+from common.tools_registry import load_tools, tailored_map, voter_groups
 
 # (meta, path of run<k>.json, its normalised CBOM)
 Normalized = tuple[dict, Path, NormalizedCbom]
 Writer = Callable[[str, list[dict], list[str]], None]
 
 analysis_app = typer.Typer(
-    help="Offline analysis of stored experiments (normalisation, call-site matching, micro ground truth, CSV tables)",
+    help="Offline analysis of stored experiments (normalisation, RQ1 schema, matching, micro ground truth, CSV tables)",
     add_completion=False,
     no_args_is_help=True,
     context_settings={"help_option_names": ["-h", "--help"]},
@@ -58,8 +59,42 @@ analysis_app = typer.Typer(
 EXP_ARG = typer.Argument(..., help="Experiment name (directory under RESULTS_DIR)")
 RUN_OPT = typer.Option(1, "--run", help="Which repetition to analyse (run<k>.json)")
 ALL_ASSETS_OPT = typer.Option(False, "--all-assets", help="Keep non-algorithm assets (keys, certificates, protocols)")
-WINDOW_OPT = typer.Option(2, help="Max line distance for two sites to match")
-MATCH_UNKNOWN_OPT = typer.Option(False, "--match-unknown", help="Let unknown-family sites join clusters")
+MERGE_LLM_OPT = typer.Option(
+    False, "--merge-llm", help="Count every LLM worker as one voter (tools.yaml merge_group; sensitivity analysis)"
+)
+CLOSURE_OPT = typer.Option(
+    False,
+    "--closure",
+    help="Close every tool's algorithm set under the vocabulary's `implies` relation (refinement 2): the ladder and "
+    "algorithms-run<k>.csv (implied rows marked) count HMAC-SHA256 as HMAC and SHA-256 for every tool",
+)
+RAQUN_OPT = typer.Option(
+    None,
+    "--raqun/--no-raqun",
+    help="Also run RaQuN (matcher (c), analysis/matchers/raqun.py) and compare it with the exact matcher; default: "
+    "when the PyQuN package is importable",
+)
+SAMPLES_OPT = typer.Option(200, "--samples", help="Bootstrap resamples over repositories for the score CIs (0: none)")
+CONSENSUS_OPT = typer.Option(
+    True,
+    "--consensus/--no-consensus",
+    help="With repeated runs, score a tool's consensus set (algorithms in more than half of its runs) instead of "
+    "run k's set (analysis/stability.py)",
+)
+FETCH_OPT = typer.Option(
+    False,
+    "--fetch",
+    help="Fetch every pinned commit of the experiment into the snapshot cache (SNAPSHOT_CACHE_DIR, default "
+    "~/.cache/bf-cbom/snapshots; one shallow git fetch per repo) so file_exists and the traceability check work on "
+    "a copied export; on the VM the git mirror is used anyway",
+)
+INCLUDE_TAILORED_OPT = typer.Option(
+    False,
+    "--include-tailored",
+    help="Keep (tool, repo) pairs the tool was tuned on (tools.yaml tailored_on) in the agreement numbers",
+)
+WINDOW_OPT = typer.Option(2, help="Line window of the exact matcher's call-site groups (same file, lines within it)")
+LEVEL_OPT = typer.Option("L3", "--level", help="Ladder level of the exact matcher's algorithm key (L0-L4)")
 
 
 def _err(msg: str, code: int = 1):
@@ -75,139 +110,19 @@ def _languages(exp_dir: Path) -> dict[str, str | None]:
     return {r["full_name"]: r.get("language") for r in _spec(exp_dir).get("repos") or []}
 
 
-def _voter_of() -> dict[str, str]:
-    return {t: str(info.get("voter_group") or t) for t, info in load_tools().items()}
+def _voter_of(merge_llm: bool = False) -> dict[str, str]:
+    return voter_groups(merge_llm=merge_llm)
 
 
-def _load_runs(exp_dir: Path, run: int) -> tuple[dict[tuple[str, str], dict[str, dict]], dict[str, str | None]]:
-    """({(repo_dir, variant): {tool: cbom dict}} for stored ok runs of repetition `run`, {repo_dir: base commit})."""
-    out: dict[tuple[str, str], dict[str, dict]] = defaultdict(dict)
-    commits: dict[str, str | None] = {}
-    for meta, cbom_path in iter_results(exp_dir):
-        if cbom_path.name != f"run{run}.json" or meta.get("status") != "ok":
-            continue
-        tool = meta.get("worker") or cbom_path.parent.name
-        repo_dir = cbom_path.parents[2].name
-        variant = cbom_path.parents[1].name
-        commits.setdefault(repo_dir, meta.get("base_commit"))
-        try:
-            out[(repo_dir, variant)][tool] = json.loads(cbom_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            typer.secho(f"skipping unparsable {cbom_path}", fg=typer.colors.YELLOW, err=True)
-    return out, commits
-
-
-@dataclass
-class MatchedSnapshot:
-    repo_dir: str
-    variant: str
-    language: str | None
-    commit: str | None
-    tools: list[str]
-    sites: list[Site]
-    extraction: dict[str, ExtractionStats]
-    clusters: list[Cluster]
-    summary: AgreementSummary
+def _is_tailored(tailored: dict[str, frozenset[str]], tool: str, repo: str) -> bool:
+    return repo in tailored.get(tool, ())
 
 
 def _experiment(name: str) -> Path:
     exp_dir = experiment_dir(name)
     if not is_experiment(exp_dir):
         _err(f"no experiment '{name}' under {RESULTS_DIR}")
-    _migrate(exp_dir)
     return exp_dir
-
-
-def _migrate(exp_dir: Path) -> None:
-    for change in migrate_layout(exp_dir):
-        typer.secho(f"layout: {change}", fg=typer.colors.BLUE, err=True)
-
-
-def _match_experiment(
-    exp_dir: Path, run: int, *, window: int, match_unknown: bool, all_assets: bool
-) -> list[MatchedSnapshot]:
-    """Call-site extraction and matching for every (snapshot, variant) with ok results of repetition `run`."""
-    languages = _languages(exp_dir)
-    runs, commits = _load_runs(exp_dir, run)
-    if not runs:
-        _err(f"no ok results for run{run} in {exp_dir}")
-    out = []
-    for (repo_dir, variant), cboms in sorted(runs.items()):
-        language = languages.get(tbl.full_name(repo_dir))
-        site_list: list[Site] = []
-        extraction = {}
-        for tool, cbom in sorted(cboms.items()):
-            s, st = extract_sites(cbom, tool, language=language, asset_types=None if all_assets else ("algorithm",))
-            site_list += s
-            extraction[tool] = st
-        clusters = cluster_sites(site_list, window=window, match_unknown=match_unknown)
-        summary = summarize_clusters(clusters, sorted(cboms))
-        out.append(
-            MatchedSnapshot(
-                repo_dir=repo_dir,
-                variant=variant,
-                language=language,
-                commit=commits.get(repo_dir),
-                tools=sorted(cboms),
-                sites=site_list,
-                extraction=extraction,
-                clusters=clusters,
-                summary=summary,
-            )
-        )
-    return out
-
-
-@analysis_app.command("sites")
-def sites(
-    name: str = EXP_ARG,
-    run: int = RUN_OPT,
-    window: int = WINDOW_OPT,
-    match_unknown: bool = MATCH_UNKNOWN_OPT,
-    all_assets: bool = ALL_ASSETS_OPT,
-):
-    """Call-site matching across tools: clusters per (repo, variant), k distribution, per-tool agreement."""
-    exp_dir = _experiment(name)
-    matched = _match_experiment(exp_dir, run, window=window, match_unknown=match_unknown, all_assets=all_assets)
-    out_dir = analysis_dir(exp_dir)
-    out_dir.mkdir(exist_ok=True)
-    all_clusters = []
-    report: dict[str, dict] = {}
-    for m in matched:
-        full_name = tbl.full_name(m.repo_dir)
-        target = out_dir / m.repo_dir / m.variant
-        target.mkdir(parents=True, exist_ok=True)
-        with (target / "clusters.jsonl").open("w", encoding="utf-8") as fh:
-            for c in m.clusters:
-                fh.write(json.dumps(c.to_dict(), ensure_ascii=False) + "\n")
-        report[f"{full_name}@{m.variant}"] = {
-            "extraction": {t: st.to_dict() for t, st in m.extraction.items()},
-            "agreement": m.summary.to_dict(),
-        }
-        all_clusters += m.clusters
-        k_dist = m.summary.to_dict()["k_distribution"]
-        typer.echo(f"{full_name}@{m.variant}: {len(m.sites)} sites -> {len(m.clusters)} clusters, k={k_dist}")
-        for t, a in m.summary.per_tool.items():
-            typer.echo(
-                f"    {t:<15} sites={a.sites:<5} clusters={a.clusters:<5} "
-                f"confirmed={a.confirmed:<5} solo={a.solo:<5} ({a.confirmed_share:.0%})"
-            )
-    overall = summarize_clusters(all_clusters)
-    (out_dir / f"sites-run{run}.json").write_text(
-        json.dumps(
-            {
-                "run": run,
-                "window": window,
-                "match_unknown": match_unknown,
-                "per_repo": report,
-                "overall": overall.to_dict(),
-            },
-            indent=2,
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    typer.echo(f"overall k distribution: {overall.to_dict()['k_distribution']}  (written to {out_dir})")
 
 
 def _micro_entries(
@@ -219,14 +134,19 @@ def _micro_entries(
     spec = _spec(exp_dir)
     tools = list(spec.get("tools") or [])
     projects = {p.name: p for r in spec.get("repos") or [] if (p := project_for_repo(r["full_name"], truth))}
+    repo_of = {
+        p.name: r["full_name"] for r in spec.get("repos") or [] if (p := project_for_repo(r["full_name"], truth))
+    }
     statuses: dict[tuple[str, str], str] = {}
     for meta, cbom_path in iter_results(exp_dir):
-        project = project_for_repo(tbl.full_name(cbom_path.parents[2].name), truth)
+        repo = tbl.full_name(cbom_path.parents[2].name)
+        project = project_for_repo(repo, truth)
         if project is None or cbom_path.name != f"run{run}.json" or cbom_path.parents[1].name != "original":
             continue
         tool = meta.get("worker") or cbom_path.parent.name
         statuses[(project.name, tool)] = meta.get("status") or "?"
         projects.setdefault(project.name, project)
+        repo_of.setdefault(project.name, repo)
         if tool not in tools:
             tools.append(tool)
     if not projects:
@@ -238,8 +158,15 @@ def _micro_entries(
         if project is None or cbom_path.name != f"run{run}.json" or cbom_path.parents[1].name != "original":
             continue
         scores[(project.name, n.tool)] = score_records(n.records, project, n.tool, asset_types=kinds)
+    tailored = tailored_map()
     return [
-        tbl.MicroEntry(projects[p], t, statuses.get((p, t), "missing"), scores.get((p, t)))
+        tbl.MicroEntry(
+            projects[p],
+            t,
+            statuses.get((p, t), "missing"),
+            scores.get((p, t)),
+            tailored=_is_tailored(tailored, t, repo_of[p]),
+        )
         for p in sorted(projects)
         for t in sorted(tools)
     ]
@@ -279,9 +206,21 @@ def norm_path(cbom_path: Path) -> Path:
     return cbom_path.with_name(cbom_path.name[: -len(".json")] + ".norm.json")
 
 
-def _normalize_runs(exp_dir: Path, *, run: int | None = None):
+def _store(exp_dir: Path, *, fetch: bool = False) -> SnapshotStore:
+    """The snapshot files behind the experiment: the git mirror on the VM, or the local cache (`--fetch` fills it
+    from lock.json's source URLs)."""
+    store = SnapshotStore()
+    if fetch:
+        for name, entry in sorted(load_lock(exp_dir).items()):
+            if entry.get("commit") and entry.get("source_url"):
+                store.fetch(name, entry["source_url"], entry["commit"], log=lambda m: typer.echo(m, err=True))
+    return store
+
+
+def _normalize_runs(exp_dir: Path, *, run: int | None = None, store: SnapshotStore | None = None):
     """Yield (meta, cbom path, NormalizedCbom) for every stored ok CBOM (all repetitions, or only `run`)."""
     languages = _languages(exp_dir)
+    store = store or SnapshotStore()
     files_cache: dict[tuple[str, str | None], frozenset[str] | None] = {}
     for meta, cbom_path in iter_results(exp_dir):
         if meta.get("status") != "ok" or not cbom_path.exists():
@@ -298,7 +237,7 @@ def _normalize_runs(exp_dir: Path, *, run: int | None = None):
         full = tbl.full_name(repo_dir)
         commit = meta.get("variant_commit") or meta.get("base_commit")
         if (full, commit) not in files_cache:
-            files_cache[(full, commit)] = snapshot_files(full, commit)
+            files_cache[(full, commit)] = store.files(full, commit)
         tool = meta.get("worker") or cbom_path.parent.name
         source = {
             "file": cbom_path.name,
@@ -331,13 +270,15 @@ def _writer(out_dir: Path, counts: dict[str, int]) -> Writer:
     return write
 
 
-def _normalize_step(exp_dir: Path, write: Writer) -> tuple[Report, list[Normalized]]:
+def _normalize_step(
+    exp_dir: Path, write: Writer, *, store: SnapshotStore | None = None
+) -> tuple[Report, list[Normalized]]:
     """Normalise every stored ok CBOM (all repetitions): run<k>.norm.json next to each, normalize.json, vocab.csv,
     coverage.csv and conformance.csv. Returns the report and the normalised CBOMs."""
     report = Report()
     done: list[Normalized] = []
     fallback: set[str] = set()
-    for meta, cbom_path, n in _normalize_runs(exp_dir):
+    for meta, cbom_path, n in _normalize_runs(exp_dir, store=store):
         _write_json(norm_path(cbom_path), n.to_dict())
         report.add(n)
         done.append((meta, cbom_path, n))
@@ -356,20 +297,77 @@ def _normalize_step(exp_dir: Path, write: Writer) -> tuple[Report, list[Normaliz
     return report, done
 
 
-def _levels_step(exp_dir: Path, run: int, normalized: list[Normalized], write: Writer) -> list[lv.LevelRow]:
-    """The L0-L4 ladder (levels-run<k>.csv) and which algorithms each tool reports (algorithms-run<k>.csv)."""
+def _schema_step(exp_dir: Path, run: int, normalized: list[Normalized], write: Writer, *, store: SnapshotStore):
+    """RQ1 (analysis/schema.py): schema-run<k>.csv (whole-document validation), meaningful-run<k>.csv and
+    traceability-run<k>.csv (needs the snapshot files: the mirror on the VM or `--fetch`)."""
+    languages = _languages(exp_dir)
+    native = {t: info.get("native_cyclonedx") for t, info in load_tools().items()}
+    schema_rows = []
+    for meta, cbom_path, _ in normalized:
+        try:
+            cbom = json.loads(cbom_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue
+        language = languages.get(tbl.full_name(cbom_path.parents[2].name))
+        tool = meta.get("worker") or cbom_path.parent.name
+        schema_rows.append(sch.schema_row(meta, cbom_path, cbom, language=language, native=native.get(tool)))
+    write(f"schema-run{run}.csv", schema_rows, sch.SCHEMA_COLUMNS)
+    write(f"meaningful-run{run}.csv", sch.meaningful_rows(normalized, native), sch.MEANINGFUL_COLUMNS)
+    trace = sch.traceability_rows(normalized, store, languages=languages)
+    write(f"traceability-run{run}.csv", trace, sch.TRACE_COLUMNS)
+    if trace and not any(r.get("source") for r in trace):
+        typer.secho(
+            "traceability: no snapshot files (no git mirror here; `--fetch` fills the snapshot cache)",
+            fg=typer.colors.YELLOW,
+            err=True,
+        )
+
+
+@analysis_app.command("schema")
+def schema_cmd(name: str = EXP_ARG, run: int = RUN_OPT, fetch: bool = FETCH_OPT):
+    """RQ1: validate every CBOM of repetition `run` against the CycloneDX schema it declares, measure how many assets
+    are meaningful (parameters in standard fields vs anywhere) and traceable (file exists at the commit, line in
+    range, vocabulary token nearby). See analysis/schema.py."""
+    exp_dir = _experiment(name)
+    store = _store(exp_dir, fetch=fetch)
+    counts: dict[str, int] = {}
+    normalized = list(_normalize_runs(exp_dir, run=run, store=store))
+    if not normalized:
+        _err(f"no ok results for run{run} in {exp_dir}")
+    _schema_step(exp_dir, run, normalized, _writer(analysis_dir(exp_dir), counts), store=store)
+
+
+def _levels_step(
+    exp_dir: Path,
+    run: int,
+    normalized: list[Normalized],
+    write: Writer,
+    *,
+    merge_llm: bool = False,
+    include_tailored: bool = False,
+    closure: bool = False,
+) -> list[lv.LevelRow]:
+    """The L0-L4 ladder (levels-run<k>.csv) and which algorithms each tool reports (algorithms-run<k>.csv).
+    (tool, repo) pairs the tool was tuned on (refinement 13) are marked in algorithms-run<k>.csv and left out of
+    the ladder unless `include_tailored`; `closure` adds the implied algorithms (refinement 2)."""
     ladder_in: dict[tuple[str, str], list] = {}
     presence_in: dict[tuple[str, str, str], list] = {}
+    tailored = tailored_map()
+    excluded: set[tuple[str, str]] = set()
     for _, cbom_path, n in normalized:
         snapshot, variant = cbom_path.parents[2].name, cbom_path.parents[1].name
         ladder_in[(f"{snapshot}/{variant}", n.tool)] = n.records
         presence_in[(snapshot, variant, n.tool)] = n.records
+        if _is_tailored(tailored, n.tool, tbl.full_name(snapshot)):
+            excluded.add((f"{snapshot}/{variant}", n.tool))
     if not ladder_in:
         _err(f"no ok results for run{run} in {exp_dir}")
-    voter_of = _voter_of()
-    rows = lv.ladder(ladder_in, voter_of)
+    voter_of = _voter_of(merge_llm)
+    rows = lv.ladder(ladder_in, voter_of, exclude=set() if include_tailored else excluded, closure=closure)
     write(f"levels-run{run}.csv", [r.to_dict() for r in rows], lv.LEVEL_COLUMNS)
-    algorithms = lv.algorithm_rows(presence_in, voter_of, run=run, languages=_languages(exp_dir))
+    algorithms = lv.algorithm_rows(
+        presence_in, voter_of, run=run, languages=_languages(exp_dir), tailored=tailored, closure=closure
+    )
     write(f"algorithms-run{run}.csv", algorithms, lv.ALGORITHM_COLUMNS)
     return rows
 
@@ -381,41 +379,198 @@ def _tables_step(
     write: Writer,
     *,
     window: int,
-    match_unknown: bool,
+    level: str = "L3",
+    closure: bool = False,
+    merge_llm: bool = False,
+    raqun: bool | None = None,
     all_assets: bool,
 ) -> None:
-    """runs.csv, the normalised records, the legacy call-site tables and the micro tables (if any)."""
+    """runs.csv, the normalised records, the exact matcher's groups/members/agreement, RaQuN's groups and the matcher
+    comparison when available, and the micro tables (if any). Returns the exact groups per (snapshot, variant)."""
     languages = _languages(exp_dir)
-    write("runs.csv", tbl.run_rows(exp_dir, languages), tbl.RUNS_COLUMNS)
-    site_rows: list[dict] = []
-    group_rows: list[dict] = []
-    member_rows: list[dict] = []
-    for m in _match_experiment(exp_dir, run, window=window, match_unknown=match_unknown, all_assets=all_assets):
-        key = {"snapshot": m.repo_dir, "variant": m.variant, "run": run, "commit": m.commit}
-        site_rows += tbl.site_rows(m.sites, language=m.language, **key)
-        g, mem = tbl.group_rows("callsite", tbl.callsite_groups(m.clusters), **key)
-        group_rows += g
-        member_rows += mem
-    write(f"sites-run{run}.csv", site_rows, tbl.SITES_COLUMNS)
+    write("runs.csv", tbl.run_rows(exp_dir, languages, tailored=tailored_map()), tbl.RUNS_COLUMNS)
+    voter_of = _voter_of(merge_llm)
+    matcher = ExactMatcher(level=level, window=window, closure=closure, voter_of=voter_of)
     norm_rows: list[dict] = []
+    per_snapshot: dict[tuple[str, str], list] = defaultdict(list)
+    commits: dict[str, str | None] = {}
     for meta, cbom_path, n in normalized:
+        snapshot, variant = cbom_path.parents[2].name, cbom_path.parents[1].name
+        commits.setdefault(snapshot, meta.get("base_commit"))
+        per_snapshot[(snapshot, variant)] += n.records
         norm_rows += tbl.record_rows(
             n.records,
-            snapshot=cbom_path.parents[2].name,
-            variant=cbom_path.parents[1].name,
+            snapshot=snapshot,
+            variant=variant,
             run=run,
             commit=meta.get("base_commit"),
-            language=languages.get(tbl.full_name(cbom_path.parents[2].name)),
+            language=languages.get(tbl.full_name(snapshot)),
         )
     write(f"records-run{run}.csv", norm_rows, tbl.RECORDS_COLUMNS)
-    write(f"groups-callsite-run{run}.csv", group_rows, tbl.CALLSITE_GROUP_COLUMNS)
-    write(f"members-callsite-run{run}.csv", member_rows, tbl.MEMBERS_COLUMNS)
+    group_rows: list[dict] = []
+    member_rows: list[dict] = []
+    agreement_rows: list[dict] = []
+    groups_by_snapshot: dict[tuple[str, str], list] = {}
+    for (snapshot, variant), records in sorted(per_snapshot.items()):
+        groups_by_snapshot[(snapshot, variant)] = matcher.match(records)
+        g, m, a = tbl.group_rows(
+            matcher.name,
+            groups_by_snapshot[(snapshot, variant)],
+            snapshot=snapshot,
+            variant=variant,
+            run=run,
+            commit=commits.get(snapshot),
+            language=languages.get(tbl.full_name(snapshot)),
+            voter_of=voter_of,
+        )
+        group_rows += g
+        member_rows += m
+        agreement_rows += a
+    write(f"groups-exact-run{run}.csv", group_rows, tbl.GROUP_COLUMNS)
+    write(f"members-exact-run{run}.csv", member_rows, tbl.MEMBERS_COLUMNS)
+    write(f"agreement-exact-run{run}.csv", agreement_rows, tbl.AGREEMENT_COLUMNS)
+    if raqun is None:
+        raqun = rq.available()
+    if raqun and not rq.available():
+        typer.secho("RaQuN not importable (install the `raqun` extra and the PyQuN package); skipped", fg="yellow")
+    elif raqun:
+        _raqun_step(
+            run,
+            per_snapshot,
+            groups_by_snapshot,
+            write,
+            level=level,
+            voter_of=voter_of,
+            commits=commits,
+            languages=languages,
+        )
     entries = _micro_entries(exp_dir, run, all_assets, normalized)
     if entries:
         write(f"micro-run{run}.csv", tbl.micro_rows(entries, run=run), tbl.MICRO_COLUMNS)
         write(f"micro-assets-run{run}.csv", tbl.micro_asset_rows(entries, run=run), tbl.MICRO_ASSET_COLUMNS)
     else:
         typer.echo("no micro projects in this experiment: micro tables skipped")
+    return groups_by_snapshot
+
+
+def _raqun_step(run, per_snapshot, exact_groups, write: Writer, *, level, voter_of, commits, languages) -> None:
+    """groups/members/agreement-raqun-run<k>.csv and matchers-run<k>.csv (RaQuN vs the exact matcher)."""
+    matcher = rq.RaqunMatcher(level=level, voter_of=voter_of)
+    g_rows: list[dict] = []
+    m_rows: list[dict] = []
+    a_rows: list[dict] = []
+    cmp_rows: list[dict] = []
+    for (snapshot, variant), records in sorted(per_snapshot.items()):
+        groups = matcher.match(records)
+        g, m, a = tbl.group_rows(
+            matcher.name,
+            groups,
+            snapshot=snapshot,
+            variant=variant,
+            run=run,
+            commit=commits.get(snapshot),
+            language=languages.get(tbl.full_name(snapshot)),
+            voter_of=voter_of,
+        )
+        g_rows += g
+        m_rows += m
+        a_rows += a
+        row = compare(exact_groups.get((snapshot, variant), []), groups, "exact", "raqun")
+        cmp_rows.append({"repo": tbl.full_name(snapshot), "snapshot": snapshot, "variant": variant, "run": run, **row})
+    write(f"groups-raqun-run{run}.csv", g_rows, tbl.GROUP_COLUMNS)
+    write(f"members-raqun-run{run}.csv", m_rows, tbl.MEMBERS_COLUMNS)
+    write(f"agreement-raqun-run{run}.csv", a_rows, tbl.AGREEMENT_COLUMNS)
+    write(f"matchers-run{run}.csv", cmp_rows, MATCHERS_COLUMNS)
+
+
+def _stability_step(all_runs: list[Normalized], write: Writer, *, level: str) -> dict[tuple[str, str, str], set[str]]:
+    """stability.csv over every repetition (analysis/stability.py); returns the consensus sets of repeated runs."""
+    runs: dict[tuple[str, str, str], dict[int, list]] = defaultdict(dict)
+    for meta, cbom_path, n in all_runs:
+        snapshot, variant = cbom_path.parents[2].name, cbom_path.parents[1].name
+        runs[(snapshot, variant, n.tool)][int(meta.get("run_index") or 1)] = n.records
+    rows, consensus = stability_rows(runs, level=level, repo_of=tbl.full_name)
+    write("stability.csv", rows, STABILITY_COLUMNS)
+    return consensus
+
+
+def _score_step(
+    exp_dir: Path,
+    run: int,
+    normalized: list[Normalized],
+    groups_by_snapshot: dict[tuple[str, str], list],
+    write: Writer,
+    *,
+    level: str,
+    merge_llm: bool,
+    include_tailored: bool,
+    samples: int,
+    consensus: dict[tuple[str, str, str], set[str]] | None = None,
+) -> None:
+    """score-run<k>.csv and loo-run<k>.csv (analysis/score.py) from the exact matcher's groups."""
+    voter_of = _voter_of(merge_llm)
+    tools_ran: dict[str, set[str]] = defaultdict(set)
+    repo_of: dict[str, str] = {}
+    for _, cbom_path, n in normalized:
+        snapshot, variant = cbom_path.parents[2].name, cbom_path.parents[1].name
+        tools_ran[f"{snapshot}/{variant}"].add(n.tool)
+        repo_of[f"{snapshot}/{variant}"] = tbl.full_name(snapshot)
+    groups = {f"{s}/{v}": g for (s, v), g in groups_by_snapshot.items()}
+    obs = sc.observe(
+        groups,
+        level=level,
+        voter_of=voter_of,
+        tools_ran=tools_ran,
+        tailored=None if include_tailored else tailored_map(),
+        repo_of=repo_of,
+    )
+    for (snapshot, variant, tool), keys in (consensus or {}).items():
+        if (f"{snapshot}/{variant}", tool) in obs.items:
+            obs.items[(f"{snapshot}/{variant}", tool)]["algorithm"] = set(keys)
+    rows, loo = sc.score_rows(obs, samples=samples)
+    write(f"score-run{run}.csv", rows, sc.SCORE_COLUMNS)
+    write(f"loo-run{run}.csv", loo, sc.LOO_COLUMNS)
+
+
+@analysis_app.command("score")
+def score_cmd(
+    name: str = EXP_ARG,
+    run: int = RUN_OPT,
+    level: str = LEVEL_OPT,
+    window: int = WINDOW_OPT,
+    closure: bool = CLOSURE_OPT,
+    merge_llm: bool = MERGE_LLM_OPT,
+    include_tailored: bool = INCLUDE_TAILORED_OPT,
+    samples: int = SAMPLES_OPT,
+    consensus: bool = CONSENSUS_OPT,
+):
+    """RQ4: score and rank the tools without ground truth (confirmation rate, exclusivity, Dawid-Skene support,
+    leave-one-voter-out, bootstrap CIs) on the exact matcher's groups; stability.csv over repeated runs."""
+    exp_dir = _experiment(name)
+    counts: dict[str, int] = {}
+    write = _writer(analysis_dir(exp_dir), counts)
+    all_runs = list(_normalize_runs(exp_dir))
+    normalized = [x for x in all_runs if x[1].name == f"run{run}.json"]
+    if not normalized:
+        _err(f"no ok results for run{run} in {exp_dir}")
+    matcher = ExactMatcher(level=level, window=window, closure=closure, voter_of=_voter_of(merge_llm))
+    per_snapshot: dict[tuple[str, str], list] = defaultdict(list)
+    for _, cbom_path, n in normalized:
+        per_snapshot[(cbom_path.parents[2].name, cbom_path.parents[1].name)] += n.records
+    groups = {key: matcher.match(records) for key, records in sorted(per_snapshot.items())}
+    sets = _stability_step(all_runs, write, level=level)
+    _score_step(
+        exp_dir,
+        run,
+        normalized,
+        groups,
+        write,
+        level=level,
+        merge_llm=merge_llm,
+        include_tailored=include_tailored,
+        samples=samples,
+        consensus=sets if consensus else None,
+    )
 
 
 def _write_info(out_dir: Path, run: int, settings: dict, counts: dict[str, int], normalized: list[Normalized]):
@@ -450,13 +605,27 @@ def normalize(name: str = EXP_ARG):
 
 
 @analysis_app.command("levels")
-def levels(name: str = EXP_ARG, run: int = RUN_OPT):
+def levels(
+    name: str = EXP_ARG,
+    run: int = RUN_OPT,
+    merge_llm: bool = MERGE_LLM_OPT,
+    include_tailored: bool = INCLUDE_TAILORED_OPT,
+    closure: bool = CLOSURE_OPT,
+):
     """How much agreement normalisation creates: share of each tool's algorithms (per repository) that another
     voter group also reports, at levels L0 (raw names) to L4 (full adapter specs). See analysis/levels.py.
     Also writes algorithms-run<k>.csv: which algorithms each tool reports per repository and level."""
     exp_dir = _experiment(name)
     counts: dict[str, int] = {}
-    rows = _levels_step(exp_dir, run, list(_normalize_runs(exp_dir, run=run)), _writer(analysis_dir(exp_dir), counts))
+    rows = _levels_step(
+        exp_dir,
+        run,
+        list(_normalize_runs(exp_dir, run=run)),
+        _writer(analysis_dir(exp_dir), counts),
+        merge_llm=merge_llm,
+        include_tailored=include_tailored,
+        closure=closure,
+    )
     for level in lv.LEVELS:
         typer.echo(f"  {level}: {lv.LEVEL_NAMES[level]}")
     typer.echo("share of a tool's algorithms (per repository) that another voter group also reports:")
@@ -469,34 +638,103 @@ def tables(
     name: str = EXP_ARG,
     run: int = RUN_OPT,
     window: int = WINDOW_OPT,
-    match_unknown: bool = MATCH_UNKNOWN_OPT,
+    level: str = LEVEL_OPT,
+    closure: bool = CLOSURE_OPT,
+    merge_llm: bool = MERGE_LLM_OPT,
+    raqun: bool | None = RAQUN_OPT,
     all_assets: bool = ALL_ASSETS_OPT,
 ):
-    """Flat CSV tables for pandas/R: runs, call sites and normalised records, call-site groups + members, micro."""
+    """Flat CSV tables for pandas/R: runs, normalised records, the exact matcher's groups, members and agreement
+    (and RaQuN's, with the comparison), micro."""
     exp_dir = _experiment(name)
     out_dir = analysis_dir(exp_dir)
     counts: dict[str, int] = {}
     normalized = list(_normalize_runs(exp_dir, run=run))
-    settings = {"run": run, "window": window, "match_unknown": match_unknown, "all_assets": all_assets}
+    settings = {"run": run, "window": window, "level": level, "closure": closure, "all_assets": all_assets}
     write = _writer(out_dir, counts)
-    _tables_step(exp_dir, run, normalized, write, window=window, match_unknown=match_unknown, all_assets=all_assets)
+    _tables_step(
+        exp_dir,
+        run,
+        normalized,
+        write,
+        window=window,
+        level=level,
+        closure=closure,
+        merge_llm=merge_llm,
+        raqun=raqun,
+        all_assets=all_assets,
+    )
     _write_info(out_dir, run, settings, counts, normalized)
     typer.echo(f"written to {out_dir}")
 
 
 def run_report(
-    exp_dir: Path, *, run: int = 1, window: int = 2, match_unknown: bool = False, all_assets: bool = False
+    exp_dir: Path,
+    *,
+    run: int = 1,
+    window: int = 2,
+    level: str = "L3",
+    all_assets: bool = False,
+    merge_llm: bool = False,
+    include_tailored: bool = False,
+    closure: bool = False,
+    fetch: bool = False,
+    samples: int = 200,
+    consensus: bool = True,
+    raqun: bool | None = None,
 ) -> Path:
-    """`normalize`, `levels` and `tables` in one pass (every CBOM normalised once), then _SUMMARY.md."""
-    _migrate(exp_dir)
+    """`normalize`, `schema`, `levels`, `tables` and `score` in one pass (every CBOM normalised once), then
+    _SUMMARY.md.
+    `_ANALYSIS/` holds regenerated output only, so it is emptied first: no stale file from an earlier version."""
     out_dir = analysis_dir(exp_dir)
+    shutil.rmtree(out_dir, ignore_errors=True)
     counts: dict[str, int] = {}
     write = _writer(out_dir, counts)
-    _, done = _normalize_step(exp_dir, write)
+    store = _store(exp_dir, fetch=fetch)
+    _, done = _normalize_step(exp_dir, write, store=store)
     normalized = [x for x in done if x[1].name == f"run{run}.json"]
-    _levels_step(exp_dir, run, normalized, write)
-    _tables_step(exp_dir, run, normalized, write, window=window, match_unknown=match_unknown, all_assets=all_assets)
-    settings = {"run": run, "window": window, "match_unknown": match_unknown, "all_assets": all_assets}
+    _schema_step(exp_dir, run, normalized, write, store=store)
+    _levels_step(
+        exp_dir, run, normalized, write, merge_llm=merge_llm, include_tailored=include_tailored, closure=closure
+    )
+    groups = _tables_step(
+        exp_dir,
+        run,
+        normalized,
+        write,
+        window=window,
+        level=level,
+        closure=closure,
+        merge_llm=merge_llm,
+        raqun=raqun,
+        all_assets=all_assets,
+    )
+    sets = _stability_step(done, write, level=level)
+    _score_step(
+        exp_dir,
+        run,
+        normalized,
+        groups,
+        write,
+        level=level,
+        merge_llm=merge_llm,
+        include_tailored=include_tailored,
+        samples=samples,
+        consensus=sets if consensus else None,
+    )
+    settings = {
+        "run": run,
+        "window": window,
+        "level": level,
+        "samples": samples,
+        "consensus": consensus,
+        "raqun": rq.available() if raqun is None else raqun,
+        "all_assets": all_assets,
+        "merge_llm": merge_llm,
+        "include_tailored": include_tailored,
+        "closure": closure,
+        "fetch": fetch,
+    }
     _write_info(out_dir, run, settings, counts, normalized)
     return sm.write(out_dir, run=run)
 
@@ -506,11 +744,32 @@ def report(
     name: str = EXP_ARG,
     run: int = RUN_OPT,
     window: int = WINDOW_OPT,
-    match_unknown: bool = MATCH_UNKNOWN_OPT,
+    level: str = LEVEL_OPT,
     all_assets: bool = ALL_ASSETS_OPT,
+    merge_llm: bool = MERGE_LLM_OPT,
+    include_tailored: bool = INCLUDE_TAILORED_OPT,
+    closure: bool = CLOSURE_OPT,
+    fetch: bool = FETCH_OPT,
+    samples: int = SAMPLES_OPT,
+    consensus: bool = CONSENSUS_OPT,
+    raqun: bool | None = RAQUN_OPT,
 ):
-    """Everything in one pass: normalised CBOMs, every CSV table (runs, records, micro at two levels, algorithms per
-    tool and level, ladder, coverage, conformance, legacy call sites) and _ANALYSIS/_SUMMARY.md with Markdown tables."""
+    """Everything in one pass: normalised CBOMs, every CSV table (runs, records, RQ1 schema/meaningful/traceability,
+    the exact matcher's groups/members/agreement, scores and leave-one-out, stability, micro at two levels,
+    algorithms per tool and level, ladder, coverage, conformance) and _ANALYSIS/_SUMMARY.md with Markdown tables."""
     exp_dir = _experiment(name)
-    path = run_report(exp_dir, run=run, window=window, match_unknown=match_unknown, all_assets=all_assets)
+    path = run_report(
+        exp_dir,
+        run=run,
+        window=window,
+        level=level,
+        all_assets=all_assets,
+        merge_llm=merge_llm,
+        include_tailored=include_tailored,
+        closure=closure,
+        fetch=fetch,
+        samples=samples,
+        consensus=consensus,
+        raqun=raqun,
+    )
     typer.echo(f"written to {path.parent} (summary: {path.name})")

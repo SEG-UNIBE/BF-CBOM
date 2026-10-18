@@ -24,6 +24,12 @@ COPY misc/pyqun/requirements.txt /tmp/requirements.txt
 RUN --mount=type=cache,target=/root/.cache/pip \
     python3 -m pip install --timeout 120 -r /tmp/requirements.txt
 
+# The embedding model, baked in at a pinned Hugging Face revision (bump deliberately); every start is then offline
+ARG MINILM_REVISION=1110a243fdf4706b3f48f1d95db1a4f5529b4d41
+RUN python3 -c "from sentence_transformers import SentenceTransformer; \
+    SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2', revision='${MINILM_REVISION}')"
+ENV MINILM_REVISION=${MINILM_REVISION} HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
+
 # our code last: editing it never invalidates the torch layer above
 COPY common/ ./common/
 COPY misc/pyqun/main.py /opt/RaQuN_Lab/main.py
@@ -32,3 +38,7 @@ COPY misc/pyqun/Stopwatch.py /opt/RaQuN_Lab/utils/Stopwatch.py
 
 CMD ["python", "main.py"]
 # ENTRYPOINT ["tini","-g","--","uv","run","--no-dev","workers/skeleton/main.py"]
+
+# BF-CBOM commit this image was built from (compose/bake pass it; last, so it never invalidates the layers above)
+ARG BF_CBOM_COMMIT=unknown
+ENV BF_CBOM_COMMIT=${BF_CBOM_COMMIT}

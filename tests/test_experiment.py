@@ -57,6 +57,20 @@ def test_spec_parsing_and_corpus_merge(tmp_path: Path):
     assert spec.expected_jobs == (1 + 2) * 1 * 2
 
 
+def test_branch_is_always_a_string():
+    # YAML parses an unquoted `branch: 1.8` as a float; the spec keeps the text, a quoted "1.10" stays "1.10"
+    data = {
+        "name": "e",
+        "tools": ["x"],
+        "repos": [{"full_name": "a/b", "branch": 1.8}, {"full_name": "c/d", "branch": "1.10"}],
+    }
+    assert [r.branch for r in ex.spec_from_dict(data).repos] == ["1.8", "1.10"]
+    assert (
+        ex.spec_from_dict({"name": "e", "tools": ["x"], "repos": [{"full_name": "a/b", "branch": ""}]}).repos[0].branch
+        is None
+    )
+
+
 @pytest.mark.parametrize(
     "data",
     [
@@ -184,10 +198,12 @@ def test_mirror_lock_plan_and_write(upstream, tmp_path: Path):
         image_ref="bf-cbom/worker-t1:1",
         run_index=1,
     )
+    jobs[0].enqueued_at = "2026-10-18T09:58:00Z"
     cbom_path = ex.write_result(exp_dir, jobs[0], res)
     assert json.loads(cbom_path.read_text()) == {"components": [{"name": "AES"}]}
     meta = json.loads(cbom_path.with_name("run1.meta.json").read_text())
     assert meta["tool_version"] == "t1 9.9" and meta["variant"] == "original" and "json" not in meta
+    assert meta["enqueued_at"] == "2026-10-18T09:58:00Z"
 
     jobs2, skipped2 = ex.plan_jobs(spec, snaps, exp_dir, new_id=lambda: next(ids))
     assert (len(jobs2), skipped2) == (7, 1)  # resumable

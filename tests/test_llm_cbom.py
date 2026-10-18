@@ -34,7 +34,9 @@ class FakeProvider:
 
     def complete(self, system, user):
         self.calls.append(user)
-        return self.answers.pop(0), {"prompt_tokens": 100, "completion_tokens": 10}
+        return self.answers.pop(0), llm.request_usage(
+            model="fake-1-2026", input_tokens=100, output_tokens=10, cached_input_tokens=40
+        )
 
 
 def test_select_files_filters_and_orders(repo: Path):
@@ -120,9 +122,20 @@ def test_generate_cbom_assembles_cyclonedx_and_verifies_locations(repo: Path):
     tls = cbom["components"][3]
     assert {"name": "bf-cbom:location-missing", "value": "true"} in tls["properties"] and "evidence" not in tls
     assert (stats.locations_verified, stats.locations_unverified) == (2, 2)
-    assert (stats.prompt_tokens, stats.completion_tokens, stats.chunks_sent) == (100, 10, 1)
+    assert (stats.input_tokens, stats.cached_input_tokens, stats.output_tokens, stats.chunks_sent) == (100, 40, 10, 1)
+    assert stats.usage() == {
+        "requests": 1,
+        "requests_failed": 0,
+        "input_tokens": 100,
+        "cached_input_tokens": 40,
+        "cache_write_tokens": 0,
+        "output_tokens": 10,
+        "reasoning_tokens": 0,
+        "models": {"fake-1-2026": 1},
+    }
     props = {p["name"]: p["value"] for p in cbom["metadata"]["properties"]}
-    assert props["bf-cbom:llm-model"] == "fake-1" and props["bf-cbom:prompt-tokens"] == "100"
+    assert props["bf-cbom:llm-model"] == "fake-1" and props["bf-cbom:input-tokens"] == "100"
+    assert props["bf-cbom:models-answered"] == "fake-1-2026" and props["bf-cbom:cached-input-tokens"] == "40"
     assert cbom["metadata"]["component"]["version"] == "a" * 12
 
 
@@ -150,7 +163,7 @@ class FailingProvider:
         self.n += 1
         if self.fail_first is None or self.n <= self.fail_first:
             raise RuntimeError("anthropic api 400: temperature is not supported")
-        return '{"assets": []}', {"prompt_tokens": 1, "completion_tokens": 1}
+        return '{"assets": []}', llm.request_usage(model="fake-1", input_tokens=1, output_tokens=1)
 
 
 def test_generate_cbom_fails_when_every_request_fails(repo: Path):
@@ -206,12 +219,28 @@ def test_anthropic_provider_request_and_usage():
         calls.append((url, headers, json, timeout))
         return _Resp(
             200,
-            {"content": [{"type": "text", "text": '{"assets": []}'}], "usage": {"input_tokens": 7, "output_tokens": 3}},
+            {
+                "model": "claude-sonnet-5-5-20261001",
+                "content": [{"type": "text", "text": '{"assets": []}'}],
+                "usage": {
+                    "input_tokens": 7,
+                    "output_tokens": 3,
+                    "cache_read_input_tokens": 20,
+                    "cache_creation_input_tokens": 5,
+                },
+            },
         )
 
     p = llm.AnthropicProvider(name="claude", model="claude-sonnet-5-5", api_key="k", timeout=9, post=fake_post)
     text, usage = p.complete("SYS", "USER")
-    assert text == '{"assets": []}' and usage == {"prompt_tokens": 7, "completion_tokens": 3}
+    assert text == '{"assets": []}' and usage == {
+        "model": "claude-sonnet-5-5-20261001",
+        "input_tokens": 32,  # Anthropic's input_tokens exclude the cached parts; we report the total sent
+        "cached_input_tokens": 20,
+        "cache_write_tokens": 5,
+        "output_tokens": 3,
+        "reasoning_tokens": 0,
+    }
     url, headers, body, timeout = calls[0]
     assert url.endswith("/v1/messages") and headers["x-api-key"] == "k" and timeout == 9
     assert body["model"] == "claude-sonnet-5-5" and body["messages"][0]["content"] == "USER"
@@ -243,10 +272,19 @@ def test_openai_provider_temperature_and_max_tokens_param():
             class _Choice:
                 message = _Msg()
 
+            class _PromptDetails:
+                cached_tokens = 4
+
+            class _CompletionDetails:
+                reasoning_tokens = 1
+
             class _Usage:
                 prompt_tokens, completion_tokens = 5, 2
+                prompt_tokens_details = _PromptDetails()
+                completion_tokens_details = _CompletionDetails()
 
             class _R:
+                model = "gpt-5-2026-01-01"
                 choices = [_Choice()]
                 usage = _Usage()
 
@@ -278,7 +316,14 @@ def test_openai_provider_temperature_and_max_tokens_param():
     ).complete("S", "U")
     kw = comp.kwargs[-1]
     assert kw["temperature"] == 0.0 and kw["max_tokens"] == llm.LLM_MAX_OUTPUT_TOKENS
-    assert text == '{"assets": []}' and usage == {"prompt_tokens": 5, "completion_tokens": 2}
+    assert text == '{"assets": []}' and usage == {
+        "model": "gpt-5-2026-01-01",
+        "input_tokens": 5,
+        "cached_input_tokens": 4,
+        "cache_write_tokens": 0,
+        "output_tokens": 2,
+        "reasoning_tokens": 1,
+    }
 
 
 def test_temperature_from_env(monkeypatch):

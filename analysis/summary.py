@@ -32,10 +32,20 @@ FILES = {
     "levels-run{k}.csv": "share of each tool's algorithms another voter group confirms, per level L0-L4",
     "coverage.csv": "fill rate of the algorithm records per tool and dimension (reported vs derived)",
     "conformance.csv": "spec issues per tool and kind (records: field, enum, type, deprecated; documents)",
+    "schema-run{k}.csv": "RQ1: one row per CBOM: declared format and version, schema validity, error count and kinds",
+    "meaningful-run{k}.csv": "RQ1: per tool and dimension, crypto assets with a value from standard fields / any",
+    "traceability-run{k}.csv": "RQ1: per (snapshot, tool), records located, existing at the commit, in range, strong",
     "vocab.csv": "what every raw value mapped to, per tool and source (the reviewable mapping table)",
-    "sites-run{k}.csv": "legacy call-site extraction (to be retired)",
-    "groups-callsite-run{k}.csv": "legacy call-site matcher: one row per cluster",
-    "members-callsite-run{k}.csv": "legacy call-site matcher: one row per (cluster, site)",
+    "groups-exact-run{k}.csv": "exact matcher: one row per group (repo scope per algorithm, site scope per call site)",
+    "members-exact-run{k}.csv": "exact matcher: one row per (group, record); `implied` with --closure",
+    "agreement-exact-run{k}.csv": "exact matcher: one row per (group, dimension): voters reporting, agreeing, majority",
+    "groups-raqun-run{k}.csv": "RaQuN (matcher (c)): one row per group, with its attribute-set similarity",
+    "members-raqun-run{k}.csv": "RaQuN: one row per (group, record)",
+    "agreement-raqun-run{k}.csv": "RaQuN: one row per (group, dimension)",
+    "matchers-run{k}.csv": "RQ3: per repository, exact vs RaQuN: common records, groups, co-membership pair Jaccard",
+    "score-run{k}.csv": "RQ4: per tool, dimension and level: items, confirmation (CI), exclusivity, rank, Dawid-Skene",
+    "loo-run{k}.csv": "RQ4: ranking without each voter group and its Kendall tau against the full ranking",
+    "stability.csv": "per (tool, snapshot) with repeated runs: Jaccard across runs, record-count CV, consensus set",
 }
 
 
@@ -102,6 +112,15 @@ def _gib(mb) -> str:
     return "" if f is None else f"{f / 1024:.1f}"
 
 
+def _true(v) -> bool:
+    """CSV booleans: write_csv lowercases them."""
+    return str(v).strip().lower() == "true"
+
+
+def _false(v) -> bool:
+    return str(v).strip().lower() == "false"
+
+
 def _lang_key(lang: str) -> tuple[int, str]:
     return (LANGUAGE_ORDER.index(lang) if lang in LANGUAGE_ORDER else len(LANGUAGE_ORDER), lang)
 
@@ -128,10 +147,9 @@ def _header(spec: dict, info: dict, run: int) -> list[str]:
 
 
 def _experiment(rows: list[dict], sessions: list[dict]) -> list[str]:
-    """When it ran, for how long, on how much RAM, and the peaks (run log of the runner plus the runs' meta)."""
+    """When it ran, for how long, on how much RAM, the peaks and the code that ran (the runner's run log plus the
+    runs' meta)."""
     ran = [r for r in rows if r.get("status") != "unsupported"]
-    ends = [t for r in ran if (t := _ts(r.get("received_at")))]
-    starts = [t.timestamp() - (_float(r.get("duration_sec")) or 0) for r in ran if (t := _ts(r.get("received_at")))]
     lines = ["## Experiment", ""]
     table: list[list] = []
     if sessions:
@@ -147,13 +165,14 @@ def _experiment(rows: list[dict], sessions: list[dict]) -> list[str]:
             table.append(["duration", f"{_span(active)} in {len(sessions)} runner session(s)"])
         outcomes = Counter(str(e.get("status") or "?") for e in sessions)
         table.append(["sessions", ", ".join(f"{n} {k}" for k, n in sorted(outcomes.items()))])
-    elif ends and starts:
-        first = datetime.fromtimestamp(min(starts), UTC)
-        table.append(["ran", f"about {_when(first)} to {_when(max(ends))} (from the stored runs; no run log)"])
-        table.append(["duration", f"about {_span((max(ends) - first).total_seconds())}"])
     tool_time = sum(_float(r.get("duration_sec")) or 0 for r in ran)
     if ran:
         table.append(["tool time", f"{_span(tool_time)} summed over {len(ran)} runs (excluding unsupported)"])
+    queue = [q for r in ran if (q := _float(r.get("queue_sec"))) is not None]
+    if queue:
+        table.append(
+            ["queue wait", f"median {statistics.median(queue):.0f} s, max {max(queue):.0f} s before a job started"]
+        )
     host = next((e.get("host") for e in reversed(sessions) if e.get("host")), None) or {}
     if host.get("ram_total_mb"):
         table.append(["host", f"{_gib(host['ram_total_mb'])} GiB RAM, {host.get('cpus') or '?'} CPUs (Docker VM)"])
@@ -179,13 +198,17 @@ def _experiment(rows: list[dict], sessions: list[dict]) -> list[str]:
     images = sorted({r["image_ref"].rsplit(":", 1)[-1] for r in ran if r.get("image_ref") and ":" in r["image_ref"]})
     if images:
         table.append(["BF-CBOM images", ", ".join(images)])
+    commits = sorted({r["bfcbom_commit"] for r in ran if r.get("bfcbom_commit")})
+    commits += sorted({e["runner_commit"] for e in sessions if e.get("runner_commit")} - set(commits))
+    if commits:
+        dirty = " (`-dirty`: built from uncommitted changes)" if any(c.endswith("-dirty") for c in commits) else ""
+        table.append(["BF-CBOM commit", ", ".join(f"`{c}`" for c in commits) + dirty])
+    image_ids = {t: i for e in sessions for t, i in (e.get("images") or {}).items()}
+    if image_ids:
+        table.append(["worker image ids", f"{len(image_ids)} recorded in `_run-log.json` (by content, per session)"])
     if not table:
         return []
     lines += md_table(["", ""], table, "ll")
-    if not sessions:
-        lines += ["", "No `_run-log.json` (run before 2026-10-18): host RAM, budget and peak RAM were not recorded."]
-    elif not per_job:
-        lines += ["", "The runs carry no memory measurements (worker images built before 2026-10-18)."]
     return lines + [""]
 
 
@@ -253,12 +276,15 @@ def _micro(rows: list[dict], assets: list[dict]) -> list[str]:
 
     tools = sorted({r["tool"] for r in rows}, key=rank)
 
+    tailored = any(_true(r.get("tailored")) for r in rows)
+
     def verdict_cell(r: dict | None) -> str:
         if r is None or r["verdict"] == "missing":
             return "not run"
+        mark = "\*" if _true(r.get("tailored")) else ""
         if r["verdict"] in ("pass", "fail"):
-            return f"{r['verdict']} {r['lenient']}"
-        return "–" if r["verdict"] == "unsupported" else r["verdict"]
+            return f"{r['verdict']} {r['lenient']}{mark}"
+        return "–" if r["verdict"] == "unsupported" else r["verdict"] + mark
 
     def recall_cell(r: dict | None) -> str:
         if r is not None and r["verdict"] in ("pass", "fail"):
@@ -268,7 +294,12 @@ def _micro(rows: list[dict], assets: list[dict]) -> list[str]:
     lines = ["## Micro projects", ""]
     lines += [
         f"**Inclusion check** (`corpus/micro`, {n_assets} assets per project): lenient call-site recall, "
-        f"bar {bar}/{n_assets}. `–` = outside the tool's languages, `error` = the run failed or timed out.",
+        f"bar {bar}/{n_assets}. `–` = outside the tool's languages, `error` = the run failed or timed out."
+        + (
+            " `*` = the tool was tuned on this project (`tailored_on` in tools.yaml, refinement 13)."
+            if tailored
+            else ""
+        ),
         "",
     ]
     lines += md_table(["tool", *langs], [[t] + [verdict_cell(cells.get((t, lg))) for lg in langs] for t in tools])
@@ -288,7 +319,7 @@ def _micro(rows: list[dict], assets: list[dict]) -> list[str]:
         style: dict[str, str] = {}
         for a in assets:
             cnt = found[(a["asset"], a["language"])]
-            cnt[0] += a["callsite_lenient"] == "true"
+            cnt[0] += _true(a["callsite_lenient"])
             cnt[1] += 1
             style[a["asset"]] = a.get("insertion_style") or ""
         asset_ids = list(dict.fromkeys(a["asset"] for a in assets))
@@ -334,7 +365,233 @@ def _coverage(cov: list[dict], conf: list[dict]) -> list[str]:
     return lines + [""]
 
 
-def _ladder(rows: list[dict]) -> list[str]:
+def _rq1(schema: list[dict], meaningful: list[dict], trace: list[dict]) -> list[str]:
+    """Conformance, meaningfulness and traceability per tool (analysis/schema.py)."""
+    if not schema and not meaningful:
+        return []
+    lines = ["## RQ1: conformance, meaningful, traceable", ""]
+    if schema:
+        by_tool: dict[str, list[dict]] = defaultdict(list)
+        for r in schema:
+            by_tool[r["tool"]].append(r)
+        table = []
+        for tool in sorted(by_tool):
+            rs = by_tool[tool]
+            native = rs[0].get("native_cyclonedx")
+            checked = [r for r in rs if r.get("schema")]
+            valid = sum(_true(r["valid"]) for r in checked)
+            kinds: Counter = Counter()
+            for r in checked:
+                for item in (r.get("error_kinds") or "").split(";"):
+                    if "=" in item:
+                        k, n = item.rsplit("=", 1)
+                        kinds[k] += _int(n)
+            top = "; ".join(f"{k} ({n})" for k, n in kinds.most_common(3))
+            versions = "; ".join(sorted({f"{r.get('bom_format')} {r.get('spec_version')}" for r in rs}))
+            table.append(
+                [
+                    tool,
+                    "adapter" if _false(native) else ("native" if _true(native) else "?"),
+                    len(rs),
+                    versions,
+                    len(checked) or "",
+                    valid if checked else "",
+                    (len(checked) - valid) or "" if checked else "",
+                    len(rs) - len(checked) or "",
+                    top,
+                ]
+            )
+        lines += [
+            "**Conformance:** every CBOM validated as a whole document against the official CycloneDX JSON schema of "
+            "the version it declares (vendored 1.6 and 1.7). `adapter` = our worker assembles the CBOM, so validity "
+            "there measures BF-CBOM, not the tool (refinement 3). `no schema` = another dialect or version "
+            "(IBM's draft, 1.5 and older).",
+            "",
+        ]
+        header = ["tool", "CBOM by", "CBOMs", "declares", "checked", "valid", "invalid", "no schema", "top error kinds"]
+        lines += md_table(header, table, "lllrrrrrl") + [""]
+    if meaningful:
+        dims = list(dict.fromkeys(r["dimension"] for r in meaningful))
+        by = {(r["tool"], r["dimension"]): r for r in meaningful}
+        tools = sorted({r["tool"] for r in meaningful})
+        table = [
+            [t, by[(t, dims[0])]["crypto_assets"]]
+            + [f"{_pct(by[(t, d)]['standard_share'])} / {_pct(by[(t, d)]['any_share'])}" for d in dims if (t, d) in by]
+            for t in tools
+        ]
+        lines += [
+            "**Meaningful:** share of crypto assets (components) carrying each dimension, `standard fields / any "
+            "source` (names, properties, symbols, derivations); the gap is what sits outside the standard. "
+            "`parameter` = parameter set or curve.",
+            "",
+        ]
+        lines += md_table(["tool", "assets", *dims], table) + [""]
+    if trace:
+        with_source = [r for r in trace if r.get("source")]
+        by_tool_t: dict[str, list[dict]] = defaultdict(list)
+        for r in trace:
+            by_tool_t[r["tool"]].append(r)
+        table = []
+        for tool in sorted(by_tool_t):
+            rs = by_tool_t[tool]
+            records = sum(_int(r["records"]) for r in rs)
+            located = sum(_int(r["located"]) for r in rs)
+            checked = [r for r in rs if r.get("source")]
+            loc_checked = sum(_int(r["located"]) for r in checked)
+            weak = sum(_int(r["line_in_range"]) for r in checked)
+            strong = sum(_int(r["strong"]) for r in checked)
+            table.append(
+                [
+                    tool,
+                    records,
+                    _pct(located / records) if records else "",
+                    _pct(weak / loc_checked) if loc_checked else "",
+                    _pct(strong / loc_checked) if loc_checked else "",
+                ]
+            )
+        lines += [
+            "**Traceable:** located = the record names a file and a line; weak = the file exists at the commit and "
+            "the line is inside it; strong = lines ±2 also hold a vocabulary token (an algorithm, family, curve, "
+            "identifier or API spelling), refinement 4. Library records excluded."
+            + (
+                ""
+                if with_source
+                else " No snapshot files were available (run the report on the VM, or `analysis report --fetch` on "
+                "the laptop to fetch each pinned commit into `~/.cache/bf-cbom/snapshots`)."
+            ),
+            "",
+        ]
+        lines += md_table(["tool", "records", "located", "weak", "strong"], table) + [""]
+    return lines
+
+
+def _matchers(rows: list[dict]) -> list[str]:
+    if not rows:
+        return []
+    common = sum(_int(r["records_common"]) for r in rows)
+    pairs_a, pairs_b, both = (sum(_int(r[c]) for r in rows) for c in ("pairs_a", "pairs_b", "pairs_both"))
+    union = pairs_a + pairs_b - both
+    a_in = [v for r in rows if (v := _float(r["a_in_one_b"])) is not None]
+    b_in = [v for r in rows if (v := _float(r["b_in_one_a"])) is not None]
+    table = [
+        [
+            f"{rows[0]['matcher_a']} vs {rows[0]['matcher_b']}",
+            len(rows),
+            common,
+            sum(_int(r["groups_a"]) for r in rows),
+            sum(_int(r["groups_b"]) for r in rows),
+            _pct(both / union) if union else "",
+            _pct(statistics.mean(a_in)) if a_in else "",
+            _pct(statistics.mean(b_in)) if b_in else "",
+        ]
+    ]
+    lines = ["## Matchers compared (RQ3)", ""]
+    lines += [
+        "Over the records both matchers grouped (repository level): co-membership pairs (two records in one group) "
+        "shared by both, as a Jaccard; `a in one b` = share of the first matcher's groups whose members all sit in "
+        "one group of the second (mean over repositories), and the reverse. RaQuN's matches hold at most one asset "
+        "per tool, so it splits what the exact matcher keeps together when a tool reports an algorithm with several "
+        "parameter sets.",
+        "",
+    ]
+    header = ["matchers", "repos", "records", "groups a", "groups b", "pair Jaccard", "a in one b", "b in one a"]
+    lines += md_table(header, table, "lrrrrrrr")
+    return lines + [""]
+
+
+def _scores(rows: list[dict], loo: list[dict]) -> list[str]:
+    """RQ4: the ranking per dimension (analysis/score.py)."""
+    if not rows:
+        return []
+    level = rows[0].get("level") or "?"
+    lines = ["## Scores without ground truth (RQ4)", ""]
+    lines += [
+        f"Exact matcher at {level}. Per tool: items = what it reports per repository (algorithms; for a parameter the "
+        "(algorithm, value) pairs; for location the algorithms it locates), confirmation = share another voter "
+        "group reports too (same value / a shared call site), with a 95 % bootstrap CI over repositories, "
+        "exclusivity = share no other voter group reports at all. Dawid-Skene (algorithm dimension): voter "
+        "sensitivity/specificity estimated by EM without labels, support = mean posterior of the tool's items. "
+        "Pairs a tool was tuned on are excluded; tools sharing an engine never confirm each other.",
+        "",
+    ]
+    dims = list(dict.fromkeys(r["dimension"] for r in rows))
+    for dim in dims:
+        rs = sorted((r for r in rows if r["dimension"] == dim), key=lambda r: (_int(r.get("rank")) or 999, r["tool"]))
+        table = []
+        for r in rs:
+            ci = f" [{_pct(r['ci_low'])}, {_pct(r['ci_high'])}]" if r.get("ci_low") not in (None, "") else ""
+            row = [
+                r["rank"],
+                r["tool"],
+                r["voter_group"],
+                r["items"],
+                f"{_pct(r['confirmation'])}{ci}",
+                _pct(r["exclusivity"]),
+            ]
+            if dim == "algorithm":
+                row += [_pct(r["ds_support"]), f"{_pct(r['ds_sensitivity'])} / {_pct(r['ds_specificity'])}"]
+            table.append(row)
+        header = ["rank", "tool", "voter group", "items", "confirmation [95 % CI]", "exclusivity"]
+        if dim == "algorithm":
+            header += ["DS support", "DS sens. / spec."]
+        lines += [f"**{dim}**", ""] + md_table(header, table, "rllrrr" + "rr" * (dim == "algorithm")) + [""]
+    if loo:
+        by_dim: dict[str, list[dict]] = defaultdict(list)
+        for r in loo:
+            by_dim[r["dimension"]].append(r)
+        table = []
+        for dim in dims:
+            taus = [
+                (_float(r["kendall_tau"]), r["left_out"])
+                for r in by_dim.get(dim, [])
+                if _float(r["kendall_tau"]) is not None
+            ]
+            if taus:
+                lo = min(taus)
+                table.append([dim, f"{lo[0]:.2f} (without {lo[1]})", f"{statistics.mean(t for t, _ in taus):.2f}"])
+        if table:
+            lines += [
+                "**Leave one voter out:** Kendall's tau between the full ranking and the ranking without one voter "
+                "group (1 = unchanged order); the lowest value names the voter whose removal changes the ranking most.",
+                "",
+            ]
+            lines += md_table(["dimension", "lowest tau", "mean tau"], table, "lll") + [""]
+    return lines
+
+
+def _stability(rows: list[dict]) -> list[str]:
+    if not rows:
+        return []
+    by_tool: dict[str, list[dict]] = defaultdict(list)
+    for r in rows:
+        by_tool[r["tool"]].append(r)
+    table = []
+    for tool in sorted(by_tool):
+        rs = by_tool[tool]
+        table.append(
+            [
+                tool,
+                len(rs),
+                f"{statistics.mean(_float(r['jaccard_mean']) or 0 for r in rs):.2f}",
+                f"{min(_float(r['jaccard_min']) or 0 for r in rs):.2f}",
+                f"{statistics.mean(_float(r['records_cv']) or 0 for r in rs):.2f}",
+                sum(len((r.get("unstable") or "").split(";")) if r.get("unstable") else 0 for r in rs),
+            ]
+        )
+    lines = ["## Run-to-run stability", ""]
+    lines += [
+        "Per tool over the repositories it ran on more than once: Jaccard similarity of the algorithm sets between "
+        "runs (mean of the per-repository means, and the lowest pair), the coefficient of variation of the record "
+        "count, and how many algorithms appeared in some runs but not in most (`stability.csv`). Scores use the "
+        "consensus set (present in more than half of the runs) where runs were repeated.",
+        "",
+    ]
+    lines += md_table(["tool", "repos", "Jaccard mean", "Jaccard min", "records CV", "unstable algorithms"], table)
+    return lines + [""]
+
+
+def _ladder(all_rows: list[dict]) -> list[str]:
+    rows = [r for r in all_rows if r.get("dimension", "algorithm") == "algorithm"]
     if not rows:
         return []
     levels = list(dict.fromkeys(r["level"] for r in rows))
@@ -353,7 +610,9 @@ def _ladder(rows: list[dict]) -> list[str]:
     lines += [
         "Share of a tool's algorithms (per repository, location ignored) that a tool of another voter group also "
         "reports, from raw names (L0) to full normalisation (L4). The L0 to L4 gap is the agreement normalisation "
-        "creates (refinement 14).",
+        "creates (refinement 14); L4lit is L4 without the interpretive dictionary entries (judgements such as a "
+        "TLS check read as TLS), so L4lit to L4 is the part that rests on them. Pairs the tool was tuned on are "
+        "excluded.",
         "",
     ]
     lines += md_table(
@@ -361,70 +620,135 @@ def _ladder(rows: list[dict]) -> list[str]:
         table,
         "ll" + "r" * (len(levels) + 2),
     )
+    params = [r for r in all_rows if r.get("dimension", "algorithm") != "algorithm" and r["tool"] == "all"]
+    if params:
+        dims = list(dict.fromkeys(r["dimension"] for r in params))
+        plevels = list(dict.fromkeys(r["level"] for r in params))
+        by_dim = {(r["dimension"], r["level"]): r for r in params}
+        ptable = []
+        for d in dims:
+            cells = [_pct(by_dim.get((d, lv), {}).get("share")) for lv in plevels]
+            ptable.append([d, *cells, by_dim.get((d, plevels[-1]), {}).get("algorithms", "")])
+        lines += [
+            "",
+            "**Parameters**, pooled over all tools: share of (algorithm, value) pairs another voter group also "
+            "reports; a value counts at L2 from a standard field, at L3 also parsed from the name, at L4 from any "
+            "source (per-tool rows in `levels-run<k>.csv`).",
+            "",
+        ]
+        lines += md_table(["parameter", *plevels, f"pairs {plevels[-1]}"], ptable)
     return lines + [""]
 
 
-def _overlap(rows: list[dict], level: str = "L3") -> list[str]:
-    rows = [r for r in rows if r["level"] == level]
-    if not rows:
+def _overlap(groups: list[dict]) -> list[str]:
+    repo = [g for g in groups if g.get("scope") == "repo"]
+    if not repo:
         return []
-    groups: dict[tuple[str, str, str], set[str]] = defaultdict(set)
-    lang_of: dict[tuple[str, str, str], str] = {}
-    for r in rows:
-        key = (r["snapshot"], r["variant"], r["algorithm"])
-        groups[key].add(r["voter_group"])
-        lang_of[key] = (r.get("language") or "?").lower()
+    level = repo[0].get("level") or "?"
     buckets = ["1", "2", "3", "4+"]
 
     def bucket(k: int) -> str:
         return buckets[min(k, 4) - 1]
 
-    def line(label: str, keys: list) -> list:
-        c = Counter(bucket(len(groups[k])) for k in keys)
-        n = len(keys)
-        return [label, n] + [f"{c.get(b, 0)} ({c.get(b, 0) / n:.0%})" if n else "" for b in buckets]
+    def line(label: str, rows: list[dict]) -> list:
+        c = Counter(bucket(_int(g["voter_groups"])) for g in rows)
+        n = len(rows)
+        sites = sum(_int(g.get("n_sites")) for g in rows)
+        coloc = sum(_int(g.get("colocated_voters")) >= 2 for g in rows)
+        return [label, n] + [f"{c.get(b, 0)} ({c.get(b, 0) / n:.0%})" if n else "" for b in buckets] + [sites, coloc]
 
-    keys = list(groups)
-    table = [line("all", keys)]
-    for lg in sorted({lang_of[k] for k in keys}, key=_lang_key):
-        table.append(line(lg, [k for k in keys if lang_of[k] == lg]))
+    table = [line("all", repo)]
+    for lg in sorted({(g.get("language") or "?").lower() for g in repo}, key=_lang_key):
+        table.append(line(lg, [g for g in repo if (g.get("language") or "?").lower() == lg]))
     lines = ["## Tools per algorithm", ""]
     lines += [
-        f"Per repository, every algorithm some tool reports ({level}: composite names parsed), by how many voter "
-        "groups report it (tools sharing an engine count once, `voter_group` in common/tools.yaml).",
+        f"Exact matcher, repository level ({level}): every algorithm some tool reports per repository, by how many "
+        "voter groups report it (tools sharing an engine count once, `voter_group` in common/tools.yaml); `sites` = "
+        "call-site groups inside those (same file, lines within ±2), `co-located` = algorithms where at least two "
+        "voter groups share a call site.",
         "",
     ]
-    lines += md_table(["language", "algorithms", *[f"k={b}" for b in buckets]], table)
+    lines += md_table(["language", "algorithms", *[f"k={b}" for b in buckets], "sites", "co-located"], table)
     return lines + [""]
 
 
-def _llm(rows: list[dict]) -> list[str]:
+def _llm(rows: list[dict], scores: list[dict] | None = None) -> list[str]:
     usage: dict[str, list[dict]] = defaultdict(list)
     for r in rows:
-        if r["status"] == "ok" and (r.get("prompt_tokens") or r.get("requests")):
+        if r.get("requests"):
             usage[r["tool"]].append(r)
     if not usage:
         return []
-    table = []
+    found = {r["tool"]: r for r in scores or [] if r.get("dimension") == "algorithm"}
+    table, cost_table = [], []
+    versions = set()
     for tool in sorted(usage):
         rs = usage[tool]
-        prompt = [_int(r.get("prompt_tokens")) for r in rs]
-        completion = [_int(r.get("completion_tokens")) for r in rs]
+        inputs = [_int(r.get("input_tokens")) for r in rs]
+        outputs = [_int(r.get("output_tokens")) for r in rs]
+        models = sorted({m for r in rs for m in (r.get("models_answered") or "").split(";") if m})
         table.append(
             [
                 tool,
                 len(rs),
                 sum(_int(r.get("requests")) for r in rs),
-                sum(prompt),
-                sum(completion),
-                f"{statistics.median(prompt):.0f}",
-                f"{statistics.median(completion):.0f}",
+                sum(_int(r.get("requests_failed")) for r in rs) or "",
+                sum(inputs),
+                sum(_int(r.get("cached_input_tokens")) for r in rs),
+                sum(outputs),
+                sum(_int(r.get("reasoning_tokens")) for r in rs) or "",
+                f"{statistics.median(inputs):.0f}",
+                f"{statistics.median(outputs):.0f}",
+                "; ".join(models),
             ]
         )
-    lines = ["## LLM usage", "", "Token counts the providers reported (ok runs, all repetitions); costs not yet.", ""]
-    lines += md_table(
-        ["tool", "runs", "requests", "prompt tokens", "completion tokens", "median prompt", "median completion"], table
-    )
+        costs = [c for r in rs if (c := _float(r.get("cost_usd"))) is not None]
+        if costs:
+            versions |= {r.get("price_table_version") for r in rs if r.get("price_table_version")}
+            total = sum(costs)
+            items = _int(found.get(tool, {}).get("items"))
+            confirmed = _int(found.get(tool, {}).get("confirmed"))
+            cost_table.append(
+                [
+                    tool,
+                    len(costs),
+                    f"{total:.2f}",
+                    f"{statistics.median(costs):.3f}",
+                    f"{total / items:.4f}" if items else "",
+                    f"{total / confirmed:.4f}" if confirmed else "",
+                    "; ".join(sorted({r.get("priced_model") or "" for r in rs if r.get("priced_model")})),
+                ]
+            )
+    lines = [
+        "## LLM usage",
+        "",
+        "What the providers reported, summed over all runs with requests (failed runs included). Cached: input "
+        "tokens served from the provider's prompt cache (priced lower).",
+        "",
+    ]
+    header = [
+        "tool", "runs", "requests", "failed", "input tokens", "cached", "output tokens", "reasoning", "median input",
+        "median output", "models answered",
+    ]  # fmt: skip
+    lines += md_table(header, table, "l" + "r" * (len(header) - 2) + "l")
+    if cost_table:
+        lines += [
+            "",
+            f"**Costs** (USD, price table {', '.join(sorted(versions))} in `analysis/data/llm_prices.yaml`, computed "
+            "from the stored token counts; per found asset = per algorithm the tool reports per repository, per "
+            "confirmed asset = per algorithm another voter group reports too, both from the scores).",
+            "",
+        ]
+        header = [
+            "tool",
+            "priced runs",
+            "total",
+            "median per repo",
+            "per found asset",
+            "per confirmed asset",
+            "priced as",
+        ]
+        lines += md_table(header, cost_table, "lrrrrrl")
     return lines + [""]
 
 
@@ -462,15 +786,18 @@ def render(analysis_dir: Path, *, run: int = 1) -> str:
     def rows(name: str) -> list[dict]:
         return read_csv(analysis_dir / name.format(k=run))
 
-    algorithms = rows("algorithms-run{k}.csv")
     lines = _header(spec or {}, info, run)
     lines += _experiment(rows("runs.csv"), load_run_log(analysis_dir.parent))
     lines += _runs(rows("runs.csv"))
     lines += _micro(rows("micro-run{k}.csv"), rows("micro-assets-run{k}.csv"))
     lines += _coverage(rows("coverage.csv"), rows("conformance.csv"))
+    lines += _rq1(rows("schema-run{k}.csv"), rows("meaningful-run{k}.csv"), rows("traceability-run{k}.csv"))
     lines += _ladder(rows("levels-run{k}.csv"))
-    lines += _overlap(algorithms)
-    lines += _llm(rows("runs.csv"))
+    lines += _overlap(rows("groups-exact-run{k}.csv"))
+    lines += _matchers(rows("matchers-run{k}.csv"))
+    lines += _scores(rows("score-run{k}.csv"), rows("loo-run{k}.csv"))
+    lines += _stability(rows("stability.csv"))
+    lines += _llm(rows("runs.csv"), rows("score-run{k}.csv"))
     lines += _files(info, run)
     return "\n".join(lines).rstrip() + "\n"
 

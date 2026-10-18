@@ -3,10 +3,17 @@
 Produces the `repos:` list consumed by `common.experiment.load_spec` via `corpus: <file>`.
 Runs inside the `runner` container; needs network access to GitHub (a token raises the
 search rate limit from 10 to 30 requests per minute).
+
+Exclusions (CLAUDE.md refinement 11): name patterns (CBOM tooling, benchmarks), the reviewed list
+`corpus/exclusions.yaml` (the generators' own repos and test suites, with a reason each), and the repos a tool was
+tuned on (`tailored_on` in common/tools.yaml, refinement 13). The crypto pre-filter greps first-party source only
+(no test, vendor, example or documentation paths). Every exclusion is recorded in the output with its reason.
+`prune_corpus` drops repos where a tool timed out in an earlier experiment (E0), with the reason.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import random
 import re
@@ -14,10 +21,20 @@ import subprocess
 import tempfile
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import requests
+import yaml
 
+from .tools_registry import REPO_ROOT, tailored_map
 from .utils import resolve_remote_commit
+
+EXCLUSIONS_FILE = REPO_ROOT / "corpus" / "exclusions.yaml"
+# Paths the crypto pre-filter ignores: the scope is first-party source (refinement 11; some tools skip tests too)
+NON_FIRST_PARTY = (
+    "test", "tests", "testing", "spec", "vendor", "third_party", "thirdparty", "node_modules", "example", "examples",
+    "sample", "samples", "demo", "docs", "doc", "benchmark", "benchmarks",
+)  # fmt: skip
 
 logger = logging.getLogger(__name__)
 
@@ -112,18 +129,7 @@ def has_crypto_usage(git_url: str, branch: str, language: str, *, timeout: float
         if clone.returncode != 0:
             return None
         grep = subprocess.run(
-            [
-                "git",
-                "-C",
-                tmp,
-                "grep",
-                "-l",
-                "-I",
-                "-E",
-                pattern,
-                "--",
-                f"*.{'java' if language.lower() == 'java' else 'py'}",
-            ],
+            ["git", "-C", tmp, "grep", "-l", "-I", "-E", pattern, "--", *grep_pathspecs(language)],
             capture_output=True,
             text=True,
             timeout=timeout,
@@ -136,13 +142,64 @@ def _excluded(full_name: str, patterns: list[str]) -> bool:
     return any(re.search(p, full_name, flags=re.IGNORECASE) for p in patterns)
 
 
-def build_corpus(params: CorpusParams, token: str | None, *, log=print) -> dict:
-    """Stratified sample per language over stars x size cells, filtered and pinned to commits."""
+def load_exclusions(path: Path = EXCLUSIONS_FILE) -> dict:
+    """{"repos": {full name (lower): reason}, "patterns": [(regex, reason)]} from corpus/exclusions.yaml."""
+    if not Path(path).exists():
+        return {"repos": {}, "patterns": []}
+    data = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+    return {
+        "repos": {str(r["full_name"]).lower(): str(r.get("reason") or "excluded") for r in data.get("repos") or []},
+        "patterns": [(str(p["regex"]), str(p.get("reason") or "excluded")) for p in data.get("patterns") or []],
+    }
+
+
+def exclusion_reason(
+    full_name: str,
+    *,
+    patterns: list[str],
+    exclusions: dict | None = None,
+    tailored: dict[str, frozenset[str]] | None = None,
+) -> str | None:
+    """Why a repo may not enter the corpus, or None: a tool was tuned on it (refinement 13), the reviewed list, a
+    reviewed pattern, or the builder's default name patterns."""
+    for tool, repos in (tailored or {}).items():
+        if full_name in repos:
+            return f"tailored_on of {tool} (tools.yaml)"
+    exclusions = exclusions or {"repos": {}, "patterns": []}
+    if full_name.lower() in exclusions["repos"]:
+        return exclusions["repos"][full_name.lower()]
+    for regex, reason in exclusions["patterns"]:
+        if re.search(regex, full_name, flags=re.IGNORECASE):
+            return f"{reason} ({regex})"
+    if _excluded(full_name, patterns):
+        return "name pattern"
+    return None
+
+
+def grep_pathspecs(language: str) -> list[str]:
+    """`git grep` pathspecs for first-party source of `language`: its extensions, minus NON_FIRST_PARTY directories."""
+    ext = "java" if language.lower() == "java" else "py"
+    return [f"*.{ext}", *(f":(exclude,glob)**/{d}/**" for d in NON_FIRST_PARTY)]
+
+
+def build_corpus(
+    params: CorpusParams,
+    token: str | None,
+    *,
+    log=print,
+    exclusions: dict | None = None,
+    tailored: dict[str, frozenset[str]] | None = None,
+) -> dict:
+    """Stratified sample per language over stars x size cells, filtered and pinned to commits. Exclusions default to
+    corpus/exclusions.yaml and the registry's `tailored_on`; every excluded candidate is listed with its reason."""
+    exclusions = load_exclusions() if exclusions is None else exclusions
+    tailored = tailored_map() if tailored is None else tailored
     rng = random.Random(params.seed)
     pushed_since = time.strftime("%Y-%m-%d", time.gmtime(time.time() - params.pushed_within_days * 86400))
     cells = [(s, z) for s in params.star_bins for z in params.size_bins_kb]
     quota = max(1, -(-params.per_language // len(cells)))  # ceil
     chosen: list[dict] = []
+    excluded: list[dict] = []
     stats = {"searched": 0, "excluded": 0, "no_crypto": 0, "clone_failed": 0, "unresolved": 0}
     for language in params.languages:
         picked_for_lang: list[dict] = []
@@ -154,16 +211,22 @@ def build_corpus(params: CorpusParams, token: str | None, *, log=print) -> dict:
             for cand in candidates:
                 if taken >= quota or len(picked_for_lang) >= params.per_language:
                     break
-                if _excluded(cand["full_name"], params.exclude_patterns):
+                reason = exclusion_reason(
+                    cand["full_name"], patterns=params.exclude_patterns, exclusions=exclusions, tailored=tailored
+                )
+                if reason:
                     stats["excluded"] += 1
+                    excluded.append({"full_name": cand["full_name"], "reason": reason})
                     continue
                 if params.crypto_filter:
                     hit = has_crypto_usage(cand["git_url"], cand["branch"], language)
                     if hit is None:
                         stats["clone_failed"] += 1
+                        excluded.append({"full_name": cand["full_name"], "reason": "clone failed"})
                         continue
                     if not hit:
                         stats["no_crypto"] += 1
+                        excluded.append({"full_name": cand["full_name"], "reason": "no first-party crypto usage"})
                         continue
                 commit = resolve_remote_commit(cand["git_url"], cand["branch"])
                 if not commit:
@@ -190,5 +253,25 @@ def build_corpus(params: CorpusParams, token: str | None, *, log=print) -> dict:
             "seed": params.seed,
         },
         "stats": stats,
+        "excluded": excluded,
         "repos": chosen,
     }
+
+
+def prune_corpus(corpus: dict, exp_dir: Path, *, statuses: tuple[str, ...] = ("timeout",)) -> dict:
+    """The corpus without the repos where some tool's run in `exp_dir` ended in one of `statuses` (E0 timeouts,
+    refinement 11); the dropped repos are listed under `pruned` with the tools and statuses."""
+    hits: dict[str, set[str]] = {}
+    for meta_path in sorted(Path(exp_dir).glob("*/*/*/run*.meta.json")):
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        if meta.get("status") in statuses:
+            repo = meta_path.parents[2].name.split("@", 1)[0].replace("__", "/", 1)
+            hits.setdefault(repo, set()).add(f"{meta.get('worker') or meta_path.parent.name}:{meta.get('status')}")
+    kept = [r for r in corpus.get("repos") or [] if r.get("full_name") not in hits]
+    reason = f"timed out in {Path(exp_dir).name}"
+    pruned = [
+        {"full_name": r["full_name"], "reason": reason, "runs": sorted(hits[r["full_name"]])}
+        for r in corpus.get("repos") or []
+        if r.get("full_name") in hits
+    ]
+    return {**corpus, "pruned_from": Path(exp_dir).name, "pruned": pruned, "repos": kept}

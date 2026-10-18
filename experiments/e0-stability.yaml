@@ -1,0 +1,65 @@
+# E0 stability: every tool three times on the micro projects and ten small pilot repositories (the development
+# set, so not held out), to measure run-to-run variance before any agreement claim (CLAUDE.md Phase 5, E0).
+# The repos are the pilot's fastest (max run 2-131 s on 2026-10-16); vault, pyjwt, jasypt, keycloak, jjwt are left
+# out for time. Analysis: `make analysis ARGS="report e0-stability"` writes stability.csv and scores the consensus sets.
+#   make experiment EXP=experiments/e0-stability.yaml EXPERIMENT_MEMORY_BUDGET_GB=52
+name: e0-stability
+description: "run-to-run stability (E0): all tools, three repetitions, micro projects plus ten small pilot repositories"
+tools: [cbomkit, cdxgen, cryptobomforge, cryptoscan, deepseek, pqcheck, qdarpan, securin-xbom, cipherradar, xgrep, cbomkit-jar, ciphersift, scanoss]
+repetitions: 3
+repos:
+  - full_name: bfcbom/micro-java
+    path: ../corpus/micro/java
+    language: Java
+  - full_name: bfcbom/micro-python
+    path: ../corpus/micro/python
+    language: Python
+  - full_name: bfcbom/micro-go
+    path: ../corpus/micro/go
+    language: Go
+  - full_name: bfcbom/micro-javascript
+    path: ../corpus/micro/javascript
+    language: JavaScript
+  - full_name: bfcbom/micro-c
+    path: ../corpus/micro/c
+    language: C
+  - full_name: panva/jose
+    language: TypeScript
+    branch: main
+    commit: 505a55b8f73536082367b2614cb77e927ba96ec1
+  - full_name: parse-community/parse-server
+    language: JavaScript
+    branch: alpha
+    commit: 4ec73c57725d0157157e2a918ca518e5853c98ea
+  - full_name: golang-jwt/jwt
+    language: Go
+    branch: main
+    commit: 7ceae619e739dc8a7bf577214aa8ebf26668e9db
+  - full_name: openssh/openssh-portable
+    language: C
+    branch: master
+    commit: d76b2675116617394cd355a3437b4963a562b64d
+  - full_name: paramiko/paramiko
+    language: Python
+    branch: main
+    commit: 23f92003898b060df0e2b8b1d889455264e63a3e
+  - full_name: smallstep/crypto
+    language: Go
+    branch: master
+    commit: 622be32d9288f7491092aacf19f7bbc035684fc0
+  - full_name: FiloSottile/age
+    language: Go
+    branch: main
+    commit: b74dce4cdbe35b5e5f66c06d9612b72f89028758
+  - full_name: opendatalab/MinerU
+    language: Python
+    branch: master
+    commit: ed50cc15bc2c9bfb00520dadfe61979866e62236
+  - full_name: curl/curl
+    language: C
+    branch: master
+    commit: 01346829096c61b372692f6dc43ffa778c6caccd
+  - full_name: apache/kafka
+    language: Java
+    branch: trunk
+    commit: 771b9576b00ecf5b64ab6e8bedf04156fbdb5cd6

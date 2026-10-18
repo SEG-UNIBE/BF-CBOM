@@ -13,9 +13,9 @@ import yaml
 
 from analysis.groundtruth import expected_agreement, load_ground_truth
 from analysis.normalize import normalize_cbom
+from analysis.normalize.locations import relative_location
 from analysis.normalize.specs import ADAPTER_DIR, SpecError, load_adapter, spec_files
 from analysis.normalize.vocab import load_vocabulary
-from analysis.sites import extract_sites
 
 TESTS = Path(__file__).parent
 V = load_vocabulary()
@@ -119,7 +119,8 @@ def test_pitch_example_secp256r1_ecdsa_p256_ec256_agree():
         ("KeySize = 2048", {"key_size": 2048}),
         ("iterations = 5", {"iterations": 5}),
         ("TLSv1.2", {"protocol": "TLS", "protocol_version": "1.2"}),
-        ("weak-rand", {"family": "PRNG"}),
+        ("weak-rand", {}),  # CipherRadar's rule name: in its spec since 2026-10-18, not in the shared vocabulary
+        ("OpenSSL-RAND", {"family": "CSPRNG"}),  # the OpenSSL RAND API; a bare `rand` stays unmapped (ambiguous)
         ("crypto/rand", {"family": "CSPRNG"}),
         ("secret-key@0c5514ad-e980-4b20", {"material": "secret-key"}),
     ],
@@ -163,12 +164,17 @@ def test_spec_issues_against_the_declared_version():
     assert old.document_issues == ["version:1.5"] and old.checked_against is None
 
 
-def test_ibm_draft_gains_locations_that_sites_misses():
+def test_ibm_draft_windows_become_located_records():
     bom = _load("MinerU_cryptobomforge.json")
     n = normalize_cbom(bom, "cryptobomforge", language="python")
     assert n.document_issues == ["dialect:CBOM/1.4-cbom-1.0"]
     assert len(n.records) == 19 and all(r.file and r.line and r.line_end >= r.line for r in n.records)
-    assert extract_sites(bom, "cryptobomforge")[0] == []
+
+
+def test_relative_location():
+    assert relative_location("./src/a.py") == "src/a.py"
+    assert relative_location("/tmp/x/repo/src/a.py") == "src/a.py"
+    assert relative_location("/abs/elsewhere/a.py") == "/abs/elsewhere/a.py"
 
 
 # ----- tool specs on real outputs -----
@@ -244,24 +250,6 @@ def test_ciphersift_rule_family_fills_the_gap_and_api_names_stay_quiet():
     assert by[("hmac.new", "SHA-2")].conflicts["family"]["value"] == "HMAC"
 
 
-@pytest.mark.parametrize(
-    "fixture, tool",
-    [
-        ("cbomkit_micro-java", "cbomkit"),
-        ("cipherradar_micro-java", "cipherradar"),
-        ("pqcheck_micro-python", "pqcheck"),
-        ("cbomkit_micro-go", "cbomkit"),
-    ],  # fmt: skip
-)
-def test_locations_equal_the_call_sites(fixture, tool):
-    bom = _load(f"fixtures/pilot/{fixture}.json")
-    sites, _ = extract_sites(bom, tool)
-    recs = normalize_cbom(bom, tool).records
-    assert {(r.file, r.line) for r in recs if r.values.get("asset_type") == "algorithm" and r.line} == {
-        (s.file, s.line) for s in sites
-    }
-
-
 def test_cbomkit_micro_java_against_the_ground_truth():
     recs = normalize_cbom(_load("fixtures/pilot/cbomkit_micro-java.json"), "cbomkit", language="java").records
     agreement = expected_agreement(recs, load_ground_truth()["micro-java"])
@@ -310,7 +298,7 @@ def _stored_experiment(root: Path) -> Path:
     exp = root / "exp-norm"
     snapshot = exp / "bfcbom__micro-java@0123456789ab" / "original"
     exp.mkdir()
-    (exp / "experiment.yaml").write_text(
+    (exp / "_experiment.yaml").write_text(
         "name: exp-norm\ntools: [cbomkit, cipherradar]\nrepos:\n  - full_name: bfcbom/micro-java\n    language: Java\n",
         encoding="utf-8",
     )
@@ -352,9 +340,9 @@ def test_normalize_and_tables_commands(tmp_path, monkeypatch):
     result = CliRunner().invoke(analysis_cmd.analysis_app, ["tables", "exp-norm"])
     assert result.exit_code == 0, result.output
     records = _csv(exp / "_ANALYSIS" / "records-run1.csv")
-    sites = {s["record_id"] for s in _csv(exp / "_ANALYSIS" / "sites-run1.csv")}
-    located = {r["site_id"] for r in records if r["site_id"] and r["asset_type"] == "algorithm"}
-    assert records and located and located <= sites
+    members = {m["record_id"] for m in _csv(exp / "_ANALYSIS" / "members-exact-run1.csv")}
+    algorithms = {r["record_id"] for r in records if r["asset_type"] == "algorithm"}
+    assert records and members and members <= algorithms
     runs = {r["tool"]: r for r in _csv(exp / "_ANALYSIS" / "runs.csv")}
     assert (runs["cipherradar"]["bom_format"], runs["cipherradar"]["spec_version"]) == ("CycloneDX", "1.7")
 

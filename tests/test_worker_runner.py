@@ -37,6 +37,24 @@ def _sleeping_grandchildren() -> set[str]:
 def test_result_is_returned_from_subprocess():
     res = run_job_with_timeout(_ok, INSTR, 5, worker_name="t")
     assert (res.status, res.json) == ("ok", '{"x":1}')
+    assert res.started_at and res.finished_at and res.started_at <= res.finished_at  # UTC ISO, set by the parent
+
+
+def test_trace_fields_usage_reaches_the_result_on_success_and_on_error():
+    from common.models import Trace
+
+    def produce_ok(instr, trace: Trace):
+        trace.fields["usage"] = {"requests": 2, "input_tokens": 10}
+        return '{"ok": true}'
+
+    def produce_fail(instr, trace: Trace):
+        trace.fields["usage"] = {"requests": 1, "requests_failed": 1}
+        raise RuntimeError("api down")
+
+    assert build_handle_instruction("t", produce_ok)(INSTR).usage == {"requests": 2, "input_tokens": 10}
+    failed = build_handle_instruction("t", produce_fail)(INSTR)
+    assert failed.status == "error" and failed.usage == {"requests": 1, "requests_failed": 1}
+    assert JobResult.from_json(failed.to_json()).usage == failed.usage  # survives the pipe to the parent
 
 
 def test_timeout_kills_job_and_its_children():

@@ -1,7 +1,8 @@
 # Engine / rule-set families of the CBOM generators (BF-CBOM 2.0, Phase 2 "engine independence").
 #
 # Tools sharing an engine (or a `voter_group`) count as one voter in the agreement-based scoring
-# (RQ4). `native_cyclonedx` tells whether the tool itself emits CycloneDX (RQ1 validity is measured
+# (RQ4); `merge_group` names a coarser voter the sensitivity analysis can merge them into (`--merge-llm`:
+# the LLM workers, which share prompts and file selection, decided 2026-10-18). `native_cyclonedx` tells whether the tool itself emits CycloneDX (RQ1 validity is measured
 # only for those; for the others our adapter produces the CBOM). `languages` is the tool's declared
 # scope: a repo in another language is "not supported", never "failed" (pilot recommendation).
 # `status`: integrated (worker exists) | candidate (passed the pilot's inclusion bar, worker pending)
@@ -70,7 +71,8 @@ tools:
     approach: LLM reading pre-filtered source files
     native_cyclonedx: true          # assembled by the worker from the model's structured answer
     languages: [java, python, go, javascript, c]
-    voter_group: llm                # sensitivity analysis merges all LLM workers into one voter
+    voter_group: deepseek           # each LLM is its own voter; `--merge-llm` merges them into `merge_group`
+    merge_group: llm
     status: integrated
     pilot: {java: fail, python: fail}   # graded on the OLD url-only worker (no code, no locations); superseded by the rewrite
   chatgpt:
@@ -79,7 +81,8 @@ tools:
     approach: LLM reading pre-filtered source files (same prompts and file selection as deepseek)
     native_cyclonedx: true
     languages: [java, python, go, javascript, c]
-    voter_group: llm
+    voter_group: chatgpt
+    merge_group: llm
     status: integrated              # needs OPENAI_API_KEY (compose profile llm)
   claude:
     engine: llm
@@ -87,7 +90,8 @@ tools:
     approach: LLM reading pre-filtered source files (same prompts and file selection as deepseek)
     native_cyclonedx: true
     languages: [java, python, go, javascript, c]
-    voter_group: llm
+    voter_group: claude
+    merge_group: llm
     status: integrated              # needs ANTHROPIC_API_KEY (compose profile llm)
   cryptoscan:
     engine: cryptoscan               # CSNP CryptoScan 1.4.0, regex pattern catalogue (90+ patterns)
@@ -149,7 +153,7 @@ tools:
     languages: [java, python, go]
     voter_group: ciphersift
     status: integrated              # workers/ciphersift; release pinned in docker/Dockerfile.worker-ciphersift
-    tailored_on: [corpus/micro, corpus/pilot-2026-10-08]   # benchmark-informed rules and defaults (its spec/DECISIONS.md): no held-out data for it
+    tailored_on: [corpus/micro, corpus/pilot-2026-10-08.yaml]   # paths from the repo root; benchmark-informed rules and defaults (its spec/DECISIONS.md): no held-out data for it
     notes: >
       Written from a behavioural specification of Crypsy; its Java/Python rules were converted from the earlier BF-CBOM
       Crypsy adaptation (spec/PROVENANCE.md). Also lists crypto libraries from Maven/Gradle, PyPI and Go manifests.

@@ -1,6 +1,9 @@
 # ====== Project Configuration (edit only here) ======
 VERSION := $(shell cat VERSION 2>/dev/null || echo "0.0.0")
 BASE_IMAGE := bf-cbom/base
+# Git commit of this checkout, stamped into every image (ENV BF_CBOM_COMMIT, last layer) and every JobResult;
+# `-dirty` means the images were built from uncommitted changes
+BF_CBOM_COMMIT := $(shell git describe --always --dirty --abbrev=12 2>/dev/null || echo unknown)
 # Comma-separated list of all workers available in the repo
 AVAILABLE_WORKERS := skeleton,testing,mssbomtool,cbomkit,cdxgen,cryptobomforge,deepseek,cryptoscan,chatgpt,claude,pqcheck,qdarpan,securin-xbom,cipherradar,xgrep,cbomkit-jar,ciphersift,scanoss
 # Comma-separated list of dev-only workers
@@ -89,8 +92,13 @@ down:
 
 # ---- Batch experiments (results stay in the results-data volume; see experiments/README.md) ----
 # make experiment EXP=experiments/e0-smoke.yaml
+# EXPERIMENT_IMAGE_IDS: the worker images on this host by content (recorded per session in <exp>/_run-log.json).
+# EXPERIMENT_REPLICAS="cryptoscan=3,xgrep=2": replicas started with `docker compose up -d --scale worker-<tool>=N`;
+# the memory budget then counts each replica (README "Parallelism and memory").
+EXPERIMENT_REPLICAS ?=
 experiment: ensure-env
-	docker compose run --rm runner experiment run /app/$(EXP) $(ARGS)
+	EXPERIMENT_IMAGE_IDS="$$(docker images --no-trunc --format '{{.Repository}}:{{.Tag}}={{.ID}}' --filter 'reference=bf-cbom/*:$(VERSION)' | paste -sd ',' -)" \
+	docker compose run --rm -e EXPERIMENT_IMAGE_IDS -e EXPERIMENT_REPLICAS runner experiment run /app/$(EXP) $(ARGS)
 
 # make experiment-status NAME=e0-smoke   /   make experiment-list
 experiment-status:

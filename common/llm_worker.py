@@ -62,13 +62,14 @@ def run_llm_worker(
                 deadline=deadline,
             )
         log.info(
-            "%s: %d assets, %d requests for %d chunks, %d+%d tokens",
+            "%s: %d assets, %d requests for %d chunks, %d in + %d out tokens (%s)",
             instr.repo_info.full_name,
             len(cbom["components"]),
             stats.chunks_sent,
             stats.chunks_total,
-            stats.prompt_tokens,
-            stats.completion_tokens,
+            stats.input_tokens,
+            stats.output_tokens,
+            ";".join(sorted(stats.models)) or provider.model,
         )
         return json.dumps(cbom, ensure_ascii=False)
 

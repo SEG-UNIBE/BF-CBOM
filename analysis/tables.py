@@ -2,9 +2,10 @@
 
 Three layers, so that later steps (the normaliser, further n-way matchers) only add files:
 - runs:    one row per stored run (`run<k>.meta.json`), all repetitions;
-- records: one row per extracted item with a stable `record_id`: the call sites (`analysis/sites.py`) and the
-           normalised records (`analysis/normalize/`, joined to the call sites by `site_id`);
-- matches: per matcher a groups table and a long membership table (group_id <-> record_id).
+- records: one row per normalised record (`analysis/normalize/`) with a stable `record_id`
+           (`<tool>:<component>:<occurrence>`; `site_id` = `<tool>:<file>:<line>` for located ones);
+- matches: per matcher (`analysis/matchers/`) a groups table, a long membership table (group_id <-> record_id) and
+           an agreement table (one row per group and dimension).
 
 Join keys: records on (snapshot, variant, run, record_id), groups on (snapshot, variant, run, group_id);
 group ids restart per (snapshot, variant). Lists inside a cell are joined with ";".
@@ -16,34 +17,61 @@ import csv
 import json
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
-from common.experiment import iter_results
+from common.experiment import iter_results, repo_full_name
 
+from .costs import cost_usd, load_prices
 from .groundtruth import TruthProject, TruthScore
-from .match import Cluster
+from .matchers import MatchGroup, agreement
 from .normalize.record import RECORD_COLUMNS, NormRecord
-from .sites import ASSET_COMPONENT_TYPES, Site
 
 LIST_SEP = ";"
+ASSET_COMPONENT_TYPES = ("cryptographic-asset", "crypto-asset")  # the latter: IBM draft 1.4-cbom-1.0
 
 RUNS_COLUMNS = [
-    "repo", "snapshot", "commit", "variant", "variant_commit", "language", "tool", "run",
+    "repo", "snapshot", "commit", "variant", "variant_commit", "language", "tool", "run", "tailored",
     "status", "duration_sec", "size_bytes", "error", "peak_memory_mb", "memory_limit_mb", "oom_kills",
-    "tool_version", "image_ref", "received_at", "bom_format", "spec_version",
+    "enqueued_at", "started_at", "finished_at", "queue_sec", "received_at",
+    "tool_version", "image_ref", "bfcbom_commit", "bom_format", "spec_version",
     "components", "crypto_assets", "algorithm_assets",
-    "requests", "prompt_tokens", "completion_tokens",
+    "requests", "requests_failed", "input_tokens", "cached_input_tokens", "cache_write_tokens", "output_tokens",
+    "reasoning_tokens", "models_answered", "cost_usd", "priced_model", "price_period", "price_table_version",
 ]  # fmt: skip
-SITES_COLUMNS = [
-    "repo", "snapshot", "commit", "variant", "language", "tool", "run",
-    "record_id", "file", "line", "families", "raw", "asset_types", "in_scope",
-]  # fmt: skip
+# JobResult.usage (common/llm_cbom.py:GenerationStats.usage) -> runs.csv columns
+USAGE_COLUMNS = (
+    "requests", "requests_failed", "input_tokens", "cached_input_tokens", "cache_write_tokens", "output_tokens",
+    "reasoning_tokens",
+)  # fmt: skip
 RECORDS_COLUMNS = ["repo", "snapshot", "commit", "variant", "language", "tool", "run"] + RECORD_COLUMNS
 GROUP_KEY_COLUMNS = ["matcher", "repo", "snapshot", "commit", "variant", "run", "group_id", "k", "tools"]
-CALLSITE_GROUP_COLUMNS = GROUP_KEY_COLUMNS + ["file", "line_min", "line_max", "n_sites", "families"]
-MEMBERS_COLUMNS = ["matcher", "snapshot", "variant", "run", "group_id", "record_id", "tool"]
+GROUP_COLUMNS = GROUP_KEY_COLUMNS + [
+    "language",
+    "level",
+    "scope",
+    "key",
+    "voters",
+    "voter_groups",
+    "n_records",
+    "n_sites",
+    "located_voters",
+    "colocated_voters",
+    "file",
+    "line_min",
+    "line_max",
+    "parent",
+    "n_elements",
+    "similarity",
+]  # fmt: skip  (exact: sites/located/parent columns; raqun: n_elements, similarity)
+EXACT_GROUP_COLUMNS = GROUP_COLUMNS
+MEMBERS_COLUMNS = ["matcher", "snapshot", "variant", "run", "group_id", "record_id", "tool", "implied"]
+AGREEMENT_COLUMNS = [
+    "matcher", "repo", "snapshot", "variant", "run", "group_id", "scope", "key", "dimension", "reporting",
+    "agreeing", "majority", "values",
+]  # fmt: skip
 MICRO_COLUMNS = [
-    "project", "language", "tool", "run", "status", "verdict", "n_assets",
+    "project", "language", "tool", "run", "tailored", "status", "verdict", "n_assets",
     "strict", "lenient", "repo", "recall_strict", "recall_lenient", "recall_repo",
     "sites_in_file", "sites_correct", "precision", "passes_bar", "missed", "repo_missed", "repo_extra",
 ]  # fmt: skip
@@ -52,11 +80,6 @@ MICRO_ASSET_COLUMNS = [
     "callsite_strict", "callsite_lenient", "repo",
 ]  # fmt: skip
 
-_LLM_PROPS = {
-    "requests": "bf-cbom:requests",
-    "prompt_tokens": "bf-cbom:prompt-tokens",
-    "completion_tokens": "bf-cbom:completion-tokens",
-}
 _ERROR_MAX = 300
 
 
@@ -111,13 +134,7 @@ def write_csv(path: Path, rows: Iterable[dict], columns: list[str]) -> int:
     return n
 
 
-def full_name(snapshot: str) -> str:
-    """`<owner>__<repo>@<sha12>` -> `<owner>/<repo>`."""
-    return snapshot.split("@", 1)[0].replace("__", "/", 1)
-
-
-def site_record_id(site: Site) -> str:
-    return f"{site.tool}:{site.file}:{site.line}"
+full_name = repo_full_name  # `<owner>__<repo>@<sha12>` -> `<owner>/<repo>`
 
 
 # ----- runs -----
@@ -127,29 +144,54 @@ def _cbom_counts(cbom: dict) -> dict:
     comps = [c for c in cbom.get("components") or [] if isinstance(c, dict)]
     crypto = [c for c in comps if c.get("type") in ASSET_COMPONENT_TYPES]
     algos = [c for c in crypto if (c.get("cryptoProperties") or {}).get("assetType") == "algorithm"]
-    props = {
-        str(p.get("name")): p.get("value")
-        for p in (cbom.get("metadata") or {}).get("properties") or []
-        if isinstance(p, dict)
-    }
-    out = {
+    return {
         "bom_format": cbom.get("bomFormat"),
         "spec_version": cbom.get("specVersion"),
         "components": len(comps),
         "crypto_assets": len(crypto),
         "algorithm_assets": len(algos),
     }
-    out.update({col: props.get(name) for col, name in _LLM_PROPS.items()})
+
+
+def _usage_columns(usage: dict | None, started_at: str | None = None) -> dict:
+    """Token columns from JobResult.usage plus the cost from the price table (analysis/costs.py)."""
+    if not isinstance(usage, dict):
+        return {}
+    out = {col: usage.get(col) for col in USAGE_COLUMNS}
+    out["models_answered"] = LIST_SEP.join(sorted(usage.get("models") or {})) or None
+    cost = cost_usd(usage, started_at=started_at)
+    out.update(
+        cost_usd=cost["cost_usd"],
+        priced_model=cost["priced_model"],
+        price_period=cost["price_period"],
+        price_table_version=load_prices()["version"] if cost["cost_usd"] is not None else None,
+    )
     return out
 
 
-def run_rows(exp_dir: Path, languages: dict[str, str | None] | None = None) -> list[dict]:
-    """One row per stored meta file; CBOM counts only where the CBOM exists and parses."""
+def _seconds_between(start: str | None, end: str | None) -> float | None:
+    try:
+        t0 = datetime.fromisoformat(str(start).replace("Z", "+00:00"))
+        t1 = datetime.fromisoformat(str(end).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    return round((t1 - t0).total_seconds(), 1)
+
+
+def run_rows(
+    exp_dir: Path,
+    languages: dict[str, str | None] | None = None,
+    tailored: dict[str, frozenset[str]] | None = None,
+) -> list[dict]:
+    """One row per stored meta file; CBOM counts only where the CBOM exists and parses. `tailored`: {tool: repos it
+    was tuned on} (refinement 13) for the `tailored` column."""
     languages = languages or {}
+    tailored = tailored or {}
     rows = []
     for meta, cbom_path in iter_results(exp_dir):
         snapshot = cbom_path.parents[2].name
         repo = full_name(snapshot)
+        tool = meta.get("worker") or cbom_path.parent.name
         row = {
             "repo": repo,
             "snapshot": snapshot,
@@ -157,8 +199,9 @@ def run_rows(exp_dir: Path, languages: dict[str, str | None] | None = None) -> l
             "variant": meta.get("variant") or cbom_path.parents[1].name,
             "variant_commit": meta.get("variant_commit"),
             "language": meta.get("language") or languages.get(repo),
-            "tool": meta.get("worker") or cbom_path.parent.name,
+            "tool": tool,
             "run": meta.get("run_index"),
+            "tailored": repo in tailored.get(tool, ()),
             "status": meta.get("status"),
             "duration_sec": meta.get("duration_sec"),
             "size_bytes": meta.get("size_bytes"),
@@ -166,9 +209,15 @@ def run_rows(exp_dir: Path, languages: dict[str, str | None] | None = None) -> l
             "peak_memory_mb": meta.get("peak_memory_mb"),
             "memory_limit_mb": meta.get("memory_limit_mb"),
             "oom_kills": meta.get("oom_kills"),
+            "enqueued_at": meta.get("enqueued_at"),
+            "started_at": meta.get("started_at"),
+            "finished_at": meta.get("finished_at"),
+            "queue_sec": _seconds_between(meta.get("enqueued_at"), meta.get("started_at")),
+            "received_at": meta.get("received_at"),
             "tool_version": meta.get("tool_version"),
             "image_ref": meta.get("image_ref"),
-            "received_at": meta.get("received_at"),
+            "bfcbom_commit": meta.get("bfcbom_commit"),
+            **_usage_columns(meta.get("usage"), meta.get("started_at")),
         }
         if cbom_path.exists():
             try:
@@ -181,43 +230,13 @@ def run_rows(exp_dir: Path, languages: dict[str, str | None] | None = None) -> l
     return rows
 
 
-# ----- records (call sites) -----
-
-
-def site_rows(
-    sites: list[Site], *, snapshot: str, variant: str, run: int, commit: str | None, language: str | None
-) -> list[dict]:
-    base = {
-        "repo": full_name(snapshot),
-        "snapshot": snapshot,
-        "commit": commit,
-        "variant": variant,
-        "language": language,
-        "run": run,
-    }
-    return [
-        {
-            **base,
-            "tool": s.tool,
-            "record_id": site_record_id(s),
-            "file": s.file,
-            "line": s.line,
-            "families": sorted(s.families),
-            "raw": s.raw,
-            "asset_types": s.asset_types,
-            "in_scope": s.in_scope,
-        }
-        for s in sorted(sites, key=lambda s: (s.file, s.line, s.tool))
-    ]
-
-
 # ----- records (normalised) -----
 
 
 def record_rows(
     records: list[NormRecord], *, snapshot: str, variant: str, run: int, commit: str | None, language: str | None
 ) -> list[dict]:
-    """Normalised records (analysis/normalize/) of one CBOM; `site_id` joins `sites-run<k>.csv`."""
+    """Normalised records (analysis/normalize/) of one CBOM."""
     base = {
         "repo": full_name(snapshot),
         "snapshot": snapshot,
@@ -234,50 +253,44 @@ def record_rows(
 
 def group_rows(
     matcher: str,
-    groups: list[tuple[str, list[tuple[str, str]], dict]],
+    groups: list[MatchGroup],
     *,
     snapshot: str,
     variant: str,
     run: int,
     commit: str | None,
-) -> tuple[list[dict], list[dict]]:
-    """Groups and membership rows of any matcher.
-
-    `groups` holds (group_id, [(record_id, tool), ...], extra columns) per match group.
-    """
+    language: str | None = None,
+    voter_of: dict[str, str] | None = None,
+) -> tuple[list[dict], list[dict], list[dict]]:
+    """Groups, membership and agreement rows of any matcher's groups for one (snapshot, variant)."""
     base = {"matcher": matcher, "snapshot": snapshot, "variant": variant, "run": run}
-    g_rows, m_rows = [], []
-    for group_id, members, extra in groups:
-        tools = sorted({t for _, t in members})
+    g_rows, m_rows, a_rows = [], [], []
+    for g in groups:
+        voters = g.voters(voter_of)
         g_rows.append(
             {
                 **base,
                 "repo": full_name(snapshot),
                 "commit": commit,
-                "group_id": group_id,
-                "k": len(tools),
-                "tools": tools,
-                **extra,
+                "language": language,
+                "group_id": g.group_id,
+                "k": g.k,
+                "tools": g.tools,
+                "scope": g.scope,
+                "key": g.key,
+                "voters": voters,
+                "voter_groups": len(voters),
+                **g.extra,
             }
         )
-        m_rows += [{**base, "group_id": group_id, "record_id": rid, "tool": t} for rid, t in members]
-    return g_rows, m_rows
-
-
-def callsite_groups(clusters: list[Cluster]) -> list[tuple[str, list[tuple[str, str]], dict]]:
-    """Adapter: call-site matcher (`analysis/match.py`) clusters -> generic match groups."""
-    out = []
-    for c in clusters:
-        members = [(site_record_id(m), m.tool) for m in sorted(c.members, key=lambda s: (s.line, s.tool))]
-        extra = {
-            "file": c.file,
-            "line_min": c.line_min,
-            "line_max": c.line_max,
-            "n_sites": len(c.members),
-            "families": [f"{name}:{n}" for name, n in c.families.most_common()],
-        }
-        out.append((c.id, members, extra))
-    return out
+        for r in g.members:
+            member = {"group_id": g.group_id, "record_id": r.record_id, "tool": r.tool}
+            m_rows.append({**base, **member, "implied": r.record_id in g.implied})
+        a_rows += [
+            {**base, "repo": full_name(snapshot), "group_id": g.group_id, "scope": g.scope, "key": g.key, **row}
+            for row in agreement(g, voter_of=voter_of)
+        ]
+    return g_rows, m_rows, a_rows
 
 
 # ----- micro ground truth -----
@@ -291,6 +304,7 @@ class MicroEntry:
     tool: str
     status: str  # status of the run (meta file); `missing` when the tool has no stored run on the project
     score: TruthScore | None = None
+    tailored: bool = False  # the tool was tuned on this project (tools.yaml tailored_on, refinement 13)
 
 
 def micro_verdict(status: str, score: TruthScore | None) -> str:
@@ -310,6 +324,7 @@ def micro_rows(entries: list[MicroEntry], *, run: int) -> list[dict]:
             "language": e.project.language,
             "tool": e.tool,
             "run": run,
+            "tailored": e.tailored,
             "status": e.status,
             "verdict": micro_verdict(e.status, s),
             "n_assets": len(e.project.assets),

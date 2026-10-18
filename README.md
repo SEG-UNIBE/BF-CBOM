@@ -387,7 +387,7 @@ Each `JobResult` records `tool_version` (reported by the worker, e.g. `cdxgen 12
 Reproducible, resumable batch runs for the research agenda described in `CLAUDE.md`. Everything they produce stays inside Docker named volumes:
 
 - `gitserver`: a read-only smart-HTTP git server on the compose network. The runner mirrors every repo there at its pinned commit (volume `git-data`); mutants are branches `bfcbom/<variant>`. Each snapshot is served as its own small bare repo `<owner>/<repo>--<sha12>.git` (objects shared with the mirror, HEAD on the snapshot branch), which workers scan. CBOMkit insists on `https://` and drops `.git`, so the server also speaks TLS with a self-signed certificate (volume `git-certs`) that the CBOMkit worker trusts.
-- `runner`: an on-demand container running `bf-cbom experiment ...`. Results land in the `results-data` volume as `<exp>/<owner>__<repo>@<sha12>/<variant>/<tool>/run<k>.json` plus a `run<k>.meta.json` with status, duration, tool version, image and the container's peak RAM; `_experiment.yaml`, `_run-log.json` (sessions, host RAM, peak RAM) and `_ANALYSIS/` sit on top of each experiment folder.
+- `runner`: an on-demand container running `bf-cbom experiment ...`. Results land in the `results-data` volume as `<exp>/<owner>__<repo>@<sha12>/<variant>/<tool>/run<k>.json` plus a `run<k>.meta.json` with status, duration, timing, tool version, image, the BF-CBOM commit the image was built from, the container's peak RAM and (LLM workers) the token usage; `_experiment.yaml`, `_run-log.json` (sessions, host RAM, peak RAM) and `_ANALYSIS/` sit on top of each experiment folder.
 
 ```bash
 make experiment EXP=experiments/e0-smoke.yaml   # pin, mirror, enqueue, collect (resumable)
@@ -397,16 +397,17 @@ make corpus ARGS="--per-language 100"           # stratified GitHub corpus with 
 make experiment EXP=experiments/e0-micro.yaml   # every tool on the hand-written micro projects (corpus/micro)
 make analysis ARGS="report e0-micro"            # everything below in one pass + _ANALYSIS/_SUMMARY.md (Markdown tables)
 make analysis ARGS="normalize e0-micro"         # every CBOM -> normalised records, one adapter spec per tool (analysis/adapters/)
+make analysis ARGS="schema e0-micro"            # RQ1: CycloneDX validity, meaningful shares, traceability (--fetch on a laptop)
 make analysis ARGS="levels e0-micro"            # how much agreement normalisation creates (levels L0 raw to L4 tool specs)
 make analysis ARGS="micro e0-micro"             # recall (call site and repo level) and precision per tool against corpus/micro/ground_truth.yaml
-make analysis ARGS="sites e0-micro"             # legacy: location-aware agreement between tools (analysis/match.py)
-make analysis ARGS="tables e0-micro"            # flat CSV tables (runs, sites, records, clusters, micro) for pandas/R
+make analysis ARGS="tables e0-micro"            # flat CSV tables (runs, records, exact-matcher groups, micro) for pandas/R
+make analysis ARGS="score e0-micro"             # RQ4: confirmation, exclusivity, Dawid-Skene, leave-one-out, CIs; stability
 ```
 
 #### Parallelism and Memory
 
 - **One job per worker container.** Each worker pops one job from its Redis queue, runs the tool in a subprocess, pushes the result and only then takes the next job. A batch therefore has as many jobs in flight as there are worker containers: with `make up-prod` that is one per generator, each working on a different repository. Queued jobs cost nothing but a Redis list entry, so the size of a batch never affects memory.
-- **More throughput: replicas.** Workers are stateless, so a tool can be scaled to several containers that share the same queue: `docker compose up -d --scale worker-cryptoscan=3`. The runner needs no change. Each replica has the full memory limit of its service.
+- **More throughput: replicas.** Workers are stateless, so a tool can be scaled to several containers that share the same queue: `docker compose up -d --scale worker-cryptoscan=3`. Each replica has the full memory limit of its service, so tell the runner: `make experiment EXP=... EXPERIMENT_REPLICAS="cryptoscan=3"` counts the tool three times in the memory budget and records the replicas in `_run-log.json`. Untested beyond one replica per tool so far (verify on the VM).
 - **Memory limits are caps, not reservations.** Every worker has a memory limit in `docker-compose.yml` (8 GiB for the two CBOMkit workers, 6 GiB for CryptobomForge, 4 GiB for most others). They sum to roughly 57 GiB for the thirteen generators, far more than a laptop's Docker VM (Docker Desktop defaults to a fraction of the host RAM). Idle workers use little, but on large repositories the JVM and CodeQL based tools grow towards their caps, and if the VM itself runs out of memory the kernel kills arbitrary containers.
 - **Memory budget (waves).** `EXPERIMENT_MEMORY_BUDGET_GB` in the `Makefile` (default 14, meant for a Docker VM of about 20 GiB) caps the summed limits of the tools a batch feeds at the same time. The runner packs the tools into waves, largest first, runs one wave to completion, then starts the next; the plan is printed before anything is enqueued. With all thirteen generators the default gives five waves. On a machine with enough RAM set the budget to 0 (one wave, everything in parallel), either per call or once in the `Makefile`:
 
@@ -414,7 +415,7 @@ make analysis ARGS="tables e0-micro"            # flat CSV tables (runs, sites, 
   make experiment EXP=experiments/e1-pilot-corpus.yaml EXPERIMENT_MEMORY_BUDGET_GB=0
   ```
 
-  The per-tool numbers come from `memory_gb` in `common/tools.yaml`, which a test keeps equal to the compose limits; adjust both when changing a limit. The budget assumes one replica per tool, so with `--scale` count each replica.
+  The per-tool numbers come from `memory_gb` in `common/tools.yaml`, which a test keeps equal to the compose limits; adjust both when changing a limit. With `--scale`, set `EXPERIMENT_REPLICAS` so the budget counts each replica. Stored experiments can be browsed in the UI's Experiments page (read-only: summary, runs table, CSV downloads).
 - **Interactive batch inspection.** The Streamlit UI applies the same budget: the Setup page shows the wave plan for the selected workers, and when an inspection starts, jobs for workers outside the first wave are created as *held* (⏸️ in the grid) and queued only once every job of the current wave has finished. A background thread in the coordinator advances the waves, so the browser tab can be closed; it starts with the first page view after the coordinator (re)starts.
 
 See `experiments/README.md` for the spec format and `corpus/README.md` for the repository lists and fixtures (plain directories such as `corpus/micro/java` are published to the git server as deterministic commits). The offline analysis library lives in `analysis/`. `make clean-docker` keeps the volumes; `docker compose down -v` removes them.

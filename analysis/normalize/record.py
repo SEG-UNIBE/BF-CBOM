@@ -36,7 +36,7 @@ class NormRecord:
     src: dict = field(default_factory=dict)  # dim -> JSON path / source it was read from ("derived:<dim>")
     via: dict = field(
         default_factory=dict
-    )  # dim -> field | vocabulary | dictionary | parse | api | dependency | ref | derived
+    )  # dim -> field | vocabulary | dictionary | interpretive | parse | api | dependency | ref | derived
     file: str | None = None
     line: int | None = None
     line_end: int | None = None

@@ -12,6 +12,8 @@ from pathlib import Path
 import yaml
 
 TOOLS_YAML = Path(os.getenv("TOOLS_YAML", str(Path(__file__).with_name("tools.yaml"))))
+# `tailored_on` entries are paths relative to the repository root (corpus YAMLs, fixture directories).
+REPO_ROOT = TOOLS_YAML.resolve().parent.parent
 # For tools missing from the registry (dev workers such as `testing`): a small, explicit placeholder.
 DEFAULT_MEMORY_GB = 1.0
 
@@ -35,6 +37,42 @@ def tool_memory_gb(tool: str, tools: dict[str, dict] | None = None, default: flo
         return float(value) if value is not None else float(default)
     except (TypeError, ValueError):
         return float(default)
+
+
+def voter_groups(tools: dict[str, dict] | None = None, *, merge_llm: bool = False) -> dict[str, str]:
+    """tool -> voter group (`voter_group`, else the tool itself). Tools of one group share an engine or rule set and
+    count as one voter (RQ4). With `merge_llm`, tools that declare a `merge_group` (the LLM workers: shared prompts
+    and file selection) are merged into it, the sensitivity analysis of CLAUDE.md Phase 2."""
+    out = {}
+    for tool, info in (tools if tools is not None else load_tools()).items():
+        group = str(info.get("voter_group") or tool)
+        if merge_llm and info.get("merge_group"):
+            group = str(info["merge_group"])
+        out[tool] = group
+    return out
+
+
+def tailored_repos(tool: str, tools: dict[str, dict] | None = None, root: Path = REPO_ROOT) -> frozenset[str]:
+    """Repositories a tool was tuned on (`tailored_on`, refinement 13), as `owner/name` full names: a corpus YAML
+    contributes its `repos`, a fixture directory such as corpus/micro one `bfcbom/<dir>-<child>` per sub-directory
+    (the naming of experiments/e0-micro.yaml). Unknown entries are ignored."""
+    entry = (tools if tools is not None else load_tools()).get(tool) or {}
+    names: set[str] = set()
+    for item in entry.get("tailored_on") or []:
+        path = root / str(item)
+        if path.is_file():
+            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            names.update(str(r.get("full_name")) for r in data.get("repos") or [] if r.get("full_name"))
+        elif path.is_dir():
+            names.update(f"bfcbom/{path.name}-{child.name}" for child in path.iterdir() if child.is_dir())
+    return frozenset(names)
+
+
+def tailored_map(tools: dict[str, dict] | None = None, root: Path = REPO_ROOT) -> dict[str, frozenset[str]]:
+    """{tool: tailored repos} for every tool with a non-empty `tailored_on`."""
+    tools = tools if tools is not None else load_tools()
+    out = {t: tailored_repos(t, tools, root) for t in tools}
+    return {t: r for t, r in out.items() if r}
 
 
 def plan_waves(

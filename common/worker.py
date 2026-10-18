@@ -27,6 +27,10 @@ _PUSH_ATTEMPTS = 6
 HEARTBEAT_TTL_SEC = max(30, BLPOP_TIMEOUT_SEC * 3)
 
 
+def _now_iso() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
 def heartbeat_key(worker_name: str) -> str:
     return f"worker:{worker_name}:alive"
 
@@ -109,6 +113,7 @@ def run_job_with_timeout(
         name=f"{worker_name}-job-{instr.job_id[:8]}",
     )
     sampler = JobSampler()
+    started_at = _now_iso()
     start = time.monotonic()
     proc.start()
     child_conn.close()
@@ -143,7 +148,7 @@ def run_job_with_timeout(
         if proc.is_alive():
             _kill_process_group(proc, log)
         parent_conn.close()
-        return _with_resources(JobResult.from_json(payload), sampler)
+        return _with_provenance(JobResult.from_json(payload), sampler, started_at)
 
     if proc.is_alive():
         log.error("Job %s timed out after %.1fs; killing job process", instr.job_id, elapsed)
@@ -163,10 +168,12 @@ def run_job_with_timeout(
         worker=worker_name,
         error=error,
     )
-    return _with_resources(result, sampler)
+    return _with_provenance(result, sampler, started_at)
 
 
-def _with_resources(result: JobResult, sampler: JobSampler) -> JobResult:
+def _with_provenance(result: JobResult, sampler: JobSampler, started_at: str) -> JobResult:
+    """Timing and container resources of the job, measured by the parent process."""
+    result.started_at, result.finished_at = started_at, _now_iso()
     for key, value in sampler.result().items():
         setattr(result, key, value)
     return result
@@ -203,14 +210,16 @@ def run_worker(
     - Pushes results to `results:{name}`
 
     Provenance: every result carries `tool_version` (argument, else env TOOL_VERSION), the
-    image it ran in (env BF_CBOM_IMAGE, set in docker-compose.yml) and the instruction's run_index.
+    image it ran in (env BF_CBOM_IMAGE, set in docker-compose.yml), the BF-CBOM commit the image was built from
+    (env BF_CBOM_COMMIT, stamped by the Dockerfiles) and the instruction's run_index.
     """
 
     log = logger or logging.getLogger(name)
     timeout_sec = int(os.getenv(timeout_env_var, str(default_timeout)))
     tool_version = tool_version or os.getenv("TOOL_VERSION") or None
     image_ref = os.getenv("BF_CBOM_IMAGE") or None
-    log.info("tool_version=%s image=%s", tool_version, image_ref)
+    bfcbom_commit = os.getenv("BF_CBOM_COMMIT") or None
+    log.info("tool_version=%s image=%s bf-cbom=%s", tool_version, image_ref, bfcbom_commit)
 
     r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True, socket_timeout=REDIS_SOCKET_TIMEOUT_SEC)
     log.info(f"{name} worker listening for jobs... (queue: jobs:{name})")
@@ -249,6 +258,7 @@ def run_worker(
 
         result.tool_version = result.tool_version or tool_version
         result.image_ref = image_ref
+        result.bfcbom_commit = bfcbom_commit
         result.run_index = instr.run_index
 
         if _push_result(r, name, result, log):
@@ -329,6 +339,7 @@ def build_handle_instruction(
             worker=name,
             error=error_msg,
             notes=notes,
+            usage=trace.fields.get("usage"),
         )
 
     return _handle

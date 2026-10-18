@@ -15,7 +15,7 @@ from collections import Counter, defaultdict
 
 from .record import ASSET_DIMS, NormalizedCbom, unmapped_text
 
-VOCAB_COLUMNS = ["tool", "source", "raw", "status", "mapped", "unmapped_tokens", "via", "count"]
+VOCAB_COLUMNS = ["tool", "source", "raw", "status", "mapped", "unmapped_tokens", "via", "interpretive", "count"]
 COVERAGE_COLUMNS = [
     "tool", "cboms", "algorithm_records", "dimension", "reported", "derived", "reported_share", "derived_share",
 ]  # fmt: skip
@@ -199,6 +199,7 @@ class Report:
                     "mapped": ";".join(f"{d}={'|'.join(v) if isinstance(v, tuple) else v}" for d, v in mapped.items()),
                     "unmapped_tokens": " ".join(t for t in e["tokens"] if t != "*"),
                     "via": ";".join(sorted(e["via"])),
+                    "interpretive": "interpretive" in e["via"],
                     "count": e["count"],
                 }
             )

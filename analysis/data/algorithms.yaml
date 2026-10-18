@@ -6,8 +6,13 @@
 # hand and published with the paper (it is the per-field mapping table of RQ3). Rule: a spelling only one tool uses
 # goes into that tool's dictionary (analysis/adapters/<tool>.yaml); once two tools use it, it moves here.
 #
-# Seeded on 2026-10-16 from the distinct values of 124 CBOMs of 11 tools (experiment e1-pilot-corpus).
-version: "2026-10-16.1"
+# Seeded on 2026-10-16 from the distinct values of 124 CBOMs of 11 tools (experiment e1-pilot-corpus). Frozen since
+# 2026-10-18 (analysis/data/CHANGELOG.md, tests/test_vocab_frozen.py): the pilot corpus is the development set, every
+# later edit bumps `version` with a reason. Rule for what belongs here: a spelling traceable to a standard or an official
+# API (registry, RFC 7518 JOSE, RFC 4253/8332 SSH, JCA standard names, OS and library APIs) stays, however many tools
+# use it; a label a tool invented (rule names, category labels) goes into that tool's spec, where `interpretive: true`
+# marks mappings that are judgements rather than spellings (they count at L4 only, analysis/levels.py).
+version: "2026-10-18.1"
 
 # Coarse groups (the family names of analysis/data/families.yaml, used by the call-site matcher and the micro ground
 # truth) -> the registry families and additions they contain. Every registry family must appear exactly once.
@@ -125,12 +130,30 @@ families:
   HKDF: [HKDF]
   SP800-56C: [ConcatenationKDF, ConcatKDF, Concat-KDF]
   CSPRNG: [DRBG, SecureRandom, CSPRNG, csprng]
-  PRNG: [rand, insecure-random, weak-random, PRNG]
+  PRNG: [insecure-random, weak-random, PRNG]   # a bare `rand` is ambiguous (C rand() vs OpenSSL RAND): unmapped
   ML-KEM: [MLKEM, Kyber, ML_KEM]
   ML-DSA: [MLDSA, Dilithium, ML_DSA]
   SLH-DSA: [SLHDSA, SPHINCS, SPHINCS+, SPHINCSPlus]
   FN-DSA: [Falcon]
   Hybrid-KEM: [hybrid]
+
+# What a record implies about other algorithms (CLAUDE.md refinement 2): some tools expand such hierarchies (CBOMkit
+# lists SHA-256 next to HMAC-SHA256), others do not, so without this an expanding tool looks "exclusive" by
+# construction. Applied as an optional closure of a tool's per-repository set (`--closure` in `levels`/`report`;
+# matchers and scoring report both). Two generic rules live in the code (Vocabulary.implied): a record's `digest`
+# implies that hash algorithm (HMAC-SHA256 -> SHA-256, SHA256withECDSA -> SHA-256), and an algorithm implies its
+# family. This table adds what a name does not spell out; protocols never imply cipher suites unless the record
+# names them.
+implies:
+  PBKDF2: [HMAC]
+  PBES2: [PBKDF2, HMAC]
+  PBES1: [PBKDF1]
+  TOTP: [HMAC]
+  HOTP: [HMAC]
+  Ed25519: [SHA-512]
+  Ed448: [SHAKE256]
+  ECIES: [ECDH]
+  X25519MLKEM768: [X25519, ML-KEM-768]
 
 curves:   # extra spellings; the registry's OID-equal names are aliases already
   secp256r1: [nistp256, NIST-P-256, P256, prime-256-v1]
@@ -345,9 +368,7 @@ names:
   # random generators named by their API
   crypto/rand: {family: CSPRNG}
   math/rand: {family: PRNG}
-  math-rand: {family: PRNG}
   math-random: {family: PRNG}
-  math-random-security: {family: PRNG}
   Math.random: {family: PRNG}
   java.util.Random: {family: PRNG}
   random.Random: {family: PRNG}
@@ -361,10 +382,8 @@ names:
   randombytes: {family: CSPRNG}
   RAND_bytes: {family: CSPRNG}
   RAND_status: {family: CSPRNG}
-  RAND: {family: CSPRNG}
+  OpenSSL RAND: {family: CSPRNG}   # the API module by name; a bare RAND/rand is ambiguous (C rand()) and unmapped
   /dev/urandom: {family: CSPRNG}
-  weak-rand: {family: PRNG}
-  Weak PRNG: {family: PRNG}
   # other identifiers
   Fernet: {family: AES, key_size: 128, mode: CBC, digest: SHA-256, primitive: ae}
   MD5-crypt: {family: crypt, algorithm: MD5-crypt, digest: MD5}

@@ -22,3 +22,7 @@ ENV PYTHONPATH=/app
 ENV STREAMLIT_CONFIG=coordinator/.streamlit/config.toml
 
 ENTRYPOINT ["tini", "-g", "--", "uv", "run", "--frozen", "--no-dev", "streamlit", "run", "coordinator/0_Start.py", "--server.port=8501", "--server.address=0.0.0.0"]
+
+# BF-CBOM commit this image was built from (compose/bake pass it; last, so it never invalidates the layers above)
+ARG BF_CBOM_COMMIT=unknown
+ENV BF_CBOM_COMMIT=${BF_CBOM_COMMIT}

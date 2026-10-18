@@ -103,6 +103,11 @@ class ExperimentSpec:
         return sum(len(r.variants) for r in self.repos) * len(self.tools) * self.repetitions
 
 
+def _opt_str(value) -> str | None:
+    text = str(value).strip() if value is not None else ""
+    return text or None
+
+
 def _as_repo_spec(item: dict, *, base_dir: Path | None = None) -> RepoSpec:
     full_name = str(item.get("full_name") or "").strip()
     if full_name.count("/") != 1:
@@ -125,7 +130,7 @@ def _as_repo_spec(item: dict, *, base_dir: Path | None = None) -> RepoSpec:
     return RepoSpec(
         full_name=full_name,
         git_url=item.get("git_url") or None,
-        branch=item.get("branch") or None,
+        branch=_opt_str(item.get("branch")),  # YAML reads `1.8` as a float: branches are strings
         commit=commit,
         language=item.get("language") or None,
         stars=item.get("stars"),
@@ -179,50 +184,25 @@ def spec_from_dict(data: dict, *, base_dir: Path | None = None) -> ExperimentSpe
 SPEC_FILE = "_experiment.yaml"
 RUN_LOG_FILE = "_run-log.json"
 ANALYSIS_DIR = "_ANALYSIS"
-# Names before 2026-10-18; read as a fallback, renamed (spec) or dropped (generated analysis) by migrate_layout
-LEGACY_SPEC_FILE = "experiment.yaml"
-LEGACY_ANALYSIS_DIR = "analysis"
 
 
 def spec_path(exp_dir: Path) -> Path:
-    """The stored spec copy of an experiment (the legacy name for one not yet migrated)."""
-    new, old = exp_dir / SPEC_FILE, exp_dir / LEGACY_SPEC_FILE
-    return old if old.exists() and not new.exists() else new
+    """The stored spec copy of an experiment."""
+    return exp_dir / SPEC_FILE
 
 
 def analysis_dir(exp_dir: Path) -> Path:
     return exp_dir / ANALYSIS_DIR
 
 
-def migrate_layout(exp_dir: Path) -> list[str]:
-    """Bring an experiment stored before 2026-10-18 to the current names; returns what was changed.
-
-    The spec copy is renamed. The old `analysis/` folder holds only regenerated output (`analysis report`), so it is
-    removed rather than moved, which keeps stale files from mixing with fresh ones.
-    """
-    changed = []
-    old_spec, old_analysis = exp_dir / LEGACY_SPEC_FILE, exp_dir / LEGACY_ANALYSIS_DIR
-    if old_spec.is_file():
-        if (exp_dir / SPEC_FILE).exists():
-            old_spec.unlink()
-        else:
-            old_spec.replace(exp_dir / SPEC_FILE)
-        changed.append(f"{LEGACY_SPEC_FILE} -> {SPEC_FILE}")
-    if old_analysis.is_dir():
-        shutil.rmtree(old_analysis)
-        changed.append(f"removed {LEGACY_ANALYSIS_DIR}/ (regenerated as {ANALYSIS_DIR}/)")
-    return changed
-
-
 def write_spec_copy(exp_dir: Path, spec: ExperimentSpec) -> Path:
-    migrate_layout(exp_dir)
-    path = exp_dir / SPEC_FILE
+    path = spec_path(exp_dir)
     path.write_text(yaml.safe_dump(spec_to_dict(spec), sort_keys=False), encoding="utf-8")
     return path
 
 
 def is_experiment(exp_dir: Path) -> bool:
-    return (exp_dir / SPEC_FILE).exists() or (exp_dir / LEGACY_SPEC_FILE).exists()
+    return spec_path(exp_dir).exists()
 
 
 def load_run_log(exp_dir: Path) -> list[dict]:
@@ -250,6 +230,11 @@ def experiment_dir(name: str, results_dir: Path = RESULTS_DIR) -> Path:
 
 def repo_dir_name(full_name: str, commit: str) -> str:
     return f"{full_name.replace('/', '__')}@{commit[:12]}"
+
+
+def repo_full_name(dir_name: str) -> str:
+    """`<owner>__<repo>@<sha12>` -> `<owner>/<repo>` (the inverse of repo_dir_name)."""
+    return dir_name.split("@", 1)[0].replace("__", "/", 1)
 
 
 def result_paths(
@@ -532,6 +517,7 @@ class PlannedJob:
     snapshot: Snapshot
     tool: str
     run_index: int
+    enqueued_at: str | None = None  # set by the runner when the job is pushed to its queue (UTC ISO)
 
     def instruction(self) -> JobInstruction:
         return JobInstruction(
@@ -635,6 +621,7 @@ def write_result(exp_dir: Path, job: PlannedJob, result: JobResult) -> Path:
             "variant_commit": job.snapshot.variant_commit,
             "base_commit": job.snapshot.commit,
             "source_url": job.snapshot.source_url,
+            "enqueued_at": job.enqueued_at,
             "received_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         }
     )

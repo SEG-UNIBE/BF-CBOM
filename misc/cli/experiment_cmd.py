@@ -98,12 +98,47 @@ def _running_key(name: str) -> str:
 
 def _job_from_descriptor(job_id: str, desc: dict) -> PlannedJob:
     return PlannedJob(
-        job_id=job_id, snapshot=Snapshot(**desc["snapshot"]), tool=desc["tool"], run_index=int(desc["run_index"])
+        job_id=job_id,
+        snapshot=Snapshot(**desc["snapshot"]),
+        tool=desc["tool"],
+        run_index=int(desc["run_index"]),
+        enqueued_at=desc.get("enqueued_at"),
     )
 
 
 def _descriptor(job: PlannedJob) -> str:
-    return json.dumps({"tool": job.tool, "run_index": job.run_index, "snapshot": job.snapshot.__dict__})
+    return json.dumps(
+        {
+            "tool": job.tool,
+            "run_index": job.run_index,
+            "enqueued_at": job.enqueued_at,
+            "snapshot": job.snapshot.__dict__,
+        }
+    )
+
+
+def parse_replicas(raw: str | None) -> dict[str, int]:
+    """`"cryptoscan=3,xgrep=2"` -> {"cryptoscan": 3, "xgrep": 2}: how many containers of a worker run (started with
+    `docker compose up -d --scale worker-<tool>=N`); the memory budget counts every replica."""
+    out = {}
+    for item in (raw or "").split(","):
+        tool, _, n = item.strip().partition("=")
+        if tool and n.strip().isdigit() and int(n) > 1:
+            out[tool] = int(n)
+    return out
+
+
+def worker_image_ids(tools: list[str], env: str | None = None) -> dict[str, str]:
+    """{tool: image id} of the worker images on the host, from EXPERIMENT_IMAGE_IDS as the Makefile's `experiment`
+    target sets it (`repo:tag=id,...` from `docker images --no-trunc`): the images that run the jobs, by content."""
+    raw = os.getenv("EXPERIMENT_IMAGE_IDS", "") if env is None else env
+    by_tool = {}
+    for item in raw.split(","):
+        ref, _, image_id = item.strip().partition("=")
+        name = ref.rsplit(":", 1)[0].rsplit("/", 1)[-1]  # bf-cbom/worker-cdxgen:1.0.3 -> worker-cdxgen
+        if name.startswith("worker-") and image_id:
+            by_tool[name[len("worker-") :]] = image_id
+    return {t: by_tool[t] for t in tools if t in by_tool}
 
 
 def _err(msg: str, code: int = 1):
@@ -117,7 +152,7 @@ class _Session:
 
     SAVE_EVERY_SEC = 60.0
 
-    def __init__(self, exp_dir: Path, command: str, **fields):
+    def __init__(self, exp_dir: Path, command: str, *, tools: list[str] = (), **fields):
         self.exp_dir = exp_dir
         self.host = HostSampler()
         self.entry = {
@@ -126,6 +161,8 @@ class _Session:
             "started_at": now_iso(),
             "status": "running",
             "runner_image": os.getenv("BF_CBOM_IMAGE"),
+            "runner_commit": os.getenv("BF_CBOM_COMMIT"),  # `-dirty` = built from uncommitted changes
+            "images": worker_image_ids(list(tools)),
             "host": {
                 "cpus": os.cpu_count(),
                 "ram_total_mb": self.host.total_mb,
@@ -241,7 +278,14 @@ def run(
         err=True,
     )
     registry = load_tools()
-    memory = {t: tool_memory_gb(t, registry) for t in spec.tools}
+    replicas = parse_replicas(os.getenv("EXPERIMENT_REPLICAS"))
+    memory = {t: tool_memory_gb(t, registry) * replicas.get(t, 1) for t in spec.tools}
+    if replicas:
+        typer.secho(
+            "replicas (EXPERIMENT_REPLICAS): " + ", ".join(f"{t} x{n}" for t, n in sorted(replicas.items())),
+            fg=typer.colors.BLUE,
+            err=True,
+        )
     pending_tools = {j.tool for j in pending.values()}
     active_tools = [t for t in spec.tools if t in pending_tools or any(j.tool == t for j in jobs)]
     waves = plan_waves(active_tools, budget_gb=memory_budget_gb, memory_gb=memory, first=sorted(pending_tools))
@@ -285,10 +329,12 @@ def run(
     session = _Session(
         exp_dir,
         "run",
+        tools=active_tools,
         started_at=started_at,
         memory_budget_gb=memory_budget_gb,
         waves=waves,
         memory_gb={t: memory[t] for t in active_tools},
+        replicas=replicas,
         jobs_enqueued=len(jobs),
         jobs_pending_before=len(pending),
         jobs_on_disk_before=skipped,
@@ -328,6 +374,7 @@ def _run_waves(
         wave_jobs = [j for j in jobs if j.tool in wave]
         pipe = r.pipeline()
         for job in wave_jobs:
+            job.enqueued_at = now_iso()
             pipe.hset(JOB_ROUTING_KEY, job.job_id, _route_key(spec.name))
             pipe.hset(_pending_key(spec.name), job.job_id, _descriptor(job))
             pipe.rpush(f"jobs:{job.tool}", job.instruction().to_json())
@@ -487,7 +534,7 @@ def collect(
         _print_summary(exp_dir)
         return
     stored = int(r.hget(_status_key(name), "stored_jobs") or 0)
-    session = _Session(exp_dir, "collect", jobs_pending_before=len(pending))
+    session = _Session(exp_dir, "collect", tools=tools, jobs_pending_before=len(pending))
     outcome = "interrupted"
     try:
         _collect(
@@ -621,3 +668,29 @@ def corpus_build(
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(yaml.safe_dump(corpus, sort_keys=False), encoding="utf-8")
     typer.echo(f"wrote {len(corpus['repos'])} repos to {out} (stats: {corpus['stats']})")
+    typer.echo(f"excluded with reasons: {len(corpus['excluded'])} (listed under `excluded` in the file)")
+
+
+PRUNE_IN_OPT = typer.Option(..., "--in", help="Corpus YAML to prune")
+PRUNE_FROM_OPT = typer.Option(..., "--from", help="Experiment whose timed-out runs drop a repo")
+PRUNE_OUT_OPT = typer.Option(None, "--out", "-o", help="Output YAML (default: <in>-pruned.yaml next to it)")
+PRUNE_STATUSES_OPT = typer.Option("timeout", help="Comma-separated run statuses that drop a repo")
+
+
+@corpus_app.command("prune")
+def corpus_prune(
+    source: Path = PRUNE_IN_OPT,
+    from_experiment: str = PRUNE_FROM_OPT,
+    out: Path = PRUNE_OUT_OPT,
+    statuses: str = PRUNE_STATUSES_OPT,
+):
+    """Drop the repos where a tool timed out in an earlier experiment (E0; CLAUDE.md refinement 11), with reasons."""
+    exp_dir = experiment_dir(from_experiment)
+    if not is_experiment(exp_dir):
+        _err(f"no experiment '{from_experiment}' under {RESULTS_DIR}")
+    corpus = yaml.safe_load(source.read_text(encoding="utf-8")) or {}
+    kinds = tuple(k.strip() for k in statuses.split(",") if k.strip())
+    pruned = corpus_mod.prune_corpus(corpus, exp_dir, statuses=kinds)
+    target = out or source.with_name(source.stem + "-pruned.yaml")
+    target.write_text(yaml.safe_dump(pruned, sort_keys=False), encoding="utf-8")
+    typer.echo(f"kept {len(pruned['repos'])} repos, pruned {len(pruned['pruned'])}: {target}")

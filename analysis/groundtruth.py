@@ -8,8 +8,7 @@ and gives recall/precision per tool on the hand-written micro projects, at two l
   tools without locations get a number too. Assets sharing a family (two RSA, two EC, two AES) are found together
   at this level.
 
-`score_records` scores the normalised records (analysis/normalize/) and is what `analysis micro` uses;
-`score_sites` scores the legacy call-site extraction (analysis/sites.py) and goes when that is retired.
+`score_records` scores the normalised records (analysis/normalize/) and is what `analysis micro` uses.
 """
 
 from __future__ import annotations
@@ -20,8 +19,6 @@ from functools import lru_cache
 from pathlib import Path
 
 import yaml
-
-from .sites import Site
 
 DEFAULT_TRUTH = Path(
     os.getenv("GROUND_TRUTH_PATH") or Path(__file__).resolve().parents[1] / "corpus" / "micro" / "ground_truth.yaml"
@@ -91,7 +88,7 @@ class TruthScore:
     sites_in_file: int = 0
     sites_correct: int = 0  # on an asset line with a compatible/unknown family, on a related or accepted line
     false_sites: list[dict] = field(default_factory=list)
-    hits_repo: list[str] | None = None  # repository level (location ignored); None: not computed (score_sites)
+    hits_repo: list[str] | None = None  # repository level (location ignored); None: not computed
     repo_extra: list[str] = field(default_factory=list)  # families reported anywhere that the project does not have
 
     @property
@@ -196,29 +193,6 @@ def project_for_repo(full_name: str, truth: dict[str, TruthProject] | None = Non
     return truth.get(full_name.split("/", 1)[-1])
 
 
-def score_sites(sites: list[Site], project: TruthProject, tool: str) -> TruthScore:
-    """Call-site level only, on the legacy extraction (analysis/sites.py); `hits_repo` stays None."""
-    score = TruthScore(tool=tool, project=project.name, n_assets=len(project.assets))
-    score._asset_ids = [a.id for a in project.assets]
-    own = [s for s in sites if s.tool == tool]
-    score.sites = len(own)
-    in_file = [s for s in own if s.file == project.file]
-    score.sites_in_file = len(in_file)
-    for asset in project.assets:
-        at_lines = [s for s in in_file if s.line in asset.lines]
-        if any(s.families & asset.families for s in at_lines):
-            score.hits_strict.append(asset.id)
-            score.hits_lenient.append(asset.id)
-        elif any(s.unknown for s in at_lines):
-            score.hits_lenient.append(asset.id)
-    for s in in_file:
-        if project.correct_at(s.line, s.families):
-            score.sites_correct += 1
-        else:
-            score.false_sites.append({"line": s.line, "families": sorted(s.families), "raw": list(s.raw)})
-    return score
-
-
 # ----- normalised records: call sites and repository level -----
 
 SCORED_ASSET_TYPES = ("algorithm", None)  # as the call-site extraction: algorithms and assets without a type
@@ -259,8 +233,9 @@ def record_spots(records) -> list[Spot]:
 
 
 def score_records(records, project: TruthProject, tool: str, *, asset_types=SCORED_ASSET_TYPES) -> TruthScore:
-    """Score one tool's normalised records at both levels (module docstring). Call sites use the rules of
-    `score_sites`; a window counts at every line it spans. `asset_types=None` keeps every crypto record except
+    """Score one tool's normalised records at both levels (module docstring). Call sites: the asset's own lines,
+    strict = a compatible family there, lenient = also an unknown family there; a window counts at every line it
+    spans. `asset_types=None` keeps every crypto record except
     library entries (dependency inventory)."""
     if asset_types is None:
         own = [r for r in records if r.tool == tool and r.values.get("asset_type") != "library"]

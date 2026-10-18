@@ -98,7 +98,7 @@
         "ambiguous": {"type": "string", "description": "a name listing several algorithms that no other source resolved"},
         "raw": {"type": "object", "description": "per dimension the value as found (a field value or the whole text that was parsed)"},
         "src": {"type": "object", "additionalProperties": {"type": "string"}, "description": "per dimension the JSON path or source it came from; derived:<dim> for our derivations"},
-        "via": {"type": "object", "additionalProperties": {"type": "string"}, "description": "per dimension: field, parse, dictionary, api, dependency, ref or derived"},
+        "via": {"type": "object", "additionalProperties": {"type": "string"}, "description": "per dimension: field, parse, dictionary, interpretive (a judgement entry of the tool spec), api, dependency, ref or derived"},
         "unmapped": {
           "type": "array",
           "items": {

@@ -43,7 +43,10 @@ from RaQuN_Lab.strategies.RaQuN.RaQuN import VanillaRaQuN
 
 class BERTEmbedding(Vectorizer):
     def __init__(self):
-        self.model = SentenceTransformer("all-MiniLM-L6-v2")  # Fast, small, good for most tasks
+        # Pinned revision baked into the image (docker/Dockerfile.misc-pyqun); unset = whatever the hub serves
+        self.model = SentenceTransformer(
+            "sentence-transformers/all-MiniLM-L6-v2", revision=os.getenv("MINILM_REVISION") or None
+        )
         self.vec_dim = self.model.get_sentence_embedding_dimension()
 
     def innit(self, m_s: "ModelSet") -> None:

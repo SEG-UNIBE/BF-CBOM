@@ -1,4 +1,4 @@
-"""Tests for the analysis package: family table, call-site extraction, matching and micro ground truth.
+"""Tests for the analysis package: micro ground truth, CSV tables, the report and the summary.
 
 The CBOM fixtures under tests/fixtures/pilot/ are real tool outputs from the pilot of 2026-10-08
 on the micro projects (CBOMkit action jar, pqcheck 0.1.0, CipherRadar efa5d9d).
@@ -9,162 +9,13 @@ from pathlib import Path
 
 import pytest
 
-from analysis.families import load_families, rule_id_to_text
-from analysis.groundtruth import load_ground_truth, project_for_repo, score_sites
-from analysis.match import cluster_sites, summarize_clusters
-from analysis.sites import Site, extract_sites, relative_location
+from analysis.groundtruth import load_ground_truth, project_for_repo
 
 FIXTURES = Path(__file__).parent / "fixtures" / "pilot"
 
 
 def _cbom(name: str) -> dict:
     return json.loads((FIXTURES / f"{name}.json").read_text(encoding="utf-8"))
-
-
-# ----- families -----
-
-
-@pytest.mark.parametrize(
-    "name, expected",
-    [
-        ("SHA256withECDSA", {"EC", "SHA-2"}),
-        ("HmacSHA512", {"HMAC", "SHA-2"}),
-        ("AES/GCM/NoPadding", {"AES"}),
-        ("RSA/ECB/OAEPWithSHA-256AndMGF1Padding", {"RSA", "SHA-2"}),
-        ("secp256r1", {"EC"}),
-        ("P-256", {"EC"}),
-        ("ECB", set()),
-        ("DES/CBC/PKCS5Padding", {"DES"}),
-        ("DESede", {"DES"}),
-        ("CODES", set()),
-        ("PBEWithMD5AndDES", {"PBKDF", "MD5", "DES"}),
-        ("SHA", {"SHA-1"}),
-        ("SHA3-256", {"SHA-3"}),
-        ("openssl-des", {"DES"}),
-        ("SSLContext", {"TLS"}),
-        ("ES256", {"EC"}),
-        ("RS256", {"RSA"}),
-        ("rand.Reader", {"RANDOM"}),
-        ("X25519MLKEM768", {"EC", "PQC"}),
-        ("jca-cipher-getinstance", set()),
-        ("private-key@1234", set()),
-        ("", set()),
-    ],
-)
-def test_family_classification(name, expected):
-    assert set(load_families().classify(name)) == expected
-
-
-def test_family_fallback_texts_and_rule_ids():
-    table = load_families()
-    assert table.classify("jca-cipher-getinstance", "AES") == {"AES"}
-    assert rule_id_to_text("cbom-java-ecb-mode-usage") == "ecb mode usage"
-    assert rule_id_to_text("tmp.x.rules.xbom-java-pqc-vulnerable-rsa-keygen") == "pqc vulnerable rsa keygen"
-    assert table.classify(rule_id_to_text("xbom-java-pqc-vulnerable-rsa-keygen")) == {"RSA"}
-
-
-# ----- sites -----
-
-
-def test_relative_location():
-    assert relative_location("./src/a.py") == "src/a.py"
-    assert relative_location("/tmp/x/repo/src/a.py") == "src/a.py"
-    assert relative_location("/abs/elsewhere/a.py") == "/abs/elsewhere/a.py"
-
-
-def test_extract_sites_merges_per_line_and_drops_material():
-    sites, stats = extract_sites(_cbom("cbomkit_micro-java"), "cbomkit", language="java")
-    assert stats.components == 23 and stats.skipped_asset_type == 8  # 8 key/iv/salt material assets
-    assert stats.sites == 12 and all(s.in_scope for s in sites)
-    by_line = {s.line: s for s in sites}
-    assert by_line[32].families == {"HMAC", "SHA-2"}  # HMAC-SHA-512 and its SHA-512 component on one line
-    assert by_line[12].raw == ["RSA-2048"]
-    assert all(s.file == "src/main/java/app/CryptoDemo.java" for s in sites)
-
-
-def test_extract_sites_keeps_all_assets_on_request():
-    _, strict = extract_sites(_cbom("cbomkit_micro-python"), "cbomkit", language="python")
-    _, lenient = extract_sites(_cbom("cbomkit_micro-python"), "cbomkit", language="python", asset_types=None)
-    assert lenient.sites > strict.sites and lenient.skipped_asset_type == 0
-
-
-def test_extract_sites_custom_property_locations():
-    cbom = {
-        "components": [
-            {
-                "type": "cryptographic-asset",
-                "name": "AES",
-                "cryptoProperties": {"assetType": "algorithm"},
-                "properties": [{"name": "qdarpan:location.0", "value": "/x/repo/src/Main.java:20"}],
-            }
-        ]
-    }
-    sites, _ = extract_sites(cbom, "q-darpan")
-    assert [(s.file, s.line, set(s.families)) for s in sites] == [("src/Main.java", 20, {"AES"})]
-
-
-def test_extract_sites_reads_cyclonedx_17_algorithm_family():
-    """Components named after the API call (CipherSift, CipherRadar) carry the family in algorithmFamily."""
-
-    def comp(name, line, family=None):
-        ap = {"algorithmFamily": family} if family else {}
-        return {
-            "type": "cryptographic-asset",
-            "name": name,
-            "cryptoProperties": {"assetType": "algorithm", "algorithmProperties": ap},
-            "evidence": {"occurrences": [{"location": "src/A.java", "line": line}]},
-        }
-
-    cbom = {"components": [comp("GCMParameterSpec", 10, "AES"), comp("Cipher.getInstance", 20)]}
-    sites, stats = extract_sites(cbom, "ciphersift", language="java")
-    assert [(s.line, set(s.families)) for s in sites] == [(10, {"AES"}), (20, set())]
-    assert stats.unknown_family == 1  # an unresolved algorithm string stays unknown
-
-
-# ----- matching -----
-
-
-def _site(tool, line, fams, file="a.py"):
-    return Site(tool=tool, file=file, line=line, families=frozenset(fams))
-
-
-def test_cluster_window_family_and_unknown_rules():
-    sites = [
-        _site("t1", 10, {"AES"}),
-        _site("t2", 12, {"AES"}),  # within +-2 -> same cluster
-        _site("t3", 13, {"AES"}),  # 3 lines from t1, but 1 from t2 -> nearest-neighbour joins it
-        _site("t1", 30, {"RSA"}),
-        _site("t2", 31, {"SHA-2"}),  # incompatible family -> separate
-        _site("t1", 50, set()),
-        _site("t2", 50, set()),  # unknown never matches by default
-        _site("t2", 10, {"AES"}, file="b.py"),  # other file
-    ]
-    clusters = cluster_sites(sites)
-    keyed = {(c.file, c.line_min): c for c in clusters}
-    assert keyed[("a.py", 10)].k == 3 and keyed[("a.py", 10)].line_max == 13
-    assert keyed[("a.py", 30)].k == 1 and keyed[("a.py", 31)].k == 1
-    assert keyed[("a.py", 50)].k == 1 and len([c for c in clusters if c.line_min == 50]) == 2
-    assert keyed[("b.py", 10)].k == 1
-    lenient = cluster_sites(sites, match_unknown=True)
-    assert [c.k for c in lenient if c.line_min == 50] == [2]
-
-
-def test_summarize_clusters_counts():
-    clusters = cluster_sites([_site("t1", 1, {"AES"}), _site("t2", 1, {"AES"}), _site("t1", 9, {"RSA"})])
-    s = summarize_clusters(clusters)
-    assert s.k_distribution == {2: 1, 1: 1}
-    assert s.per_tool["t1"].confirmed == 1 and s.per_tool["t1"].solo == 1
-    assert s.per_tool["t2"].confirmed_share == 1.0
-    assert s.pairwise_jaccard == {"t1|t2": 0.5}
-
-
-def test_two_tools_agree_on_micro_java():
-    sites = []
-    for fixture, tool in (("cbomkit_micro-java", "cbomkit"), ("cipherradar_micro-java", "cipherradar")):
-        s, _ = extract_sites(_cbom(fixture), tool, language="java")
-        sites += s
-    clusters = cluster_sites(sites)
-    assert {c.k for c in clusters} == {2} and len(clusters) == 12
 
 
 # ----- ground truth -----
@@ -180,25 +31,6 @@ def test_ground_truth_loads_and_maps_repo_names():
 
 
 @pytest.mark.parametrize(
-    "fixture, tool, project, strict, lenient",
-    [
-        ("cbomkit_micro-java", "cbomkit", "micro-java", 11, 11),  # pilot: 11/11
-        ("cbomkit_micro-python", "cbomkit", "micro-python", 5, 5),  # pilot: 6/11 counting a key-material asset
-        ("pqcheck_micro-python", "pqcheck", "micro-python", 8, 8),
-        ("cipherradar_micro-java", "cipherradar", "micro-java", 11, 11),
-        ("cbomkit_micro-go", "cbomkit", "micro-go", 8, 8),  # pilot: 8-10/11
-    ],
-)
-def test_micro_scores_reproduce_pilot(fixture, tool, project, strict, lenient):
-    truth = load_ground_truth()[project]
-    sites, _ = extract_sites(_cbom(fixture), tool, language=truth.language)
-    score = score_sites(sites, truth, tool)
-    assert (len(score.hits_strict), len(score.hits_lenient)) == (strict, lenient)
-    assert score.false_sites == [] and score.precision == 1.0
-    assert score.passes_bar is (lenient >= 6)
-
-
-@pytest.mark.parametrize(
     "fixture, tool, project, strict, lenient, repo",
     [
         ("cbomkit_micro-java", "cbomkit", "micro-java", 11, 11, 11),
@@ -209,8 +41,8 @@ def test_micro_scores_reproduce_pilot(fixture, tool, project, strict, lenient):
     ],
 )
 def test_score_records_matches_call_sites_and_adds_repo_level(fixture, tool, project, strict, lenient, repo):
-    """The record-based scorer reproduces the call-site numbers of score_sites (same fixtures) and adds the repo
-    level, which is at least the call-site level (assets sharing a family are found together)."""
+    """Call-site numbers as the pilot found them (CBOMkit micro-python: 6/11 in the pilot counted a key-material
+    asset) plus the repo level, which is at least the call-site level (assets sharing a family are found together)."""
     from analysis.groundtruth import score_records
     from analysis.normalize import normalize_cbom
 
@@ -243,21 +75,6 @@ def test_score_records_windows_location_free_records_and_extra_families():
     assert score.hits_strict == ["rsa-2048-keygen"] and score.sites == 1 and score.precision == 1.0
     assert set(score.hits_repo) == {"rsa-2048-keygen", "rsa-oaep-sha256", "md5", "sha-256"}
     assert score.repo_extra == ["ChaCha"] and "hmac-sha512" in score.repo_missed
-
-
-def test_score_sites_lenient_and_false_positives():
-    truth = load_ground_truth()["micro-python"]
-    sites = [
-        Site("t", truth.file, 15, frozenset()),  # unknown family on the RSA line: lenient hit only
-        Site("t", truth.file, 23, frozenset({"MD5"})),  # wrong family on the SHA-256 line: false site
-        Site("t", truth.file, 11, frozenset({"SHA-2"})),  # related line (HASH constant): not a false site
-        Site("t", "README.md", 1, frozenset({"AES"})),  # other file: ignored for precision
-    ]
-    score = score_sites(sites, truth, "t")
-    assert score.hits_strict == [] and score.hits_lenient == ["rsa-2048-keygen"]
-    assert score.sites == 4 and score.sites_in_file == 3 and score.sites_correct == 2
-    assert score.false_sites == [{"line": 23, "families": ["MD5"], "raw": []}]
-    assert score.passes_bar is False and "sha-256" in score.missed
 
 
 # ----- CSV tables -----
@@ -326,31 +143,32 @@ def test_tables_command_writes_joinable_tables(tmp_path, monkeypatch):
     result = CliRunner().invoke(analysis_cmd.analysis_app, ["tables", "exp-tables"])
     assert result.exit_code == 0, result.output
     out = exp / "_ANALYSIS"
-    expected = ["runs.csv", "sites-run1.csv", "groups-callsite-run1.csv", "members-callsite-run1.csv"]
-    assert all((out / f).exists() for f in expected + ["micro-run1.csv", "tables-run1.json"])
+    expected = ["runs.csv", "records-run1.csv", "groups-exact-run1.csv", "members-exact-run1.csv"]
+    assert all(
+        (out / f).exists() for f in expected + ["agreement-exact-run1.csv", "micro-run1.csv", "tables-run1.json"]
+    )
 
-    sites = _read_csv(out / "sites-run1.csv")
-    groups = _read_csv(out / "groups-callsite-run1.csv")
-    members = _read_csv(out / "members-callsite-run1.csv")
-    assert list(sites[0]) == tbl.SITES_COLUMNS and list(groups[0]) == tbl.CALLSITE_GROUP_COLUMNS
-    record_ids = [s["record_id"] for s in sites]
-    assert len(record_ids) == len(set(record_ids))
+    records = _read_csv(out / "records-run1.csv")
+    groups = _read_csv(out / "groups-exact-run1.csv")
+    members = _read_csv(out / "members-exact-run1.csv")
+    agreement = _read_csv(out / "agreement-exact-run1.csv")
+    assert list(groups[0]) == tbl.EXACT_GROUP_COLUMNS and list(members[0]) == tbl.MEMBERS_COLUMNS
+    assert list(agreement[0]) == tbl.AGREEMENT_COLUMNS
+    record_ids = {r["record_id"] for r in records}
+    assert {m["record_id"] for m in members} <= record_ids
     group_ids = {g["group_id"] for g in groups}
-    assert {m["record_id"] for m in members} <= set(record_ids) and {m["group_id"] for m in members} == group_ids
-    in_scope = {s["record_id"] for s in sites if s["in_scope"] == "true"}
-    assert sorted(m["record_id"] for m in members) == sorted(in_scope)
+    assert {m["group_id"] for m in members} == group_ids == {a["group_id"] for a in agreement}
+    repo = [g for g in groups if g["scope"] == "repo"]
+    sites = [g for g in groups if g["scope"] == "site"]
+    assert all(g["level"] == "L3" and g["parent"] == "" for g in repo) and all(g["parent"] in group_ids for g in sites)
     for g in groups:
-        assert int(g["n_sites"]) == sum(m["group_id"] == g["group_id"] for m in members)
-    assert {g["k"] for g in groups} == {"2"} and len(groups) == 12  # as in test_two_tools_agree_on_micro_java
-
-    micro = {r["tool"]: r for r in _read_csv(out / "micro-run1.csv")}
-    assert set(micro) == {"cbomkit", "cipherradar", "pqcheck"} and micro["cbomkit"]["language"] == "java"
-    cbomkit = micro["cbomkit"]
-    assert (cbomkit["status"], cbomkit["verdict"], cbomkit["lenient"], cbomkit["repo"]) == ("ok", "pass", "11", "11")
-    assert (micro["pqcheck"]["verdict"], micro["pqcheck"]["lenient"]) == ("unsupported", "")
-    assets = _read_csv(out / "micro-assets-run1.csv")
-    assert list(assets[0]) == tbl.MICRO_ASSET_COLUMNS and len(assets) == 2 * 11  # scored runs only
-    assert json.loads((out / "tables-run1.json").read_text())["rows"]["runs.csv"] == 3
+        assert int(g["n_records"]) == sum(m["group_id"] == g["group_id"] for m in members)
+    # CBOMkit and CipherRadar agree on micro-java: most repo groups have both voters, most sites too
+    assert sum(g["k"] == "2" for g in repo) >= 8 and sum(g["k"] == "2" for g in sites) >= 10
+    dims = {a["dimension"] for a in agreement}
+    assert dims == {"key_size", "mode", "padding", "curve", "digest", "location"}
+    info = json.loads((out / "tables-run1.json").read_text())
+    assert info["settings"]["level"] == "L3" and info["settings"]["window"] == 2
 
 
 def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch):
@@ -367,6 +185,13 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     out = exp / "_ANALYSIS"
     for f in ("normalize.json", "vocab.csv", "levels-run1.csv", "records-run1.csv", "micro-run1.csv"):
         assert (out / f).exists(), f
+    for f in ("schema-run1.csv", "meaningful-run1.csv", "traceability-run1.csv", "score-run1.csv", "loo-run1.csv"):
+        assert (out / f).exists(), f
+    assert (out / "stability.csv").exists() and _read_csv(out / "stability.csv") == []  # one run each: no rows
+    scores = {(r["dimension"], r["tool"]): r for r in _read_csv(out / "score-run1.csv")}
+    assert int(scores[("algorithm", "cbomkit")]["items"]) >= 11 and scores[("algorithm", "cipherradar")]["items"]
+    assert float(scores[("algorithm", "cbomkit")]["confirmation"]) >= 0.8  # CBOMkit and CipherRadar agree on micro-java
+    assert scores[("algorithm", "cbomkit")]["ds_support"] and scores[("location", "cbomkit")]["items"]
     assert list(_read_csv(out / "coverage.csv")[0]) == COVERAGE_COLUMNS
     assert (out / "conformance.csv").read_text(encoding="utf-8").startswith(",".join(CONFORMANCE_COLUMNS))
     algos = _read_csv(out / "algorithms-run1.csv")
@@ -376,7 +201,8 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert info["rows"]["algorithms-run1.csv"] == len(algos) and info["vocabulary"]["algorithms"]
     summary = (out / "_SUMMARY.md").read_text(encoding="utf-8")
     assert summary.startswith("# exp-tables: analysis summary (run 1)")
-    for section in ("## Runs", "## Micro projects", "## Normalisation", "## Agreement ladder", "## Files"):
+    sections = ("## Runs", "## Micro projects", "## RQ1", "## Agreement ladder", "## Tools per algorithm", "## Scores")
+    for section in (*sections, "## Files"):
         assert section in summary
     assert "| cbomkit | pass 11 |" in summary and "| pqcheck | – |" in summary
     assert "| cbomkit | 11 / 11 · 11 |" in summary
@@ -423,22 +249,6 @@ def test_summary_markdown_from_csv_rows():
     assert "| weak | 0 / 2 · 7 |  |" in lines
 
 
-def test_report_migrates_the_layout_of_older_experiments(tmp_path, monkeypatch):
-    from typer.testing import CliRunner
-
-    from misc.cli import analysis_cmd
-
-    exp = _fake_experiment(tmp_path)
-    (exp / "_experiment.yaml").replace(exp / "experiment.yaml")
-    (exp / "analysis").mkdir()
-    (exp / "analysis" / "SUMMARY.md").write_text("stale", encoding="utf-8")
-    monkeypatch.setattr(analysis_cmd, "experiment_dir", lambda name: tmp_path / name)
-    result = CliRunner().invoke(analysis_cmd.analysis_app, ["report", "exp-tables"])
-    assert result.exit_code == 0, result.output
-    assert (exp / "_experiment.yaml").exists() and not (exp / "experiment.yaml").exists()
-    assert not (exp / "analysis").exists() and (exp / "_ANALYSIS" / "_SUMMARY.md").exists()
-
-
 def test_summary_starts_with_when_how_long_and_how_much_ram(tmp_path, monkeypatch):
     from typer.testing import CliRunner
 
@@ -448,7 +258,16 @@ def test_summary_starts_with_when_how_long_and_how_much_ram(tmp_path, monkeypatc
     for tool, peak in (("cbomkit", 3000.0), ("cipherradar", 900.0)):
         meta_path = exp / SNAPSHOT / "original" / tool / "run1.meta.json"
         meta = json.loads(meta_path.read_text())
-        meta.update(peak_memory_mb=peak, memory_limit_mb=4096.0, oom_kills=0, received_at="2026-10-18T10:00:00Z")
+        meta.update(
+            peak_memory_mb=peak,
+            memory_limit_mb=4096.0,
+            oom_kills=0,
+            received_at="2026-10-18T10:00:00Z",
+            enqueued_at="2026-10-18T09:58:00Z",
+            started_at="2026-10-18T09:59:30Z",
+            finished_at="2026-10-18T10:00:00Z",
+            bfcbom_commit="abc123def456",
+        )
         meta_path.write_text(json.dumps(meta))
     session = {
         "session": "s1",
@@ -456,6 +275,8 @@ def test_summary_starts_with_when_how_long_and_how_much_ram(tmp_path, monkeypatc
         "status": "completed",
         "started_at": "2026-10-18T08:00:00Z",
         "finished_at": "2026-10-18T10:30:00Z",
+        "runner_commit": "abc123def456-dirty",
+        "images": {"cbomkit": "sha256:" + "0" * 64},
         "host": {"cpus": 10, "ram_total_mb": 20480.0},
         "memory_budget_gb": 14,
         "waves": [["cbomkit"], ["cipherradar"]],
@@ -473,8 +294,39 @@ def test_summary_starts_with_when_how_long_and_how_much_ram(tmp_path, monkeypatc
     assert "| memory budget | 14 GiB -> 2 wave(s) (last session) |" in summary
     assert "| peak RAM in use | 15.0 GiB of 20.0 GiB (75%) on the VM" in summary
     assert "| peak RAM of a job | 2.9 GiB: `cbomkit` on `bfcbom/micro-java`" in summary
+    assert "| queue wait | median 90 s, max 90 s before a job started |" in summary
+    assert (
+        "| BF-CBOM commit | `abc123def456`, `abc123def456-dirty` (`-dirty`: built from uncommitted changes) |"
+        in summary
+    )
+    assert "| worker image ids | 1 recorded in `_run-log.json` (by content, per session) |" in summary
     assert "| tool | ok | error | timeout | unsupported | median s | peak GiB | limit GiB | OOM kills |" in summary
     assert "| cbomkit | 1 |  |  |  | 2 | 2.9 | 4.0 |  |" in summary
+    runs = {r["tool"]: r for r in _read_csv(exp / "_ANALYSIS" / "runs.csv")}
+    assert runs["cbomkit"]["queue_sec"] == "90.0" and runs["cbomkit"]["bfcbom_commit"] == "abc123def456"
+
+
+def test_run_rows_carry_usage_and_tailored(tmp_path):
+    from analysis.tables import run_rows
+
+    exp = _fake_experiment(tmp_path)
+    meta_path = exp / SNAPSHOT / "original" / "cbomkit" / "run1.meta.json"
+    meta = json.loads(meta_path.read_text())
+    meta["usage"] = {
+        "requests": 4,
+        "requests_failed": 1,
+        "input_tokens": 1000,
+        "cached_input_tokens": 300,
+        "cache_write_tokens": 0,
+        "output_tokens": 50,
+        "reasoning_tokens": 7,
+        "models": {"m-2026": 3},
+    }
+    meta_path.write_text(json.dumps(meta))
+    rows = {r["tool"]: r for r in run_rows(exp, tailored={"cbomkit": frozenset({"bfcbom/micro-java"})})}
+    assert rows["cbomkit"]["tailored"] is True and rows["cipherradar"]["tailored"] is False
+    assert (rows["cbomkit"]["requests"], rows["cbomkit"]["cached_input_tokens"]) == (4, 300)
+    assert rows["cbomkit"]["models_answered"] == "m-2026" and "models_answered" not in rows["cipherradar"]
 
 
 def test_error_line_skips_the_echoed_command():

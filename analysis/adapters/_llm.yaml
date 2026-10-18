@@ -12,6 +12,8 @@ sources:
 dictionary:
   asset_type:
     key: {asset_type: related-crypto-material, material: key}    # CBOMs assembled before 2026-10-16
+  name:
+    Entropy: {material: seed, interpretive: true}    # the model's free text; a judgement, counts at L4 only
 context: [property:bf-cbom:evidence]
 notes: >
   One component per reported site (file and line verified against the clone where possible, see

@@ -10,6 +10,7 @@ sources:
 dictionary:
   name:
     KEYGEN: {functions: [keygen]}
+    MATH-RAND: {family: PRNG}    # its spelling of Go's math/rand (moved from the shared vocabulary 2026-10-18)
 notes: >
   Lists every declared dependency as a library component (pqcheck:declared_in go.mod / requirements.txt); these
   are an inventory, not findings, and are skipped. Findings carry pqcheck:detector_id (go-types, go-tree-sitter,

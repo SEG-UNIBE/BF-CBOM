@@ -35,7 +35,7 @@ from .models import RepoInfo, Trace
 logger = logging.getLogger(__name__)
 
 PROMPT_VERSION = "2026-10-15.2"  # prompt + file-selection version (recorded in the CBOM metadata)
-ASSEMBLY_VERSION = "2026-10-16.1"  # how answers become CycloneDX: enum mapping (recorded in the CBOM metadata)
+ASSEMBLY_VERSION = "2026-10-18.1"  # how answers become CycloneDX: enum mapping, usage properties (in the CBOM metadata)
 
 LLM_MAX_FILES = int(os.getenv("LLM_MAX_FILES", "1000"))
 LLM_MAX_CHUNK_CHARS = int(os.getenv("LLM_MAX_CHUNK_CHARS", "40000"))  # ~10k tokens of code per request
@@ -259,8 +259,31 @@ class LLMProvider(Protocol):
     model: str
 
     def complete(self, system: str, user: str) -> tuple[str, dict]:
-        """Return (text, usage) where usage has prompt_tokens / completion_tokens when known."""
+        """Return (text, usage), usage as built by `request_usage`."""
         ...
+
+
+def request_usage(
+    *,
+    model: str | None,
+    input_tokens=0,
+    output_tokens=0,
+    cached_input_tokens=0,
+    cache_write_tokens=0,
+    reasoning_tokens=0,
+) -> dict:
+    """Usage of one request in provider-independent terms. `input_tokens` is everything the request sent (cached
+    tokens included), `cached_input_tokens` the part served from the provider's prompt cache (priced lower),
+    `cache_write_tokens` the part written to it (Anthropic prices writes higher), `reasoning_tokens` the share of
+    the output spent on reasoning where reported. `model` is the id the provider answered with."""
+    return {
+        "model": model,
+        "input_tokens": int(input_tokens or 0),
+        "cached_input_tokens": int(cached_input_tokens or 0),
+        "cache_write_tokens": int(cache_write_tokens or 0),
+        "output_tokens": int(output_tokens or 0),
+        "reasoning_tokens": int(reasoning_tokens or 0),
+    }
 
 
 class OpenAICompatProvider:
@@ -299,10 +322,17 @@ class OpenAICompatProvider:
             kwargs["temperature"] = self.temperature
         resp = self._client.chat.completions.create(**kwargs)
         usage = getattr(resp, "usage", None)
-        return resp.choices[0].message.content or "", {
-            "prompt_tokens": getattr(usage, "prompt_tokens", 0) or 0,
-            "completion_tokens": getattr(usage, "completion_tokens", 0) or 0,
-        }
+        prompt_details = getattr(usage, "prompt_tokens_details", None)
+        completion_details = getattr(usage, "completion_tokens_details", None)
+        return resp.choices[0].message.content or "", request_usage(
+            model=getattr(resp, "model", None) or self.model,
+            input_tokens=getattr(usage, "prompt_tokens", 0),
+            output_tokens=getattr(usage, "completion_tokens", 0),
+            # DeepSeek reports cache hits at the top level, OpenAI under prompt_tokens_details
+            cached_input_tokens=getattr(usage, "prompt_cache_hit_tokens", None)
+            or getattr(prompt_details, "cached_tokens", 0),
+            reasoning_tokens=getattr(completion_details, "reasoning_tokens", 0),
+        )
 
 
 class AnthropicProvider:
@@ -349,10 +379,16 @@ class AnthropicProvider:
         data = resp.json()
         text = "".join(block.get("text", "") for block in data.get("content", []) if block.get("type") == "text")
         usage = data.get("usage") or {}
-        return text, {
-            "prompt_tokens": int(usage.get("input_tokens") or 0),
-            "completion_tokens": int(usage.get("output_tokens") or 0),
-        }
+        cache_read = int(usage.get("cache_read_input_tokens") or 0)
+        cache_write = int(usage.get("cache_creation_input_tokens") or 0)
+        return text, request_usage(
+            model=data.get("model") or self.model,
+            # Anthropic's input_tokens exclude the cached parts; the total is what the request sent
+            input_tokens=int(usage.get("input_tokens") or 0) + cache_read + cache_write,
+            output_tokens=usage.get("output_tokens"),
+            cached_input_tokens=cache_read,
+            cache_write_tokens=cache_write,
+        )
 
 
 def parse_assets(text: str) -> list[dict]:
@@ -501,8 +537,12 @@ class GenerationStats:
     chunks_sent: int = 0  # successful requests
     requests_failed: int = 0  # requests that raised (network / API errors)
     chunks_total: int = 0
-    prompt_tokens: int = 0
-    completion_tokens: int = 0
+    input_tokens: int = 0  # sums over the successful requests, see request_usage
+    cached_input_tokens: int = 0
+    cache_write_tokens: int = 0
+    output_tokens: int = 0
+    reasoning_tokens: int = 0
+    models: dict[str, int] = field(default_factory=dict)  # model id the provider answered with -> requests
     assets_raw: int = 0
     assets_unparsable_chunks: int = 0
     chunks_split: int = 0  # chunks re-sent as two halves after an unparsable answer
@@ -510,6 +550,26 @@ class GenerationStats:
     locations_unverified: int = 0
     values_not_in_enum: int = 0  # model values kept in bf-cbom:<field> because CycloneDX 1.6 has no such value
     notes: list[str] = field(default_factory=list)
+
+    def add_usage(self, usage: dict) -> None:
+        for key in ("input_tokens", "cached_input_tokens", "cache_write_tokens", "output_tokens", "reasoning_tokens"):
+            setattr(self, key, getattr(self, key) + int(usage.get(key) or 0))
+        if usage.get("model"):
+            self.models[str(usage["model"])] = self.models.get(str(usage["model"]), 0) + 1
+
+    def usage(self) -> dict:
+        """What JobResult.usage holds: every request counts (failed ones too, the provider may have billed them),
+        token sums per kind, and the model ids answered with."""
+        return {
+            "requests": self.chunks_sent + self.requests_failed,
+            "requests_failed": self.requests_failed,
+            "input_tokens": self.input_tokens,
+            "cached_input_tokens": self.cached_input_tokens,
+            "cache_write_tokens": self.cache_write_tokens,
+            "output_tokens": self.output_tokens,
+            "reasoning_tokens": self.reasoning_tokens,
+            "models": dict(self.models),
+        }
 
 
 def assemble_cbom(
@@ -615,11 +675,15 @@ def assemble_cbom(
             {"name": "bf-cbom:files-matched", "value": str(stats.files_matched)},
             {"name": "bf-cbom:files-sent", "value": str(stats.files_sent)},
             {"name": "bf-cbom:chunks-total", "value": str(stats.chunks_total)},
-            {"name": "bf-cbom:requests", "value": str(stats.chunks_sent)},
+            {"name": "bf-cbom:requests", "value": str(stats.chunks_sent + stats.requests_failed)},
             {"name": "bf-cbom:requests-failed", "value": str(stats.requests_failed)},
             {"name": "bf-cbom:chunks-split", "value": str(stats.chunks_split)},
-            {"name": "bf-cbom:prompt-tokens", "value": str(stats.prompt_tokens)},
-            {"name": "bf-cbom:completion-tokens", "value": str(stats.completion_tokens)},
+            {"name": "bf-cbom:input-tokens", "value": str(stats.input_tokens)},
+            {"name": "bf-cbom:cached-input-tokens", "value": str(stats.cached_input_tokens)},
+            {"name": "bf-cbom:cache-write-tokens", "value": str(stats.cache_write_tokens)},
+            {"name": "bf-cbom:output-tokens", "value": str(stats.output_tokens)},
+            {"name": "bf-cbom:reasoning-tokens", "value": str(stats.reasoning_tokens)},
+            {"name": "bf-cbom:models-answered", "value": ";".join(sorted(stats.models)) or model},
             {"name": "bf-cbom:values-not-in-enum", "value": str(stats.values_not_in_enum)},
         ],
     }
@@ -679,12 +743,13 @@ def generate_cbom(
             text, usage = provider.complete(SYSTEM_PROMPT, user)
         except Exception as e:  # network / API errors: keep what we have, record the failure
             stats.requests_failed += 1
+            trace.fields["usage"] = stats.usage()
             last_error[0] = f"{type(e).__name__}: {str(e)[:300]}"
             trace.add(f"llm: {label} failed: {last_error[0][:200]}")
             return None
         stats.chunks_sent += 1
-        stats.prompt_tokens += int(usage.get("prompt_tokens") or 0)
-        stats.completion_tokens += int(usage.get("completion_tokens") or 0)
+        stats.add_usage(usage)
+        trace.fields["usage"] = stats.usage()  # after every request, so a failed or killed job keeps its usage
         try:
             return parse_assets(text)
         except (json.JSONDecodeError, ValueError) as e:
@@ -728,7 +793,7 @@ def generate_cbom(
         f"llm: files {stats.files_sent}/{stats.files_matched} matched of {stats.files_candidates}; "
         f"requests {stats.chunks_sent} ok, {stats.requests_failed} failed, for {stats.chunks_total} chunks "
         f"({stats.chunks_split} split); "
-        f"tokens {stats.prompt_tokens}+{stats.completion_tokens}; "
+        f"tokens {stats.input_tokens} in ({stats.cached_input_tokens} cached) + {stats.output_tokens} out; "
         f"assets {len(cbom['components'])} (raw {stats.assets_raw}); "
         f"locations verified {stats.locations_verified}, unverified {stats.locations_unverified}"
     )

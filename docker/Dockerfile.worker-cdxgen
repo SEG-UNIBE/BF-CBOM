@@ -34,3 +34,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY workers/cdxgen/ ./workers/cdxgen/
 
 ENTRYPOINT ["uv", "run", "--frozen", "--no-dev", "workers/cdxgen/main.py"]
+
+# BF-CBOM commit this image was built from (compose/bake pass it; last, so it never invalidates the layers above)
+ARG BF_CBOM_COMMIT=unknown
+ENV BF_CBOM_COMMIT=${BF_CBOM_COMMIT}

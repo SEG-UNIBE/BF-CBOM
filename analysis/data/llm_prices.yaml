@@ -1,0 +1,117 @@
+# Price table for the LLM workers (analysis/costs.py): USD per 1M tokens, taken from the providers' official pricing
+# pages on the `retrieved` date. Costs are computed offline from the stored token usage; `version` lands in runs.csv.
+# Bump `version` and add entries (never edit old ones) when prices change; `valid_from` picks the entry for a run.
+# `input` = tokens not served from a prompt cache, `cached_input` = cache reads, `cache_write` = cache creation
+# (Anthropic; OpenAI and DeepSeek write for free), `output` includes reasoning tokens. DeepSeek bills by time of day:
+# `off_peak` rates apply outside `peak_hours_utc` on weekdays and all weekend (Chinese public holidays not modelled).
+version: "2026-10-18.1"
+prices:
+  - provider: deepseek
+    models: [deepseek-flash, deepseek-v4-flash, deepseek-chat]
+    note: >
+      Official page lists deepseek-flash (served by DeepSeek-V4.1-Flash-1017) and the legacy name deepseek-v4-flash.
+      `deepseek-chat` (the worker's default until 2026-10-18) is not on the page any more; third-party sources say it
+      was a deprecated alias of V4-Flash (non-thinking) until 2026-07-24, yet it still answered on 2026-10-17. Priced
+      as deepseek-flash; verify with `models_answered` of a new run and move the worker to an explicit model id.
+    valid_from: "2026-10-18"
+    input: 0.30
+    cached_input: 0.006
+    output: 1.20
+    off_peak: {input: 0.15, cached_input: 0.003, output: 0.60}
+    peak_hours_utc: [[1, 4], [6, 10]]
+    source: https://api-docs.deepseek.com/quick_start/pricing
+    retrieved: "2026-10-18"
+  - provider: deepseek
+    models: [deepseek-v4-pro]
+    valid_from: "2026-10-18"
+    input: 1.32
+    cached_input: 0.044
+    output: 3.96
+    off_peak: {input: 0.66, cached_input: 0.022, output: 1.98}
+    peak_hours_utc: [[1, 4], [6, 10]]
+    source: https://api-docs.deepseek.com/quick_start/pricing
+    retrieved: "2026-10-18"
+  - provider: openai
+    models: [gpt-5]
+    prefixes: [gpt-5-2]   # dated snapshots such as gpt-5-2025-08-07
+    valid_from: "2026-10-18"
+    input: 1.25
+    cached_input: 0.125
+    output: 10.00
+    source: https://developers.openai.com/api/docs/pricing
+    retrieved: "2026-10-18"
+  - provider: openai
+    models: [gpt-5-mini]
+    prefixes: [gpt-5-mini-]
+    valid_from: "2026-10-18"
+    input: 0.25
+    cached_input: 0.025
+    output: 2.00
+    source: https://developers.openai.com/api/docs/pricing
+    retrieved: "2026-10-18"
+  - provider: openai
+    models: [gpt-5-nano]
+    prefixes: [gpt-5-nano-]
+    valid_from: "2026-10-18"
+    input: 0.05
+    cached_input: 0.005
+    output: 0.40
+    source: https://developers.openai.com/api/docs/pricing
+    retrieved: "2026-10-18"
+  - provider: openai
+    models: [gpt-5.4]
+    valid_from: "2026-10-18"
+    input: 2.50
+    cached_input: 0.25
+    output: 15.00
+    source: https://developers.openai.com/api/docs/pricing
+    retrieved: "2026-10-18"
+  - provider: openai
+    models: [gpt-5.5]
+    valid_from: "2026-10-18"
+    input: 5.00
+    cached_input: 0.50
+    output: 30.00
+    source: https://developers.openai.com/api/docs/pricing
+    retrieved: "2026-10-18"
+  - provider: anthropic
+    models: [claude-sonnet-5-5]
+    prefixes: [claude-sonnet-5-5-]
+    valid_from: "2026-10-18"
+    input: 2.00
+    cached_input: 0.10
+    cache_write: 2.50
+    output: 10.00
+    source: https://claude.com/pricing
+    retrieved: "2026-10-18"
+  - provider: anthropic
+    models: [claude-opus-5-5]
+    prefixes: [claude-opus-5-5-]
+    valid_from: "2026-10-18"
+    input: 4.00
+    cached_input: 0.20
+    cache_write: 5.00
+    output: 20.00
+    source: https://claude.com/pricing
+    retrieved: "2026-10-18"
+  - provider: anthropic
+    models: [claude-haiku-5-5]
+    prefixes: [claude-haiku-5-5-]
+    note: the rates for prompts up to 100K tokens (longer prompts cost five times as much)
+    valid_from: "2026-10-18"
+    input: 0.10
+    cached_input: 0.01
+    cache_write: 0.125
+    output: 0.50
+    source: https://claude.com/pricing
+    retrieved: "2026-10-18"
+  - provider: anthropic
+    models: [claude-fable-5-1]
+    prefixes: [claude-fable-5-1-]
+    valid_from: "2026-10-18"
+    input: 10.00
+    cached_input: 0.25
+    cache_write: 12.50
+    output: 50.00
+    source: https://claude.com/pricing
+    retrieved: "2026-10-18"

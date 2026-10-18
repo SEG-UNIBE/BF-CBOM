@@ -86,3 +86,7 @@ COPY --chown=appuser:appuser common/ ./common/
 ENV PYTHONPATH=/app:/app/misc/treesimilartiy/build
 
 ENTRYPOINT ["tini", "-g", "--", "uv", "run", "--frozen", "--no-dev", "python", "misc/treesimilartiy/src/main.py"]
+
+# BF-CBOM commit this image was built from (compose/bake pass it; last, so it never invalidates the layers above)
+ARG BF_CBOM_COMMIT=unknown
+ENV BF_CBOM_COMMIT=${BF_CBOM_COMMIT}

@@ -106,6 +106,8 @@ class Vocabulary:
             fold(k): (str(v[0]), str(v[1])) for k, v in (data.get("protocol_versions") or {}).items()
         }
         self.names = {fold(k): dict(v or {}) for k, v in (data.get("names") or {}).items()}
+        # algorithm or family -> algorithms it implies (refinement 2); `implied` adds the generic digest rule
+        self.implies = {str(k): [str(x) for x in v or []] for k, v in (data.get("implies") or {}).items()}
         self.keystores = {fold(t) for t in data.get("keystores") or []}
         self.formats = {fold(t) for t in data.get("formats") or []}
         self.noise = {fold(t) for t in data.get("noise") or []}
@@ -263,6 +265,21 @@ class Vocabulary:
 
     def curve_size(self, curve: str | None) -> int | None:
         return self.curve_sizes.get(curve) if curve else None
+
+    def implied(self, values: dict) -> list[str]:
+        """Algorithms a record implies besides the one it names (CLAUDE.md refinement 2): its `digest` (HMAC-SHA256
+        -> SHA-256, SHA256withECDSA -> SHA-256) and the `implies` table entries of its algorithm and family
+        (PBKDF2 -> HMAC). Used to close a tool's per-repository set so that tools expanding such hierarchies do not
+        look exclusive by construction; never applied silently (`closure` flags)."""
+        out: list[str] = []
+        digest = values.get("digest")
+        if digest and digest in self.hashes:
+            out.append(str(digest))
+        for key in (values.get("algorithm"), values.get("family")):
+            for name in self.implies.get(str(key), []) if key else []:
+                if name != values.get("algorithm"):
+                    out.append(name)
+        return list(dict.fromkeys(out))
 
     def standard_name(self, text: str) -> str | None:
         """The algorithm (or family) a WHOLE name stands for in the vocabulary, without splitting it into parts:
@@ -550,6 +567,15 @@ def _to_int(raw) -> int | None:
         return raw
     m = re.fullmatch(r"\s*(\d{1,6})\s*(bits?)?\s*", str(raw), flags=re.IGNORECASE)
     return int(m.group(1)) if m else None
+
+
+def rule_id_to_text(rule_id: str | None) -> str | None:
+    """Make a scanner rule id parsable: drop `cbom-<lang>-` / `xbom-<lang>-` prefixes and module paths."""
+    if not rule_id:
+        return None
+    text = str(rule_id).rsplit(".", 1)[-1]  # semgrep ids carry the rule file's module path
+    text = re.sub(r"^(cbom|xbom|cradar)-[a-z]+-", "", text)
+    return text.replace("-", " ").replace("_", " ")
 
 
 def clean_name(text: str) -> str:

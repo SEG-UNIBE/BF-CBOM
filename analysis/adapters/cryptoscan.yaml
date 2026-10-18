@@ -7,20 +7,20 @@ sources:
   - {parse: "occurrence:symbol", when: {asset_type: [algorithm, protocol]}, quiet: true}
   - base
 dictionary:
-  name:
+  name:   # `interpretive: true` = a judgement (a TLS check read as a TLS finding), not a spelling; L4 only
     Weak PBKDF Usage: {group: PBKDF}
     Hardcoded Key Size: {}
-    Certificate Validation Bypass: {protocol: TLS}
-    Weak Cipher Suite: {protocol: TLS}
+    Certificate Validation Bypass: {protocol: TLS, interpretive: true}
+    Weak Cipher Suite: {protocol: TLS, interpretive: true}
     AWS KMS Key Reference: {}
     GCP KMS Reference: {}
     HashiCorp Vault Path: {}
     Composite-Signature: {primitive: signature}
-    Subject Alternative Name: {group: CERT}
+    Subject Alternative Name: {group: CERT, interpretive: true}
     Certificate Subject/Issuer: {group: CERT}
     Certificate Revocation Check: {group: CERT}
     Certificate Pinning: {group: CERT}
-    ACME/Let's Encrypt: {group: CERT}
+    ACME/Let's Encrypt: {group: CERT, interpretive: true}
     Mutual TLS: {protocol: TLS}
     Hardcoded Encryption Key: {material: secret-key}
     HMAC Secret Pattern: {family: HMAC, material: secret-key}
