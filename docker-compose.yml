@@ -226,14 +226,15 @@ services:
       - REDIS_HOST=redis
       - BF_CBOM_IMAGE=bf-cbom/worker-cdxgen:${VERSION:-latest}
       - REDIS_PORT=6379
-      - WORKER_TIMEOUT_SEC=600
+      - WORKER_TIMEOUT_SEC=1800  # e1-icpc-corpus at 600: Sentinel, Sa-Token timed out (Maven), Chat2DB took 574 s
       - CDXGEN_DEBUG_MODE=debug
     env_file: docker/env/worker-cdxgen.env
     restart: on-failure:3
     deploy:
       resources:
         limits:
-          memory: 4g
+          # 4g OOM-killed its Gradle runs on bisq/bisq2 (rc=-9, e1-icpc-corpus); 8g scans bisq without an OOM kill
+          memory: 8g
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     profiles: [prod, all]
