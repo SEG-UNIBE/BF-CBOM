@@ -107,6 +107,14 @@ experiment-status:
 experiment-list:
 	docker compose run --rm runner experiment list
 
+# make experiment-collect NAME=e0-smoke  -> collect results of jobs already queued (after `ARGS=--no-wait`)
+experiment-collect:
+	docker compose run --rm runner experiment collect $(NAME) $(ARGS)
+
+# make experiment-cancel NAME=e0-smoke  -> remove its queued jobs from the worker queues
+experiment-cancel:
+	docker compose run --rm runner experiment cancel $(NAME)
+
 # make experiment-delete NAME=e0-smoke  -> removes <name> from the results-data volume (asks first; ARGS=--yes skips)
 experiment-delete:
 	docker compose run --rm runner experiment delete $(NAME) $(ARGS)
@@ -120,6 +128,10 @@ experiment-export:
 # make corpus ARGS="--per-language 100"  -> results volume: corpus/corpus.yaml (export with experiment-export-corpus)
 corpus: ensure-env
 	docker compose run --rm runner experiment corpus build $(ARGS)
+
+# make corpus-prune ARGS="--in /data/results/corpus/corpus.yaml --from e0-stability"  -> drops repos a tool timed out on
+corpus-prune:
+	docker compose run --rm runner experiment corpus prune $(ARGS)
 
 corpus-export:
 	mkdir -p exports
@@ -147,7 +159,8 @@ $(ENV_DIR)/%.env: $(ENV_DIR)/%.env.template
 	@$(ENSURE_ENV_SCRIPT) $< $@
 
 .PHONY: clean-docker build-base build-all release up-dev up-prod up-prod-pull up-all down logs ps show-workers \
-	experiment experiment-status experiment-list experiment-delete experiment-export corpus corpus-export analysis clean-cache
+	experiment experiment-status experiment-list experiment-collect experiment-cancel experiment-delete \
+	experiment-export corpus corpus-prune corpus-export analysis clean-cache
 
 # Frees Docker's build cache and dangling images (safe: volumes and tagged images are kept).
 # Repeated rebuilds of the large worker images fill the Docker VM disk ("No space left on device").

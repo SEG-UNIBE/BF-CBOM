@@ -27,7 +27,8 @@ make corpus ARGS="--per-language 100"              # stratified corpus -> result
 
 The smoke tests are quick checks after changing a single worker. E1 on the full ~200-repo corpus and E4 on mutants
 (see `CLAUDE.md`, Phase 5) have no specs yet; E1 needs the corpus from `make corpus` first, pruned with
-`experiment corpus prune --in <corpus> --from e0-stability` to drop repos a tool timed out on.
+`make corpus-prune ARGS="--in /data/results/corpus/corpus.yaml --from e0-stability"` to drop repos a tool
+timed out on.
 
 ## Spec format
 
@@ -81,7 +82,7 @@ make experiment EXP=experiments/e1-pilot-corpus.yaml EXPERIMENT_MEMORY_BUDGET_GB
 
 or change the default in the Makefile once per machine. The wave plan is printed before anything is
 enqueued and stored in the experiment's Redis status (`waves`, `wave`). `--no-wait` enqueues only the
-first wave; after `experiment collect` rerun `run` for the next one. Jobs left pending by an interrupted
+first wave; after `make experiment-collect NAME=<exp>` rerun `run` for the next one. Jobs left pending by an interrupted
 run are already in the queues and are collected in wave 1 regardless of the budget.
 
 ## Normalisation
