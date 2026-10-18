@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import csv
 import json
+from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
@@ -31,11 +32,12 @@ LIST_SEP = ";"
 ASSET_COMPONENT_TYPES = ("cryptographic-asset", "crypto-asset")  # the latter: IBM draft 1.4-cbom-1.0
 
 RUNS_COLUMNS = [
-    "repo", "snapshot", "commit", "variant", "variant_commit", "language", "tool", "run", "tailored",
+    "repo", "snapshot", "commit", "variant", "variant_commit", "language", "expect_crypto", "tool", "run", "tailored",
     "status", "duration_sec", "size_bytes", "error", "peak_memory_mb", "memory_limit_mb", "oom_kills",
     "enqueued_at", "started_at", "finished_at", "queue_sec", "received_at",
     "tool_version", "image_ref", "bfcbom_commit", "bom_format", "spec_version",
-    "components", "crypto_assets", "algorithm_assets",
+    "components", "crypto_assets", "algorithm_assets", "certificate_assets", "protocol_assets", "material_assets",
+    "other_assets", "located_assets",
     "requests", "requests_failed", "input_tokens", "cached_input_tokens", "cache_write_tokens", "output_tokens",
     "reasoning_tokens", "models_answered", "cost_usd", "priced_model", "price_period", "price_table_version",
 ]  # fmt: skip
@@ -65,7 +67,12 @@ GROUP_COLUMNS = GROUP_KEY_COLUMNS + [
     "similarity",
 ]  # fmt: skip  (exact: sites/located/parent columns; raqun: n_elements, similarity)
 EXACT_GROUP_COLUMNS = GROUP_COLUMNS
-MEMBERS_COLUMNS = ["matcher", "snapshot", "variant", "run", "group_id", "record_id", "tool", "implied"]
+MEMBERS_COLUMNS = ["matcher", "snapshot", "variant", "run", "group_id", "record_id", "tool", "implied", "matched"]
+MATCHLEVELS_COLUMNS = [
+    "matcher", "level", "run", "repos", "items", "records", "k1", "k2", "k3", "k4plus", "share_k2plus",
+    *[f"{d}_groups" for d in ("key_size", "mode", "padding", "curve", "digest", "location")],
+    *[f"{d}_agree" for d in ("key_size", "mode", "padding", "curve", "digest", "location")],
+]  # fmt: skip
 AGREEMENT_COLUMNS = [
     "matcher", "repo", "snapshot", "variant", "run", "group_id", "scope", "key", "dimension", "reporting",
     "agreeing", "majority", "values",
@@ -140,17 +147,42 @@ full_name = repo_full_name  # `<owner>__<repo>@<sha12>` -> `<owner>/<repo>`
 # ----- runs -----
 
 
+ASSET_TYPE_COLUMNS = {  # cryptoProperties.assetType as declared -> runs.csv column; anything else is `other`
+    "algorithm": "algorithm_assets",
+    "certificate": "certificate_assets",
+    "protocol": "protocol_assets",
+    "related-crypto-material": "material_assets",
+}
+
+
+def _located(component: dict) -> bool:
+    """The component carries a file location as the tool wrote it: CycloneDX `evidence.occurrences[].location`, or
+    `cryptoProperties.detectionContext[].filePath` in IBM's draft."""
+    occurrences = (component.get("evidence") or {}).get("occurrences") or []
+    if any(isinstance(o, dict) and o.get("location") for o in occurrences):
+        return True
+    contexts = (component.get("cryptoProperties") or {}).get("detectionContext") or []
+    return any(isinstance(c, dict) and c.get("filePath") for c in contexts)
+
+
 def _cbom_counts(cbom: dict) -> dict:
+    """What the CBOM holds as written, before normalisation: components, crypto assets by declared asset type, and
+    the crypto assets with a location (the raw RQ2 columns of runs.csv)."""
     comps = [c for c in cbom.get("components") or [] if isinstance(c, dict)]
     crypto = [c for c in comps if c.get("type") in ASSET_COMPONENT_TYPES]
-    algos = [c for c in crypto if (c.get("cryptoProperties") or {}).get("assetType") == "algorithm"]
-    return {
+    out = {
         "bom_format": cbom.get("bomFormat"),
         "spec_version": cbom.get("specVersion"),
         "components": len(comps),
         "crypto_assets": len(crypto),
-        "algorithm_assets": len(algos),
+        "located_assets": sum(_located(c) for c in crypto),
+        **dict.fromkeys(ASSET_TYPE_COLUMNS.values(), 0),
+        "other_assets": 0,
     }
+    for c in crypto:
+        kind = (c.get("cryptoProperties") or {}).get("assetType")
+        out[ASSET_TYPE_COLUMNS.get(kind, "other_assets")] += 1
+    return out
 
 
 def _usage_columns(usage: dict | None, started_at: str | None = None) -> dict:
@@ -182,11 +214,13 @@ def run_rows(
     exp_dir: Path,
     languages: dict[str, str | None] | None = None,
     tailored: dict[str, frozenset[str]] | None = None,
+    expects: dict[str, str | None] | None = None,
 ) -> list[dict]:
     """One row per stored meta file; CBOM counts only where the CBOM exists and parses. `tailored`: {tool: repos it
-    was tuned on} (refinement 13) for the `tailored` column."""
+    was tuned on} (refinement 13) for the `tailored` column; `expects`: {repo: expect_crypto} from the spec."""
     languages = languages or {}
     tailored = tailored or {}
+    expects = expects or {}
     rows = []
     for meta, cbom_path in iter_results(exp_dir):
         snapshot = cbom_path.parents[2].name
@@ -199,6 +233,7 @@ def run_rows(
             "variant": meta.get("variant") or cbom_path.parents[1].name,
             "variant_commit": meta.get("variant_commit"),
             "language": meta.get("language") or languages.get(repo),
+            "expect_crypto": expects.get(repo),
             "tool": tool,
             "run": meta.get("run_index"),
             "tailored": repo in tailored.get(tool, ()),
@@ -285,12 +320,55 @@ def group_rows(
         )
         for r in g.members:
             member = {"group_id": g.group_id, "record_id": r.record_id, "tool": r.tool}
-            m_rows.append({**base, **member, "implied": r.record_id in g.implied})
+            m_rows.append({**base, **member, "implied": r.record_id in g.implied, "matched": r.record_id in g.matched})
         a_rows += [
             {**base, "repo": full_name(snapshot), "group_id": g.group_id, "scope": g.scope, "key": g.key, **row}
             for row in agreement(g, voter_of=voter_of)
         ]
     return g_rows, m_rows, a_rows
+
+
+def matchlevel_row(
+    matcher: str, level: str, run: int, groups_by_snapshot: dict, voter_of: dict[str, str] | None = None
+) -> dict:
+    """One row of matchlevels-run<k>.csv (RQ3, matcher x level): over the repo groups of every snapshot, how many
+    items (algorithms, by their L4 identity) have 1 / 2 / 3 / 4+ voter groups in their largest group at that level,
+    and per dimension the share of the groups with at least two
+    voters reporting a value (admitted at the level) in which every reporting voter carries the majority value;
+    `location`: of the groups with two located voters, the share with two voters at one call site."""
+    best: dict[tuple, int] = {}  # (snapshot, item) -> voter groups of its largest cluster
+    records = 0
+    reporting: Counter = Counter()
+    agreeing: Counter = Counter()
+    for snapshot, groups in groups_by_snapshot.items():
+        for g in groups:
+            if g.scope != "repo":
+                continue
+            best[(snapshot, g.key)] = max(best.get((snapshot, g.key), 0), len(g.voters(voter_of)))
+            records += len(g.members)
+            for row in agreement(g, voter_of=voter_of, level=level):
+                if row["reporting"] >= 2:
+                    reporting[row["dimension"]] += 1
+                    agreeing[row["dimension"]] += row["agreeing"] == row["reporting"]
+    k = Counter(min(v, 4) for v in best.values())
+    items = len(best)
+    out = {
+        "matcher": matcher,
+        "level": level,
+        "run": run,
+        "repos": len(groups_by_snapshot),
+        "items": items,
+        "records": records,
+        "k1": k[1],
+        "k2": k[2],
+        "k3": k[3],
+        "k4plus": k[4],
+        "share_k2plus": round((items - k[1]) / items, 3) if items else None,
+    }
+    for dim in ("key_size", "mode", "padding", "curve", "digest", "location"):
+        out[f"{dim}_groups"] = reporting[dim]
+        out[f"{dim}_agree"] = round(agreeing[dim] / reporting[dim], 3) if reporting[dim] else None
+    return out
 
 
 # ----- micro ground truth -----

@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 
-from ..levels import identity
+from ..levels import identity, parameter_at
 from ..normalize.record import NormRecord
 from ..normalize.vocab import Vocabulary, load_vocabulary
 from .base import MatchGroup
@@ -36,15 +36,17 @@ def available() -> bool:
 
 
 def attributes(rec: NormRecord, level: str, vocab: Vocabulary | None = None) -> frozenset[str]:
-    """The structured attribute set of a record: `<dimension>=<canonical value>` for every value it carries."""
+    """The structured attribute set of a record at a ladder level: `algorithm=<identity at the level>` plus
+    `<dimension>=<value>` for every value admitted at that level (`levels.parameter_at`: nothing below L2, standard
+    fields at L2, parsed names from L3, any source at L4); `group` from L2 on."""
     attrs = set()
     key = identity(rec, level, vocab)
     if key:
         attrs.add(f"algorithm={key}")
-    if rec.group:
+    if rec.group and level not in ("L0", "L1"):
         attrs.add(f"group={rec.group}")
     for dim in STRUCTURED_DIMS:
-        v = rec.values.get(dim)
+        v = parameter_at(rec, level, dim)
         if v is not None:
             attrs.add(f"{dim}={v}")
     return frozenset(attrs)

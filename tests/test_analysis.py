@@ -121,6 +121,11 @@ def test_run_rows_counts_and_unsupported(tmp_path):
     assert rows["cbomkit"]["components"] == len(cbom["components"])
     assert rows["cbomkit"]["repo"] == "bfcbom/micro-java" and rows["cbomkit"]["snapshot"] == SNAPSHOT
     assert 0 < rows["cbomkit"]["algorithm_assets"] <= rows["cbomkit"]["crypto_assets"]
+    kinds = ("algorithm_assets", "certificate_assets", "protocol_assets", "material_assets", "other_assets")
+    assert sum(rows["cbomkit"][k] for k in kinds) == rows["cbomkit"]["crypto_assets"]
+    assert 0 < rows["cbomkit"]["located_assets"] <= rows["cbomkit"]["crypto_assets"]
+    rows = {r["tool"]: r for r in run_rows(tmp_path / "exp-tables", expects={"bfcbom/micro-java": "low"})}
+    assert rows["cbomkit"]["expect_crypto"] == "low" and rows["pqcheck"]["expect_crypto"] == "low"
 
 
 def test_write_csv_round_trip_and_empty_header(tmp_path):
@@ -195,13 +200,19 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert list(_read_csv(out / "coverage.csv")[0]) == COVERAGE_COLUMNS
     assert (out / "conformance.csv").read_text(encoding="utf-8").startswith(",".join(CONFORMANCE_COLUMNS))
     algos = _read_csv(out / "algorithms-run1.csv")
-    assert list(algos[0]) == lv.ALGORITHM_COLUMNS and {a["level"] for a in algos} == set(lv.LEVELS)
+    assert list(algos[0]) == lv.ALGORITHM_COLUMNS and all(int(a["k_L0"]) <= int(a["k_L4"]) for a in algos)
+    levels = _read_csv(out / "matchlevels-run1.csv")
+    assert [r["level"] for r in levels] == list(lv.LEVELS) and all(r["matcher"] == "exact" for r in levels)
+    assert int(levels[0]["items"]) == int(levels[-1]["items"])  # the unit is fixed across levels
+    k2plus = [int(r["k2"]) + int(r["k3"]) + int(r["k4plus"]) for r in levels]
+    assert k2plus == sorted(k2plus)  # cumulative: agreement never drops at a higher level
     assert {a["tool"] for a in algos} == {"cbomkit", "cipherradar"} and algos[0]["language"] == "Java"
     info = json.loads((out / "tables-run1.json").read_text())
     assert info["rows"]["algorithms-run1.csv"] == len(algos) and info["vocabulary"]["algorithms"]
     summary = (out / "_SUMMARY.md").read_text(encoding="utf-8")
     assert summary.startswith("# exp-tables: analysis summary (run 1)")
-    sections = ("## Runs", "## Micro projects", "## RQ1", "## Agreement ladder", "## Tools per algorithm", "## Scores")
+    sections = ("## Runs", "## What the tools report", "## Micro projects", "## RQ1", "## Agreement ladder",
+                "## Matching (RQ3)", "## Scores")  # fmt: skip
     for section in (*sections, "## Files"):
         assert section in summary
     assert "| cbomkit | pass 11 |" in summary and "| pqcheck | – |" in summary
@@ -247,6 +258,57 @@ def test_summary_markdown_from_csv_rows():
     assert "| tool | java | go |" in lines  # paper languages first
     assert lines.index("| good | pass 11 | – |") < lines.index("| weak | fail 2 | error |")  # passes first
     assert "| weak | 0 / 2 · 7 |  |" in lines
+
+
+def test_reported_section_shows_raw_counts_and_the_repo_matrix():
+    from analysis import summary as sm
+
+    def row(repo, tool, status, lang="Java", expect="", **counts):
+        r = {"repo": repo, "language": lang, "expect_crypto": expect, "tool": tool, "run": "1", "variant": "original",
+             "status": status}  # fmt: skip
+        if status == "ok":
+            r.update(
+                {
+                    k: "0"
+                    for k in (
+                        "components",
+                        "crypto_assets",
+                        "located_assets",
+                        "algorithm_assets",
+                        "certificate_assets",
+                        "protocol_assets",
+                        "material_assets",
+                        "other_assets",
+                    )
+                }
+            )
+            r.update({k: str(v) for k, v in counts.items()})
+        return r
+
+    rows = [
+        row(
+            "o/a",
+            "t1",
+            "ok",
+            components=40,
+            crypto_assets=10,
+            algorithm_assets=8,
+            certificate_assets=2,
+            located_assets=5,
+        ),
+        row("o/b", "t1", "ok", lang="Python", expect="low", components=3, crypto_assets=0),
+        row("o/a", "t2", "unsupported"),
+        row("o/b", "t2", "timeout", lang="Python", expect="low"),
+        row("o/a", "t1", "ok", components=99, crypto_assets=99),  # a second repetition is not counted
+    ]
+    rows[-1]["run"] = "2"
+    lines = sm._reported(rows, 1)
+    assert "| t1 | 2 | 43 | 10 | 8 | 2 | 0 | 0 | 0 | 50% | 1 | 5 |" in lines
+    assert "| t2 | 0 |  |  |  |  |  |  |  |  |  |  |" in lines
+    assert "| repo | language | expect | t1 | t2 |" in lines
+    assert "| o/a | java |  | 10 | – |" in lines and "| o/b | python | low | 0 | × |" in lines
+    assert "| all |  |  | 10 |  |" in lines
+    assert "expect" not in "\n".join(sm._reported([r for r in rows if r["repo"] == "o/a"], 1))
 
 
 def test_summary_starts_with_when_how_long_and_how_much_ram(tmp_path, monkeypatch):

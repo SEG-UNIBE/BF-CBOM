@@ -68,6 +68,8 @@ class RepoSpec:
     # A plain directory (e.g. corpus/micro/java) published to the git server by the runner instead of
     # a remote repo; resolved to an absolute path at spec load time.
     path: str | None = None
+    # Corpus metadata for the analysis, ignored by the runner: `low` marks a negative case (little crypto expected)
+    expect_crypto: str | None = None
 
     @property
     def owner(self) -> str:
@@ -137,6 +139,7 @@ def _as_repo_spec(item: dict, *, base_dir: Path | None = None) -> RepoSpec:
         size_kb=item.get("size_kb") or item.get("size"),
         variants=[str(v) for v in variants],
         path=path or None,
+        expect_crypto=_opt_str(item.get("expect_crypto")),
     )
 
 

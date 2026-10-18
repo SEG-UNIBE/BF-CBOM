@@ -110,6 +110,10 @@ def _languages(exp_dir: Path) -> dict[str, str | None]:
     return {r["full_name"]: r.get("language") for r in _spec(exp_dir).get("repos") or []}
 
 
+def _expects(exp_dir: Path) -> dict[str, str | None]:
+    return {r["full_name"]: r.get("expect_crypto") for r in _spec(exp_dir).get("repos") or []}
+
+
 def _voter_of(merge_llm: bool = False) -> dict[str, str]:
     return voter_groups(merge_llm=merge_llm)
 
@@ -388,9 +392,12 @@ def _tables_step(
     """runs.csv, the normalised records, the exact matcher's groups/members/agreement, RaQuN's groups and the matcher
     comparison when available, and the micro tables (if any). Returns the exact groups per (snapshot, variant)."""
     languages = _languages(exp_dir)
-    write("runs.csv", tbl.run_rows(exp_dir, languages, tailored=tailored_map()), tbl.RUNS_COLUMNS)
+    write(
+        "runs.csv",
+        tbl.run_rows(exp_dir, languages, tailored=tailored_map(), expects=_expects(exp_dir)),
+        tbl.RUNS_COLUMNS,
+    )
     voter_of = _voter_of(merge_llm)
-    matcher = ExactMatcher(level=level, window=window, closure=closure, voter_of=voter_of)
     norm_rows: list[dict] = []
     per_snapshot: dict[tuple[str, str], list] = defaultdict(list)
     commits: dict[str, str | None] = {}
@@ -407,15 +414,24 @@ def _tables_step(
             language=languages.get(tbl.full_name(snapshot)),
         )
     write(f"records-run{run}.csv", norm_rows, tbl.RECORDS_COLUMNS)
+    # the exact matcher at every level feeds matchlevels-run<k>.csv (RQ3, matcher x level); the full group, member
+    # and agreement tables are written at the scoring level only
+    matchlevel_rows: list[dict] = []
+    groups_by_snapshot: dict[tuple[str, str], list] = {}
+    exact_by_level: dict[str, dict[tuple[str, str], list]] = {}
+    for lv_name in lv.LEVELS:
+        matcher = ExactMatcher(level=lv_name, window=window, closure=closure, voter_of=voter_of)
+        at_level = {key: matcher.match(records) for key, records in sorted(per_snapshot.items())}
+        exact_by_level[lv_name] = at_level
+        matchlevel_rows.append(tbl.matchlevel_row(matcher.name, lv_name, run, at_level, voter_of))
+    groups_by_snapshot = exact_by_level[level]
     group_rows: list[dict] = []
     member_rows: list[dict] = []
     agreement_rows: list[dict] = []
-    groups_by_snapshot: dict[tuple[str, str], list] = {}
-    for (snapshot, variant), records in sorted(per_snapshot.items()):
-        groups_by_snapshot[(snapshot, variant)] = matcher.match(records)
+    for (snapshot, variant), groups in groups_by_snapshot.items():
         g, m, a = tbl.group_rows(
-            matcher.name,
-            groups_by_snapshot[(snapshot, variant)],
+            "exact",
+            groups,
             snapshot=snapshot,
             variant=variant,
             run=run,
@@ -434,16 +450,17 @@ def _tables_step(
     if raqun and not rq.available():
         typer.secho("RaQuN not importable (install the `raqun` extra and the PyQuN package); skipped", fg="yellow")
     elif raqun:
-        _raqun_step(
+        matchlevel_rows += _raqun_step(
             run,
             per_snapshot,
-            groups_by_snapshot,
+            exact_by_level,
             write,
             level=level,
             voter_of=voter_of,
             commits=commits,
             languages=languages,
         )
+    write(f"matchlevels-run{run}.csv", matchlevel_rows, tbl.MATCHLEVELS_COLUMNS)
     entries = _micro_entries(exp_dir, run, all_assets, normalized)
     if entries:
         write(f"micro-run{run}.csv", tbl.micro_rows(entries, run=run), tbl.MICRO_COLUMNS)
@@ -453,34 +470,44 @@ def _tables_step(
     return groups_by_snapshot
 
 
-def _raqun_step(run, per_snapshot, exact_groups, write: Writer, *, level, voter_of, commits, languages) -> None:
-    """groups/members/agreement-raqun-run<k>.csv and matchers-run<k>.csv (RaQuN vs the exact matcher)."""
-    matcher = rq.RaqunMatcher(level=level, voter_of=voter_of)
+def _raqun_step(run, per_snapshot, exact_by_level, write: Writer, *, level, voter_of, commits, languages) -> list[dict]:
+    """RaQuN at every level: groups/members/agreement-raqun-run<k>.csv at the scoring level, matchers-run<k>.csv
+    (RaQuN vs the exact matcher, per repository and level); returns its matchlevels rows."""
     g_rows: list[dict] = []
     m_rows: list[dict] = []
     a_rows: list[dict] = []
     cmp_rows: list[dict] = []
-    for (snapshot, variant), records in sorted(per_snapshot.items()):
-        groups = matcher.match(records)
-        g, m, a = tbl.group_rows(
-            matcher.name,
-            groups,
-            snapshot=snapshot,
-            variant=variant,
-            run=run,
-            commit=commits.get(snapshot),
-            language=languages.get(tbl.full_name(snapshot)),
-            voter_of=voter_of,
-        )
-        g_rows += g
-        m_rows += m
-        a_rows += a
-        row = compare(exact_groups.get((snapshot, variant), []), groups, "exact", "raqun")
-        cmp_rows.append({"repo": tbl.full_name(snapshot), "snapshot": snapshot, "variant": variant, "run": run, **row})
+    level_rows: list[dict] = []
+    for lv_name in lv.LEVELS:
+        matcher = rq.RaqunMatcher(level=lv_name, voter_of=voter_of)
+        at_level = {key: matcher.match(records) for key, records in sorted(per_snapshot.items())}
+        level_rows.append(tbl.matchlevel_row(matcher.name, lv_name, run, at_level, voter_of))
+        for (snapshot, variant), groups in at_level.items():
+            row = compare(exact_by_level[lv_name].get((snapshot, variant), []), groups, "exact", "raqun")
+            cmp_rows.append(
+                {"repo": tbl.full_name(snapshot), "snapshot": snapshot, "variant": variant, "run": run,
+                 "level": lv_name, **row}
+            )  # fmt: skip
+            if lv_name != level:
+                continue
+            g, m, a = tbl.group_rows(
+                matcher.name,
+                groups,
+                snapshot=snapshot,
+                variant=variant,
+                run=run,
+                commit=commits.get(snapshot),
+                language=languages.get(tbl.full_name(snapshot)),
+                voter_of=voter_of,
+            )
+            g_rows += g
+            m_rows += m
+            a_rows += a
     write(f"groups-raqun-run{run}.csv", g_rows, tbl.GROUP_COLUMNS)
     write(f"members-raqun-run{run}.csv", m_rows, tbl.MEMBERS_COLUMNS)
     write(f"agreement-raqun-run{run}.csv", a_rows, tbl.AGREEMENT_COLUMNS)
     write(f"matchers-run{run}.csv", cmp_rows, MATCHERS_COLUMNS)
+    return level_rows
 
 
 def _stability_step(all_runs: list[Normalized], write: Writer, *, level: str) -> dict[tuple[str, str, str], set[str]]:
@@ -525,8 +552,9 @@ def _score_step(
         repo_of=repo_of,
     )
     for (snapshot, variant, tool), keys in (consensus or {}).items():
-        if (f"{snapshot}/{variant}", tool) in obs.items:
-            obs.items[(f"{snapshot}/{variant}", tool)]["algorithm"] = set(keys)
+        bucket = obs.items.get((f"{snapshot}/{variant}", tool))
+        if bucket is not None:  # keep the items whose algorithm is in the tool's consensus set
+            bucket["algorithm"] = {it for it in bucket["algorithm"] if sc.unit_of(it) in keys}
     rows, loo = sc.score_rows(obs, samples=samples)
     write(f"score-run{run}.csv", rows, sc.SCORE_COLUMNS)
     write(f"loo-run{run}.csv", loo, sc.LOO_COLUMNS)

@@ -11,7 +11,8 @@ from analysis.normalize import NormRecord
 
 def _rec(i, tool, name, **values):
     vals = {"asset_type": "algorithm", **values}
-    return NormRecord(f"{tool}:{i}:0", tool, i, 0, name=name, values=vals)
+    via, src = ({k: "parse" for k in values}, {k: "name" for k in values})  # admitted from L3 on
+    return NormRecord(f"{tool}:{i}:0", tool, i, 0, name=name, values=vals, via=via, src=src)
 
 
 def test_structured_attributes_are_canonical_dimension_values():
@@ -26,6 +27,7 @@ def test_structured_attributes_are_canonical_dimension_values():
         "primitive=ae",
     }
     assert attributes(_rec(1, "a", "parseCsvMap"), "L3") == {"algorithm=parsecsvmap"}
+    assert attributes(rec, "L1") == {"algorithm=aes256gcm"}  # no normalised values below L2
 
 
 def test_compare_partitions_by_co_membership():

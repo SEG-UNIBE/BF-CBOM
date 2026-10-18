@@ -39,6 +39,14 @@ ladder = ladder[["L0", "L1", "L2", "L3", "L4lit", "L4"]]       # one line per to
 params = lv.query("dimension != 'algorithm' and tool == 'all'").pivot(index="dimension", columns="level", values="share")
 ```
 
+**Matchability per level (RQ3).** Items by the number of voter groups in their largest group, and the agreement per
+dimension inside the groups, exact matcher vs RaQuN, level by level.
+```python
+ml = pd.read_csv(f"{A}/matchlevels-run1.csv")
+k = ml.set_index(["matcher", "level"])[["k1", "k2", "k3", "k4plus"]].div(ml["items"].values, axis=0)  # stacked bars
+agree = ml.set_index(["matcher", "level"]).filter(like="_agree")                                   # heatmap
+```
+
 **Ranking with confidence intervals (RQ4).**
 ```python
 sc = pd.read_csv(f"{A}/score-run1.csv").query("dimension == 'algorithm'").sort_values("confirmation")

@@ -6,9 +6,9 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import Protocol
 
+from ..levels import PARAMETER_DIMS, parameter_at
 from ..normalize.record import NormRecord
 
-PARAMETER_DIMS = ("key_size", "mode", "padding", "curve", "digest")
 AGREEMENT_DIMS = (*PARAMETER_DIMS, "location")
 
 
@@ -23,6 +23,7 @@ class MatchGroup:
     members: list[NormRecord]
     extra: dict = field(default_factory=dict)  # matcher-specific columns (file, line range, located voters, ...)
     implied: frozenset[str] = frozenset()  # record ids that are members only by implication (closure)
+    matched: frozenset[str] = frozenset()  # record ids whose own identity differs: matched in at a lower level
 
     @property
     def tools(self) -> list[str]:
@@ -46,13 +47,19 @@ class Matcher(Protocol):
 
 
 def agreement(
-    group: MatchGroup, dims: tuple[str, ...] = AGREEMENT_DIMS, *, voter_of: dict[str, str] | None = None
+    group: MatchGroup,
+    dims: tuple[str, ...] = AGREEMENT_DIMS,
+    *,
+    voter_of: dict[str, str] | None = None,
+    level: str | None = None,
 ) -> list[dict]:
     """Per dimension: how many voters report a value inside the group, how many of them carry the majority value,
-    that value and every value seen. A voter with several values counts for each. `location` (repo groups only)
-    reads the matcher's `located_voters` / `colocated_voters`: voters that locate the asset at all, and the most
-    that share one call site."""
+    that value and every value seen. A voter with several values counts for each. Values are read as admitted at
+    `level` (default: the group's level, else L4: any source; `levels.parameter_at`), so a group at L2 compares
+    standard-field values only. `location` (repo groups only) reads the matcher's `located_voters` /
+    `colocated_voters`: voters that locate the asset at all, and the most that share one call site."""
     voter_of = voter_of or {}
+    level = level or group.extra.get("level") or "L4"
     rows = []
     for dim in dims:
         if dim == "location":
@@ -64,7 +71,7 @@ def agreement(
             continue
         by_voter: dict[str, set[str]] = {}
         for r in group.members:
-            v = r.values.get(dim)
+            v = parameter_at(r, level, dim)
             if v is not None:
                 by_voter.setdefault(voter_of.get(r.tool, r.tool), set()).add(str(v))
         if not by_voter:

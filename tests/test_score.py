@@ -8,7 +8,8 @@ from analysis.stability import stability_rows
 
 def _rec(i, tool, name, *, file=None, line=None, **values):
     vals = {"asset_type": "algorithm", **values}
-    return NormRecord(f"{tool}:{i}:0", tool, i, 0, name=name, values=vals, file=file, line=line)
+    via, src = ({k: "parse" for k in values}, {k: "name" for k in values})  # admitted from L3 on
+    return NormRecord(f"{tool}:{i}:0", tool, i, 0, name=name, values=vals, via=via, src=src, file=file, line=line)
 
 
 VOTERS = {"a": "ga", "b": "gb", "c": "gc", "a2": "ga"}
@@ -119,14 +120,18 @@ def test_score_rows_cover_every_dimension_with_items():
 def test_stability_jaccard_and_consensus():
     runs = {
         ("s", "original", "t"): {
-            1: [_rec(0, "t", "AES"), _rec(1, "t", "RSA")],
-            2: [_rec(0, "t", "AES"), _rec(1, "t", "RSA"), _rec(2, "t", "MD5")],
-            3: [_rec(0, "t", "AES")],
+            1: [_rec(0, "t", "AES", family="AES"), _rec(1, "t", "RSA", family="RSA")],
+            2: [
+                _rec(0, "t", "AES", family="AES"),
+                _rec(1, "t", "RSA", family="RSA"),
+                _rec(2, "t", "MD5", family="MD5"),
+            ],  # fmt: skip
+            3: [_rec(0, "t", "AES", family="AES")],
         },
-        ("s", "original", "once"): {1: [_rec(0, "once", "AES")]},
+        ("s", "original", "once"): {1: [_rec(0, "once", "AES", family="AES")]},
     }
     rows, consensus = stability_rows(runs, level="L3")
     (row,) = rows
     assert row["tool"] == "t" and row["runs"] == 3 and row["records_mean"] == 2.0
     assert row["jaccard_min"] == round(1 / 3, 3) and row["consensus"] == ["AES", "RSA"] and row["unstable"] == ["MD5"]
-    assert consensus == {("s", "original", "t"): {"AES", "RSA"}}  # a single run has no consensus row
+    assert consensus == {("s", "original", "t"): {"AES", "RSA"}}  # a single run has no consensus row; L4 identities

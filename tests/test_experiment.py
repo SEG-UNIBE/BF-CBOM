@@ -351,3 +351,12 @@ def test_mark_unsupported_records_meta_and_plan_skips_it(tmp_path: Path):
     jobs, _ = ex.plan_jobs(spec, [snap], exp_dir, new_id=lambda: next(ids), retry_failed=True)
     assert {j.tool for j in jobs} == {"cryptoscan"}  # unsupported runs are never retried
     assert [(m["worker"], m["status"]) for m, _ in ex.iter_results(exp_dir)] == [("cbomkit", "unsupported")] * 2
+
+
+def test_repo_spec_keeps_expect_crypto_as_metadata():
+    spec = ex.spec_from_dict(
+        {"name": "e", "tools": ["t"], "repos": [{"full_name": "o/r", "expect_crypto": "low"}, {"full_name": "o/s"}]}
+    )
+    assert [r.expect_crypto for r in spec.repos] == ["low", None]
+    repos = ex.spec_to_dict(spec)["repos"]
+    assert repos[0]["expect_crypto"] == "low" and "expect_crypto" not in repos[1]

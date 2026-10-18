@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 
+from analysis.levels import LEVELS
 from analysis.matchers import ExactMatcher, MatchGroup, agreement
 from analysis.normalize import NormRecord, normalize_cbom
 
@@ -10,8 +11,21 @@ FIXTURES = Path(__file__).parent / "fixtures" / "pilot"
 
 
 def _rec(i, tool, name, *, file=None, line=None, line_end=None, **values):
+    """A normalised record as the normaliser would build it: the family of a known name is set (so the L4 identity
+    is canonical), parameter values come from the parsed name."""
+    families = {"aes": "AES", "rsa": "RSA", "hmac": "HMAC", "sha": "SHA-2"}
     vals = {"asset_type": "algorithm", **values}
-    return NormRecord(f"{tool}:{i}:0", tool, i, 0, name=name, values=vals, file=file, line=line, line_end=line_end)
+    head = name.lower().replace("-", "").replace("_", "")
+    for prefix, family in families.items():
+        if head.startswith(prefix) and "family" not in vals:
+            vals["family"] = family
+            if family == "SHA-2":
+                vals["algorithm"] = "SHA-256"
+    via = {k: "parse" for k in values}
+    src = {k: "name" for k in values}
+    return NormRecord(
+        f"{tool}:{i}:0", tool, i, 0, name=name, values=vals, via=via, src=src, file=file, line=line, line_end=line_end
+    )
 
 
 def test_repo_groups_by_identity_and_site_groups_by_file_and_window():
@@ -27,6 +41,7 @@ def test_repo_groups_by_identity_and_site_groups_by_file_and_window():
     groups = ExactMatcher(level="L3", window=2, voter_of={"a": "g1", "b": "g1", "c": "g2", "d": "g3"}).match(records)
     repo = {g.key: g for g in groups if g.scope == "repo"}
     assert set(repo) == {"AES", "SHA-256", "parsecsvmap"}
+    assert all(not g.matched for g in repo.values())  # every member's own identity is the group's
     aes = repo["AES"]
     assert aes.tools == ["a", "b", "c", "d"] and aes.k == 4 and aes.voters({"a": "g1", "b": "g1"}) == ["c", "d", "g1"]
     assert (aes.extra["n_records"], aes.extra["n_sites"]) == (5, 3)
@@ -81,3 +96,35 @@ def test_two_tools_agree_on_micro_java_as_the_call_site_matcher_did():
     assert sum(g.k == 2 for g in sites) >= 10 and all(g.k <= 2 for g in sites)
     repo = [g for g in groups if g.scope == "repo"]
     assert sum(g.k == 2 for g in repo) >= 8
+
+
+def test_groups_follow_the_cumulative_relation_of_the_level():
+    """Groups are the clusters of the level: at L0 only verbatim equal names match, an item may have several groups,
+    and a record that joins through a lower level is flagged `matched`."""
+    records = [
+        _rec(0, "a", "AES-256-GCM"),
+        _rec(1, "b", "aes"),
+        _rec(2, "c", "AES-256-GCM"),
+        _rec(3, "d", "foo", family="AES"),  # a tool-specific resolution: L4 identity AES, raw name foo
+        _rec(4, "e", "foo"),  # no family: its own identity stays the folded name
+    ]
+
+    def keyed(level):
+        out = {}
+        for g in ExactMatcher(level=level).match(records):
+            if g.scope == "repo":
+                out.setdefault(g.key, []).append(g)
+        return out
+
+    by_level = {lv: keyed(lv) for lv in LEVELS}
+    assert all(set(by_level[lv]) == {"AES", "foo"} for lv in LEVELS)  # the unit is the same at every level
+    aes0 = by_level["L0"]["AES"]
+    assert [tuple(g.tools) for g in aes0] == [("a", "c"), ("b",), ("d", "e")]  # a = c verbatim; d = e verbatim
+    assert [g.group_id for g in aes0] == ["E00001", "E00001-2", "E00001-3"]
+    assert [tuple(g.tools) for g in by_level["L3"]["AES"]] == [("a", "b", "c"), ("d", "e")]  # parsed: aes = AES
+    assert by_level["L3"]["AES"][1].matched == frozenset({"e:4:0"})  # e's foo joined d's AES report at L0
+    assert by_level["L3"]["foo"][0].matched == frozenset({"d:3:0"})  # and the other way round
+    (aes4,) = by_level["L4"]["AES"]
+    assert aes4.tools == ["a", "b", "c", "d", "e"] and aes4.matched == frozenset({"e:4:0"})
+    ks = [max(g.k for g in by_level[lv]["AES"]) for lv in LEVELS]
+    assert ks == sorted(ks) and ks[0] == 2 and ks[-1] == 5  # cumulative

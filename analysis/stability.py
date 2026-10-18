@@ -2,9 +2,9 @@
 
 For every (tool, snapshot, variant) with at least two stored ok runs: the Jaccard similarity of the algorithm sets
 (identity at a ladder level, `analysis/levels.py`) between runs, the coefficient of variation of the record count,
-and the consensus set: the algorithms present in more than half of the runs (an inserted asset of Phase 4 counts as
-detected only when it is in most runs). Scoring uses the consensus sets instead of run k's sets when repetitions
-exceed one (`--consensus`, the default then).
+and the consensus set: the algorithms (L4 identity, the unit of the ladder and the scores) present in more than half
+of the runs (an inserted asset of Phase 4 counts as detected only when it is in most runs). Scoring uses the
+consensus sets instead of run k's sets when repetitions exceed one (`--consensus`, the default then).
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ import statistics
 from collections import defaultdict
 from itertools import combinations
 
-from .levels import algorithms_at
+from .levels import UNIT_LEVEL, algorithms_at
 from .normalize.record import NormRecord
 from .normalize.vocab import Vocabulary, load_vocabulary
 
@@ -42,10 +42,11 @@ def stability_rows(
         if len(by_run) < 2:
             continue
         sets = {k: set(algorithms_at(recs, level, vocab)) for k, recs in by_run.items()}
+        units = {k: set(algorithms_at(recs, UNIT_LEVEL, vocab)) for k, recs in by_run.items()}  # the consensus unit
         counts = [len([r for r in recs if r.values.get("asset_type") == "algorithm"]) for recs in by_run.values()]
         pairs = [jaccard(sets[a], sets[b]) for a, b in combinations(sorted(sets), 2)]
         seen: dict[str, int] = defaultdict(int)
-        for s in sets.values():
+        for s in units.values():
             for key in s:
                 seen[key] += 1
         majority = {key for key, n in seen.items() if n > len(by_run) / 2}

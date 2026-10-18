@@ -51,6 +51,7 @@ repos:                     # and/or explicit repos
     branch: main           # default: main (resolved once, then frozen in lock.json)
     commit: <40-hex sha>   # optional pin; otherwise resolved with git ls-remote on first run
     language: Python       # helps language-specific tools
+    expect_crypto: low     # optional corpus metadata for the analysis (a negative case: little crypto expected)
     variants: [original, m-rsa2048-insert-01]   # mutants are branches bfcbom/<variant> on gitserver
   - full_name: bfcbom/micro-java
     path: ../corpus/micro/java   # a plain directory (relative to this file) published to gitserver as a
@@ -154,26 +155,36 @@ what, and where does it violate its declared standard"; a full validation of who
 
 **How much agreement does normalisation create?** A normaliser developed on the outputs it evaluates could manufacture
 agreement and work against our own hypothesis that tools report heterogeneous things. So agreement is reported as a
-ladder (`levels`, below; CLAUDE.md method refinement 14):
+ladder (`levels`, below; CLAUDE.md method refinement 14). The ladder varies only *when two reports count as the same
+algorithm*; the unit stays fixed: an algorithm is its identity under the full normalisation (L4), so every level's
+share is a fraction of the same population. Two records match at a level when they are equal under any of the key
+functions up to that level (cumulative), so a match is never lost at a higher level, every tool's share can only grow
+from L0 to L4, and each step's gain is one normalisation step:
 
-| Level | Information allowed |
+| Level | Two reports match when ... |
 |---|---|
-| L0 | the component name exactly as reported |
-| L1 | case and separators ignored (`SHA-256` = `sha256`) |
-| L2 | the standard vocabulary: whole names and CycloneDX 1.7 `algorithmFamily` through the registry and JOSE/SSH/JCA identifiers (`DESede` -> 3DES, `HS256` -> HMAC) |
-| L3 | composite names parsed (`AES-256-GCM` -> AES) |
-| L4lit | L4 without the *interpretive* dictionary entries (`interpretive: true` in a tool spec: a judgement such as CryptoScan's "Certificate Validation Bypass" read as TLS); those records fall back to L3 |
-| L4 | everything tool-specific: spec sources (symbols, properties, refs, dependencies), tool dictionaries, API context |
+| L0 | the component names are identical as reported |
+| L1 | ... or equal with case and separators ignored (`SHA-256` = `sha256`) |
+| L2 | ... or map to the same entry of the standard vocabulary: whole names and CycloneDX 1.7 `algorithmFamily` through the registry and JOSE/SSH/JCA identifiers (`DESede` -> 3DES, `HS256` -> HMAC) |
+| L3 | ... or parse to the same algorithm (`AES-256-GCM` -> AES) |
+| L4lit | ... or get the same identity from the tool specs, interpretive entries excluded (`interpretive: true`: a judgement such as CryptoScan's "Certificate Validation Bypass" read as TLS; such records keep their L3 identity) |
+| L4 | ... or get the same identity from everything tool-specific: spec sources (symbols, properties, refs, dependencies), tool dictionaries, API context |
 
-Hypotheses are tested at L2/L3, the L0 -> L4 gap is reported as representational heterogeneity, the L4lit -> L4 gap
-as the part that rests on judgement entries, and rankings are checked for stability across levels. Parameters (key
-size, mode, padding, curve, digest) get the same ladder from L2 on: an (algorithm, value) pair counts at L2 when the
-value comes from a standard field, at L3 also when parsed from the name, at L4 from any source. `--closure` (refinement
-2) adds the algorithms a record implies (its digest, the `implies` table: HMAC-SHA256 -> HMAC and SHA-256, PBKDF2 ->
-HMAC) to every tool's set from L3 on, so tools that expand such hierarchies and tools that do not are compared on
-equal terms; the plain and the closed numbers are reported apart, never pooled. On e1-pilot-corpus the pooled share
-of a tool's algorithms that another voter group confirms is 48 % (L0), 53 %, 60 %, 74 % (L3), 75 % (L4lit) and 75 %
-(L4): the tool-specific part adds nothing overall, the interpretive entries nothing at all (2026-10-18).
+The records of a repository fall into clusters at each level (connected under the relation); a tool's algorithm is
+confirmed at a level when a cluster holding one of its records also holds a record of another voter group. The L0
+share reads as "another tool uses a verbatim identical spelling". Hypotheses are tested at L2/L3, the L0 -> L4 gap is
+reported as representational heterogeneity, the L4lit -> L4 gap as the part that rests on judgement entries, and
+rankings are checked for stability across levels. Parameters (key size, mode, padding, curve, digest) get the same
+ladder from L2 on over (algorithm, value) pairs with values from any source: a pair is confirmed when the tool's value
+is admitted at the level (L2 from a standard field, L3 also parsed from the name, L4 from any source) and a record of
+another voter group in the same cluster carries the same admitted value. `--closure` (refinement 2) adds the
+algorithms a record implies (its digest, the `implies` table: HMAC-SHA256 -> HMAC and SHA-256, PBKDF2 -> HMAC) as
+items of the tool, matchable from L3 on (an implication is parsed knowledge; it never merges clusters), so tools that
+expand such hierarchies and tools that do not are compared on equal terms; the plain and the closed numbers are
+reported apart, never pooled. On e1-pilot-corpus the pooled share of a tool's algorithms that another voter group
+confirms is 56 % (L0), 60 %, 67 %, 73 % (L3), 77 % (L4lit) and 77 % (L4): most of the gain comes from the standard
+vocabulary and parsing, the tool specs add four points, the interpretive entries nothing (2026-10-18, fixed-unit
+ladder; `docs/findings.md` has the per-tool numbers).
 
 **Frozen.** The vocabulary and the adapter specs were developed on the pilot corpus (the development set); the main
 corpus is held out. Since 2026-10-18 they are frozen: every change bumps `version` in `analysis/data/algorithms.yaml`
@@ -243,8 +254,10 @@ of this too (`report --fetch`).
 importable (`uv sync --extra raqun` plus the package from the user's fork; `--raqun/--no-raqun` forces it): tools are
 models, a tool's distinct canonical assets are elements with `<dimension>=<value>` attributes, RaQuN's Jaccard on
 them is the per-field agreement; `groups-raqun`/`members-raqun`/`agreement-raqun-run<k>.csv` have the same columns
-as the exact tables, `matchers-run<k>.csv` compares the two partitions per repository (co-membership pair Jaccard,
-share of groups that sit inside one group of the other matcher).
+as the exact tables (at the scoring level), `matchers-run<k>.csv` compares the two partitions per repository and
+level (co-membership pair Jaccard, share of groups that sit inside one group of the other matcher), and RaQuN's
+rows in `matchlevels-run<k>.csv` put it next to the exact matcher level by level (its attributes are the identity
+and the values admitted at that level).
 
 **`score <exp>`** scores and ranks the tools without ground truth (RQ4, `analysis/score.py`) on the exact
 matcher's groups. Voters are voter groups (tools sharing an engine count once; `--merge-llm` merges the LLM workers).
@@ -266,9 +279,10 @@ algorithms each tool reports, and the share that a tool of another voter group (
 also reports. It prints a tools x levels table and writes `_ANALYSIS/levels-run<k>.csv` (dimension, level, tool,
 voter_group, algorithms, confirmed, share; tool `all` pools all tools; `dimension` is `algorithm` or a parameter:
 key_size, mode, padding, curve, digest, which exist from L2 on) and `_ANALYSIS/algorithms-run<k>.csv`: one row per
-(snapshot, variant, level, tool, algorithm) with the tool's voter group, whether the tool was tuned on the repo
-(`tailored`), whether the row is only implied (`implied`, with `--closure`), the repo's language and the number of
-records behind it. That table is location-free, so every tool takes part; it is the basis for UpSet plots and the
+(snapshot, variant, tool, algorithm) with the tool's voter group, whether the tool was tuned on the repo
+(`tailored`), whether the row is only implied (`implied`, with `--closure`), the repo's language, the number of
+records and distinct spellings behind it, and per level the voter groups in the algorithm's largest cluster (`k_L0`
+.. `k_L4`). That table is location-free, so every tool takes part; it is the basis for UpSet plots and the
 tools-per-algorithm distribution. Options: `--run K` for another repetition, `--merge-llm` (every LLM worker one
 voter), `--include-tailored`, `--closure` (refinement 2).
 
@@ -308,6 +322,7 @@ The commands write to the experiment's folder on the volume:
 ├── agreement-exact-run1.csv              # tables: one row per (group, dimension): voters reporting / agreeing, majority value
 ├── groups-raqun-run1.csv                 # tables: RaQuN's groups (with members-/agreement-raqun-run1.csv), when PyQuN is installed
 ├── matchers-run1.csv                     # tables: exact vs RaQuN per repository (co-membership pair Jaccard)
+├── matchlevels-run1.csv                  # tables: RQ3, per matcher and level: items by voter groups, agreement per dimension
 ├── score-run1.csv                        # score (RQ4): per tool, dimension, level: items, confirmation [CI], exclusivity, rank, Dawid-Skene
 ├── loo-run1.csv                          # score (RQ4): ranking without each voter group, Kendall tau vs the full ranking
 ├── stability.csv                         # score: per (tool, snapshot) with repeated runs: Jaccard across runs, records CV, consensus
@@ -320,34 +335,38 @@ The commands write to the experiment's folder on the volume:
 ├── meaningful-run1.csv                   # schema (RQ1): per tool and dimension, assets with a value from standard fields / any
 ├── traceability-run1.csv                 # schema (RQ1): per (snapshot, tool): located, existing, in range, strong
 ├── levels-run1.csv                       # levels: confirmed share per tool at normalisation levels L0-L4
-├── algorithms-run1.csv                   # levels: which algorithms each tool reports per repository and level
+├── algorithms-run1.csv                   # levels: which algorithms each tool reports per repository, with the voter groups matching at each level
 ├── coverage.csv                          # normalize: fill rates per tool and dimension
 ├── conformance.csv                       # normalize: spec issues per tool and kind
 └── vocab.csv                             # normalize: what every raw value mapped to, per tool and source
 ```
 
 **`tables <exp>`** writes flat, long-format CSV files (UTF-8, comma-separated, lists inside a cell joined with `;`)
-and runs the **exact matcher** (`analysis/matchers/exact.py`, matcher (b)): every algorithm record of every tool is
-keyed by its canonical identity at a ladder level (`--level`, default L3), one group per key and repository, so tools
-without locations take part; inside a group the located records form call-site groups (same file, lines within
-`--window`, default 2; a window record spans `line` .. `line_end`). Per group and dimension (key size, mode,
-padding, curve, digest, location) the agreement table says how many voters report a value and how many carry the
-majority value. `--closure` lets a record join the groups of the algorithms it implies (`implied` member rows). The
-settings are recorded in `tables-run<k>.json`. The tables come in three layers, so further matchers only add
+and runs the **exact matcher** (`analysis/matchers/exact.py`, matcher (b)) at every ladder level: its groups are the
+clusters of the ladder (records equal under any key function up to the level), each keyed by the algorithm they
+belong to (its L4 identity), so tools without locations take part and an algorithm may have several groups below
+L4; the full group, member and agreement tables are written at the scoring level (`--level`, default L3), the
+per-level summary `matchlevels-run<k>.csv` for all six. Inside a group the located records form call-site groups
+(same file, lines within `--window`, default 2; a window record spans `line` .. `line_end`). Per group and dimension
+(key size, mode, padding, curve, digest, location) the agreement table says how many voters report a value admitted
+at the level and how many carry the majority value. A member whose own identity differs from the group's key joined
+through a lower level (`matched`); `--closure` lets a record join the groups of the algorithms it implies (`implied`
+member rows). The settings are recorded in `tables-run<k>.json`. The tables come in three layers, so further matchers only add
 files and never change these:
 
 | File | Layer | One row per | Main columns |
 |---|---|---|---|
-| `runs.csv` | runs | stored run, every repetition, incl. failed, timed-out and `unsupported` | repo, snapshot, commit, variant, tool, run, tailored (the tool was tuned on this repo), status, duration_sec, size_bytes, error (the most telling line), peak_memory_mb, memory_limit_mb, oom_kills, enqueued_at, started_at, finished_at, queue_sec, tool_version, image_ref, bfcbom_commit, bom_format, spec_version (as the CBOM declares), components, crypto_assets, algorithm_assets; for LLM workers requests, requests_failed, input_tokens, cached_input_tokens, cache_write_tokens, output_tokens, reasoning_tokens, models_answered |
+| `runs.csv` | runs | stored run, every repetition, incl. failed, timed-out and `unsupported` | repo, snapshot, commit, variant, tool, run, tailored (the tool was tuned on this repo), status, duration_sec, size_bytes, error (the most telling line), peak_memory_mb, memory_limit_mb, oom_kills, enqueued_at, started_at, finished_at, queue_sec, tool_version, image_ref, bfcbom_commit, bom_format, spec_version (as the CBOM declares), components, crypto_assets and, by the declared `assetType`, algorithm_assets, certificate_assets, protocol_assets, material_assets, other_assets, plus located_assets (crypto assets with a file location in the CBOM), expect_crypto (from the spec); for LLM workers requests, requests_failed, input_tokens, cached_input_tokens, cache_write_tokens, output_tokens, reasoning_tokens, models_answered |
 | `records-run<k>.csv` | records | normalised record: one (component, occurrence) of one tool | snapshot, variant, tool, run, record_id (`<tool>:<component>:<occurrence>`), site_id (`<tool>:<file>:<line>` when located), every record dimension, `raw_*`, `src_*`, unmapped, conflicts, spec_issues |
-| `groups-exact-run<k>.csv` | matches | group of the exact matcher: `repo` scope = one algorithm key per repository, `site` scope = its located records at one call site | matcher, repo, snapshot, commit, variant, run, group_id (`E00001`, sites `E00001.001`), k (tools), tools, language, level, scope, key, voters, voter_groups, n_records, n_sites, located_voters, colocated_voters (repo scope), file, line_min, line_max, parent (site scope) |
-| `members-exact-run<k>.csv` | matches | (group, record) pair | matcher, snapshot, variant, run, group_id, record_id, tool, implied (member only through `--closure`) |
+| `groups-exact-run<k>.csv` | matches | group of the exact matcher: `repo` scope = one cluster of an algorithm per repository (one per algorithm at L4), `site` scope = its located records at one call site | matcher, repo, snapshot, commit, variant, run, group_id (`E00001`; a second cluster of the same algorithm below L4 `E00001-2`; sites `E00001.001`), k (tools), tools, language, level, scope, key, voters, voter_groups, n_records, n_sites, cluster, clusters, located_voters, colocated_voters (repo scope), file, line_min, line_max, parent (site scope) |
+| `members-exact-run<k>.csv` | matches | (group, record) pair | matcher, snapshot, variant, run, group_id, record_id, tool, implied (member only through `--closure`), matched (its own identity differs from the group's key: joined through a lower level) |
 | `groups-raqun-run<k>.csv`, `members-raqun-run<k>.csv`, `agreement-raqun-run<k>.csv` | matches | RaQuN's groups (repo scope only; `n_elements`, `similarity` = Jaccard of the attribute sets) | as the exact tables |
-| `matchers-run<k>.csv` | matches | (repository): exact vs RaQuN | repo, snapshot, variant, run, matcher_a, matcher_b, records_common, groups_a, groups_b, pairs_a, pairs_b, pairs_both, pair_jaccard, a_in_one_b, b_in_one_a |
+| `matchers-run<k>.csv` | matches | (repository, level): exact vs RaQuN | repo, snapshot, variant, run, level, matcher_a, matcher_b, records_common, groups_a, groups_b, pairs_a, pairs_b, pairs_both, pair_jaccard, a_in_one_b, b_in_one_a |
 | `score-run<k>.csv` | scores | (dimension, tool) at the matcher's level | dimension, level, tool, voter_group, items, confirmed, confirmation, ci_low, ci_high, exclusive, exclusivity, rank, ds_support, ds_sensitivity, ds_specificity (algorithm dimension only) |
 | `loo-run<k>.csv` | scores | (dimension, left-out voter group) | dimension, level, left_out, kendall_tau, ranking |
 | `stability.csv` | scores | (tool, snapshot, variant) with >= 2 runs | repo, snapshot, variant, tool, level, runs, records_mean, records_cv, algorithms_mean, jaccard_mean, jaccard_min, consensus, unstable |
 | `agreement-exact-run<k>.csv` | matches | (group, dimension) | matcher, repo, snapshot, variant, run, group_id, scope, key, dimension (key_size, mode, padding, curve, digest; location for repo groups), reporting (voters with a value), agreeing (voters carrying the majority value), majority, values |
+| `matchlevels-run<k>.csv` | matches | (matcher, level) | matcher, level, run, repos, items (algorithms by L4 identity), records, k1, k2, k3, k4plus (items by the voter groups of their largest group at the level), share_k2plus, `<dim>_groups` and `<dim>_agree` for key_size, mode, padding, curve, digest (groups with 2+ voters reporting a value admitted at the level; share where all agree), location_groups, location_agree (groups with 2+ located voters; share with 2+ at one call site) |
 | `micro-run<k>.csv` | ground truth | micro project and tool of the spec, also unsupported and failed runs | project, language, tool, status (of the run, `missing` without one), verdict (`pass`, `fail`, `unsupported`, `error`, `missing`), strict, lenient, repo, recall_strict, recall_lenient, recall_repo, sites_in_file, sites_correct, precision, passes_bar, missed, repo_missed, repo_extra (families reported that the project does not contain) |
 | `micro-assets-run<k>.csv` | ground truth | (micro project, tool, asset) of every scored run | project, language, tool, asset, families, insertion_style (`direct`, `constant`), callsite_strict, callsite_lenient, repo |
 
@@ -367,8 +386,8 @@ groups["tools"].str.split(";")          # list cells
 
 micro = pd.read_csv("_ANALYSIS/micro-run1.csv")
 micro.pivot(index="tool", columns="language", values="lenient")      # the inclusion matrix
-algos = pd.read_csv("_ANALYSIS/algorithms-run1.csv").query("level == 'L3'")
-algos.groupby(["snapshot", "variant", "algorithm"])["voter_group"].nunique().value_counts()   # tools per algorithm
+algos = pd.read_csv("_ANALYSIS/algorithms-run1.csv")
+algos.drop_duplicates(["snapshot", "variant", "algorithm"])["k_L3"].value_counts()   # tools per algorithm at L3
 ```
 
 **Export.** The analysis files live inside the experiment folder, so the normal export takes them along together with

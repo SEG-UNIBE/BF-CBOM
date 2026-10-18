@@ -1,22 +1,26 @@
-"""Matcher (b): exact matching on the canonical algorithm identity.
+"""Matcher (b): exact matching on the canonical algorithm identity, at a ladder level.
 
-Repository level: every algorithm record of every tool is keyed by its identity at a ladder level
-(`analysis/levels.py:identity`, default L3: composite names parsed, no tool-specific sources); one group per key, so
-tools without locations take part. Call-site level: inside a repo group, the located records are chained by file
-and line: sorted by line, a record joins the current site group when it starts within `window` lines of the group's
-last line (a window record spans `line` .. `line_end`). The location rule of the retired call-site matcher survives
-here; its family-compatibility rule is replaced by the identity key, and unknown names (no identity beyond the folded
-name) match only the same folded name.
+Repository level: the groups are the clusters of `analysis/levels.py:level_matches`: records connected by the
+cumulative relation of the ladder (equal under any key function up to `level`: at L0 only verbatim identical names,
+at L3 parsed names, at L4 everything the tool specs know). Every group carries as `key` the *item* it belongs to,
+an algorithm as the full normalisation sees it (its L4 identity); an item has one group at L4 and may have several
+at a lower level (its tools' spellings are not yet recognised as one thing). Tools without locations take part. A
+member whose own identity differs from the group's key (it joined through a lower level: the same raw string that
+another tool's spec resolves differently) is flagged `matched`; with `closure` (refinement 2) a record is also a
+member of the groups of the algorithms it implies (HMAC-SHA256 -> SHA-256), flagged `implied`.
 
-With `closure` (refinement 2) a record also joins the groups of the algorithms it implies (HMAC-SHA256 -> SHA-256);
-such memberships are marked `implied`, so tables can keep them apart.
+Call-site level: inside a repo group, the located members are chained by file and line: sorted by line, a record
+joins the current site group when it starts within `window` lines of the group's last line (a window record spans
+`line` .. `line_end`). The location rule of the retired call-site matcher survives here.
+
+Group ids: `E00007` for an item's first group, `E00007-2` for its second cluster at a lower level, sites
+`E00007.001`. The ladder (`levels.ladder`) and the tools-per-algorithm distribution read the same clusters, so this
+matcher at a level, the ladder's column for that level and the k distribution are one definition.
 """
 
 from __future__ import annotations
 
-from collections import defaultdict
-
-from ..levels import identity
+from ..levels import level_matches
 from ..normalize.record import NormRecord
 from ..normalize.vocab import Vocabulary, load_vocabulary
 from .base import MatchGroup
@@ -42,36 +46,30 @@ class ExactMatcher:
         return self.voter_of.get(tool, tool)
 
     def match(self, records: list[NormRecord]) -> list[MatchGroup]:
-        by_key: dict[str, list[NormRecord]] = defaultdict(list)
-        implied_in: dict[str, set[str]] = defaultdict(set)
-        for r in records:
-            if r.values.get("asset_type") != "algorithm":
-                continue
-            key = identity(r, self.level, self.vocab)
-            if not key:
-                continue
-            by_key[key].append(r)
-            if self.closure:
-                for other in self.vocab.implied(r.values):
-                    if other != key and r not in by_key[other]:
-                        by_key[other].append(r)
-                        implied_in[other].add(r.record_id)
+        items = level_matches(records, self.vocab, closure=self.closure)
         groups: list[MatchGroup] = []
-        for n, key in enumerate(sorted(by_key), start=1):
-            members = by_key[key]
-            gid = f"E{n:05d}"
-            sites = self._site_groups(members, key, gid)
-            located = {self._voter(r.tool) for r in members if r.file and r.line}
-            colocated = max((len({self._voter(r.tool) for r in s.members}) for s in sites), default=0)
-            extra = {
-                "level": self.level,
-                "n_records": len(members),
-                "n_sites": len(sites),
-                "located_voters": len(located),
-                "colocated_voters": colocated,
-            }
-            groups.append(MatchGroup(gid, "repo", key, members, extra, frozenset(implied_in.get(key, ()))))
-            groups += sites
+        for n, key in enumerate(sorted(items), start=1):
+            item = items[key]
+            own = {r.record_id for recs in item.own.values() for r in recs}
+            clusters = item.clusters_at(self.level) or [[]]
+            for c, members in enumerate(clusters, start=1):
+                gid = f"E{n:05d}" if c == 1 else f"E{n:05d}-{c}"
+                matched = frozenset(r.record_id for r in members if r.record_id not in own)
+                implied = frozenset(r.record_id for r in members if r.record_id in item.implied)
+                sites = self._site_groups(members, key, gid)
+                located = {self._voter(r.tool) for r in members if r.file and r.line}
+                colocated = max((len({self._voter(r.tool) for r in s.members}) for s in sites), default=0)
+                extra = {
+                    "level": self.level,
+                    "n_records": len(members),
+                    "n_sites": len(sites),
+                    "cluster": c,
+                    "clusters": len(clusters),
+                    "located_voters": len(located),
+                    "colocated_voters": colocated,
+                }
+                groups.append(MatchGroup(gid, "repo", key, members, extra, implied, matched))
+                groups += sites
         return groups
 
     def _site_groups(self, members: list[NormRecord], key: str, parent: str) -> list[MatchGroup]:

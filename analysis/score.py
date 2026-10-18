@@ -24,6 +24,7 @@ import random
 from collections import defaultdict
 from dataclasses import dataclass, field
 
+from .levels import parameter_at
 from .matchers import PARAMETER_DIMS, MatchGroup
 
 DIMS = ("algorithm", *PARAMETER_DIMS, "location")
@@ -49,6 +50,17 @@ class Observations:
 
     def voter(self, tool: str) -> str:
         return self.voter_of.get(tool, tool)
+
+
+def item_id(group: MatchGroup) -> str:
+    """The scoring item of a repo group: the algorithm (its L4 identity) and the cluster at the matcher's level, so
+    two tools count as reporting the same item only when their records match at that level (as in the ladder); at
+    L4 an algorithm has one cluster. `unit_of` gives the algorithm back."""
+    return f"{group.key}#{group.group_id}"
+
+
+def unit_of(item: str) -> str:
+    return item.rsplit("#", 1)[0]
 
 
 def observe(
@@ -77,17 +89,17 @@ def observe(
                     continue
                 obs.tools.add(r.tool)
                 bucket = obs.items[(snapshot, r.tool)]
-                bucket["algorithm"].add(g.key)
+                bucket["algorithm"].add(item_id(g))
                 for dim in PARAMETER_DIMS:
-                    v = r.values.get(dim)
+                    v = parameter_at(r, level, dim)
                     if v is not None:
-                        bucket[dim].add((g.key, str(v)))
+                        bucket[dim].add((item_id(g), str(v)))
             for s in sites.values():
                 if s.extra.get("parent") != g.group_id:
                     continue
                 for r in s.members:
                     if r.tool not in skip:
-                        obs.items[(snapshot, r.tool)]["location"].add((g.key, s.group_id))
+                        obs.items[(snapshot, r.tool)]["location"].add((item_id(g), s.group_id))
     return obs
 
 

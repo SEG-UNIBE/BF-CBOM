@@ -13,7 +13,7 @@ from itertools import combinations
 from .base import MatchGroup
 
 MATCHERS_COLUMNS = [
-    "repo", "snapshot", "variant", "run", "matcher_a", "matcher_b", "records_common", "groups_a", "groups_b",
+    "repo", "snapshot", "variant", "run", "level", "matcher_a", "matcher_b", "records_common", "groups_a", "groups_b",
     "pairs_a", "pairs_b", "pairs_both", "pair_jaccard", "a_in_one_b", "b_in_one_a",
 ]  # fmt: skip
 

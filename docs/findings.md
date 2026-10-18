@@ -98,7 +98,10 @@ repository level (refinement 1). Every call-site cell stayed equal except two, b
   call-site scorer did not read (micro 0/11).
 
 ## Normalisation ladder (e1-pilot-corpus)
-Per repository, the algorithms a tool reports that another voter group confirms.
+Per repository, the algorithms a tool reports that another voter group confirms. The numbers up to 2026-10-18
+afternoon come from the first ladder, which changed both the key function and the unit per level (the share at L3
+was over parsed algorithms, at L0 over raw names) and was not monotone; the fixed-unit ladder of the evening is
+below.
 - **2026-10-16, first ladder:** pooled 48 % at L0, 53 % L1, 60 % L2, 75 % L3, 75 % L4: the tool-specific part (L4) adds
   nothing overall; the gain comes from standard spellings and parsing composite names. Per tool L0 -> L4: DeepSeek 28
   -> 64 %, cbomkit-jar 57 -> 93 %, CipherRadar 53 -> 85 %, xgrep 67 -> 92 %, CryptoScan 37 -> 53 %, securin-xbom 87 ->
@@ -142,3 +145,32 @@ server 67 % [23, 100] (15), DeepSeek 59 % [46, 69] (198), CryptoScan 52 % [43, 6
 cdxgen had no algorithm records in those CBOMs (runs before `-t`). Dawid-Skene agrees on the tails (Q-DARPAN support
 83 %, securin-xbom 81 %; CryptoScan 28 %, DeepSeek 31 %) but reorders the middle. The careful-tools-alone effect is
 visible (CBOMkit server: few items, wide CI); E4 decides what exclusivity means.
+With the fixed-unit matcher of the evening (scoring items are the clusters at L3, `score.item_id`) the ranking is
+the same except that xgrep (91 %) and pqcheck (90 %) swap places with nothing, and every rate moves by a few points:
+securin-xbom 96, cbomkit-jar 93, xgrep 91, pqcheck 90, CipherRadar 88, Q-DARPAN 88, CBOMkit server 71, DeepSeek 64,
+CryptoScan 52, CryptobomForge 50 %.
+
+## Ladder and matching on the fixed unit (2026-10-18, evening)
+The ladder now keeps the unit fixed (an algorithm = its L4 identity) and varies only the matching relation, which is
+cumulative (`experiments/README.md` "How much agreement does normalisation create?"). Every tool's share is
+non-decreasing by construction. Pilot corpus, confirmed share of a tool's algorithms at L0 / L1 / L2 / L3 / L4lit /
+L4 (number of algorithms): pooled 56 / 60 / 67 / 73 / 77 / 77 % (937); CBOMkit server 27 / 60 / 60 / 67 / 67 / 67
+(15), cbomkit-jar 68 / 74 / 84 / 93 / 94 / 94 (68), CipherRadar 70 / 74 / 81 / 87 / 89 / 89 (115), CryptoScan 32 /
+33 / 43 / 50 / 60 / 60 (225), DeepSeek 46 / 48 / 56 / 60 / 64 / 64 (198), pqcheck 71 / 81 / 87 / 88 / 90 / 90 (90),
+Q-DARPAN 79 / 81 / 81 / 87 / 89 / 89 (62), securin-xbom 87 / 87 / 91 / 96 / 96 / 96 (23), xgrep 74 / 77 / 81 / 90 /
+92 / 92 (134), CryptobomForge 29 / 43 / 43 / 43 / 43 / 43 (7). Reading: the L0 column is the share of a tool's
+algorithms for which another tool uses a verbatim identical spelling; the standard vocabulary and parsing add 17
+points pooled, the tool specs 4 (CryptoScan 10: its occurrence symbols), the interpretive entries 0. Parameters
+pooled L2 / L3 / L4: key size 28 / 35 / 74 % of 295 pairs, mode 45 / 62 / 78 % (60), padding 30 / 48 / 67 % (67),
+curve 25 / 54 / 86 % (196), digest 0 / 4 / 38 % (217). Held-out ICPC corpus: pooled 60 / 65 / 74 / 79 / 81 / 81 %
+(845 algorithms); CipherSift 39 -> 86 % (the standard vocabulary alone adds 38 points: it writes registry names),
+CryptoScan 33 -> 70, securin-xbom 49 -> 59, DeepSeek 58 -> 72, xgrep 87 -> 99, CBOMkit 84 -> 93.
+
+**Matcher x level (exact matcher; RaQuN needs the PyQuN package, not installed on the laptop).** Pilot corpus, 433
+algorithms per repository: the share reported by at least two voter groups rises from 38 % at L0 to 50 % at L4
+(k >= 4 from 15 to 26 %); of the groups with two voters reporting a key size, 95 % agree at L2 (42 groups) and 72 % at
+L4 (76), curve 61 -> 57 % (18 -> 51), digest agreement exists from L3 (2 groups) and is 67 % at L4 (39); of the
+groups with two located voters, 63 % share a call site at L0 (210 groups), 50 % at L4 (217): as clusters grow, more
+voter pairs are located but not at the same place. ICPC corpus, 289 algorithms: k >= 2 from 37 % to 47 %, k >= 4 from
+20 % to 37 %; key-size agreement 79 % (19) at L2 to 36 % (39) at L4, location 78 % (144) to 73 % (135). The exact vs
+RaQuN comparison per level is produced when RaQuN is available (VM).

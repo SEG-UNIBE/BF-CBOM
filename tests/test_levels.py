@@ -1,6 +1,6 @@
 """The L0-L4 normalisation ladder (analysis/levels.py) on tiny hand-written CBOMs."""
 
-from analysis.levels import LEVELS, PARAMETER_LEVELS, algorithm_rows, algorithms_at, identity, ladder
+from analysis.levels import LEVELS, PARAMETER_LEVELS, algorithm_rows, algorithms_at, identity, ladder, level_matches
 from analysis.normalize import load_adapter, normalize_cbom
 from analysis.normalize.vocab import load_vocabulary
 
@@ -73,7 +73,8 @@ def test_parameter_ladder_admits_values_by_source():
     records = {("s", "a"): standard, ("s", "b"): [parsed], ("s", "c"): [also]}
     rows = {(r.dimension, r.level, r.tool): r for r in ladder(records, {"a": "g1", "b": "g2", "c": "g3"})}
     assert ("key_size", "L0", "b") not in rows and ("key_size", "L2", "b") in rows
-    assert rows[("key_size", "L2", "b")].algorithms == 0  # parsed from the name: not a standard field
+    l2 = rows[("key_size", "L2", "b")]
+    assert (l2.algorithms, l2.confirmed) == (1, 0)  # the pair exists (fixed unit), parsed values are not admitted
     assert (rows[("key_size", "L3", "b")].algorithms, rows[("key_size", "L3", "b")].confirmed) == (1, 1)
     assert (rows[("mode", "L4", "all")].algorithms, rows[("mode", "L4", "all")].confirmed) == (2, 2)
     assert set(PARAMETER_LEVELS) == {r.level for r in rows.values() if r.dimension != "algorithm"}
@@ -87,7 +88,22 @@ def test_closure_adds_implied_algorithms_without_pooling():
     assert set(algorithms_at([hmac], "L3", vocab, closure=True)) == {"HMAC", "SHA-256"}
     assert set(algorithms_at([hmac], "L2", vocab, closure=True)) == {"hmacsha256"}  # nothing parsed at L2
     rows = algorithm_rows({("s", "original", "a"): [hmac]}, {"a": "a"}, run=1, closure=True)
-    l3 = {(r["algorithm"], r["implied"]) for r in rows if r["level"] == "L3"}
-    assert l3 == {("HMAC", False), ("SHA-256", True)}
+    assert {(r["algorithm"], r["implied"]) for r in rows} == {("HMAC", False), ("SHA-256", True)}
+    assert all(r["k_L0"] == 1 and r["k_L4"] == 1 for r in rows)
     (pbkdf,) = _records("a", "PBKDF2WithHmacSHA1")
     assert vocab.implied(pbkdf.values) == ["SHA-1", "HMAC"]
+
+
+def test_ladder_is_cumulative_on_the_fixed_l4_unit():
+    """The unit is the L4 identity; the relation is cumulative: a match at a lower level is never lost."""
+    # a: two spellings of one algorithm; b: one. The unit stays one item, confirmed from L1 on (aes = AES)
+    records = {("s", "a"): _records("a", "AES-256-GCM", "aes"), ("s", "b"): _records("b", "AES")}
+    rows = {(r.level, r.tool): r for r in ladder(records, {"a": "g1", "b": "g2"}, dims=("algorithm",))}
+    assert [(rows[(lv, "a")].algorithms, rows[(lv, "a")].confirmed) for lv in LEVELS] == [(1, 0)] + [(1, 1)] * 5
+    # the same raw string, resolved differently: a's "foo" has algorithmFamily AES, b's has nothing
+    records = {("s", "a"): _records("a", "foo", family_field="AES"), ("s", "b"): _records("b", "foo")}
+    assert [identity(r, "L4") for r in records[("s", "a")] + records[("s", "b")]] == ["AES", "foo"]
+    rows = {(r.level, r.tool): r for r in ladder(records, {"a": "g1", "b": "g2"}, dims=("algorithm",))}
+    assert all(rows[(lv, t)].share == 1.0 for lv in LEVELS for t in ("a", "b"))  # verbatim equal: agree everywhere
+    items = level_matches(records[("s", "a")] + records[("s", "b")])
+    assert set(items) == {"AES", "foo"} and items["AES"].k_at("L0", {"a": "a", "b": "b"}) == 2

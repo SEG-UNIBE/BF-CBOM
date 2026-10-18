@@ -76,7 +76,8 @@ Shared context for coworkers and for Claude Code (which loads this file automati
   - `normalize/`: CBOM -> normalised records (below); `normalize` also writes `run<k>.norm.json` next to each CBOM.
   - `schema.py`: RQ1, whole-document validation, meaningful shares, traceability; `snapshots.py` reads a pinned
     commit's files from the git mirror or a cache fetched with `--fetch`.
-  - `levels.py`: the L0-L4 normalisation ladder (refinement 14) and which algorithms each tool reports per repo.
+  - `levels.py`: the L0-L4 ladder on a fixed unit (refinement 14): `level_matches` clusters a repo's records level
+    by level; the exact matcher, the ladder and the tools-per-algorithm distribution share it.
   - `matchers/`: n-way matchers on the records, `exact.py` and `raqun.py`, compared by `compare.py` (Phase 3).
   - `score.py`, `stability.py`, `costs.py`: RQ4 scores, run-to-run stability, LLM costs from
     `analysis/data/llm_prices.yaml`.
@@ -197,12 +198,14 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
   confuse:
   - (a) the pilot's **call-site matcher** (same file, |Δline| ≤ 2, regex families): retired 2026-10-18; its line
     window lives on in (b).
-  - (b) the **exact matcher** (`matchers/exact.py`): groups by the canonical algorithm identity of a ladder level
-    (`--level`, default L3) at repository level, so location-less tools take part; inside a group, located records
-    are chained into call-site groups (same file, lines within `--window`); `--closure` adds implied memberships.
+  - (b) the **exact matcher** (`matchers/exact.py`): its groups are the ladder's clusters at a level (records equal
+    under any key function up to `--level`, default L3), keyed by the algorithm's L4 identity, so location-less
+    tools take part; run at every level for `matchlevels-run<k>.csv` (RQ3: matcher × level); inside a group, located
+    records are chained into call-site groups (same file, lines within `--window`); `--closure` adds implied
+    memberships.
   - (c) **RaQuN** (`matchers/raqun.py`): PyQuN's n-way matching with a structured similarity (Jaccard over
-    `<dimension>=<value>` attributes), location-free, at most one asset per tool per group. Optional until PyQuN is
-    packaged. The UI's "Find Similar Components" (`misc/pyqun`, BERT over a bag of strings) is a different thing and
+    `<dimension>=<value>` attributes), location-free, at most one asset per tool per group, run at every level like
+    (b) with the values admitted at that level. Optional until PyQuN is packaged. The UI's "Find Similar Components" (`misc/pyqun`, BERT over a bag of strings) is a different thing and
     stays a comparison only.
   - (d) further matchers: the interface (records in, match groups with per-dimension agreement out,
     `matchers/base.py`) must not assume (a)-(c) are the only ones.
@@ -307,12 +310,16 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
     both written by Claude.
 14. **Normalisation can create agreement; report how much.** The vocabulary and the specs were developed on the
     outputs we evaluate, and a too eager normaliser would work against our own hypothesis that tools report
-    heterogeneous things. Every agreement number is reported as a ladder (`levels`): L0 raw names, L1 case and
-    separators ignored, L2 standard vocabulary (whole names, 1.7 `algorithmFamily`, JOSE/SSH/JCA identifiers), L3
-    composite names parsed, L4 everything tool-specific; L4lit leaves out the interpretive dictionary entries
-    (judgements rather than synonyms, `interpretive: true`); parameters enter from L2. Hypotheses are tested at
-    L2/L3, the L0 -> L4 gap is reported as representational heterogeneity, rankings are checked across levels. The
-    vocabulary is frozen before E1 (Rules); two raters review `vocab.csv`.
+    heterogeneous things. Every agreement number is reported as a ladder (`levels`) that varies only *when two
+    reports count as the same algorithm*, on a fixed unit (an algorithm = its L4 identity) with a cumulative
+    relation (a match is never lost at a higher level, so shares only grow and each step is attributable): L0 raw
+    names, L1 case and separators ignored, L2 standard vocabulary (whole names, 1.7 `algorithmFamily`, JOSE/SSH/JCA
+    identifiers), L3 composite names parsed, L4 everything tool-specific; L4lit leaves out the interpretive
+    dictionary entries (judgements rather than synonyms, `interpretive: true`); parameters enter from L2.
+    Hypotheses are tested at L2/L3, the L0 -> L4 gap is reported as representational heterogeneity, rankings are
+    checked across levels (decided 2026-10-18 after review: the first ladder changed key *and* unit per level and
+    was not monotone; `notes.md` "Ladder and matcher on a fixed unit"). The vocabulary is frozen before E1 (Rules);
+    two raters review `vocab.csv`.
 15. **Every tool gets its best fair run; no result may be BF-CBOM's fault** (decided 2026-10-17).
     - *Invocation:* the tool's documented best invocation for the repo at hand (queries, project types, flags),
       current pinned releases, robust workers (cwd outside the clone, timeouts, failure reporting), and everything
