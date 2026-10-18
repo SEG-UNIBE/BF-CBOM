@@ -37,7 +37,6 @@ from common.experiment import (
     plan_waves,
     resolve_snapshots,
     save_run_log_entry,
-    summarize,
     write_result,
     write_spec_copy,
 )
@@ -51,6 +50,7 @@ from coordinator.redis_io import (
     ingest_worker_results,
     now_iso,
 )
+from misc.cli import overview
 
 experiment_app = typer.Typer(
     help="Batch experiments (reproducible, resumable; results stay on the results-data volume)",
@@ -325,7 +325,7 @@ def run(
         },
     )
     if not total:
-        _print_summary(exp_dir)
+        _print_overview(exp_dir, spec_file=_display_spec(spec_path))
         return
     session = _Session(
         exp_dir,
@@ -342,7 +342,8 @@ def run(
     )
     outcome = "interrupted"
     try:
-        _run_waves(r, spec, exp_dir, waves, jobs, pending, total, idle_timeout, no_wait, session)
+        _run_waves(r, spec, exp_dir, waves, jobs, pending, total, idle_timeout, no_wait, session,
+                   spec_file=_display_spec(spec_path))  # fmt: skip
         outcome = "enqueued (--no-wait)" if no_wait else "completed"
     except typer.Exit as e:
         outcome = "stopped" if e.exit_code else "completed"
@@ -353,7 +354,7 @@ def run(
         return
     r.hset(_status_key(spec.name), mapping={"status": "completed", "finished_at": now_iso()})
     r.delete(_running_key(spec.name))
-    _print_summary(exp_dir)
+    _print_overview(exp_dir, outcome="completed", session=session.entry, spec_file=_display_spec(spec_path))
 
 
 def _run_waves(
@@ -367,6 +368,8 @@ def _run_waves(
     idle_timeout: int,
     no_wait: bool,
     session: _Session,
+    *,
+    spec_file: str | None = None,
 ) -> int:
     """Enqueue wave by wave and collect each before the next; returns the number of results stored."""
     done = 0
@@ -402,7 +405,7 @@ def _run_waves(
                     fg=typer.colors.YELLOW,
                     err=True,
                 )
-            _print_summary(exp_dir)
+            _print_overview(exp_dir, outcome="enqueued (--no-wait)", spec_file=spec_file)
             return done
         session.save(wave=f"{i}/{len(waves)}")
         done = _collect(
@@ -500,8 +503,15 @@ def _drain(r: redis.Redis, inbox: str) -> list[str]:
         batch.append(raw)
 
 
-def _print_summary(exp_dir: Path) -> None:
-    typer.echo(json.dumps(summarize(exp_dir), indent=2))
+def _print_overview(exp_dir: Path, **kwargs) -> None:
+    """The human-readable overview (misc/cli/overview.py) on stdout; progress lines go to stderr."""
+    for line in overview.render(overview.build(exp_dir), **kwargs):
+        typer.echo(line)
+
+
+def _display_spec(path: Path) -> str:
+    """The spec path as the user typed it on the host: the runner sees `/app/experiments/<x>.yaml`."""
+    return f"experiments/{path.name}" if path.parent.name == "experiments" else str(path)
 
 
 def _cancel_pending(r: redis.Redis, name: str, pending: dict[str, PlannedJob]) -> int:
@@ -531,8 +541,8 @@ def collect(
     pending = {jid: _job_from_descriptor(jid, json.loads(d)) for jid, d in r.hgetall(_pending_key(name)).items()}
     tools = json.loads(r.hget(_status_key(name), "tools") or "[]") or sorted({j.tool for j in pending.values()})
     if not pending:
-        typer.echo("nothing pending")
-        _print_summary(exp_dir)
+        typer.secho("nothing pending in Redis", fg=typer.colors.BLUE, err=True)
+        _print_overview(exp_dir)
         return
     stored = int(r.hget(_status_key(name), "stored_jobs") or 0)
     session = _Session(exp_dir, "collect", tools=tools, jobs_pending_before=len(pending))
@@ -552,7 +562,7 @@ def collect(
     if "/" in wave and wave.split("/")[0] != wave.split("/")[1]:
         msg = f"wave {wave} collected; rerun `experiment run` to issue the next wave"
         typer.secho(msg, fg=typer.colors.YELLOW, err=True)
-    _print_summary(exp_dir)
+    _print_overview(exp_dir, outcome="collected", session=session.entry)
 
 
 @experiment_app.command("cancel")
@@ -568,14 +578,29 @@ def cancel(name: str = typer.Argument(...), redis_host: str = REDIS_HOST_OPT, re
 @experiment_app.command("status")
 def status(name: str = typer.Argument(...), redis_host: str = REDIS_HOST_OPT, redis_port: int = REDIS_PORT_OPT):
     """Progress from Redis plus what is stored on disk."""
+    exp_dir = experiment_dir(name)
+    if not exp_dir.exists():
+        _err(f"no experiment '{name}' under {RESULTS_DIR}")
     r = _redis(redis_host, redis_port)
     meta = r.hgetall(_status_key(name))
-    meta["pending_jobs"] = r.hlen(_pending_key(name))
-    running = r.hgetall(_running_key(name))
-    pending_ids = set(r.hkeys(_pending_key(name)))
-    meta["running_jobs"] = {jid: ts for jid, ts in running.items() if jid in pending_ids}
-    exp_dir = experiment_dir(name)
-    typer.echo(json.dumps({"redis": meta, "disk": summarize(exp_dir) if exp_dir.exists() else None}, indent=2))
+    live = None
+    if meta:
+        pending = {jid: json.loads(d) for jid, d in r.hgetall(_pending_key(name)).items()}
+        running = {jid: ts for jid, ts in r.hgetall(_running_key(name)).items() if jid in pending}
+        live = {
+            "status": meta.get("status"),
+            "wave": meta.get("wave"),
+            "updated_at": meta.get("updated_at"),
+            "queued": len(pending) - len(running),
+            "running": sorted(
+                (
+                    {"tool": pending[jid]["tool"], "repo": pending[jid]["snapshot"]["full_name"], "started_at": ts}
+                    for jid, ts in running.items()
+                ),
+                key=lambda j: (j["started_at"] or "", j["tool"]),
+            ),
+        }
+    _print_overview(exp_dir, live=live)
 
 
 @experiment_app.command("list")
@@ -585,10 +610,12 @@ def list_experiments():
         typer.echo(f"(no results yet under {RESULTS_DIR})")
         return
     folders = sorted(p for p in RESULTS_DIR.iterdir() if p.is_dir() and p.name != "corpus")
-    for d in folders:
-        if is_experiment(d):
-            s = summarize(d)
-            typer.echo(f"{d.name:<30} {s['stored_runs']:>6} run(s)  {json.dumps(s['per_tool'])}")
+    experiments = [overview.build(d) for d in folders if is_experiment(d)]
+    if experiments:
+        for line in overview.list_rows(experiments):
+            typer.echo(line)
+    else:
+        typer.echo(f"(no experiments under {RESULTS_DIR})")
     stale = [d for d in folders if not is_experiment(d)]
     if stale:
         typer.echo(f"\nno {SPEC_FILE} (older layout, not read by any command; rerun, then delete):")

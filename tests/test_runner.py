@@ -126,6 +126,8 @@ def test_run_stores_results_resumes_retries_and_exports(world, tmp_path):
     assert session["status"] == "completed" and session["results_stored"] == 4 and session["command"] == "run"
     assert session["runner_commit"] == "abc123def456" and session["images"] == {"t1": "sha256:" + "1" * 64}
     assert session["memory_budget_gb"] == 1.0 and len(session["waves"]) == 2  # two unknown tools at 1 GiB each
+    assert "e-fake: completed, 4 of 4 runs stored" in result.output and "ok 3   error 1" in result.output
+    assert "o/second  boom" in result.output and "ARGS=--retry-failed   redo the 1 run(s) not ok" in result.output
     assert time.monotonic() - t0 < 60
 
     # resume: everything on disk, nothing enqueued
@@ -161,4 +163,6 @@ def test_list_shows_experiments_and_folders_in_an_older_layout(tmp_path, monkeyp
     (results / "corpus").mkdir()
     monkeypatch.setattr(experiment_cmd, "RESULTS_DIR", results)
     out = _run(["list"]).output
-    assert out.startswith("e-new") and "make experiment-delete NAME=e-old" in out and "corpus" not in out
+    lines = out.splitlines()
+    assert lines[0].split()[0] == "experiment" and lines[1].split()[0] == "e-new"
+    assert "make experiment-delete NAME=e-old" in out and "corpus" not in out

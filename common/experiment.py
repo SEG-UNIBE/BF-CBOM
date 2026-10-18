@@ -639,19 +639,6 @@ def iter_results(exp_dir: Path):
         yield meta, meta_path.with_name(meta_path.name.replace(".meta.json", ".json"))
 
 
-def summarize(exp_dir: Path) -> dict:
-    """Counts per tool and status from the files on disk."""
-    per_tool: dict[str, dict[str, int]] = {}
-    total = 0
-    for meta, _ in iter_results(exp_dir):
-        tool = meta.get("worker") or "?"
-        status = meta.get("status") or "?"
-        per_tool.setdefault(tool, {})
-        per_tool[tool][status] = per_tool[tool].get(status, 0) + 1
-        total += 1
-    return {"name": exp_dir.name, "stored_runs": total, "per_tool": per_tool}
-
-
 def spec_to_dict(spec: ExperimentSpec) -> dict:
     return {
         "name": spec.name,

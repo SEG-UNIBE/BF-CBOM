@@ -215,7 +215,7 @@ def test_mirror_lock_plan_and_write(upstream, tmp_path: Path):
     jobs3, skipped3 = ex.plan_jobs(spec, snaps, exp_dir, new_id=lambda: next(ids), retry_failed=True)
     assert (len(jobs3), skipped3) == (7, 1)  # the failed run is redone, the ok one kept
     assert not jobs[1].paths(exp_dir)[1].exists()
-    assert ex.summarize(exp_dir) == {"name": "e", "stored_runs": 1, "per_tool": {"t1": {"ok": 1}}}
+    assert [(m["worker"], m["status"]) for m, _ in ex.iter_results(exp_dir)] == [("t1", "ok")]
 
 
 # ----- fixtures published from plain directories -----
@@ -350,4 +350,4 @@ def test_mark_unsupported_records_meta_and_plan_skips_it(tmp_path: Path):
     assert {j.tool for j in jobs} == {"cryptoscan"} and skipped == 2
     jobs, _ = ex.plan_jobs(spec, [snap], exp_dir, new_id=lambda: next(ids), retry_failed=True)
     assert {j.tool for j in jobs} == {"cryptoscan"}  # unsupported runs are never retried
-    assert ex.summarize(exp_dir)["per_tool"] == {"cbomkit": {"unsupported": 2}}
+    assert [(m["worker"], m["status"]) for m, _ in ex.iter_results(exp_dir)] == [("cbomkit", "unsupported")] * 2

@@ -12,6 +12,12 @@ make experiment-delete NAME=e0-smoke               # remove one from the volume 
 make corpus ARGS="--per-language 100"              # stratified corpus -> results volume corpus/corpus.yaml
 ```
 
+When a run ends it prints an overview (`misc/cli/overview.py`): runs stored out of expected, per tool the counts per
+status, median and longest duration, peak RAM against the limit and OOM kills, the LLM token usage with an estimated
+cost, every run that is not ok with its most telling error line, and the commands to retry, resume or export.
+`make experiment-status` shows the same plus the live progress from Redis, `make experiment-list` one line per
+experiment.
+
 ## Specs in this folder
 
 | Spec | Tools | Repos | Purpose |
