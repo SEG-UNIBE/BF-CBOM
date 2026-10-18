@@ -79,6 +79,15 @@ Shared context for coworkers and for Claude Code (which loads this file automati
   - `levels.py`: the L0-L4 ladder on a fixed unit (refinement 14): `level_matches` clusters a repo's records level
     by level; the exact matcher, the ladder and the tools-per-algorithm distribution share it.
   - `matchers/`: n-way matchers on the records, `exact.py` and `raqun.py`, compared by `compare.py` (Phase 3).
+    **Open (2026-10-18): RaQuN runs nowhere yet.** `raqun.py` imports `RaQuN_Lab` in the process that runs the
+    analysis (the runner image, or the host venv for a copied export); both install the project with `uv sync`,
+    which cannot install PyQuN from git without a `pyproject.toml` in the fork, so `available()` is false and the
+    report skips matcher (c). The `misc-pyqun` image is the UI's similarity worker only (clone + `touch
+    __init__.py`, no `analysis/` code). Options: (1) package the fork and pin it in the `raqun` extra, installed by
+    the runner Dockerfile (clean, also replaces the misc-pyqun hack); (2) stopgap: clone PyQuN at the pinned
+    commit in the runner Dockerfile and put it on `PYTHONPATH`, a second copy of the UI hack. Decide before the
+    E2 runs; RaQuN per level also multiplies its runtime by six (`notes.md` "Ladder and matcher on a fixed unit"
+    says how to limit it).
   - `score.py`, `stability.py`, `costs.py`: RQ4 scores, run-to-run stability, LLM costs from
     `analysis/data/llm_prices.yaml`.
   - `groundtruth.py`: micro recall at call sites and at repo level, precision, inclusion bar, field-by-field
@@ -139,9 +148,10 @@ Decisions: mutants are hosted on the local git server; the LLM generator reads t
 - **Phases 1-3 are done** in code and tests. Waiting for the VM: rerun e1-icpc-corpus (new provenance, usage and memory
   fields; traceability against the mirror), run e0-stability, build the E1 corpus with `GITHUB_TOKEN` and prune it,
   check replicas.
-- **Waiting for the user:** a `pyproject.toml` in the PyQuN fork (draft in `notes.md` WP6), then pin it in the `raqun`
-  extra and the misc-pyqun image; an explicit DeepSeek model id (the default `deepseek-chat` is no longer on DeepSeek's
-  model page and is priced as `deepseek-flash` meanwhile); human review of the micro ground truth, the hand-check
+- **Waiting for the user:** how RaQuN gets into the runner (see "Analysis", `matchers/`): a `pyproject.toml` in the
+  PyQuN fork (draft in `notes.md` WP6), then pin it in the `raqun` extra and the misc-pyqun image, or the stopgap;
+  an explicit DeepSeek model id (the default `deepseek-chat` is no longer on DeepSeek's model page and is priced as
+  `deepseek-flash` meanwhile); human review of the micro ground truth, the hand-check
   verdicts and the `languages` lists (all AI-made); whether Go becomes a third paper language.
 - **External:** the SCANOSS research key, the Cryptoscope artifact, the two-rater reviews (`vocab.csv`, matcher
   validation).
