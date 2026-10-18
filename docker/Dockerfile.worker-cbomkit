@@ -10,19 +10,7 @@ FROM ghcr.io/cbomkit/cbomkit:2.3.0@sha256:20d37926b979d7c901d130fe8a4178c3f87601
 # --- Runtime stage: single worker container running DB + backend + worker ---
 FROM ${BASE_IMAGE}:${BASE_TAG}
 
-USER appuser
-WORKDIR /app
-ENV PYTHONPATH=/app
-# Reported in every JobResult.tool_version (keep in sync with the FROM line above)
-ENV TOOL_VERSION="cbomkit 2.3.0 (sonar-cryptography 1.7.0)"
-
-# 1) Deps first for better caching
-COPY --chown=appuser:appuser pyproject.toml uv.lock ./
-COPY --chown=appuser:appuser common/ ./common/
-RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=1000,gid=1000 \
-    uv sync --frozen --no-dev
-
-# 2) Runtime OS deps for backend
+# 1) Runtime OS deps for backend (before our code: editing common/ never invalidates them)
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends \
       openjdk-21-jre-headless \
@@ -32,8 +20,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
 USER appuser
 
-# 3) Mirror CBOMkit layout from upstream image
+# 2) Mirror CBOMkit layout from upstream image
 COPY --from=cbomkit-upstream --chown=appuser:appuser /deployments/ /deployments/
+
+WORKDIR /app
+ENV PYTHONPATH=/app
+# Reported in every JobResult.tool_version (keep in sync with the FROM line above)
+ENV TOOL_VERSION="cbomkit 2.3.0 (sonar-cryptography 1.7.0)"
+
+# 3) Python deps + shared code
+COPY --chown=appuser:appuser pyproject.toml uv.lock ./
+COPY --chown=appuser:appuser common/ ./common/
+RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=1000,gid=1000 \
+    uv sync --frozen --no-dev
 
 # 4) Worker sources + entrypoint
 COPY --chown=appuser:appuser workers/cbomkit/ ./workers/cbomkit/

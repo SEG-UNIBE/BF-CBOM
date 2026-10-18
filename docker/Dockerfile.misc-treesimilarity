@@ -40,16 +40,12 @@ ENV PATH="/home/appuser/.local/bin:${PATH}"
 USER appuser
 WORKDIR /app
 
-# Copy project manifests and shared code for dependency installation
+# Copy project manifests for dependency installation
 COPY --chown=appuser:appuser pyproject.toml uv.lock README.md LICENSE ./
-COPY --chown=appuser:appuser common/ ./common/
 
 # Prepare virtual environment with project dependencies (without installing the root project)
 RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=1001,gid=1001 \
     uv sync --frozen --no-dev --no-install-project
-
-# Copy tree similarity sources
-COPY --chown=appuser:appuser misc/treesimilartiy/ ./misc/treesimilartiy/
 
 # Fetch required third-party dependencies into the expected external/ folder
 # (pinned commits; bump deliberately)
@@ -76,9 +72,15 @@ ENV CMAKE_PREFIX_PATH=/opt/or-tools/lib/cmake
 # Provide CMake with the OR-Tools config path
 ENV ortools_DIR=/opt/or-tools/lib/cmake/ortools
 
+# Tree similarity sources after the downloads: editing them never re-fetches OR-Tools or the externals
+COPY --chown=appuser:appuser misc/treesimilartiy/ ./misc/treesimilartiy/
+
 # Build the native pybind11 extension
 RUN cmake -S misc/treesimilartiy -B misc/treesimilartiy/build -DPython3_EXECUTABLE=$(which python3) -Dortools_DIR=${ortools_DIR} \
     && cmake --build misc/treesimilartiy/build --config Release
+
+# Shared code last: editing it never invalidates the layers above
+COPY --chown=appuser:appuser common/ ./common/
 
 # Ensure the extension is importable
 ENV PYTHONPATH=/app:/app/misc/treesimilartiy/build
