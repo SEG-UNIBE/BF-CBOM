@@ -7,6 +7,8 @@ read-only into the `runner` container; everything they produce stays in Docker v
 make experiment EXP=experiments/e0-smoke.yaml      # pin commits, mirror to gitserver, run, persist
 make experiment-status NAME=e0-smoke               # Redis progress + what is on disk
 make experiment-export NAME=e0-smoke               # exports/e0-smoke.zip (only way data reaches the host)
+make experiment-list                               # experiments stored on the volume
+make experiment-delete NAME=e0-smoke               # remove one from the volume (asks first)
 make corpus ARGS="--per-language 100"              # stratified corpus -> results volume corpus/corpus.yaml
 ```
 

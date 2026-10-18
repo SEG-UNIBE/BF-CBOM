@@ -7,7 +7,7 @@ Shared context for coworkers and for Claude Code (which loads this file automati
 - **Coordinator:** Streamlit UI on :8501 (`coordinator/`). Redis is the job queue: `jobs:<worker>` / `results:<worker>`.
 - **Workers:** one Docker image per generator (`workers/<tool>/main.py`), all using `common/worker.py` `run_worker`.
 - **Matching:** n-way component matching via RaQuN in `misc/pyqun/`.
-- **Start:** `make up-prod`. Clean rebuild: `make clean-docker && make up-prod NO_CACHE=1`. Never run plain `docker compose up`.
+- **Start:** `make up-prod`. Clean rebuild: `make clean-docker && make up-prod NO_CACHE=1`. Never run plain `docker compose up` or `docker compose run`: the Makefile exports the image tag (`VERSION`) and `BASE_IMAGE`, without them compose looks for `:latest` images and tries to build from a nonexistent `base`; every runner command has a make target (`experiment`, `experiment-list`/`-status`/`-delete`/`-export`, `analysis`, `corpus`).
 - **Pinned builds:** base images, uv, git sources and CodeQL packs are pinned. See `notes.md` for how to bump them.
 - **Lint/format/tests:** `uv run ruff check --fix`, `uv run ruff format`, `uv run pytest` (CI runs all three).
 - **Batch experiments:** `make experiment EXP=experiments/<x>.yaml` runs inside the `runner` container (`misc/cli/experiment_cmd.py`, logic in `common/experiment.py`); repos are mirrored at pinned commits on the `gitserver` service (volume `git-data`; one served repo `<owner>/<repo>--<sha12>.git` per snapshot because CBOMkit only checks out a clone's default branch), results go to the `results-data` volume, `make experiment-export` is the only path to the host. Spec format: `experiments/README.md`.

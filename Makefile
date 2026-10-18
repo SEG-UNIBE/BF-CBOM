@@ -107,6 +107,10 @@ experiment-status:
 experiment-list:
 	docker compose run --rm runner experiment list
 
+# make experiment-delete NAME=e0-smoke  -> removes <name> from the results-data volume (asks first; ARGS=--yes skips)
+experiment-delete:
+	docker compose run --rm runner experiment delete $(NAME) $(ARGS)
+
 # make experiment-export NAME=e0-smoke  -> exports/<name>.zip (the only path from the volume to the host);
 # runs `analysis report` first (ARGS=--no-report skips it)
 experiment-export:
@@ -121,7 +125,7 @@ corpus-export:
 	mkdir -p exports
 	docker compose run --rm -v "$(CURDIR)/exports:/export" runner sh -c 'cp /data/results/corpus/*.yaml /export/'
 
-# make analysis ARGS="micro e0-micro"  /  ARGS="sites e0-micro"  -> results volume: <exp>/analysis/
+# make analysis ARGS="report e0-micro"  /  ARGS="micro e0-micro"  -> results volume: <exp>/_ANALYSIS/
 analysis:
 	docker compose run --rm --no-deps runner analysis $(ARGS)
 
@@ -143,7 +147,7 @@ $(ENV_DIR)/%.env: $(ENV_DIR)/%.env.template
 	@$(ENSURE_ENV_SCRIPT) $< $@
 
 .PHONY: clean-docker build-base build-all release up-dev up-prod up-prod-pull up-all down logs ps show-workers \
-	experiment experiment-status experiment-list experiment-export corpus corpus-export analysis clean-cache
+	experiment experiment-status experiment-list experiment-delete experiment-export corpus corpus-export analysis clean-cache
 
 # Frees Docker's build cache and dangling images (safe: volumes and tagged images are kept).
 # Repeated rebuilds of the large worker images fill the Docker VM disk ("No space left on device").

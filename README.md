@@ -393,6 +393,8 @@ Reproducible, resumable batch runs for the research agenda described in `CLAUDE.
 make experiment EXP=experiments/e0-smoke.yaml   # pin, mirror, enqueue, collect (resumable)
 make experiment-status NAME=e0-smoke
 make experiment-export NAME=e0-smoke            # -> exports/e0-smoke.zip (runs the analysis report first), the only path to the host
+make experiment-list                            # experiments stored on the volume
+make experiment-delete NAME=e0-smoke            # remove one from the volume (asks first; ARGS=--yes skips)
 make corpus ARGS="--per-language 100"           # stratified GitHub corpus with pinned commits
 make experiment EXP=experiments/e0-micro.yaml   # every tool on the hand-written micro projects (corpus/micro)
 make analysis ARGS="report e0-micro"            # everything below in one pass + _ANALYSIS/_SUMMARY.md (Markdown tables)
