@@ -29,7 +29,7 @@ LIST_SEP = ";"
 
 RUNS_COLUMNS = [
     "repo", "snapshot", "commit", "variant", "variant_commit", "language", "tool", "run",
-    "status", "duration_sec", "size_bytes", "error",
+    "status", "duration_sec", "size_bytes", "error", "peak_memory_mb", "memory_limit_mb", "oom_kills",
     "tool_version", "image_ref", "received_at", "bom_format", "spec_version",
     "components", "crypto_assets", "algorithm_assets",
     "requests", "prompt_tokens", "completion_tokens",
@@ -58,6 +58,32 @@ _LLM_PROPS = {
     "completion_tokens": "bf-cbom:completion-tokens",
 }
 _ERROR_MAX = 300
+
+
+def _timeout_text(meta: dict) -> str | None:
+    if meta.get("status") != "timeout":
+        return None
+    d = meta.get("duration_sec")
+    return f"timed out after {d:.0f} s" if isinstance(d, int | float) else "timed out"
+
+
+def error_line(text: str | None) -> str | None:
+    """The most telling line of a run's error text, which usually starts with the echoed tool command: the
+    exception line of the last Python traceback (the first unindented line after it), else a timeout line, else the
+    first line that is not an echoed command (None if there is none)."""
+    lines = [ln.rstrip() for ln in (text or "").splitlines() if ln.strip()]
+    if not lines:
+        return None
+    starts = [i for i, ln in enumerate(lines) if ln.startswith("Traceback (most recent call last)")]
+    if starts:
+        for ln in lines[starts[-1] + 1 :]:
+            if not ln[0].isspace():
+                return ln[:_ERROR_MAX]
+    for ln in lines:
+        if "timeout" in ln.lower() and " cmd: " not in ln:
+            return ln.strip()[:_ERROR_MAX]
+    rest = [ln for ln in lines if " cmd: " not in ln]
+    return rest[0][:_ERROR_MAX] if rest else None
 
 
 def _cell(value) -> str:
@@ -124,7 +150,6 @@ def run_rows(exp_dir: Path, languages: dict[str, str | None] | None = None) -> l
     for meta, cbom_path in iter_results(exp_dir):
         snapshot = cbom_path.parents[2].name
         repo = full_name(snapshot)
-        error = (meta.get("error") or "").strip().splitlines()
         row = {
             "repo": repo,
             "snapshot": snapshot,
@@ -137,7 +162,10 @@ def run_rows(exp_dir: Path, languages: dict[str, str | None] | None = None) -> l
             "status": meta.get("status"),
             "duration_sec": meta.get("duration_sec"),
             "size_bytes": meta.get("size_bytes"),
-            "error": error[0][:_ERROR_MAX] if error else None,
+            "error": error_line(meta.get("error")) or _timeout_text(meta),
+            "peak_memory_mb": meta.get("peak_memory_mb"),
+            "memory_limit_mb": meta.get("memory_limit_mb"),
+            "oom_kills": meta.get("oom_kills"),
             "tool_version": meta.get("tool_version"),
             "image_ref": meta.get("image_ref"),
             "received_at": meta.get("received_at"),

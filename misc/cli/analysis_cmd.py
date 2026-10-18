@@ -1,9 +1,9 @@
 """`bf-cbom analysis ...`: offline analysis of stored experiment results (no Redis).
 
 Reads RESULTS_DIR/<exp>/... written by `bf-cbom experiment run` and writes derived data next to
-it under RESULTS_DIR/<exp>/analysis/: JSON reports (`sites`, `micro`, `normalize`) and flat CSV tables (`tables`,
+it under RESULTS_DIR/<exp>/_ANALYSIS/: JSON reports (`sites`, `micro`, `normalize`) and flat CSV tables (`tables`,
 `levels`, see analysis/tables.py). `normalize` also writes the normalised CBOM `run<k>.norm.json` next to each stored
-`run<k>.json`. `report` does all of it in one pass and adds `SUMMARY.md` (analysis/summary.py); `experiment export`
+`run<k>.json`. `report` does all of it in one pass and adds `_SUMMARY.md` (analysis/summary.py); `experiment export`
 runs it first. Everything stays on the results-data volume; use `experiment export` to get it out.
 """
 
@@ -32,7 +32,16 @@ from analysis.normalize import (
     normalize_cbom,
 )
 from analysis.sites import ExtractionStats, Site, extract_sites
-from common.experiment import RESULTS_DIR, experiment_dir, iter_results, snapshot_files
+from common.experiment import (
+    RESULTS_DIR,
+    analysis_dir,
+    experiment_dir,
+    is_experiment,
+    iter_results,
+    migrate_layout,
+    snapshot_files,
+    spec_path,
+)
 from common.tools_registry import load_tools
 
 # (meta, path of run<k>.json, its normalised CBOM)
@@ -59,7 +68,7 @@ def _err(msg: str, code: int = 1):
 
 
 def _spec(exp_dir: Path) -> dict:
-    return yaml.safe_load((exp_dir / "experiment.yaml").read_text(encoding="utf-8")) or {}
+    return yaml.safe_load(spec_path(exp_dir).read_text(encoding="utf-8")) or {}
 
 
 def _languages(exp_dir: Path) -> dict[str, str | None]:
@@ -103,9 +112,15 @@ class MatchedSnapshot:
 
 def _experiment(name: str) -> Path:
     exp_dir = experiment_dir(name)
-    if not (exp_dir / "experiment.yaml").exists():
+    if not is_experiment(exp_dir):
         _err(f"no experiment '{name}' under {RESULTS_DIR}")
+    _migrate(exp_dir)
     return exp_dir
+
+
+def _migrate(exp_dir: Path) -> None:
+    for change in migrate_layout(exp_dir):
+        typer.secho(f"layout: {change}", fg=typer.colors.BLUE, err=True)
 
 
 def _match_experiment(
@@ -154,7 +169,7 @@ def sites(
     """Call-site matching across tools: clusters per (repo, variant), k distribution, per-tool agreement."""
     exp_dir = _experiment(name)
     matched = _match_experiment(exp_dir, run, window=window, match_unknown=match_unknown, all_assets=all_assets)
-    out_dir = exp_dir / "analysis"
+    out_dir = analysis_dir(exp_dir)
     out_dir.mkdir(exist_ok=True)
     all_clusters = []
     report: dict[str, dict] = {}
@@ -249,7 +264,7 @@ def micro(name: str = EXP_ARG, run: int = RUN_OPT, all_assets: bool = ALL_ASSETS
             f"{len(r.hits_repo or []):>4}/{r.n_assets:<2}{r.sites_correct:>7}/{r.sites_in_file:<3} "
             f"{'pass' if r.passes_bar else 'FAIL':<5}{','.join(r.missed)}"
         )
-    out_dir = exp_dir / "analysis"
+    out_dir = analysis_dir(exp_dir)
     out_dir.mkdir(exist_ok=True)
     data = [
         {"status": e.status, "verdict": tbl.micro_verdict(e.status, e.score)}
@@ -330,7 +345,7 @@ def _normalize_step(exp_dir: Path, write: Writer) -> tuple[Report, list[Normaliz
             fallback.add(n.tool)
     if not done:
         _err(f"no ok results in {exp_dir}")
-    out_dir = exp_dir / "analysis"
+    out_dir = analysis_dir(exp_dir)
     out_dir.mkdir(exist_ok=True)
     _write_json(out_dir / "normalize.json", report.to_dict())
     write("vocab.csv", report.vocab_rows(), VOCAB_COLUMNS)
@@ -427,7 +442,7 @@ def normalize(name: str = EXP_ARG):
     """
     exp_dir = _experiment(name)
     counts: dict[str, int] = {}
-    report, done = _normalize_step(exp_dir, _writer(exp_dir / "analysis", counts))
+    report, done = _normalize_step(exp_dir, _writer(analysis_dir(exp_dir), counts))
     typer.echo("algorithm records with a value reported by the tool (not derived):")
     for line in report.summary_lines():
         typer.echo("  " + line)
@@ -441,7 +456,7 @@ def levels(name: str = EXP_ARG, run: int = RUN_OPT):
     Also writes algorithms-run<k>.csv: which algorithms each tool reports per repository and level."""
     exp_dir = _experiment(name)
     counts: dict[str, int] = {}
-    rows = _levels_step(exp_dir, run, list(_normalize_runs(exp_dir, run=run)), _writer(exp_dir / "analysis", counts))
+    rows = _levels_step(exp_dir, run, list(_normalize_runs(exp_dir, run=run)), _writer(analysis_dir(exp_dir), counts))
     for level in lv.LEVELS:
         typer.echo(f"  {level}: {lv.LEVEL_NAMES[level]}")
     typer.echo("share of a tool's algorithms (per repository) that another voter group also reports:")
@@ -459,7 +474,7 @@ def tables(
 ):
     """Flat CSV tables for pandas/R: runs, call sites and normalised records, call-site groups + members, micro."""
     exp_dir = _experiment(name)
-    out_dir = exp_dir / "analysis"
+    out_dir = analysis_dir(exp_dir)
     counts: dict[str, int] = {}
     normalized = list(_normalize_runs(exp_dir, run=run))
     settings = {"run": run, "window": window, "match_unknown": match_unknown, "all_assets": all_assets}
@@ -472,8 +487,9 @@ def tables(
 def run_report(
     exp_dir: Path, *, run: int = 1, window: int = 2, match_unknown: bool = False, all_assets: bool = False
 ) -> Path:
-    """`normalize`, `levels` and `tables` in one pass (every CBOM normalised once), then SUMMARY.md."""
-    out_dir = exp_dir / "analysis"
+    """`normalize`, `levels` and `tables` in one pass (every CBOM normalised once), then _SUMMARY.md."""
+    _migrate(exp_dir)
+    out_dir = analysis_dir(exp_dir)
     counts: dict[str, int] = {}
     write = _writer(out_dir, counts)
     _, done = _normalize_step(exp_dir, write)
@@ -494,7 +510,7 @@ def report(
     all_assets: bool = ALL_ASSETS_OPT,
 ):
     """Everything in one pass: normalised CBOMs, every CSV table (runs, records, micro at two levels, algorithms per
-    tool and level, ladder, coverage, conformance, legacy call sites) and analysis/SUMMARY.md with Markdown tables."""
+    tool and level, ladder, coverage, conformance, legacy call sites) and _ANALYSIS/_SUMMARY.md with Markdown tables."""
     exp_dir = _experiment(name)
     path = run_report(exp_dir, run=run, window=window, match_unknown=match_unknown, all_assets=all_assets)
     typer.echo(f"written to {path.parent} (summary: {path.name})")

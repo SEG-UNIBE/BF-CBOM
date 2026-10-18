@@ -7,7 +7,9 @@ into the `runner` container (`RESULTS_DIR`, `GIT_MIRROR_DIR`) so that nothing la
 Layout of one experiment (under RESULTS_DIR):
 
     <exp>/
-      experiment.yaml          copy of the spec as it was run
+      _experiment.yaml         copy of the spec as it was run (leading underscore: listed first)
+      _run-log.json            one entry per `experiment run` session: times, host RAM/CPUs, budget, waves, peak RAM
+      _ANALYSIS/               derived tables and _SUMMARY.md (`analysis report`; regenerated, never input)
       lock.json                resolved snapshot per repo and variant (commit SHAs, git URLs)
       <owner>__<repo>@<sha12>/<variant>/<tool>/run<k>.json        the CBOM
       <owner>__<repo>@<sha12>/<variant>/<tool>/run<k>.meta.json   JobResult without the CBOM body
@@ -172,6 +174,74 @@ def spec_from_dict(data: dict, *, base_dir: Path | None = None) -> ExperimentSpe
 
 
 # ----- paths -----
+
+
+SPEC_FILE = "_experiment.yaml"
+RUN_LOG_FILE = "_run-log.json"
+ANALYSIS_DIR = "_ANALYSIS"
+# Names before 2026-10-18; read as a fallback, renamed (spec) or dropped (generated analysis) by migrate_layout
+LEGACY_SPEC_FILE = "experiment.yaml"
+LEGACY_ANALYSIS_DIR = "analysis"
+
+
+def spec_path(exp_dir: Path) -> Path:
+    """The stored spec copy of an experiment (the legacy name for one not yet migrated)."""
+    new, old = exp_dir / SPEC_FILE, exp_dir / LEGACY_SPEC_FILE
+    return old if old.exists() and not new.exists() else new
+
+
+def analysis_dir(exp_dir: Path) -> Path:
+    return exp_dir / ANALYSIS_DIR
+
+
+def migrate_layout(exp_dir: Path) -> list[str]:
+    """Bring an experiment stored before 2026-10-18 to the current names; returns what was changed.
+
+    The spec copy is renamed. The old `analysis/` folder holds only regenerated output (`analysis report`), so it is
+    removed rather than moved, which keeps stale files from mixing with fresh ones.
+    """
+    changed = []
+    old_spec, old_analysis = exp_dir / LEGACY_SPEC_FILE, exp_dir / LEGACY_ANALYSIS_DIR
+    if old_spec.is_file():
+        if (exp_dir / SPEC_FILE).exists():
+            old_spec.unlink()
+        else:
+            old_spec.replace(exp_dir / SPEC_FILE)
+        changed.append(f"{LEGACY_SPEC_FILE} -> {SPEC_FILE}")
+    if old_analysis.is_dir():
+        shutil.rmtree(old_analysis)
+        changed.append(f"removed {LEGACY_ANALYSIS_DIR}/ (regenerated as {ANALYSIS_DIR}/)")
+    return changed
+
+
+def write_spec_copy(exp_dir: Path, spec: ExperimentSpec) -> Path:
+    migrate_layout(exp_dir)
+    path = exp_dir / SPEC_FILE
+    path.write_text(yaml.safe_dump(spec_to_dict(spec), sort_keys=False), encoding="utf-8")
+    return path
+
+
+def is_experiment(exp_dir: Path) -> bool:
+    return (exp_dir / SPEC_FILE).exists() or (exp_dir / LEGACY_SPEC_FILE).exists()
+
+
+def load_run_log(exp_dir: Path) -> list[dict]:
+    path = exp_dir / RUN_LOG_FILE
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    return data if isinstance(data, list) else []
+
+
+def save_run_log_entry(exp_dir: Path, entry: dict) -> None:
+    """Insert or update the session `entry["session"]` in _run-log.json (atomic rewrite)."""
+    log = [e for e in load_run_log(exp_dir) if e.get("session") != entry.get("session")]
+    log.append(entry)
+    path = exp_dir / RUN_LOG_FILE
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(log, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    tmp.replace(path)
 
 
 def experiment_dir(name: str, results_dir: Path = RESULTS_DIR) -> Path:

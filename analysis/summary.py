@@ -1,8 +1,9 @@
-"""SUMMARY.md: Markdown tables of one experiment for a first look, e.g. in an exported zip (CLAUDE.md, Phase 3).
+"""_SUMMARY.md: Markdown tables of one experiment for a first look, e.g. in an exported zip (CLAUDE.md, Phase 3).
 
-Rendered only from what `analysis report` writes into `<exp>/analysis/` (the CSV tables and `tables-run<k>.json`)
-plus the stored spec, so it can be rebuilt from an export (`python -m analysis.summary <exp>/analysis`) and never
-shows anything the CSVs don't hold. The CSVs are the data for plots; this file is for reading.
+Rendered only from what `analysis report` writes into `<exp>/_ANALYSIS/` (the CSV tables and `tables-run<k>.json`)
+plus the stored spec and run log (`_experiment.yaml`, `_run-log.json`), so it can be rebuilt from an export
+(`python -m analysis.summary <exp>/_ANALYSIS`) and never shows anything those files don't hold. The CSVs are the data
+for plots; this file is for reading.
 """
 
 from __future__ import annotations
@@ -17,6 +18,9 @@ from pathlib import Path
 
 import yaml
 
+from common.experiment import load_run_log, spec_path
+
+SUMMARY_FILE = "_SUMMARY.md"
 LANGUAGE_ORDER = ["java", "python", "go", "javascript", "typescript", "c", "cpp"]
 COVERAGE_SHOWN = ["family", "key_size", "mode", "padding", "curve", "digest", "location"]
 FILES = {
@@ -77,6 +81,27 @@ def _pct(v) -> str:
     return "" if f is None else f"{f:.0%}"
 
 
+def _ts(v) -> datetime | None:
+    try:
+        return datetime.fromisoformat(str(v).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _when(t: datetime) -> str:
+    return t.astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC")
+
+
+def _span(seconds: float) -> str:
+    m = round(seconds / 60)
+    return f"{m // 60} h {m % 60:02d} min" if m >= 60 else f"{m} min"
+
+
+def _gib(mb) -> str:
+    f = _float(mb)
+    return "" if f is None else f"{f / 1024:.1f}"
+
+
 def _lang_key(lang: str) -> tuple[int, str]:
     return (LANGUAGE_ORDER.index(lang) if lang in LANGUAGE_ORDER else len(LANGUAGE_ORDER), lang)
 
@@ -102,14 +127,77 @@ def _header(spec: dict, info: dict, run: int) -> list[str]:
     return lines
 
 
+def _experiment(rows: list[dict], sessions: list[dict]) -> list[str]:
+    """When it ran, for how long, on how much RAM, and the peaks (run log of the runner plus the runs' meta)."""
+    ran = [r for r in rows if r.get("status") != "unsupported"]
+    ends = [t for r in ran if (t := _ts(r.get("received_at")))]
+    starts = [t.timestamp() - (_float(r.get("duration_sec")) or 0) for r in ran if (t := _ts(r.get("received_at")))]
+    lines = ["## Experiment", ""]
+    table: list[list] = []
+    if sessions:
+        s_start = [t for e in sessions if (t := _ts(e.get("started_at")))]
+        s_end = [t for e in sessions if (t := _ts(e.get("finished_at") or e.get("updated_at")))]
+        active = sum(
+            (e_end - e_start).total_seconds()
+            for e in sessions
+            if (e_start := _ts(e.get("started_at"))) and (e_end := _ts(e.get("finished_at") or e.get("updated_at")))
+        )
+        if s_start and s_end:
+            table.append(["ran", f"{_when(min(s_start))} to {_when(max(s_end))}"])
+            table.append(["duration", f"{_span(active)} in {len(sessions)} runner session(s)"])
+        outcomes = Counter(str(e.get("status") or "?") for e in sessions)
+        table.append(["sessions", ", ".join(f"{n} {k}" for k, n in sorted(outcomes.items()))])
+    elif ends and starts:
+        first = datetime.fromtimestamp(min(starts), UTC)
+        table.append(["ran", f"about {_when(first)} to {_when(max(ends))} (from the stored runs; no run log)"])
+        table.append(["duration", f"about {_span((max(ends) - first).total_seconds())}"])
+    tool_time = sum(_float(r.get("duration_sec")) or 0 for r in ran)
+    if ran:
+        table.append(["tool time", f"{_span(tool_time)} summed over {len(ran)} runs (excluding unsupported)"])
+    host = next((e.get("host") for e in reversed(sessions) if e.get("host")), None) or {}
+    if host.get("ram_total_mb"):
+        table.append(["host", f"{_gib(host['ram_total_mb'])} GiB RAM, {host.get('cpus') or '?'} CPUs (Docker VM)"])
+    last = sessions[-1] if sessions else {}
+    if "memory_budget_gb" in last:
+        budget, waves = _float(last.get("memory_budget_gb")) or 0, last.get("waves") or []
+        if budget:
+            table.append(["memory budget", f"{budget:g} GiB -> {len(waves)} wave(s) (last session)"])
+        else:
+            table.append(["memory budget", "none (all tools at once)"])
+    peaks = [p for e in sessions if (p := _float(e.get("ram_peak_used_mb"))) is not None]
+    if peaks:
+        total = _float(host.get("ram_total_mb"))
+        share = f" of {_gib(total)} GiB ({max(peaks) / total:.0%})" if total else ""
+        table.append(["peak RAM in use", f"{_gib(max(peaks))} GiB{share} on the VM, sampled every 2 s"])
+    per_job = [(p, r) for r in ran if (p := _float(r.get("peak_memory_mb"))) is not None]
+    if per_job:
+        p, r = max(per_job, key=lambda x: x[0])
+        table.append(["peak RAM of a job", f"{_gib(p)} GiB: `{r['tool']}` on `{r['repo']}` (container working set)"])
+    ooms = sum(_int(r.get("oom_kills")) for r in ran)
+    if per_job:
+        table.append(["OOM kills", str(ooms)])
+    images = sorted({r["image_ref"].rsplit(":", 1)[-1] for r in ran if r.get("image_ref") and ":" in r["image_ref"]})
+    if images:
+        table.append(["BF-CBOM images", ", ".join(images)])
+    if not table:
+        return []
+    lines += md_table(["", ""], table, "ll")
+    if not sessions:
+        lines += ["", "No `_run-log.json` (run before 2026-10-18): host RAM, budget and peak RAM were not recorded."]
+    elif not per_job:
+        lines += ["", "The runs carry no memory measurements (worker images built before 2026-10-18)."]
+    return lines + [""]
+
+
 def _runs(rows: list[dict]) -> list[str]:
     if not rows:
         return []
     by_tool: dict[str, list[dict]] = defaultdict(list)
     for r in rows:
         by_tool[r["tool"]].append(r)
-    statuses = ["ok", "failed", "timeout", "unsupported"]
-    table = []
+    statuses = ["ok", "error", "timeout", "unsupported"]
+    memory = any(r.get("peak_memory_mb") for r in rows)
+    table, others = [], []
     for tool in sorted(by_tool):
         rs = by_tool[tool]
         c = Counter(r["status"] for r in rs)
@@ -117,9 +205,29 @@ def _runs(rows: list[dict]) -> list[str]:
         durations = [d for r in rs if r["status"] == "ok" and (d := _float(r.get("duration_sec"))) is not None]
         median = f"{statistics.median(durations):.0f}" if durations else ""
         versions = sorted({r["tool_version"] for r in rs if r.get("tool_version")})
-        table.append([tool] + [c.get(s, 0) or "" for s in statuses] + [other or "", median, "; ".join(versions)])
-    lines = ["## Runs", "", "All stored runs, every repetition.", ""]
-    lines += md_table(["tool", *statuses, "other", "median s", "tool version"], table, "lrrrrrrl")
+        if not versions and c.get("unsupported") == len(rs):
+            versions = ["not run: no repo in its languages"]
+        row = [tool] + [c.get(s, 0) or "" for s in statuses] + [other or "", median]
+        others.append(other)
+        if memory:
+            peaks = [p for r in rs if (p := _float(r.get("peak_memory_mb"))) is not None]
+            limits = [p for r in rs if (p := _float(r.get("memory_limit_mb"))) is not None]
+            row += [_gib(max(peaks)) if peaks else "", _gib(max(limits)) if limits else ""]
+            row += [sum(_int(r.get("oom_kills")) for r in rs) or ""]
+        table.append(row + ["; ".join(versions)])
+    header = ["tool", *statuses, "other", "median s"]
+    if not any(others):  # statuses outside the four are rare; keep the column only when there are some
+        i = header.index("other")
+        header.pop(i)
+        for row in table:
+            row.pop(i)
+    if memory:
+        header += ["peak GiB", "limit GiB", "OOM kills"]
+    lines = ["## Runs", "", "All stored runs, every repetition."]
+    if memory:
+        lines[-1] += " Peak GiB: the largest container working set of any run (sampled every second)."
+    lines += [""]
+    lines += md_table([*header, "tool version"], table, "l" + "r" * (len(header) - 1) + "l")
     failed = [r for r in rows if r["status"] not in ("ok", "unsupported")]
     if failed:
         lines += ["", f"Runs without a result ({len(failed)}):", ""]
@@ -329,6 +437,7 @@ def _files(info: dict, run: int) -> list[str]:
             lines.append(f"- `{name}` ({counts[name]} rows): {meaning}")
     lines += [
         "- `normalize.json`: coverage per tool in full (sources, conflicts, top unmapped values)",
+        "- `../_run-log.json`: one entry per runner session (times, host RAM and CPUs, budget, waves, peak RAM)",
         "- `<snapshot>/<variant>/<tool>/run<k>.norm.json`: the normalised CBOM next to each stored one",
     ]
     settings = info.get("settings") or {}
@@ -345,8 +454,8 @@ def _files(info: dict, run: int) -> list[str]:
 
 def render(analysis_dir: Path, *, run: int = 1) -> str:
     analysis_dir = Path(analysis_dir)
-    spec_path = analysis_dir.parent / "experiment.yaml"
-    spec = yaml.safe_load(spec_path.read_text(encoding="utf-8")) if spec_path.exists() else {}
+    spec_file = spec_path(analysis_dir.parent)
+    spec = yaml.safe_load(spec_file.read_text(encoding="utf-8")) if spec_file.exists() else {}
     info_path = analysis_dir / f"tables-run{run}.json"
     info = json.loads(info_path.read_text(encoding="utf-8")) if info_path.exists() else {}
 
@@ -355,6 +464,7 @@ def render(analysis_dir: Path, *, run: int = 1) -> str:
 
     algorithms = rows("algorithms-run{k}.csv")
     lines = _header(spec or {}, info, run)
+    lines += _experiment(rows("runs.csv"), load_run_log(analysis_dir.parent))
     lines += _runs(rows("runs.csv"))
     lines += _micro(rows("micro-run{k}.csv"), rows("micro-assets-run{k}.csv"))
     lines += _coverage(rows("coverage.csv"), rows("conformance.csv"))
@@ -366,13 +476,13 @@ def render(analysis_dir: Path, *, run: int = 1) -> str:
 
 
 def write(analysis_dir: Path, *, run: int = 1) -> Path:
-    path = Path(analysis_dir) / "SUMMARY.md"
+    path = Path(analysis_dir) / SUMMARY_FILE
     tmp = path.with_name(path.name + ".tmp")
     tmp.write_text(render(analysis_dir, run=run), encoding="utf-8")
     tmp.replace(path)
     return path
 
 
-if __name__ == "__main__":  # rebuild from an exported folder: python -m analysis.summary <exp>/analysis [run]
-    target = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("analysis")
+if __name__ == "__main__":  # rebuild from an exported folder: python -m analysis.summary <exp>/_ANALYSIS [run]
+    target = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("_ANALYSIS")
     print(write(target, run=int(sys.argv[2]) if len(sys.argv) > 2 else 1))

@@ -387,7 +387,7 @@ Each `JobResult` records `tool_version` (reported by the worker, e.g. `cdxgen 12
 Reproducible, resumable batch runs for the research agenda described in `CLAUDE.md`. Everything they produce stays inside Docker named volumes:
 
 - `gitserver`: a read-only smart-HTTP git server on the compose network. The runner mirrors every repo there at its pinned commit (volume `git-data`); mutants are branches `bfcbom/<variant>`. Each snapshot is served as its own small bare repo `<owner>/<repo>--<sha12>.git` (objects shared with the mirror, HEAD on the snapshot branch), which workers scan. CBOMkit insists on `https://` and drops `.git`, so the server also speaks TLS with a self-signed certificate (volume `git-certs`) that the CBOMkit worker trusts.
-- `runner`: an on-demand container running `bf-cbom experiment ...`. Results land in the `results-data` volume as `<exp>/<owner>__<repo>@<sha12>/<variant>/<tool>/run<k>.json` plus a `run<k>.meta.json` with status, duration, tool version and image.
+- `runner`: an on-demand container running `bf-cbom experiment ...`. Results land in the `results-data` volume as `<exp>/<owner>__<repo>@<sha12>/<variant>/<tool>/run<k>.json` plus a `run<k>.meta.json` with status, duration, tool version, image and the container's peak RAM; `_experiment.yaml`, `_run-log.json` (sessions, host RAM, peak RAM) and `_ANALYSIS/` sit on top of each experiment folder.
 
 ```bash
 make experiment EXP=experiments/e0-smoke.yaml   # pin, mirror, enqueue, collect (resumable)
@@ -395,7 +395,7 @@ make experiment-status NAME=e0-smoke
 make experiment-export NAME=e0-smoke            # -> exports/e0-smoke.zip (runs the analysis report first), the only path to the host
 make corpus ARGS="--per-language 100"           # stratified GitHub corpus with pinned commits
 make experiment EXP=experiments/e0-micro.yaml   # every tool on the hand-written micro projects (corpus/micro)
-make analysis ARGS="report e0-micro"            # everything below in one pass + analysis/SUMMARY.md (Markdown tables)
+make analysis ARGS="report e0-micro"            # everything below in one pass + _ANALYSIS/_SUMMARY.md (Markdown tables)
 make analysis ARGS="normalize e0-micro"         # every CBOM -> normalised records, one adapter spec per tool (analysis/adapters/)
 make analysis ARGS="levels e0-micro"            # how much agreement normalisation creates (levels L0 raw to L4 tool specs)
 make analysis ARGS="micro e0-micro"             # recall (call site and repo level) and precision per tool against corpus/micro/ground_truth.yaml

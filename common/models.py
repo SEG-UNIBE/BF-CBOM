@@ -68,6 +68,11 @@ class JobResult(DataClassJsonMixin):
     run_index: int | None = None
     # Non-fatal remarks from the worker (e.g. a fallback that was taken) for successful jobs.
     notes: str | None = None
+    # Resources of the worker's container while the job ran (common/memory.py, filled by run_job_with_timeout):
+    # peak working set sampled once per second, the container's memory limit, OOM kills during the job.
+    peak_memory_mb: float | None = None
+    memory_limit_mb: float | None = None
+    oom_kills: int | None = None
 
 
 @dataclass

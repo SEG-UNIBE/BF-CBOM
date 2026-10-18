@@ -29,15 +29,18 @@ from common.experiment import (
     PlannedJob,
     Snapshot,
     experiment_dir,
+    is_experiment,
     load_spec,
     mark_unsupported,
     plan_jobs,
     plan_waves,
     resolve_snapshots,
-    spec_to_dict,
+    save_run_log_entry,
     summarize,
     write_result,
+    write_spec_copy,
 )
+from common.memory import HostSampler
 from common.models import JobResult
 from common.tools_registry import load_tools, tool_memory_gb
 from coordinator.redis_io import (
@@ -108,6 +111,51 @@ def _err(msg: str, code: int = 1):
     raise typer.Exit(code)
 
 
+class _Session:
+    """One `experiment run` / `collect` invocation in <exp>/_run-log.json: wall times, the Docker VM's RAM and CPUs,
+    the memory budget and waves, and the peak RAM in use on the VM while it ran (sampled with every poll)."""
+
+    SAVE_EVERY_SEC = 60.0
+
+    def __init__(self, exp_dir: Path, command: str, **fields):
+        self.exp_dir = exp_dir
+        self.host = HostSampler()
+        self.entry = {
+            "session": uuid.uuid4().hex[:12],
+            "command": command,
+            "started_at": now_iso(),
+            "status": "running",
+            "runner_image": os.getenv("BF_CBOM_IMAGE"),
+            "host": {
+                "cpus": os.cpu_count(),
+                "ram_total_mb": self.host.total_mb,
+                "ram_used_at_start_mb": self.host.start_used_mb,
+            },
+            **fields,
+        }
+        self._saved = 0.0
+        self.save()
+
+    def tick(self) -> None:
+        self.host.sample()
+        if time.monotonic() - self._saved >= self.SAVE_EVERY_SEC:
+            self.save()
+
+    def save(self, **fields) -> None:
+        self.entry.update(fields)
+        self.entry["ram_peak_used_mb"] = self.host.peak_used_mb
+        self.entry["updated_at"] = now_iso()
+        self._saved = time.monotonic()
+        try:
+            save_run_log_entry(self.exp_dir, self.entry)
+        except OSError as e:  # bookkeeping must never stop a batch
+            typer.secho(f"warning: cannot write the run log ({e})", fg=typer.colors.YELLOW, err=True)
+
+    def finish(self, status: str, **fields) -> None:
+        self.host.sample()
+        self.save(status=status, finished_at=now_iso(), **fields)
+
+
 @experiment_app.command("run")
 def run(
     spec_path: Path = SPEC_ARG,
@@ -139,13 +187,14 @@ def run(
     jobs queued. With a memory budget the tools are packed into waves (common/experiment.py:plan_waves); each
     wave is enqueued only after the previous one has been collected.
     """
+    started_at = now_iso()  # the session includes pinning and mirroring
     try:
         spec = load_spec(spec_path)
     except (ExperimentError, OSError, yaml.YAMLError) as e:
         _err(f"invalid experiment spec: {e}", 2)
     exp_dir = experiment_dir(spec.name)
     exp_dir.mkdir(parents=True, exist_ok=True)
-    (exp_dir / "experiment.yaml").write_text(yaml.safe_dump(spec_to_dict(spec), sort_keys=False), encoding="utf-8")
+    write_spec_copy(exp_dir, spec)
     typer.secho(
         f"experiment {spec.name}: {len(spec.repos)} repos x {spec.tools} x {spec.repetitions} rep(s)",
         fg=typer.colors.BLUE,
@@ -233,6 +282,46 @@ def run(
     if not total:
         _print_summary(exp_dir)
         return
+    session = _Session(
+        exp_dir,
+        "run",
+        started_at=started_at,
+        memory_budget_gb=memory_budget_gb,
+        waves=waves,
+        memory_gb={t: memory[t] for t in active_tools},
+        jobs_enqueued=len(jobs),
+        jobs_pending_before=len(pending),
+        jobs_on_disk_before=skipped,
+    )
+    outcome = "interrupted"
+    try:
+        _run_waves(r, spec, exp_dir, waves, jobs, pending, total, idle_timeout, no_wait, session)
+        outcome = "enqueued (--no-wait)" if no_wait else "completed"
+    except typer.Exit as e:
+        outcome = "stopped" if e.exit_code else "completed"
+        raise
+    finally:
+        session.finish(outcome, results_stored=session.entry.get("results_stored", 0))
+    if no_wait:
+        return
+    r.hset(_status_key(spec.name), mapping={"status": "completed", "finished_at": now_iso()})
+    r.delete(_running_key(spec.name))
+    _print_summary(exp_dir)
+
+
+def _run_waves(
+    r: redis.Redis,
+    spec,
+    exp_dir: Path,
+    waves: list[list[str]],
+    jobs: list[PlannedJob],
+    pending: dict[str, PlannedJob],
+    total: int,
+    idle_timeout: int,
+    no_wait: bool,
+    session: _Session,
+) -> int:
+    """Enqueue wave by wave and collect each before the next; returns the number of results stored."""
     done = 0
     issued = 0
     for i, wave in enumerate(waves, 1):
@@ -266,11 +355,12 @@ def run(
                     err=True,
                 )
             _print_summary(exp_dir)
-            return
-        done = _collect(r, spec.name, spec.tools, exp_dir, wave_pending, idle_timeout, done=done, total=total)
-    r.hset(_status_key(spec.name), mapping={"status": "completed", "finished_at": now_iso()})
-    r.delete(_running_key(spec.name))
-    _print_summary(exp_dir)
+            return done
+        session.save(wave=f"{i}/{len(waves)}")
+        done = _collect(
+            r, spec.name, spec.tools, exp_dir, wave_pending, idle_timeout, done=done, total=total, session=session
+        )
+    return done
 
 
 def _collect(
@@ -283,6 +373,7 @@ def _collect(
     *,
     done: int = 0,
     total: int | None = None,
+    session: _Session | None = None,
 ) -> int:
     """Persist results until `pending` is empty; returns the cumulative count of stored results."""
     inbox = f"results:{_route_key(name)}"
@@ -291,6 +382,8 @@ def _collect(
     warned_dead: set[str] = set()
     redis_failures = 0
     while pending:
+        if session is not None:
+            session.tick()
         try:
             ingest_worker_results(r, _route_key(name), tools)
             batch = _drain(r, inbox)
@@ -317,6 +410,8 @@ def _collect(
             r.hdel(_pending_key(name), result.job_id)
             r.hdel(_running_key(name), result.job_id)
             done += 1
+            if session is not None:
+                session.entry["results_stored"] = session.entry.get("results_stored", 0) + 1
             r.hset(_status_key(name), mapping={"stored_jobs": str(done), "updated_at": now_iso()})
             colour = typer.colors.GREEN if result.status == "ok" else typer.colors.RED
             typer.secho(
@@ -392,7 +487,18 @@ def collect(
         _print_summary(exp_dir)
         return
     stored = int(r.hget(_status_key(name), "stored_jobs") or 0)
-    _collect(r, name, tools, exp_dir, pending, idle_timeout, done=stored, total=stored + len(pending))
+    session = _Session(exp_dir, "collect", jobs_pending_before=len(pending))
+    outcome = "interrupted"
+    try:
+        _collect(
+            r, name, tools, exp_dir, pending, idle_timeout, done=stored, total=stored + len(pending), session=session
+        )
+        outcome = "completed"
+    except typer.Exit as e:
+        outcome = "stopped" if e.exit_code else "completed"
+        raise
+    finally:
+        session.finish(outcome, results_stored=session.entry.get("results_stored", 0))
     r.hset(_status_key(name), mapping={"status": "completed", "finished_at": now_iso()})
     wave = r.hget(_status_key(name), "wave") or ""
     if "/" in wave and wave.split("/")[0] != wave.split("/")[1]:
@@ -430,7 +536,7 @@ def list_experiments():
     if not RESULTS_DIR.exists():
         typer.echo(f"(no results yet under {RESULTS_DIR})")
         return
-    for d in sorted(p for p in RESULTS_DIR.iterdir() if p.is_dir() and (p / "experiment.yaml").exists()):
+    for d in sorted(p for p in RESULTS_DIR.iterdir() if p.is_dir() and is_experiment(p)):
         s = summarize(d)
         typer.echo(f"{d.name:<30} {s['stored_runs']:>6} run(s)  {json.dumps(s['per_tool'])}")
 
@@ -441,8 +547,8 @@ def export(
     dest: Path = DEST_OPT,
     no_report: bool = typer.Option(False, "--no-report", help="Zip as stored, without running `analysis report`"),
 ):
-    """Zip one experiment (spec, lock, all CBOMs and meta files, analysis/ with SUMMARY.md). The only way data
-    leaves the volume. Runs `analysis report` first, so the CSV tables and SUMMARY.md in the zip are current."""
+    """Zip one experiment (spec, run log, lock, all CBOMs and meta files, _ANALYSIS/ with _SUMMARY.md). The only way
+    data leaves the volume. Runs `analysis report` first, so the CSV tables and _SUMMARY.md in the zip are current."""
     exp_dir = experiment_dir(name)
     if not exp_dir.exists():
         _err(f"no experiment '{name}' under {RESULTS_DIR}")

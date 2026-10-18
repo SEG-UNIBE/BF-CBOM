@@ -13,6 +13,7 @@ import redis
 
 from .config import BLPOP_TIMEOUT_SEC, REDIS_HOST, REDIS_PORT, REDIS_SOCKET_TIMEOUT_SEC
 from .jobs import mark_job_running
+from .memory import JobSampler
 from .models import JobInstruction, JobResult, Trace
 from .utils import normalize_json
 
@@ -107,6 +108,7 @@ def run_job_with_timeout(
         args=(child_conn, handle_instruction, instr, worker_name),
         name=f"{worker_name}-job-{instr.job_id[:8]}",
     )
+    sampler = JobSampler()
     start = time.monotonic()
     proc.start()
     child_conn.close()
@@ -117,6 +119,7 @@ def run_job_with_timeout(
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             break
+        sampler.sample()
         if parent_conn.poll(min(_TICK_SEC, remaining)):
             try:
                 payload = parent_conn.recv()
@@ -140,7 +143,7 @@ def run_job_with_timeout(
         if proc.is_alive():
             _kill_process_group(proc, log)
         parent_conn.close()
-        return JobResult.from_json(payload)
+        return _with_resources(JobResult.from_json(payload), sampler)
 
     if proc.is_alive():
         log.error("Job %s timed out after %.1fs; killing job process", instr.job_id, elapsed)
@@ -150,7 +153,7 @@ def run_job_with_timeout(
         log.error("Job %s process exited with code %s without a result", instr.job_id, proc.exitcode)
         status, error = "error", f"job process exited with code {proc.exitcode} without returning a result"
     parent_conn.close()
-    return JobResult(
+    result = JobResult(
         job_id=instr.job_id,
         status=status,
         repo_info=instr.repo_info,
@@ -160,6 +163,13 @@ def run_job_with_timeout(
         worker=worker_name,
         error=error,
     )
+    return _with_resources(result, sampler)
+
+
+def _with_resources(result: JobResult, sampler: JobSampler) -> JobResult:
+    for key, value in sampler.result().items():
+        setattr(result, key, value)
+    return result
 
 
 def _push_result(r: redis.Redis, name: str, result: JobResult, log: logging.Logger) -> bool:

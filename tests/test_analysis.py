@@ -269,7 +269,7 @@ def _fake_experiment(root: Path) -> Path:
     """Tiny stored experiment: two ok runs on micro-java plus one unsupported run without a CBOM."""
     exp = root / "exp-tables"
     exp.mkdir()
-    (exp / "experiment.yaml").write_text(
+    (exp / "_experiment.yaml").write_text(
         "name: exp-tables\ntools: [cbomkit, cipherradar, pqcheck]\nrepos:\n"
         "  - full_name: bfcbom/micro-java\n    language: Java\n",
         encoding="utf-8",
@@ -325,7 +325,7 @@ def test_tables_command_writes_joinable_tables(tmp_path, monkeypatch):
     monkeypatch.setattr(analysis_cmd, "experiment_dir", lambda name: tmp_path / name)
     result = CliRunner().invoke(analysis_cmd.analysis_app, ["tables", "exp-tables"])
     assert result.exit_code == 0, result.output
-    out = exp / "analysis"
+    out = exp / "_ANALYSIS"
     expected = ["runs.csv", "sites-run1.csv", "groups-callsite-run1.csv", "members-callsite-run1.csv"]
     assert all((out / f).exists() for f in expected + ["micro-run1.csv", "tables-run1.json"])
 
@@ -364,7 +364,7 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     monkeypatch.setattr(analysis_cmd, "experiment_dir", lambda name: tmp_path / name)
     result = CliRunner().invoke(analysis_cmd.analysis_app, ["report", "exp-tables"])
     assert result.exit_code == 0, result.output
-    out = exp / "analysis"
+    out = exp / "_ANALYSIS"
     for f in ("normalize.json", "vocab.csv", "levels-run1.csv", "records-run1.csv", "micro-run1.csv"):
         assert (out / f).exists(), f
     assert list(_read_csv(out / "coverage.csv")[0]) == COVERAGE_COLUMNS
@@ -374,7 +374,7 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert {a["tool"] for a in algos} == {"cbomkit", "cipherradar"} and algos[0]["language"] == "Java"
     info = json.loads((out / "tables-run1.json").read_text())
     assert info["rows"]["algorithms-run1.csv"] == len(algos) and info["vocabulary"]["algorithms"]
-    summary = (out / "SUMMARY.md").read_text(encoding="utf-8")
+    summary = (out / "_SUMMARY.md").read_text(encoding="utf-8")
     assert summary.startswith("# exp-tables: analysis summary (run 1)")
     for section in ("## Runs", "## Micro projects", "## Normalisation", "## Agreement ladder", "## Files"):
         assert section in summary
@@ -396,14 +396,14 @@ def test_export_runs_the_report_and_zips_the_summary(tmp_path, monkeypatch):
     result = CliRunner().invoke(experiment_cmd.experiment_app, ["export", "exp-tables", "--dest", str(dest)])
     assert result.exit_code == 0, result.output
     names = zipfile.ZipFile(dest / "exp-tables.zip").namelist()
-    assert "exp-tables/analysis/SUMMARY.md" in names and "exp-tables/analysis/micro-run1.csv" in names
-    assert (exp / "analysis" / "SUMMARY.md").exists()
+    assert "exp-tables/_ANALYSIS/_SUMMARY.md" in names and "exp-tables/_ANALYSIS/micro-run1.csv" in names
+    assert (exp / "_ANALYSIS" / "_SUMMARY.md").exists()
 
-    (exp / "analysis" / "SUMMARY.md").unlink()
+    (exp / "_ANALYSIS" / "_SUMMARY.md").unlink()
     result = CliRunner().invoke(
         experiment_cmd.experiment_app, ["export", "exp-tables", "--dest", str(dest), "--no-report"]
     )
-    assert result.exit_code == 0 and not (exp / "analysis" / "SUMMARY.md").exists()
+    assert result.exit_code == 0 and not (exp / "_ANALYSIS" / "_SUMMARY.md").exists()
 
 
 def test_summary_markdown_from_csv_rows():
@@ -421,3 +421,70 @@ def test_summary_markdown_from_csv_rows():
     assert "| tool | java | go |" in lines  # paper languages first
     assert lines.index("| good | pass 11 | – |") < lines.index("| weak | fail 2 | error |")  # passes first
     assert "| weak | 0 / 2 · 7 |  |" in lines
+
+
+def test_report_migrates_the_layout_of_older_experiments(tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+
+    from misc.cli import analysis_cmd
+
+    exp = _fake_experiment(tmp_path)
+    (exp / "_experiment.yaml").replace(exp / "experiment.yaml")
+    (exp / "analysis").mkdir()
+    (exp / "analysis" / "SUMMARY.md").write_text("stale", encoding="utf-8")
+    monkeypatch.setattr(analysis_cmd, "experiment_dir", lambda name: tmp_path / name)
+    result = CliRunner().invoke(analysis_cmd.analysis_app, ["report", "exp-tables"])
+    assert result.exit_code == 0, result.output
+    assert (exp / "_experiment.yaml").exists() and not (exp / "experiment.yaml").exists()
+    assert not (exp / "analysis").exists() and (exp / "_ANALYSIS" / "_SUMMARY.md").exists()
+
+
+def test_summary_starts_with_when_how_long_and_how_much_ram(tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+
+    from misc.cli import analysis_cmd
+
+    exp = _fake_experiment(tmp_path)
+    for tool, peak in (("cbomkit", 3000.0), ("cipherradar", 900.0)):
+        meta_path = exp / SNAPSHOT / "original" / tool / "run1.meta.json"
+        meta = json.loads(meta_path.read_text())
+        meta.update(peak_memory_mb=peak, memory_limit_mb=4096.0, oom_kills=0, received_at="2026-10-18T10:00:00Z")
+        meta_path.write_text(json.dumps(meta))
+    session = {
+        "session": "s1",
+        "command": "run",
+        "status": "completed",
+        "started_at": "2026-10-18T08:00:00Z",
+        "finished_at": "2026-10-18T10:30:00Z",
+        "host": {"cpus": 10, "ram_total_mb": 20480.0},
+        "memory_budget_gb": 14,
+        "waves": [["cbomkit"], ["cipherradar"]],
+        "ram_peak_used_mb": 15360.0,
+    }
+    (exp / "_run-log.json").write_text(json.dumps([session]))
+    monkeypatch.setattr(analysis_cmd, "experiment_dir", lambda name: tmp_path / name)
+    result = CliRunner().invoke(analysis_cmd.analysis_app, ["report", "exp-tables"])
+    assert result.exit_code == 0, result.output
+    summary = (exp / "_ANALYSIS" / "_SUMMARY.md").read_text(encoding="utf-8")
+    assert summary.index("## Experiment") < summary.index("## Runs")
+    assert "| ran | 2026-10-18 08:00 UTC to 2026-10-18 10:30 UTC |" in summary
+    assert "| duration | 2 h 30 min in 1 runner session(s) |" in summary
+    assert "| host | 20.0 GiB RAM, 10 CPUs (Docker VM) |" in summary
+    assert "| memory budget | 14 GiB -> 2 wave(s) (last session) |" in summary
+    assert "| peak RAM in use | 15.0 GiB of 20.0 GiB (75%) on the VM" in summary
+    assert "| peak RAM of a job | 2.9 GiB: `cbomkit` on `bfcbom/micro-java`" in summary
+    assert "| tool | ok | error | timeout | unsupported | median s | peak GiB | limit GiB | OOM kills |" in summary
+    assert "| cbomkit | 1 |  |  |  | 2 | 2.9 | 4.0 |  |" in summary
+
+
+def test_error_line_skips_the_echoed_command():
+    from analysis.tables import error_line
+
+    text = (
+        "cdxgen cmd: cdxgen -o /tmp/x/bom.json /tmp/x/repo\ncdxgen_failed rc=-9: Downloading gradle\n"
+        'Traceback (most recent call last):\n  File "/app/w.py", line 1, in f\n    raise RuntimeError(msg)\n'
+        "RuntimeError: cdxgen_failed rc=-9: Downloading gradle\n  BUILD FAILED\n"
+    )
+    assert error_line(text) == "RuntimeError: cdxgen_failed rc=-9: Downloading gradle"
+    assert error_line("cdxgen cmd: cdxgen x\ncdxgen timeout during run") == "cdxgen timeout during run"
+    assert error_line("cradar cmd: cradar scan x") is None and error_line(None) is None

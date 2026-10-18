@@ -347,15 +347,15 @@ def test_normalize_and_tables_commands(tmp_path, monkeypatch):
     assert result.exit_code == 0, result.output
     norm = next(exp.glob("*/original/cbomkit/run1.norm.json"))
     assert json.loads(norm.read_text())["source"]["file"] == "run1.json"
-    report = json.loads((exp / "analysis" / "normalize.json").read_text())
-    assert set(report) == {"cbomkit", "cipherradar"} and (exp / "analysis" / "vocab.csv").exists()
+    report = json.loads((exp / "_ANALYSIS" / "normalize.json").read_text())
+    assert set(report) == {"cbomkit", "cipherradar"} and (exp / "_ANALYSIS" / "vocab.csv").exists()
     result = CliRunner().invoke(analysis_cmd.analysis_app, ["tables", "exp-norm"])
     assert result.exit_code == 0, result.output
-    records = _csv(exp / "analysis" / "records-run1.csv")
-    sites = {s["record_id"] for s in _csv(exp / "analysis" / "sites-run1.csv")}
+    records = _csv(exp / "_ANALYSIS" / "records-run1.csv")
+    sites = {s["record_id"] for s in _csv(exp / "_ANALYSIS" / "sites-run1.csv")}
     located = {r["site_id"] for r in records if r["site_id"] and r["asset_type"] == "algorithm"}
     assert records and located and located <= sites
-    runs = {r["tool"]: r for r in _csv(exp / "analysis" / "runs.csv")}
+    runs = {r["tool"]: r for r in _csv(exp / "_ANALYSIS" / "runs.csv")}
     assert (runs["cipherradar"]["bom_format"], runs["cipherradar"]["spec_version"]) == ("CycloneDX", "1.7")
 
 
