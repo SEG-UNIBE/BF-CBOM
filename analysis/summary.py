@@ -281,7 +281,7 @@ def _micro(rows: list[dict], assets: list[dict]) -> list[str]:
     def verdict_cell(r: dict | None) -> str:
         if r is None or r["verdict"] == "missing":
             return "not run"
-        mark = "\*" if _true(r.get("tailored")) else ""
+        mark = r"\*" if _true(r.get("tailored")) else ""
         if r["verdict"] in ("pass", "fail"):
             return f"{r['verdict']} {r['lenient']}{mark}"
         return "–" if r["verdict"] == "unsupported" else r["verdict"] + mark

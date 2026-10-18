@@ -150,3 +150,15 @@ def test_run_stores_results_resumes_retries_and_exports(world, tmp_path):
 def test_parse_replicas():
     assert experiment_cmd.parse_replicas("cryptoscan=3, xgrep=2,bad,one=1") == {"cryptoscan": 3, "xgrep": 2}
     assert experiment_cmd.parse_replicas(None) == {} and experiment_cmd.parse_replicas("") == {}
+
+
+def test_list_shows_experiments_and_folders_in_an_older_layout(tmp_path, monkeypatch):
+    results = tmp_path / "results"
+    (results / "e-new").mkdir(parents=True)
+    (results / "e-new" / ex.SPEC_FILE).write_text("name: e-new\n")
+    (results / "e-old").mkdir()
+    (results / "e-old" / "experiment.yaml").write_text("name: e-old\n")
+    (results / "corpus").mkdir()
+    monkeypatch.setattr(experiment_cmd, "RESULTS_DIR", results)
+    out = _run(["list"]).output
+    assert out.startswith("e-new") and "make experiment-delete NAME=e-old" in out and "corpus" not in out

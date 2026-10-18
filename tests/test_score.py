@@ -86,12 +86,12 @@ def test_dawid_skene_recovers_a_reliable_and_an_unreliable_voter():
     import random
 
     rng = random.Random(1)
-    real = {f"alg{i}" for i in range(20)}
-    fake = {f"alg{i}" for i in range(20, 40)}
+    real = [f"alg{i}" for i in range(20)]  # lists, not sets: set order changes with the hash seed per process
+    fake = [f"alg{i}" for i in range(20, 40)]
     reports = {
         "good": set(real),
-        "ok": set(list(real)[:16]) | set(list(fake)[:3]),
-        "noisy": {k for k in real | fake if rng.random() < 0.5},
+        "ok": set(real[:16]) | set(fake[:3]),
+        "noisy": {k for k in real + fake if rng.random() < 0.5},
     }
     voter_of = {t: t for t in reports}
     obs = sc.Observations(level="L3", voter_of=voter_of)

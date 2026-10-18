@@ -38,7 +38,7 @@ extend-exclude = ["corpus/micro"]
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
+select = ["E", "F", "I", "UP", "B", "W605"]
 
 [tool.ruff.lint.per-file-ignores]
 "misc/pyqun/main.py" = ["E402"]  # sys.path must be patched before the RaQuN_Lab imports

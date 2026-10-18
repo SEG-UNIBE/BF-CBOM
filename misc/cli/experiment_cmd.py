@@ -25,6 +25,7 @@ from common.experiment import (
     GIT_MIRROR_DIR,
     GITSERVER_URL,
     RESULTS_DIR,
+    SPEC_FILE,
     ExperimentError,
     PlannedJob,
     Snapshot,
@@ -583,9 +584,16 @@ def list_experiments():
     if not RESULTS_DIR.exists():
         typer.echo(f"(no results yet under {RESULTS_DIR})")
         return
-    for d in sorted(p for p in RESULTS_DIR.iterdir() if p.is_dir() and is_experiment(p)):
-        s = summarize(d)
-        typer.echo(f"{d.name:<30} {s['stored_runs']:>6} run(s)  {json.dumps(s['per_tool'])}")
+    folders = sorted(p for p in RESULTS_DIR.iterdir() if p.is_dir() and p.name != "corpus")
+    for d in folders:
+        if is_experiment(d):
+            s = summarize(d)
+            typer.echo(f"{d.name:<30} {s['stored_runs']:>6} run(s)  {json.dumps(s['per_tool'])}")
+    stale = [d for d in folders if not is_experiment(d)]
+    if stale:
+        typer.echo(f"\nno {SPEC_FILE} (older layout, not read by any command; rerun, then delete):")
+        for d in stale:
+            typer.echo(f"  {d.name:<28} make experiment-delete NAME={d.name}")
 
 
 @experiment_app.command("export")
