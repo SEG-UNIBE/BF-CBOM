@@ -22,6 +22,7 @@ import yaml
 
 from common import corpus as corpus_mod
 from common.experiment import (
+    ANALYSIS_DIR,
     GIT_MIRROR_DIR,
     GITSERVER_URL,
     RESULTS_DIR,
@@ -29,6 +30,7 @@ from common.experiment import (
     ExperimentError,
     PlannedJob,
     Snapshot,
+    clear_stored_runs,
     experiment_dir,
     is_experiment,
     load_spec,
@@ -213,6 +215,13 @@ def run(
     rerun: str = typer.Option(
         "", "--rerun", help="Comma-separated tools whose stored runs are all redone (e.g. after a worker change)"
     ),
+    overwrite_old: bool = typer.Option(
+        False,
+        "--overwrite-old",
+        help="Run the whole spec afresh: remove every stored run first (also of tools and repos the spec no longer "
+        "names) and the old _ANALYSIS/, cancel jobs an earlier run left pending; the pinned commits (lock.json) and "
+        "the run log are kept",
+    ),
     skip_unsupported: bool = typer.Option(
         True,
         "--skip-unsupported/--run-unsupported",
@@ -256,6 +265,17 @@ def run(
     r = _redis(redis_host, redis_port)
     pending_raw = r.hgetall(_pending_key(spec.name))
     pending = {jid: _job_from_descriptor(jid, json.loads(d)) for jid, d in pending_raw.items()}
+    overwritten = 0
+    if overwrite_old:  # only now: a spec or snapshot that fails to resolve leaves the stored runs untouched
+        _cancel_pending(r, spec.name, pending)  # a late result of a cancelled job is ignored (`_collect`)
+        overwritten = clear_stored_runs(exp_dir)
+        typer.secho(
+            f"--overwrite-old: removed {overwritten} stored run(s) and the old {ANALYSIS_DIR}/, cancelled "
+            f"{len(pending)} pending job(s); commits stay pinned (lock.json)",
+            fg=typer.colors.BLUE,
+            err=True,
+        )
+        pending = {}
     # Drop descriptors whose result arrived in the meantime.
     for jid, job in list(pending.items()):
         if job.paths(exp_dir)[1].exists():
@@ -352,6 +372,7 @@ def run(
         jobs_enqueued=len(jobs),
         jobs_pending_before=len(pending),
         jobs_on_disk_before=skipped,
+        runs_overwritten=overwritten,
     )
     outcome = "interrupted"
     try:

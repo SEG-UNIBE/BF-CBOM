@@ -241,6 +241,27 @@ def repo_full_name(dir_name: str) -> str:
     return dir_name.split("@", 1)[0].replace("__", "/", 1)
 
 
+_SNAPSHOT_DIR = re.compile(r".+__.+@[0-9a-f]+")  # repo_dir_name's shape
+
+
+def clear_stored_runs(exp_dir: Path) -> int:
+    """Remove every stored run of an experiment (`experiment run --overwrite-old`): all snapshot folders, with every
+    CBOM, meta file, unsupported mark and normalised CBOM in them, also of tools, repos and repetitions the spec no
+    longer names (the analysis reads whatever is stored, `iter_results`), and `_ANALYSIS/`, which described them.
+    Kept: the spec copy, the run log (the history of sessions) and `lock.json` (the pinned commits, so the rerun
+    scans the same snapshots). Returns the number of stored runs removed."""
+    removed = 0
+    for d in sorted(exp_dir.iterdir()) if exp_dir.is_dir() else []:
+        if not d.is_dir():
+            continue
+        if _SNAPSHOT_DIR.fullmatch(d.name):
+            removed += sum(1 for _ in d.glob("*/*/run*.meta.json"))
+            shutil.rmtree(d)
+        elif d.name == ANALYSIS_DIR:
+            shutil.rmtree(d)
+    return removed
+
+
 def result_paths(
     exp_dir: Path, full_name: str, commit: str, variant: str, tool: str, run_index: int
 ) -> tuple[Path, Path]:
@@ -589,6 +610,7 @@ def plan_jobs(
                         continue
                     meta.unlink()
                     cbom.unlink(missing_ok=True)
+                    cbom.with_name(f"run{k}.norm.json").unlink(missing_ok=True)  # `analysis normalize`'s output
                 jobs.append(PlannedJob(job_id=new_id(), snapshot=snap, tool=tool, run_index=k))
     return jobs, skipped
 

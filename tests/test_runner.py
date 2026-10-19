@@ -149,6 +149,37 @@ def test_run_stores_results_resumes_retries_and_exports(world, tmp_path):
     assert sum(n.endswith("run1.json") for n in names) == 4
 
 
+def test_overwrite_old_reruns_the_whole_spec_on_the_pinned_commits(world):
+    spec, results, r = world["spec"], world["results"], world["redis"]
+    assert _run(["run", str(spec), "--idle-timeout", "20"]).exit_code == 0
+    exp = results / "e-fake"
+    lock = (exp / "lock.json").read_text()
+    first = next(exp.glob("o__first@*")) / "original"
+    stale_tool = first / "t9"  # a tool the spec no longer names: iter_results (the analysis) would still read it
+    stale_tool.mkdir()
+    (stale_tool / "run1.meta.json").write_text('{"status": "ok", "worker": "t9"}')
+    norm = first / "t1" / "run1.norm.json"
+    norm.write_text("{}")
+    (exp / ex.ANALYSIS_DIR).mkdir(exist_ok=True)
+    (exp / ex.ANALYSIS_DIR / "_SUMMARY.md").write_text("old")
+    # a job an earlier run left pending whose result never comes: without the flag the run would wait for it
+    snap = experiment_cmd.resolve_snapshots(ex.load_spec(spec), exp)[0]
+    stale_job = ex.PlannedJob(job_id="stale-job", snapshot=snap, tool="t1", run_index=1)
+    r.hset(experiment_cmd._pending_key("e-fake"), "stale-job", experiment_cmd._descriptor(stale_job))
+
+    out = _run(["run", str(spec), "--idle-timeout", "20", "--overwrite-old"])
+    assert out.exit_code == 0, out.output
+    assert "removed 5 stored run(s)" in out.output and "cancelled 1 pending job(s)" in out.output
+    assert "0 run(s) already on disk, 0 still pending from an earlier run, 4 to enqueue" in out.output
+    assert len(world["workers"].seen) == 8  # every run of the spec again
+    assert len(list(exp.glob("*/*/*/run1.meta.json"))) == 4 and not stale_tool.exists() and not norm.exists()
+    assert not (exp / ex.ANALYSIS_DIR / "_SUMMARY.md").exists() and (exp / "lock.json").read_text() == lock
+    assert not r.hexists(experiment_cmd._pending_key("e-fake"), "stale-job")
+    first_session, second = ex.load_run_log(exp)
+    assert (first_session["runs_overwritten"], second["runs_overwritten"]) == (0, 5)
+    assert second["results_stored"] == 4
+
+
 def test_parse_replicas():
     assert experiment_cmd.parse_replicas("cryptoscan=3, xgrep=2,bad,one=1") == {"cryptoscan": 3, "xgrep": 2}
     assert experiment_cmd.parse_replicas(None) == {} and experiment_cmd.parse_replicas("") == {}

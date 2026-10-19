@@ -225,9 +225,11 @@ def test_mirror_lock_plan_and_write(upstream, tmp_path: Path):
     assert ex.plan_jobs(spec, snaps, exp_dir, new_id=lambda: next(ids))[1] == 2
     jobs4, skipped4 = ex.plan_jobs(spec, snaps, exp_dir, new_id=lambda: next(ids), retry_failed=True)
     assert (len(jobs4), skipped4) == (7, 1) and not jobs[2].paths(exp_dir)[1].exists()
-    # --rerun redoes every stored run of a tool, ok ones included
+    # --rerun redoes every stored run of a tool, ok ones included, and drops the old normalised CBOM with it
+    norm = jobs[0].paths(exp_dir)[0].with_name("run1.norm.json")
+    norm.write_text("{}")
     jobs5, skipped5 = ex.plan_jobs(spec, snaps, exp_dir, new_id=lambda: next(ids), rerun={"t1"})
-    assert (len(jobs5), skipped5) == (8, 0) and not jobs[0].paths(exp_dir)[1].exists()
+    assert (len(jobs5), skipped5) == (8, 0) and not jobs[0].paths(exp_dir)[1].exists() and not norm.exists()
 
 
 # ----- fixtures published from plain directories -----

@@ -55,7 +55,9 @@ Shared context for coworkers and for Claude Code (which loads this file automati
   `gitserver` service (one served repo `<owner>/<repo>--<sha12>.git` per snapshot, because CBOMkit only checks out a
   clone's default branch; mutants will be branches `bfcbom/<variant>`), enqueues through the normal Redis protocol and
   stores the results on `results-data`. Resumable: a run with a stored meta file is skipped, `--retry-failed` redoes
-  the runs that are not ok. A spec entry with `path:` publishes a directory as a deterministic commit
+  the runs that are not ok, `--rerun <tools>` every run of those tools, `--overwrite-old` the whole spec (every stored
+  run and the old `_ANALYSIS/` removed first, pending jobs cancelled; `lock.json` keeps the commits pinned, the run log
+  is kept; `common/experiment.py:clear_stored_runs`). A spec entry with `path:` publishes a directory as a deterministic commit
   (`publish_fixture`). Spec format and the list of specs: `experiments/README.md`.
 - **Experiment folder:** `_experiment.yaml`, `_run-log.json` (runner sessions: times, VM RAM and CPUs, budget, waves,
   peak VM RAM, worker image IDs), `_ANALYSIS/` (with `_SUMMARY.md`; emptied and rebuilt by every `report`),
@@ -197,15 +199,14 @@ analysis, figure or tuning effort goes into those languages.
   `ASSEMBLY_VERSION` 2026-10-20.1). CryptobomForge's worker no longer replaces an empty CodeQL result by an empty
   CycloneDX CBOM of its own (the 2026-10-15 audit's placeholder): cryptobom-forge writes its own empty draft document
   (checked 2026-10-20), so every stored CryptobomForge CBOM is the tool's; the placeholder runs (curl,
-  openssh-portable, AutoGPTQ, sparrow) are redone by the `--rerun cryptobomforge` below. cdxgen's Go locations are
-  read now (they were ignored). Vocabulary 2026-10-20.2. The DeepSeek rerun below picks up the new assembly.
+  openssh-portable, AutoGPTQ, sparrow) are redone by the rerun below. cdxgen's Go locations are read now (they were
+  ignored). Vocabulary 2026-10-20.2. The DeepSeek rerun below picks up the new assembly.
 - **Observers added (2026-10-19):** qelens, cryptarium and qScan are workers with `role: observer` and are in the
-  three experiment specs; the reruns below pick them up (their runs are missing, so `--retry-failed` schedules
-  them). Vocabulary 2026-10-19.2 (their specs only).
-- **Waiting for the VM:** `make up-prod`, then `make experiment EXP=experiments/e1-pilot-corpus.yaml
-  ARGS="--retry-failed --rerun deepseek,cryptobomforge" EXPERIMENT_MEMORY_BUDGET_GB=0`, the same for e1-icpc-corpus and
-  e0-stability (DeepSeek needs credit first; `make experiment-delete NAME=e0-micro`, superseded by e0-stability);
-  then build the E1 corpus with `GITHUB_TOKEN` and prune it, check replicas.
+  three experiment specs; the reruns below pick them up. Vocabulary 2026-10-19.2 (their specs only).
+- **Waiting for the VM:** `make up-prod`, then each experiment as a whole (the user's preference, 2026-10-20):
+  `make experiment EXP=experiments/e1-pilot-corpus.yaml ARGS="--overwrite-old" EXPERIMENT_MEMORY_BUDGET_GB=0`, the
+  same for e1-icpc-corpus and e0-stability (DeepSeek needs credit first; `make experiment-delete NAME=e0-micro`,
+  superseded by e0-stability); then build the E1 corpus with `GITHUB_TOKEN` and prune it, check replicas.
 - **Waiting for the user:** how RaQuN gets into the runner (see "Analysis", `matchers/`): a `pyproject.toml` in the
   PyQuN fork (draft in `notes.md` WP6), then pin it in the `raqun` extra and the misc-pyqun image, or the stopgap;
   an explicit DeepSeek model id (the default `deepseek-chat` is no longer on DeepSeek's model page and is priced as

@@ -62,6 +62,11 @@ Rerunning a spec is resumable: runs whose `run<k>.meta.json` exists are skipped,
 `lock.json`, and jobs still pending from an interrupted run are collected (`--requeue-pending` to reissue).
 `ARGS=--retry-failed` redoes stored runs whose status is not `ok`; `--rerun <tool>[,<tool>]` redoes every stored run
 of those tools, whatever its status (after a worker change, e.g. `--rerun deepseek,cryptobomforge`).
+`ARGS=--overwrite-old` runs the whole spec afresh: it first removes every stored run (CBOMs, meta files, unsupported
+marks, normalised CBOMs, also of tools and repos the spec no longer names, since the analysis reads whatever is
+stored) and the old `_ANALYSIS/`, and cancels jobs an earlier run left pending. `lock.json` stays, so the same commits
+are scanned, and `_run-log.json` keeps the earlier sessions (the new one records `runs_overwritten`). Nothing is
+removed when the spec or a snapshot fails to resolve. For fresh pins, `make experiment-delete NAME=<exp>` first.
 
 **What an experiment folder holds.** `_experiment.yaml` (the spec as run), `_run-log.json` (one entry per
 `experiment run` / `collect` session: start and end, the Docker VM's RAM and CPUs, the memory budget and waves, and the
