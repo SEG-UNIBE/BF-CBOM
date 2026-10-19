@@ -292,6 +292,16 @@ def test_observer_specs_read_their_tools_as_shipped():
     assert not any(r.spec_issues for r in qe + cr + qs)
 
 
+def test_cryptobom_forge_empty_document_is_read_as_the_tools_own_zero():
+    """CodeQL found nothing: cryptobom-forge writes its draft document without a components key (the worker's own
+    empty CycloneDX placeholder for that case went on 2026-10-20). Zero records, no error, the draft's dialect issue
+    like every other run of the tool."""
+    doc = _load("fixtures/normalize/cryptobomforge-empty.json")
+    assert "components" not in doc
+    res = normalize_cbom(doc, "cryptobomforge")
+    assert res.records == [] and res.document_issues == ["dialect:CBOM/1.4-cbom-1.0"]
+
+
 def test_cbomkit_micro_java_against_the_ground_truth():
     recs = normalize_cbom(_load("fixtures/pilot/cbomkit_micro-java.json"), "cbomkit", language="java").records
     agreement = expected_agreement(recs, load_ground_truth()["micro-java"])

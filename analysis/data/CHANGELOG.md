@@ -5,6 +5,13 @@ refinement 14): they were developed on the pilot corpus (the development set); t
 change bumps `version` in `algorithms.yaml`, adds an entry here with the fingerprint `python -m analysis.freeze`
 prints and the reason, and the tests fail otherwise (`tests/test_vocab_frozen.py`). Newest entry first.
 
+## 2026-10-20.2 (2026-10-20) fingerprint `fb39aefee3a5a878efbca29fef7e47839caaec8fcc2f3f99795c0d582d867476`
+- `cryptobomforge.yaml` (version 2): declares IBM's draft `1.4-cbom-1.0` only. The CycloneDX entry (1.6, then 1.7 in
+  2026-10-20.1) covered the worker's own empty placeholder CBOM for a CodeQL run without results; that placeholder is
+  gone (cryptobom-forge writes its own empty draft document for that case, checked in the pinned image; refinement 15:
+  every stored CBOM is the tool's). Stored placeholder runs are redone with `--rerun cryptobomforge`. The notes drop a
+  stale sentence (the detectionContext windows are read, as line and line_end). The shared vocabulary is unchanged.
+
 ## 2026-10-20.1 (2026-10-20) fingerprint `0feb566720a73894da61d5dfc5f8fe9d369b0c4a9cbb8d8914641acb04608a7f`
 CycloneDX versions harmonised where BF-CBOM writes the CBOM itself; the tools' own versions are untouched (a tool's
 choice of 1.6, 1.7 or IBM's draft is part of what it ships and what RQ1 measures).

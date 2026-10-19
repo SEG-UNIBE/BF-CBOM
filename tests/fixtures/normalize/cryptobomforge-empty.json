@@ -1,0 +1,72 @@
+{
+  "dependencies": [
+    {
+      "ref": "33c8252d-24b6-4d2f-a3c0-56c8924db579"
+    }
+  ],
+  "metadata": {
+    "component": {
+      "bom-ref": "33c8252d-24b6-4d2f-a3c0-56c8924db579",
+      "name": "root",
+      "type": "application"
+    },
+    "timestamp": "2026-10-19T22:31:27.638617+00:00",
+    "tools": [
+      {
+        "externalReferences": [
+          {
+            "type": "build-system",
+            "url": "https://github.com/CycloneDX/cyclonedx-python-lib/actions"
+          },
+          {
+            "type": "distribution",
+            "url": "https://pypi.org/project/cyclonedx-python-lib/"
+          },
+          {
+            "type": "documentation",
+            "url": "https://cyclonedx.github.io/cyclonedx-python-lib/"
+          },
+          {
+            "type": "issue-tracker",
+            "url": "https://github.com/CycloneDX/cyclonedx-python-lib/issues"
+          },
+          {
+            "type": "license",
+            "url": "https://github.com/CycloneDX/cyclonedx-python-lib/blob/main/LICENSE"
+          },
+          {
+            "type": "release-notes",
+            "url": "https://github.com/CycloneDX/cyclonedx-python-lib/blob/main/CHANGELOG.md"
+          },
+          {
+            "type": "vcs",
+            "url": "https://github.com/CycloneDX/cyclonedx-python-lib"
+          },
+          {
+            "type": "website",
+            "url": "https://cyclonedx.org"
+          }
+        ],
+        "name": "cyclonedx-python-lib",
+        "vendor": "CycloneDX",
+        "version": "4.2.2"
+      },
+      {
+        "name": "CodeQL",
+        "vendor": "GitHub",
+        "version": "2.23.0"
+      }
+    ],
+    "properties": [
+      {
+        "name": "bf-cbom:fixture-origin",
+        "value": "cryptobom-forge 1.1.0 (worker image bf-cbom/worker-cryptobomforge:1.0.3) on a CodeQL SARIF with zero results, 2026-10-20; complete document, unchanged apart from this property"
+      }
+    ]
+  },
+  "serialNumber": "urn:uuid:4d692f73-6dac-469e-9e1e-45590b49e874",
+  "version": 1,
+  "$schema": "https://raw.githubusercontent.com/IBM/CBOM/main/bom-1.4-cbom-1.0.schema.json",
+  "bomFormat": "CBOM",
+  "specVersion": "1.4-cbom-1.0"
+}

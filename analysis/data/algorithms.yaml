@@ -12,7 +12,7 @@
 # API (registry, RFC 7518 JOSE, RFC 4253/8332 SSH, JCA standard names, OS and library APIs) stays, however many tools
 # use it; a label a tool invented (rule names, category labels) goes into that tool's spec, where `interpretive: true`
 # marks mappings that are judgements rather than spellings (they count at L4 only, analysis/levels.py).
-version: "2026-10-20.1"
+version: "2026-10-20.2"
 
 # Coarse groups (the family names of analysis/data/families.yaml, used by the call-site matcher and the micro ground
 # truth) -> the registry families and additions they contain. Every registry family must appear exactly once.

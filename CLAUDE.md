@@ -143,7 +143,7 @@ appear in the paper's figures is decided later.
 | `cbomkit` | cbomkit | Java, Python, Go | CBOMkit server image, cloned through the git server over TLS; Python covers pyca only; modules need a build file and `src/`; large repos need ~45 min and a 16 GB heap |
 | `cbomkit-jar` | cbomkit | Java, Python, Go | cbomkit-action, source only, the same engine (packaging differences are measured); `CBOMKIT_ENSURE_SRC=1` opt-in |
 | `cdxgen` | cdxgen | Java, Python, JS, Go | `--include-crypto --evidence`, `-t python` / `-t go` for those repos; algorithms carry locations only for JS/TS (occurrences) and Go (property `cdx:golem:crypto:sourceLocation`); Java code yields none (atom has no crypto sinks); 16 GiB (OOM-killed at 8 on Chat2DB, bisq, bisq2, kafka) |
-| `cryptobomforge` | cryptobomforge | Python, C | CodeQL's crypto inventory queries, C with `--build-mode none`; writes IBM's draft `1.4-cbom-1.0`, not CycloneDX |
+| `cryptobomforge` | cryptobomforge | Python, C | CodeQL's crypto inventory queries, C with `--build-mode none`; writes IBM's draft `1.4-cbom-1.0`, not CycloneDX, also when CodeQL finds nothing (every stored CBOM is the tool's; the worker's placeholder for that case went 2026-10-20) |
 | `deepseek`, `chatgpt`, `claude` | one each, `merge_group: llm` | all five | `common/llm_cbom.py` (below), CycloneDX 1.7 assembled by us; `chatgpt` / `claude` need `make up-prod EXTRA_PROFILES=llm` and a key in `docker/env/worker-<provider>.env`; a request that fails after the provider's retries fails the job (no partial CBOMs), `LLM_MAX_CHUNKS` 1000, `LLM_CONCURRENCY` 4 |
 | `cryptoscan` | cryptoscan | eleven | always `--include-quantum-safe`; skips folders named demo, example, sample; on a Go panic (1.4.0, specific files) the worker bisects and reruns with `--exclude` of those files, recorded as a workaround |
 | `pqcheck` | pqcheck | Python, Go | |
@@ -194,13 +194,16 @@ analysis, figure or tuning effort goes into those languages.
 - **CycloneDX versions (2026-10-20):** the tools' versions stay as shipped (1.6: CBOMkit, cbomkit-jar, CryptoScan,
   pqcheck, securin-xbom, xgrep and the observers; 1.7: cdxgen, CipherRadar, CipherSift, Q-DARPAN, SCANOSS;
   CryptobomForge IBM's draft); what BF-CBOM writes itself is 1.7 (the LLM assembly, `PROMPT_VERSION` and
-  `ASSEMBLY_VERSION` 2026-10-20.1; CryptobomForge's empty placeholder). cdxgen's Go locations are read now (they
-  were ignored). Vocabulary 2026-10-20.1. The DeepSeek rerun below picks up the new assembly.
+  `ASSEMBLY_VERSION` 2026-10-20.1). CryptobomForge's worker no longer replaces an empty CodeQL result by an empty
+  CycloneDX CBOM of its own (the 2026-10-15 audit's placeholder): cryptobom-forge writes its own empty draft document
+  (checked 2026-10-20), so every stored CryptobomForge CBOM is the tool's; the placeholder runs (curl,
+  openssh-portable, AutoGPTQ, sparrow) are redone by the `--rerun cryptobomforge` below. cdxgen's Go locations are
+  read now (they were ignored). Vocabulary 2026-10-20.2. The DeepSeek rerun below picks up the new assembly.
 - **Observers added (2026-10-19):** qelens, cryptarium and qScan are workers with `role: observer` and are in the
   three experiment specs; the reruns below pick them up (their runs are missing, so `--retry-failed` schedules
   them). Vocabulary 2026-10-19.2 (their specs only).
 - **Waiting for the VM:** `make up-prod`, then `make experiment EXP=experiments/e1-pilot-corpus.yaml
-  ARGS="--retry-failed --rerun deepseek" EXPERIMENT_MEMORY_BUDGET_GB=0`, the same for e1-icpc-corpus and
+  ARGS="--retry-failed --rerun deepseek,cryptobomforge" EXPERIMENT_MEMORY_BUDGET_GB=0`, the same for e1-icpc-corpus and
   e0-stability (DeepSeek needs credit first; `make experiment-delete NAME=e0-micro`, superseded by e0-stability);
   then build the E1 corpus with `GITHUB_TOKEN` and prune it, check replicas.
 - **Waiting for the user:** how RaQuN gets into the runner (see "Analysis", `matchers/`): a `pyproject.toml` in the

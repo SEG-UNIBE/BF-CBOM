@@ -101,21 +101,6 @@ def _detect_language(repo_path: str) -> str | None:
     return best[0] if best[1] > 0 else None
 
 
-def _empty_cbom(reason: str) -> dict:
-    """A valid CycloneDX 1.7 CBOM with no components, annotated with why it is empty (ours, not the tool's: the
-    same version as every CBOM BF-CBOM itself writes)."""
-    return {
-        "bomFormat": "CycloneDX",
-        "specVersion": "1.7",
-        "version": 1,
-        "metadata": {
-            "tools": {"components": [{"type": "application", "name": "cryptobom-forge"}]},
-            "properties": [{"name": "bf-cbom:empty-reason", "value": reason}],
-        },
-        "components": [],
-    }
-
-
 class CryptobomForgeClient:
     def __init__(self, *, timeout_sec: int = TIMEOUT_SEC):
         self.timeout_sec = timeout_sec
@@ -411,11 +396,11 @@ class CryptobomForgeClient:
                 raise RuntimeError("no_sarif_found")
             logger.info("SARIF files found: %s", sarif_files)
 
+            # The count goes into the run notes so that a 0 can be checked (refinement 15). An empty result is not
+            # short-circuited: cryptobom-forge writes its own empty draft document for it (the worker's CycloneDX
+            # placeholder for that case went on 2026-10-20; every stored CBOM is the tool's).
             results_count = self._sarif_results_count(sarif_files[0], trace)
-            if results_count == 0:
-                # CodeQL ran fine and found no crypto: that is a valid, empty CBOM, not a failure.
-                logger.info("CodeQL produced no results for %s; returning an empty CBOM", git_url)
-                return json.dumps(_empty_cbom("codeql returned no results"), ensure_ascii=False)
+            trace.add(f"codeql results: {results_count if results_count is not None else 'unreadable'}")
 
             # Normalize SARIF to avoid downstream KeyError on 'contextRegion'
             self._normalize_sarif_files(sarif_files, trace)

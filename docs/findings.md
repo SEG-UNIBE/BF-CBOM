@@ -123,7 +123,9 @@ below.
 - **Whole-document validity:** every CBOM of cbomkit-jar, cdxgen, CipherRadar, CryptoScan, pqcheck, Q-DARPAN and xgrep
   validates. CBOMkit server 3 of 6 (`uniqueItems` in `dependencies`), DeepSeek 2 of 15 (the assembly before
   2026-10-16), securin-xbom 2 of 8 (`relatedCryptoMaterialProperties.type`, `primitive` enums), CryptobomForge 4 of 6
-  in IBM's draft (no schema), the two 1.6 ones valid.
+  in IBM's draft (no schema); the two 1.6 ones were valid, but they were the worker's own empty placeholder for a
+  CodeQL run without results, not the tool's output (removed 2026-10-20; cryptobom-forge writes its own empty draft
+  document, and those runs are redone).
 - **Meaningful** (standard fields / any source): primitives mostly in standard fields except cdxgen (0 / 70 %) and
   securin-xbom (42 / 96 %); key sizes largely outside the standard for pqcheck (12 / 44 %) and cdxgen (0 / 31 %); OIDs
   only from CBOMkit, Q-DARPAN and xgrep.

@@ -60,7 +60,8 @@ repos:                     # and/or explicit repos
 
 Rerunning a spec is resumable: runs whose `run<k>.meta.json` exists are skipped, commits come from
 `lock.json`, and jobs still pending from an interrupted run are collected (`--requeue-pending` to reissue).
-`ARGS=--retry-failed` redoes stored runs whose status is not `ok`.
+`ARGS=--retry-failed` redoes stored runs whose status is not `ok`; `--rerun <tool>[,<tool>]` redoes every stored run
+of those tools, whatever its status (after a worker change, e.g. `--rerun deepseek,cryptobomforge`).
 
 **What an experiment folder holds.** `_experiment.yaml` (the spec as run), `_run-log.json` (one entry per
 `experiment run` / `collect` session: start and end, the Docker VM's RAM and CPUs, the memory budget and waves, and the
