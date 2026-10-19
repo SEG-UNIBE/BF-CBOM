@@ -552,9 +552,7 @@ def _score_step(
         repo_of=repo_of,
     )
     for (snapshot, variant, tool), keys in (consensus or {}).items():
-        bucket = obs.items.get((f"{snapshot}/{variant}", tool))
-        if bucket is not None:  # keep the items whose algorithm is in the tool's consensus set
-            bucket["algorithm"] = {it for it in bucket["algorithm"] if sc.unit_of(it) in keys}
+        obs.restrict(f"{snapshot}/{variant}", tool, set(keys))  # keep the items in the tool's consensus set
     rows, loo = sc.score_rows(obs, samples=samples)
     write(f"score-run{run}.csv", rows, sc.SCORE_COLUMNS)
     write(f"loo-run{run}.csv", loo, sc.LOO_COLUMNS)

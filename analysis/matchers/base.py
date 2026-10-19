@@ -24,6 +24,7 @@ class MatchGroup:
     extra: dict = field(default_factory=dict)  # matcher-specific columns (file, line range, located voters, ...)
     implied: frozenset[str] = frozenset()  # record ids that are members only by implication (closure)
     matched: frozenset[str] = frozenset()  # record ids whose own identity differs: matched in at a lower level
+    attached: frozenset[str] = frozenset()  # record ids attached by vocabulary knowledge (generic or implied)
 
     @property
     def tools(self) -> list[str]:

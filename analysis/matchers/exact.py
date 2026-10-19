@@ -1,26 +1,24 @@
 """Matcher (b): exact matching on the canonical algorithm identity, at a ladder level.
-
-Repository level: the groups are the clusters of `analysis/levels.py:level_matches`: records connected by the
-cumulative relation of the ladder (equal under any key function up to `level`: at L0 only verbatim identical names,
-at L3 parsed names, at L4 everything the tool specs know). Every group carries as `key` the *item* it belongs to,
-an algorithm as the full normalisation sees it (its L4 identity); an item has one group at L4 and may have several
-at a lower level (its tools' spellings are not yet recognised as one thing). Tools without locations take part. A
-member whose own identity differs from the group's key (it joined through a lower level: the same raw string that
-another tool's spec resolves differently) is flagged `matched`; with `closure` (refinement 2) a record is also a
-member of the groups of the algorithms it implies (HMAC-SHA256 -> SHA-256), flagged `implied`.
-
-Call-site level: inside a repo group, the located members are chained by file and line: sorted by line, a record
+Repository level: the groups are the clusters of `analysis/levels.py:level_matches`, one per key at the level: the
+records whose identity at that level or below is the key (at L0 only verbatim identical names, at L3 parsed names, at
+L4 everything the tool specs know), plus the records attached by vocabulary knowledge (a generic report such as SHA-2
+next to SHA-256; with `closure`, refinement 2, a record implying the algorithm, HMAC-SHA256 -> SHA-256). A record with
+several keys is in several groups; groups never merge through it. `key` is the level's key (a raw name at L0, a
+canonical identity at L4); `extra.units` lists the L4 identities of the members, so a group whose members span
+several units shows what the level declares "the same". A member whose own L4 identity differs from the key is
+flagged `matched`; attached records are flagged `attached` (and `implied` when they joined by implication). Tools
+without locations take part; records without an L4 identity (`undefined`, `api`, `non-crypto`) are not matched.
+Call-site level: inside a repo group, the located records are chained by file and line: sorted by line, a record
 joins the current site group when it starts within `window` lines of the group's last line (a window record spans
 `line` .. `line_end`). The location rule of the retired call-site matcher survives here.
-
-Group ids: `E00007` for an item's first group, `E00007-2` for its second cluster at a lower level, sites
-`E00007.001`. The ladder (`levels.ladder`) and the tools-per-algorithm distribution read the same clusters, so this
-matcher at a level, the ladder's column for that level and the k distribution are one definition.
+Group ids: `E00007` per repo group (clusters sorted by key), sites `E00007.001`. The ladder (`levels.ladder`), the
+tools-per-algorithm distribution and the scores read the same clusters, so this matcher at a level, the ladder's
+column for that level and the k distribution are one definition.
 """
 
 from __future__ import annotations
 
-from ..levels import level_matches
+from ..levels import UNIT_LEVEL, clusters_at, identity, level_matches
 from ..normalize.record import NormRecord
 from ..normalize.vocab import Vocabulary, load_vocabulary
 from .base import MatchGroup
@@ -48,28 +46,30 @@ class ExactMatcher:
     def match(self, records: list[NormRecord]) -> list[MatchGroup]:
         items = level_matches(records, self.vocab, closure=self.closure)
         groups: list[MatchGroup] = []
-        for n, key in enumerate(sorted(items), start=1):
-            item = items[key]
-            own = {r.record_id for recs in item.own.values() for r in recs}
-            clusters = item.clusters_at(self.level) or [[]]
-            for c, members in enumerate(clusters, start=1):
-                gid = f"E{n:05d}" if c == 1 else f"E{n:05d}-{c}"
-                matched = frozenset(r.record_id for r in members if r.record_id not in own)
-                implied = frozenset(r.record_id for r in members if r.record_id in item.implied)
-                sites = self._site_groups(members, key, gid)
-                located = {self._voter(r.tool) for r in members if r.file and r.line}
-                colocated = max((len({self._voter(r.tool) for r in s.members}) for s in sites), default=0)
-                extra = {
-                    "level": self.level,
-                    "n_records": len(members),
-                    "n_sites": len(sites),
-                    "cluster": c,
-                    "clusters": len(clusters),
-                    "located_voters": len(located),
-                    "colocated_voters": colocated,
-                }
-                groups.append(MatchGroup(gid, "repo", key, members, extra, implied, matched))
-                groups += sites
+        for n, cluster in enumerate(clusters_at(items, self.level), start=1):
+            gid = f"E{n:05d}"
+            members = cluster.records
+            units = sorted(cluster.units(self.vocab))
+            attached = frozenset(cluster.reason)
+            implied = frozenset(rid for rid, why in cluster.reason.items() if why == "implied")
+            matched = frozenset(
+                r.record_id for r in cluster.members if identity(r, UNIT_LEVEL, self.vocab) != cluster.key
+            )
+            sites = self._site_groups(members, cluster.key, gid)
+            located = {self._voter(r.tool) for r in members if r.file and r.line}
+            colocated = max((len({self._voter(r.tool) for r in s.members}) for s in sites), default=0)
+            extra = {
+                "level": self.level,
+                "n_records": len(members),
+                "n_sites": len(sites),
+                "units": units,
+                "n_units": len(units),
+                "n_attached": len(attached),
+                "located_voters": len(located),
+                "colocated_voters": colocated,
+            }
+            groups.append(MatchGroup(gid, "repo", cluster.key, members, extra, implied, matched, attached))
+            groups += sites
         return groups
 
     def _site_groups(self, members: list[NormRecord], key: str, parent: str) -> list[MatchGroup]:

@@ -8,7 +8,7 @@ sources:
   - property: {pqcheck:confidence: confidence}
   - parse: name
 dictionary:
-  name:
+  name:   # pqcheck's own detector labels (source: its CBOM output, pilot fixture micro-python), read as they say
     KEYGEN: {functions: [keygen]}
     MATH-RAND: {family: PRNG}    # its spelling of Go's math/rand (moved from the shared vocabulary 2026-10-18)
 notes: >

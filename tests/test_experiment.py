@@ -216,6 +216,18 @@ def test_mirror_lock_plan_and_write(upstream, tmp_path: Path):
     assert (len(jobs3), skipped3) == (7, 1)  # the failed run is redone, the ok one kept
     assert not jobs[1].paths(exp_dir)[1].exists()
     assert [(m["worker"], m["status"]) for m, _ in ex.iter_results(exp_dir)] == [("t1", "ok")]
+    # an ok run whose container was OOM-killed meanwhile is not a clean result: --retry-failed redoes it
+    oomed = JobResult(
+        job_id=jobs[2].job_id, status="ok", repo_info=instr.repo_info, json="{}", worker="t1", oom_kills=1
+    )
+    ex.write_result(exp_dir, jobs[2], oomed)
+    assert ex._stored_status(jobs[2].paths(exp_dir)[1]) == ex.OOM
+    assert ex.plan_jobs(spec, snaps, exp_dir, new_id=lambda: next(ids))[1] == 2
+    jobs4, skipped4 = ex.plan_jobs(spec, snaps, exp_dir, new_id=lambda: next(ids), retry_failed=True)
+    assert (len(jobs4), skipped4) == (7, 1) and not jobs[2].paths(exp_dir)[1].exists()
+    # --rerun redoes every stored run of a tool, ok ones included
+    jobs5, skipped5 = ex.plan_jobs(spec, snaps, exp_dir, new_id=lambda: next(ids), rerun={"t1"})
+    assert (len(jobs5), skipped5) == (8, 0) and not jobs[0].paths(exp_dir)[1].exists()
 
 
 # ----- fixtures published from plain directories -----

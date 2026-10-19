@@ -30,6 +30,12 @@ DIMS = (
     "param_set", "iterations", "protocol", "protocol_version", "material", "asset_type",
 )  # fmt: skip
 NO_INFO = frozenset({"other", "unknown", "none", "null", "n/a", ""})
+# What a recognised name is when it names no algorithm: `api` = a crypto API, library or key-management reference
+# (Cipher.getInstance, jca, HashiCorp Vault Path), `non-crypto` = a finding outside cryptography that a tool reports
+# as an asset (SQL injection, unsafe reflection). Dictionary and whole-name entries carry it as `kind`; the record's
+# `resolution` is derived from it (analysis/normalize/engine.py).
+KINDS = ("api", "non-crypto")
+ENTRY_FLAGS = ("interpretive", "kind")  # keys of a dictionary entry that are not dimensions
 # Families that name a key type or a whole group without a scheme: a scheme of the same group refines them.
 UMBRELLA_FAMILIES = frozenset({"RSA", "EC", "CSPRNG", "PBE"})
 UMBRELLA_ALGORITHMS = frozenset({"SHA-2", "SHA-3", "SHAKE", "BLAKE2"})
@@ -80,6 +86,7 @@ class Parsed:
     unmapped: list = field(default_factory=list)  # tokens nobody knows
     candidates: list = field(default_factory=list)  # families of an unresolved list ("RSA, ECC, AES")
     known: bool = False  # recognised: at least one value, or an explicit "carries no algorithm" entry
+    kind: str | None = None  # `api` | `non-crypto`: a whole-name entry that names no algorithm (KINDS)
 
     @property
     def empty(self) -> bool:
@@ -92,6 +99,7 @@ class Vocabulary:
         registry = json.loads(Path(registry_file).read_text(encoding="utf-8"))
         self.version = str(data.get("version") or "?")
         self.registry_version = str(registry.get("lastUpdated") or "?")
+        self._specifics: dict[str, frozenset[str]] = {}
         self._load_families(data, registry)
         self._load_algorithms(data)
         self._load_curves(data, registry)
@@ -106,6 +114,13 @@ class Vocabulary:
             fold(k): (str(v[0]), str(v[1])) for k, v in (data.get("protocol_versions") or {}).items()
         }
         self.names = {fold(k): dict(v or {}) for k, v in (data.get("names") or {}).items()}
+        # generic markers -> the families they stand for (a bare "SHA" may be SHA-1, SHA-2 or SHA-3); such a record
+        # attaches to the specific algorithms' clusters but never merges them (analysis/levels.py)
+        self.generic_over = {str(k): [str(x) for x in v or []] for k, v in (data.get("generic_over") or {}).items()}
+        # material type -> the more specific types it covers (credential > password): a refinement, not a conflict
+        self.material_hierarchy = {
+            str(k): [str(x) for x in v or []] for k, v in (data.get("material_hierarchy") or {}).items()
+        }
         # algorithm or family -> algorithms it implies (refinement 2); `implied` adds the generic digest rule
         self.implies = {str(k): [str(x) for x in v or []] for k, v in (data.get("implies") or {}).items()}
         self.keystores = {fold(t) for t in data.get("keystores") or []}
@@ -286,7 +301,7 @@ class Vocabulary:
         "DESede" -> 3DES, "HS256" -> HMAC, "SHA256" -> SHA-256, "AES-256-GCM" -> None (level L2, analysis/levels.py)."""
         key = fold(clean_name(text))
         if key in self.names:
-            values = self._expand(dict(self.names[key]))
+            values = self._expand({k: v for k, v in self.names[key].items() if k not in ENTRY_FLAGS})
             return values.get("algorithm") or values.get("family")
         return self.algorithm_alias.get(key) or self.family_alias.get(key)
 
@@ -311,7 +326,56 @@ class Vocabulary:
                     return "coarser"
         if dim == "curve" and frozenset((current, new)) in EQUIVALENT_CURVES:
             return "coarser"
+        if dim == "material":
+            if new in self._material_below(current):
+                return "refines"
+            if current in self._material_below(new):
+                return "coarser"
+        if dim in ("family", "algorithm", "digest"):
+            if new in self.specifics(current):
+                return "refines"
+            if current in self.specifics(new):
+                return "coarser"
         return None
+
+    def _material_below(self, material) -> set[str]:
+        """Every material type the hierarchy places under `material` (transitively)."""
+        out: set[str] = set()
+        todo = list(self.material_hierarchy.get(str(material), []))
+        while todo:
+            m = todo.pop()
+            if m not in out:
+                out.add(m)
+                todo += self.material_hierarchy.get(m, [])
+        return out
+
+    def specifics(self, identity: str | None) -> frozenset[str]:
+        """The more specific identities a family or generic marker stands for: the algorithms of the family (SHA-2 ->
+        SHA-256, ...; HMAC -> TOTP, HOTP), for an umbrella family (RSA, EC) the schemes of its group and their
+        algorithms, for a generic marker (`generic_over`: SHA) the families it may mean and their algorithms. Empty
+        for a specific algorithm."""
+        if not identity or identity not in self.families:
+            return frozenset()
+        if identity in self._specifics:
+            return self._specifics[identity]
+        out: set[str] = set()
+        families = {identity}
+        if identity in UMBRELLA_FAMILIES:
+            group = self.group_of(identity)
+            families |= {f for f, info in self.families.items() if group and info.group == group}
+        for fam in self.generic_over.get(identity, []):
+            families.add(fam)
+            families |= self.specifics(fam)
+        out |= families - {identity}
+        for name, info in self.algorithms.items():
+            if info.get("family") in families and name != identity:
+                out.add(name)
+        self._specifics[identity] = frozenset(out)
+        return self._specifics[identity]
+
+    def generic(self, identity: str | None) -> bool:
+        """True for an identity that stands for several more specific ones (a family or generic marker)."""
+        return bool(self.specifics(identity))
 
     def canonical(self, dim: str, raw):
         """Canonical value of one field, or None (unknown spelling or a CycloneDX no-information value)."""
@@ -376,8 +440,8 @@ class Vocabulary:
             return Parsed()
         whole = self.names.get(fold(cleaned))
         if whole is not None:
-            vals = self._expand(dict(whole))
-            return Parsed(values=vals, raw={d: cleaned for d in vals}, known=True)
+            vals = self._expand({k: v for k, v in whole.items() if k not in ENTRY_FLAGS})
+            return Parsed(values=vals, raw={d: cleaned for d in vals}, known=True, kind=whole.get("kind"))
         parts = [p for p in re.split(r"\s*[,;]\s*", cleaned) if p] if re.search(r"[,;]", cleaned) else [cleaned]
         if len(parts) > 1:
             subs = [self._parse_one(p) for p in parts]
@@ -457,7 +521,8 @@ class Vocabulary:
 
         for term, src in found:  # whole identifiers found inside the text (JOSE, SSH, JCA)
             if term.kind == "name":
-                for dim, value in self._expand(dict(self.names[term.value])).items():
+                entry = {k: v for k, v in self.names[term.value].items() if k not in ENTRY_FLAGS}
+                for dim, value in self._expand(entry).items():
                     put(dim, value, src)
         algos = [(t, s) for t, s in found if t.kind in ("algorithm", "family")]
         secondary = [(t, s) for t, s in algos if t.kind == "algorithm" and self.algorithms[t.value].get("secondary")]
@@ -523,8 +588,8 @@ class Vocabulary:
                     out.raw["algorithm"] = tok
                 else:
                     out.unmapped.append(tok)
-            elif info is not None and sem == "none" and "param_set" not in out.values:
-                put("param_set", str(n), tok)
+            elif info is not None and sem in ("none", "digest") and "param_set" not in out.values:
+                put("param_set", str(n), tok)  # BLAKE2b-256: the digest length of a hash that has no such variant
             else:
                 out.unmapped.append(tok)
 

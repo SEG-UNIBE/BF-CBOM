@@ -9,12 +9,18 @@ Exclusions (CLAUDE.md refinement 11): name patterns (CBOM tooling, benchmarks), 
 tuned on (`tailored_on` in common/tools.yaml, refinement 13). The crypto pre-filter greps first-party source only
 (no test, vendor, example or documentation paths). Every exclusion is recorded in the output with its reason.
 `prune_corpus` drops repos where a tool timed out in an earlier experiment (E0), with the reason.
+
+Repo size cap: the git server serves full clones from a container limited to GITSERVER_MEMORY (Makefile), so the
+corpus never samples repos above CORPUS_MAX_REPO_SIZE_MB (default GITSERVER_MEMORY / SIZE_CAP_RATIO; GitHub's `size`
+is the packed repository size in KB). The cap is recorded in the corpus `params` and the search cells are clamped to
+it; a candidate above it is listed as excluded with the reason.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import os
 import random
 import re
 import subprocess
@@ -47,6 +53,36 @@ CRYPTO_PATTERNS: dict[str, str] = {
 }
 # Repos that are themselves CBOM tooling or benchmarks would bias the comparison.
 DEFAULT_EXCLUDE_PATTERNS = [r"cbom", r"benchmark", r"sonar-cryptography", r"cryptobom", r"crypto-finder", r"cryptoscan"]
+# Rule of thumb: a repo whose packed size is below GITSERVER_MEMORY / SIZE_CAP_RATIO clones through the git server
+# (pack-objects holds the object list plus bounded delta windows, Dockerfile.gitserver).
+SIZE_CAP_RATIO = 4
+_SIZE_UNITS = {"": 1, "b": 1, "k": 1024, "m": 1024**2, "g": 1024**3}
+
+
+def parse_size_mb(text: str | None) -> int | None:
+    """A Docker memory string (`4g`, `512m`, `1024k`, bytes without a suffix) in MB; None when empty or malformed."""
+    m = re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*([kmgb]?)i?b?\s*", (text or "").lower())
+    if not m:
+        return None
+    return int(float(m.group(1)) * _SIZE_UNITS[m.group(2)] / 1024**2)
+
+
+def repo_size_cap_mb(env: dict | None = None) -> int | None:
+    """The corpus size cap in MB: CORPUS_MAX_REPO_SIZE_MB when set, else GITSERVER_MEMORY / SIZE_CAP_RATIO."""
+    env = os.environ if env is None else env
+    explicit = (env.get("CORPUS_MAX_REPO_SIZE_MB") or "").strip()
+    if explicit:
+        return int(float(explicit))
+    gitserver = parse_size_mb(env.get("GITSERVER_MEMORY"))
+    return gitserver // SIZE_CAP_RATIO if gitserver else None
+
+
+def clamp_size_bins(bins: list[tuple[int, int]], cap_mb: int | None) -> list[tuple[int, int]]:
+    """The size cells (KB) cut at the cap: cells above it disappear, the cell containing it ends at the cap."""
+    if not cap_mb:
+        return list(bins)
+    cap_kb = cap_mb * 1024
+    return [(lo, min(hi, cap_kb)) for lo, hi in bins if lo < cap_kb]
 
 
 @dataclass
@@ -61,6 +97,7 @@ class CorpusParams:
     crypto_filter: bool = True
     exclude_patterns: list[str] = field(default_factory=lambda: list(DEFAULT_EXCLUDE_PATTERNS))
     seed: int = 20261015
+    max_repo_size_mb: int | None = field(default_factory=repo_size_cap_mb)  # see the module docstring
 
 
 def _headers(token: str | None) -> dict:
@@ -196,7 +233,11 @@ def build_corpus(
     tailored = tailored_map() if tailored is None else tailored
     rng = random.Random(params.seed)
     pushed_since = time.strftime("%Y-%m-%d", time.gmtime(time.time() - params.pushed_within_days * 86400))
-    cells = [(s, z) for s in params.star_bins for z in params.size_bins_kb]
+    cap_mb = params.max_repo_size_mb
+    size_bins = clamp_size_bins(params.size_bins_kb, cap_mb)
+    if cap_mb:
+        log(f"repo size cap {cap_mb} MB (git server memory / {SIZE_CAP_RATIO}); size cells (KB): {size_bins}")
+    cells = [(s, z) for s in params.star_bins for z in size_bins]
     quota = max(1, -(-params.per_language // len(cells)))  # ceil
     chosen: list[dict] = []
     excluded: list[dict] = []
@@ -217,6 +258,15 @@ def build_corpus(
                 if reason:
                     stats["excluded"] += 1
                     excluded.append({"full_name": cand["full_name"], "reason": reason})
+                    continue
+                if cap_mb and (cand.get("size_kb") or 0) > cap_mb * 1024:
+                    stats["excluded"] += 1
+                    excluded.append(
+                        {
+                            "full_name": cand["full_name"],
+                            "reason": f"repo size {cand['size_kb'] // 1024} MB > cap {cap_mb} MB (GITSERVER_MEMORY)",
+                        }
+                    )
                     continue
                 if params.crypto_filter:
                     hit = has_crypto_usage(cand["git_url"], cand["branch"], language)
@@ -246,7 +296,8 @@ def build_corpus(
             "languages": params.languages,
             "per_language": params.per_language,
             "star_bins": [list(b) for b in params.star_bins],
-            "size_bins_kb": [list(b) for b in params.size_bins_kb],
+            "size_bins_kb": [list(b) for b in size_bins],
+            "max_repo_size_mb": cap_mb,
             "pushed_since": pushed_since,
             "crypto_filter": params.crypto_filter,
             "exclude_patterns": params.exclude_patterns,

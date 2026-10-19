@@ -36,11 +36,11 @@ def test_repo_groups_by_identity_and_site_groups_by_file_and_window():
         _rec(3, "d", "AES"),  # no location: repo level only
         _rec(4, "a", "AES", file="y.py", line=1),  # other file
         _rec(5, "a", "SHA-256", file="x.py", line=10),  # other algorithm at the same place
-        _rec(6, "b", "parseCsvMap", file="x.py", line=10),  # unknown name: only its own folded key
+        _rec(6, "b", "parseCsvMap", file="x.py", line=10),  # unknown name: no L4 identity, never matched
     ]
     groups = ExactMatcher(level="L3", window=2, voter_of={"a": "g1", "b": "g1", "c": "g2", "d": "g3"}).match(records)
     repo = {g.key: g for g in groups if g.scope == "repo"}
-    assert set(repo) == {"AES", "SHA-256", "parsecsvmap"}
+    assert set(repo) == {"AES", "SHA-256"}  # the raw spellings inside AES bring nothing together: no group of their own
     assert all(not g.matched for g in repo.values())  # every member's own identity is the group's
     aes = repo["AES"]
     assert aes.tools == ["a", "b", "c", "d"] and aes.k == 4 and aes.voters({"a": "g1", "b": "g1"}) == ["c", "d", "g1"]
@@ -65,7 +65,7 @@ def test_windows_extend_the_chain_and_closure_adds_implied_members():
     assert rsa_sites == [(5, 11), (14, 14)]
     closed = ExactMatcher(level="L3", closure=True).match(records)
     sha = next(g for g in closed if g.scope == "repo" and g.key == "SHA-256")
-    assert [r.record_id for r in sha.members] == ["a:3:0"] and sha.implied == frozenset({"a:3:0"})
+    assert [r.record_id for r in sha.members] == ["a:3:0"] and sha.implied == sha.attached == frozenset({"a:3:0"})
 
 
 def test_agreement_per_dimension_counts_voters_and_the_majority_value():
@@ -99,14 +99,16 @@ def test_two_tools_agree_on_micro_java_as_the_call_site_matcher_did():
 
 
 def test_groups_follow_the_cumulative_relation_of_the_level():
-    """Groups are the clusters of the level: at L0 only verbatim equal names match, an item may have several groups,
-    and a record that joins through a lower level is flagged `matched`."""
+    """Groups are the clusters of the level, one per key: at L0 only verbatim equal names match; a raw spelling two
+    tools share but resolve differently stays a group of its own (its members span two units, flagged `matched`);
+    a spelling inside a higher key's cluster brings nothing together and is no group."""
     records = [
         _rec(0, "a", "AES-256-GCM"),
         _rec(1, "b", "aes"),
         _rec(2, "c", "AES-256-GCM"),
         _rec(3, "d", "foo", family="AES"),  # a tool-specific resolution: L4 identity AES, raw name foo
-        _rec(4, "e", "foo"),  # no family: its own identity stays the folded name
+        _rec(4, "e", "foo", family="RSA"),  # the same raw name resolved as RSA
+        _rec(5, "f", "parseCsvMap"),  # no family: no identity, never a member
     ]
 
     def keyed(level):
@@ -117,14 +119,18 @@ def test_groups_follow_the_cumulative_relation_of_the_level():
         return out
 
     by_level = {lv: keyed(lv) for lv in LEVELS}
-    assert all(set(by_level[lv]) == {"AES", "foo"} for lv in LEVELS)  # the unit is the same at every level
-    aes0 = by_level["L0"]["AES"]
-    assert [tuple(g.tools) for g in aes0] == [("a", "c"), ("b",), ("d", "e")]  # a = c verbatim; d = e verbatim
-    assert [g.group_id for g in aes0] == ["E00001", "E00001-2", "E00001-3"]
-    assert [tuple(g.tools) for g in by_level["L3"]["AES"]] == [("a", "b", "c"), ("d", "e")]  # parsed: aes = AES
-    assert by_level["L3"]["AES"][1].matched == frozenset({"e:4:0"})  # e's foo joined d's AES report at L0
-    assert by_level["L3"]["foo"][0].matched == frozenset({"d:3:0"})  # and the other way round
+    assert set(by_level["L0"]) == {"AES-256-GCM", "aes", "foo"}  # raw spellings
+    assert set(by_level["L3"]) == {"AES", "foo"}  # a, b, c parsed as AES; foo is still a raw spelling of d and e
+    # the specs resolve d as AES and e as RSA; the shared spelling stays a group spanning both units, and RSA has no
+    # group of its own at L4 because `foo` already holds its only record together with d's (cumulative: never lost)
+    assert set(by_level["L4"]) == {"AES", "foo"}
+    (foo,) = by_level["L4"]["foo"]
+    assert foo.tools == ["d", "e"] and foo.extra["units"] == ["AES", "RSA"] and foo.extra["n_units"] == 2
+    assert foo.matched == frozenset({"d:3:0", "e:4:0"})  # neither member's own identity is `foo`
     (aes4,) = by_level["L4"]["AES"]
-    assert aes4.tools == ["a", "b", "c", "d", "e"] and aes4.matched == frozenset({"e:4:0"})
-    ks = [max(g.k for g in by_level[lv]["AES"]) for lv in LEVELS]
-    assert ks == sorted(ks) and ks[0] == 2 and ks[-1] == 5  # cumulative
+    assert aes4.tools == ["a", "b", "c", "d"] and aes4.matched == frozenset() and aes4.extra["units"] == ["AES"]
+    assert not any("f" in g.tools for gs in by_level.values() for g in gs.values() for g in g)
+    key_at = {"L0": "AES-256-GCM", "L1": "aes256gcm", "L2": "aes256gcm"}
+    ks = [max(g.k for g in by_level[lv][key_at.get(lv, "AES")]) for lv in LEVELS]
+    assert ks == sorted(ks) and ks[0] == 2 and ks[-1] == 4  # cumulative
+    assert [g.group_id for g in ExactMatcher(level="L4").match(records) if g.scope == "repo"] == ["E00001", "E00002"]

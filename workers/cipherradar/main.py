@@ -161,7 +161,10 @@ def _produce(instr: JobInstruction, trace: Trace) -> tuple[str, float]:
         ignored = run_cradar(Path(cloned), out_file, home, trace, deadline=deadline)
         raw = out_file.read_text(encoding="utf-8")
     if ignored:
-        trace.add(f"files excluded via .cradarignore (known crash trigger / crashes): {', '.join(ignored)}")
+        trace.add(
+            f"workaround: .cradarignore {','.join(ignored)} (known nil-pointer crash trigger / crashes; the tool is "
+            "unchanged)"
+        )
     cbom = json.loads(raw)  # fail early on malformed output
     logger.info("%s: %d components", instr.repo_info.full_name, len(cbom.get("components") or []))
     return raw, time.monotonic() - start

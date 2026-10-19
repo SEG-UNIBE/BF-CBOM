@@ -42,7 +42,7 @@ tools:
   cdxgen:
     micro_2026-10-17: {java: 0/11, python: 0/11, go: 0/11, javascript: 4/11}
     engine: cdxgen
-    memory_gb: 8                    # 4 OOM-killed Gradle on bisq/bisq2 (2026-10-18; notes.md, memory budget)
+    memory_gb: 16                   # 4 OOM-killed Gradle on bisq/bisq2 (2026-10-18); 8 still OOM-killed on Chat2DB, bisq, bisq2, kafka (2026-10-19)
     approach: dependency manifests + evidence (atom); crypto output is mostly libraries and certificates
     native_cyclonedx: true
     languages: [java, python, javascript, go]   # source-level crypto with locations: JS/TS only (12.8.x, run without -t)

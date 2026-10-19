@@ -2,7 +2,14 @@ spec: scanoss
 inherits: _cyclonedx
 version: 1
 declared: [{bomFormat: CycloneDX, specVersion: "1.7"}]
-checked_on: "micro go/c/java 2026-10-17 (crypto-finder 0.37.1, open-crypto-rules@c5f32b7b)"
+checked_on: "micro go/c/java 2026-10-17 (crypto-finder 0.37.1, open-crypto-rules@c5f32b7b); certificate names 2026-10-19"
+sources:
+  - fields: standard
+  - {extract: kv_name}        # certificate:<line>:<line>:api=tls.LoadX509KeyPair:cryptoFunction=other:library=...
+  - parse: name
+  - refs
+  - dependencies
+  - api: occurrence:additionalContext
 context: [occurrence:additionalContext]
 notes: >
   One component per (algorithm, parameters) with every match as an occurrence (file and line in the standard
@@ -11,3 +18,6 @@ notes: >
   `scanoss:match,<matched code>`; the rule id sits in evidence.identity[].methods[].value (`scanoss:ruleid,<id>`).
   parameterSetIdentifier is the key length in bytes for AES (32 for AES-256) and in bits elsewhere (RSA 2048, 3DES
   168); it is read as CycloneDX defines it (bits), not corrected. implementationPlatform is always x86_64.
+  Certificate components are named `certificate:<line>:<line>:api=<call>:cryptoFunction=<fn>:findingType=...:
+  library=<lib>` (an `X.509` segment may stand alone): the `kv_name` extractor reads the asset type, the API as
+  supporting evidence and the function; such a name is never parsed as an algorithm name.

@@ -17,7 +17,7 @@ from pathlib import Path
 
 import yaml
 
-from .vocab import clean_name, fold
+from .vocab import ENTRY_FLAGS, KINDS, clean_name, fold
 
 ADAPTER_DIR = Path(__file__).resolve().parents[1] / "adapters"
 DEFAULT_BASE = "_cyclonedx"
@@ -29,10 +29,10 @@ FIELD_DIMS = (
     "param", "ref", "parse", "size",
 )  # fmt: skip
 LOCATION_EXTRACTORS = ("evidence_occurrences", "property_locations", "detection_context", "src_file_property")
-EXTRACTORS = ("json_context",)
+EXTRACTORS = ("json_context", "kv_name")
 ALLOWED_KEYS = {
     "spec", "inherits", "version", "declared", "checked_on", "findings", "fields", "sources", "locations",
-    "context", "dictionary", "notes",
+    "context", "dictionary", "rule_crypto_segments", "notes",
 }  # fmt: skip
 
 
@@ -65,6 +65,10 @@ class AdapterSpec:
     locations: list  # extractor names, or {properties: {file: <name>, line: <name>}}
     context: list[str]
     dictionary: dict[str, dict[str, object]]  # dim -> {folded raw or prefix*: value}
+    # A rule id with a module path (semgrep style) belongs to the tool's crypto rules when one of its path segments
+    # is one of these; any other such rule is one of the tool's generic audit rules (`non-crypto`): the tool's own
+    # taxonomy, read from the id, never a list of ours (empty: no such reading)
+    rule_crypto_segments: tuple[str, ...] = ()
     declared: list = field(default_factory=list)
     checked_on: str = ""
     notes: str = ""
@@ -73,6 +77,9 @@ class AdapterSpec:
     @property
     def label(self) -> str:
         return " < ".join(self.chain)
+
+    def has_extractor(self, name: str) -> bool:
+        return any(s.kind == "extract" and s.arg == name for s in self.sources)
 
     def lookup(self, dim: str, raw) -> object | None:
         """The tool's own dictionary: exact (case/separator-insensitive) or `prefix*` entries."""
@@ -182,6 +189,12 @@ def build_spec(tool: str, data: dict, chain: list[str], *, fallback: bool = Fals
         str(dim): {(fold(k[:-1]) + "*" if str(k).endswith("*") else fold(k)): v for k, v in (table or {}).items()}
         for dim, table in (data.get("dictionary") or {}).items()
     }
+    for dim, table in dictionary.items():
+        for key, entry in table.items():
+            if isinstance(entry, dict) and entry.get("kind") not in (None, *KINDS):
+                raise SpecError(f"{tool}: dictionary {dim}/{key}: kind must be one of {KINDS}, got {entry['kind']!r}")
+            if isinstance(entry, dict) and (bad := [d for d in entry if d not in FIELD_DIMS + ("group", *ENTRY_FLAGS)]):
+                raise SpecError(f"{tool}: dictionary {dim}/{key}: unknown keys {bad}")
     declared = data.get("declared") or []
     return AdapterSpec(
         tool=tool,
@@ -192,6 +205,7 @@ def build_spec(tool: str, data: dict, chain: list[str], *, fallback: bool = Fals
         locations=locations,
         context=[str(c) for c in data.get("context") or []],
         dictionary=dictionary,
+        rule_crypto_segments=tuple(fold(x) for x in data.get("rule_crypto_segments") or []),
         declared=declared if isinstance(declared, list) else [declared],
         checked_on=str(data.get("checked_on") or ""),
         notes=str(data.get("notes") or ""),

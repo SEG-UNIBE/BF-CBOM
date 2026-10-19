@@ -45,6 +45,8 @@ class NormRecord:
     file_exists: bool | None = None
     context: str | None = None
     ambiguous: str | None = None  # a name listing several algorithms that no other source resolved
+    resolution: str | None = None  # mapped | ambiguous | api | non-crypto | undefined (engine.RESOLUTIONS)
+    name_kind: str | None = None  # the name is an API or a non-crypto rule (vocab.KINDS): no algorithm spelling
     unmapped: list = field(default_factory=list)
     conflicts: dict = field(default_factory=dict)  # dim -> {"value", "src"} of a lower-precedence source
     spec_issues: list = field(default_factory=list)
@@ -79,6 +81,8 @@ class NormRecord:
                 "file_exists": self.file_exists,
                 "context": self.context,
                 "ambiguous": self.ambiguous,
+                "resolution": self.resolution,
+                "name_kind": self.name_kind,
                 "raw": self.raw,
                 "src": self.src,
                 "via": self.via,
@@ -103,6 +107,7 @@ class NormRecord:
             "file_exists": self.file_exists,
             "context": self.context,
             "ambiguous": self.ambiguous,
+            "resolution": self.resolution,
             "unmapped": LIST_SEP.join(unmapped_text(u) for u in self.unmapped),
             "conflicts": LIST_SEP.join(f"{d}={c['value']}@{c['src']}" for d, c in self.conflicts.items()),
             "spec_issues": LIST_SEP.join(self.spec_issues),
@@ -125,7 +130,7 @@ def unmapped_text(u: dict) -> str:
 RECORD_COLUMNS = (
     ["record_id", "site_id", "component", "name", "group"]
     + list(VALUE_DIMS)
-    + ["file", "line", "line_end", "in_scope", "file_exists", "context", "ambiguous"]
+    + ["file", "line", "line_end", "in_scope", "file_exists", "context", "ambiguous", "resolution"]
     + [f"raw_{d}" for d in VALUE_DIMS]
     + [f"src_{d}" for d in VALUE_DIMS]
     + ["unmapped", "conflicts", "spec_issues"]

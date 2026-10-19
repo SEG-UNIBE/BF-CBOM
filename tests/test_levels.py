@@ -1,7 +1,17 @@
 """The L0-L4 normalisation ladder (analysis/levels.py) on tiny hand-written CBOMs."""
 
-from analysis.levels import LEVELS, PARAMETER_LEVELS, algorithm_rows, algorithms_at, identity, ladder, level_matches
+from analysis.levels import (
+    LEVELS,
+    PARAMETER_LEVELS,
+    algorithm_rows,
+    algorithms_at,
+    clusters_at,
+    identity,
+    ladder,
+    level_matches,
+)
 from analysis.normalize import load_adapter, normalize_cbom
+from analysis.normalize.specs import spec_files
 from analysis.normalize.vocab import load_vocabulary
 
 
@@ -17,7 +27,7 @@ def _records(tool: str, *names: str, family_field: str | None = None, version: s
 
 def test_identity_per_level():
     (rec,) = _records("t", "AES-256-GCM")
-    assert [identity(rec, lv) for lv in LEVELS] == ["AES-256-GCM", "aes256gcm", "aes256gcm", "AES", "AES", "AES"]
+    assert [identity(rec, lv) for lv in LEVELS] == ["AES-256-GCM", "aes256gcm", "aes256gcm", "AES", "AES"]
     (des,) = _records("t", "DESede")
     assert identity(des, "L1") == "desede" and identity(des, "L2") == "3DES"
     (cr,) = _records("t", "RSA-ECB/OAEPWithSHA-256AndMGF1Padding", family_field="RSASSA-PKCS1", version="1.7")
@@ -32,7 +42,7 @@ def test_ladder_counts_confirmations_by_other_voter_groups():
     }
     rows = {(r.level, r.tool): r for r in ladder(records, {"a": "g1", "b": "g2", "c": "g1"}, dims=("algorithm",))}
     assert [(rows[(lv, "a")].confirmed, rows[(lv, "a")].algorithms) for lv in LEVELS] == [
-        (0, 2), (1, 2), (1, 2), (2, 2), (2, 2), (2, 2)]  # fmt: skip
+        (0, 2), (1, 2), (1, 2), (2, 2), (2, 2)]  # fmt: skip
     assert rows[("L3", "all")].share == 1.0
 
 
@@ -47,7 +57,7 @@ def test_ladder_excludes_tailored_pairs_on_both_sides():
     assert (rows[("L3", "a")].algorithms, rows[("L3", "a")].confirmed) == (1, 0)  # ... and it confirms nobody
 
 
-def test_interpretive_entries_count_at_l4_only(tmp_path):
+def test_tool_labels_resolve_at_l4_and_no_spec_makes_judgements(tmp_path):
     (tmp_path / "t.yaml").write_text(
         "spec: t\ninherits: _cyclonedx\nsources: [base]\n"
         "dictionary:\n  name:\n    Cert Check: {protocol: TLS, interpretive: true}\n    weird-rand: {family: PRNG}\n",
@@ -59,11 +69,19 @@ def test_interpretive_entries_count_at_l4_only(tmp_path):
         {"type": "cryptographic-asset", "name": "Cert Check", "cryptoProperties": {"assetType": "algorithm"}},
     ]}  # fmt: skip
     rand, cert = normalize_cbom(bom, "t", spec=spec).records
-    assert rand.via["family"] == "dictionary" and cert.via["protocol"] == "interpretive"
-    # a tool idiom is tool-specific: unknown at L2/L3, resolved at L4lit and L4
-    assert [identity(rand, lv) for lv in ("L2", "L3", "L4lit", "L4")] == ["weirdrand", "weirdrand", "PRNG", "PRNG"]
-    # a judgement entry: resolved at L4 only (here it sets no family, so the identity stays the folded name)
-    assert identity(cert, "L4lit") == identity(cert, "L3") == "certcheck"
+    # a tool's own label is tool-specific: unknown at L2/L3, resolved at L4
+    assert rand.via["family"] == "dictionary"
+    assert [identity(rand, lv) for lv in ("L2", "L3", "L4")] == ["weirdrand", "weirdrand", "PRNG"]
+    # the engine still tags a judgement entry (`interpretive`), but no shipped spec may contain one (CLAUDE.md Rules):
+    # what a tool reports is the finding, not what we think it meant
+    assert cert.via["protocol"] == "interpretive" and identity(cert, "L4") is None
+    import yaml
+
+    for path in spec_files():
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        for dim, table in (data.get("dictionary") or {}).items():
+            for key, entry in (table or {}).items():
+                assert not (isinstance(entry, dict) and entry.get("interpretive")), f"{path.name}: {dim}/{key}"
 
 
 def test_parameter_ladder_admits_values_by_source():
@@ -99,11 +117,55 @@ def test_ladder_is_cumulative_on_the_fixed_l4_unit():
     # a: two spellings of one algorithm; b: one. The unit stays one item, confirmed from L1 on (aes = AES)
     records = {("s", "a"): _records("a", "AES-256-GCM", "aes"), ("s", "b"): _records("b", "AES")}
     rows = {(r.level, r.tool): r for r in ladder(records, {"a": "g1", "b": "g2"}, dims=("algorithm",))}
-    assert [(rows[(lv, "a")].algorithms, rows[(lv, "a")].confirmed) for lv in LEVELS] == [(1, 0)] + [(1, 1)] * 5
-    # the same raw string, resolved differently: a's "foo" has algorithmFamily AES, b's has nothing
-    records = {("s", "a"): _records("a", "foo", family_field="AES"), ("s", "b"): _records("b", "foo")}
-    assert [identity(r, "L4") for r in records[("s", "a")] + records[("s", "b")]] == ["AES", "foo"]
+    assert [(rows[(lv, "a")].algorithms, rows[(lv, "a")].confirmed) for lv in LEVELS] == [(1, 0)] + [(1, 1)] * 4
+    # the same raw string, resolved differently: a's "foo" has algorithmFamily AES, b's RSA
+    records = {
+        ("s", "a"): _records("a", "foo", family_field="AES"),
+        ("s", "b"): _records("b", "foo", family_field="RSA"),
+    }
+    assert [identity(r, "L4") for r in records[("s", "a")] + records[("s", "b")]] == ["AES", "RSA"]
     rows = {(r.level, r.tool): r for r in ladder(records, {"a": "g1", "b": "g2"}, dims=("algorithm",))}
     assert all(rows[(lv, t)].share == 1.0 for lv in LEVELS for t in ("a", "b"))  # verbatim equal: agree everywhere
+    assert all(rows[(lv, "all")].multi_unit_clusters == 1 for lv in LEVELS)  # the `foo` cluster spans AES and RSA
     items = level_matches(records[("s", "a")] + records[("s", "b")])
-    assert set(items) == {"AES", "foo"} and items["AES"].k_at("L0", {"a": "a", "b": "b"}) == 2
+    assert set(items) == {"AES", "RSA"} and items["AES"].k_at("L0", {"a": "a", "b": "b"}) == 2
+    # a name nobody understands has no unit: it is no item and matches nothing
+    records = {("s", "a"): _records("a", "AES", "parseCsvMap"), ("s", "b"): _records("b", "parseCsvMap")}
+    rows = {(r.level, r.tool): r for r in ladder(records, {"a": "g1", "b": "g2"}, dims=("algorithm",))}
+    assert (rows[("L4", "a")].algorithms, rows[("L4", "a")].confirmed) == (1, 0) and rows[("L4", "b")].algorithms == 0
+
+
+def test_generic_reports_attach_without_merging_and_bridges_do_not_merge():
+    """SHA-2 (generic) next to SHA-256 and SHA-512: the generic record confirms both and is confirmed, but SHA-256 and
+    SHA-512 stay two clusters; a record with different identities per level sits in two clusters that never merge."""
+    records = {
+        ("s", "a"): _records("a", "SHA-256"),
+        ("s", "b"): _records("b", "SHA-512"),
+        ("s", "c"): _records("c", "SHA-2"),
+    }
+    voters = {"a": "a", "b": "b", "c": "c"}
+    items = level_matches(records[("s", "a")] + records[("s", "b")] + records[("s", "c")])
+    assert set(items) == {"SHA-256", "SHA-512", "SHA-2"}
+    l4 = {c.key: c for c in clusters_at(items, "L4")}
+    assert set(l4) == {"SHA-256", "SHA-512", "SHA-2"}
+    assert [r.tool for r in l4["SHA-256"].members] == ["a"] and [r.tool for r in l4["SHA-256"].attached] == ["c"]
+    assert [r.tool for r in l4["SHA-512"].attached] == ["c"] and l4["SHA-512"].reason == {"c:0:0": "generic"}
+    assert l4["SHA-2"].attached == [] and all(len(c.units(load_vocabulary())) == 1 for c in l4.values())
+    assert items["SHA-256"].confirmed_at("L4", "a", voters) and items["SHA-2"].confirmed_at("L4", "c", voters)
+    assert not items["SHA-256"].confirmed_strictly_at("L4", "a", voters)  # only through the attached generic report
+    assert not items["SHA-256"].confirmed_at("L1", "a", voters)  # generic knowledge exists from L2 on
+    rows = {(r.level, r.tool): r for r in ladder(records, voters, dims=("algorithm",))}
+    assert (rows[("L4", "all")].confirmed, rows[("L4", "all")].confirmed_strict) == (3, 0)
+    assert rows[("L4", "all")].multi_unit_clusters == 0
+    # CipherSift's `hmac.new` with SHA-2 in its family field: the raw name at L0/L1, the field's SHA-2 at L2, the
+    # parsed HMAC at L3, the field's SHA-2 at L4: the record sits in the HMAC and the SHA-2 cluster, which never merge
+    comp = {
+        "type": "cryptographic-asset",
+        "name": "hmac.new",
+        "cryptoProperties": {"assetType": "algorithm", "algorithmProperties": {"algorithmFamily": "SHA-2"}},
+    }
+    (rec,) = normalize_cbom(
+        {"bomFormat": "CycloneDX", "specVersion": "1.7", "components": [comp]}, "ciphersift"
+    ).records
+    assert rec.name_kind is None
+    assert [identity(rec, lv) for lv in LEVELS] == ["hmac.new", "hmacnew", "SHA-2", "HMAC", "SHA-2"]

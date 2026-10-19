@@ -10,7 +10,13 @@ temperature from LLM_TEMPERATURE (unset: the parameter is not sent, as current C
 models reject non-default values; the value is recorded in the CBOM as bf-cbom:temperature).
 Request knobs (env): LLM_TEMPERATURE, OPENAI_MAX_TOKENS_PARAM (max_tokens, or max_completion_tokens for
 OpenAI reasoning models).
-Cost knobs (env): LLM_MAX_FILES, LLM_MAX_CHUNK_CHARS, LLM_MAX_CHUNKS, LLM_MAX_FILE_BYTES.
+Budget knobs (env): LLM_MAX_FILES, LLM_MAX_CHUNK_CHARS, LLM_MAX_CHUNKS (a safety valve, not a cost cap: a run that hits
+it is marked `bf-cbom:chunks-skipped` and the chunk coverage is in runs.csv), LLM_MAX_FILE_BYTES; LLM_CONCURRENCY
+requests in flight per job.
+
+Request failures: the providers retry transient errors (rate limits, 5xx, timeouts) themselves; a request that still
+fails aborts the job (`error`), since a CBOM built from a subset of the chunks would look like a tool that found
+less. An unparsable answer is retried once as two halves. Chunks past the deadline raise a TimeoutError (`timeout`).
 
 The model answers in free text ("GCM", "PSS", assetType "key"); `assemble_cbom` maps every value onto the
 CycloneDX 1.6 enums so the CBOM is valid. A value without an enum equivalent becomes `other` and the model's
@@ -23,9 +29,11 @@ import json
 import logging
 import os
 import re
+import threading
 import time
 import uuid
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
@@ -40,8 +48,10 @@ ASSEMBLY_VERSION = "2026-10-18.1"  # how answers become CycloneDX: enum mapping,
 LLM_MAX_FILES = int(os.getenv("LLM_MAX_FILES", "1000"))
 LLM_MAX_CHUNK_CHARS = int(os.getenv("LLM_MAX_CHUNK_CHARS", "40000"))  # ~10k tokens of code per request
 LLM_MAX_OUTPUT_TOKENS = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "8192"))  # long asset lists must not be cut off
-LLM_MAX_CHUNKS = int(os.getenv("LLM_MAX_CHUNKS", "100"))
+LLM_MAX_CHUNKS = int(os.getenv("LLM_MAX_CHUNKS", "1000"))  # 100 cut bisq2 (312 chunks), bisq, parse-server, smallstep
 LLM_MAX_FILE_BYTES = int(os.getenv("LLM_MAX_FILE_BYTES", "400000"))
+LLM_CONCURRENCY = max(1, int(os.getenv("LLM_CONCURRENCY", "4")))  # requests in flight per job
+LLM_MAX_RETRIES = max(0, int(os.getenv("LLM_MAX_RETRIES", "3")))  # transient API errors, retried by the provider
 
 
 def _temperature_from_env() -> float | None:
@@ -309,7 +319,8 @@ class OpenAICompatProvider:
             return
         from openai import OpenAI  # imported lazily so the module stays importable without the SDK
 
-        self._client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout, max_retries=1)
+        # the SDK retries 408/409/429/5xx and connection errors with backoff; anything that still escapes fails the job
+        self._client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout, max_retries=LLM_MAX_RETRIES)
 
     def complete(self, system: str, user: str) -> tuple[str, dict]:
         kwargs: dict = {
@@ -342,6 +353,7 @@ class AnthropicProvider:
 
     API_URL = "https://api.anthropic.com/v1/messages"
     API_VERSION = "2023-06-01"
+    RETRY_STATUSES = (408, 409, 429, 500, 502, 503, 504, 529)  # 529 = overloaded
 
     def __init__(
         self,
@@ -352,11 +364,12 @@ class AnthropicProvider:
         max_output_tokens: int = LLM_MAX_OUTPUT_TOKENS,
         post=None,
         temperature: float | None = LLM_TEMPERATURE,
+        sleep=time.sleep,
     ):
         import requests
 
         self.name, self.model, self.timeout, self.max_output_tokens = name, model, timeout, max_output_tokens
-        self.temperature = temperature
+        self.temperature, self._sleep = temperature, sleep
         self._headers = {
             "x-api-key": api_key,
             "anthropic-version": self.API_VERSION,
@@ -373,7 +386,12 @@ class AnthropicProvider:
         }
         if self.temperature is not None:
             payload["temperature"] = self.temperature
-        resp = self._post(self.API_URL, headers=self._headers, json=payload, timeout=self.timeout)
+        resp = None
+        for attempt in range(LLM_MAX_RETRIES + 1):
+            resp = self._post(self.API_URL, headers=self._headers, json=payload, timeout=self.timeout)
+            if resp.status_code == 200 or resp.status_code not in self.RETRY_STATUSES or attempt == LLM_MAX_RETRIES:
+                break
+            self._sleep(min(2.0**attempt, 30.0))  # 1, 2, 4 s: rate limits and overload are transient
         if resp.status_code != 200:
             raise RuntimeError(f"anthropic api {resp.status_code}: {resp.text[:300]}")
         data = resp.json()
@@ -535,8 +553,9 @@ class GenerationStats:
     files_matched: int = 0
     files_sent: int = 0
     chunks_sent: int = 0  # successful requests
-    requests_failed: int = 0  # requests that raised (network / API errors)
-    chunks_total: int = 0
+    requests_failed: int = 0  # requests that raised (network / API errors) after the provider's retries
+    chunks_total: int = 0  # chunks the selected files render to; chunks_skipped of them were over LLM_MAX_CHUNKS
+    chunks_skipped: int = 0
     input_tokens: int = 0  # sums over the successful requests, see request_usage
     cached_input_tokens: int = 0
     cache_write_tokens: int = 0
@@ -563,6 +582,9 @@ class GenerationStats:
         return {
             "requests": self.chunks_sent + self.requests_failed,
             "requests_failed": self.requests_failed,
+            "chunks_total": self.chunks_total,
+            "chunks_sent": self.chunks_sent,
+            "chunks_skipped": self.chunks_skipped,
             "input_tokens": self.input_tokens,
             "cached_input_tokens": self.cached_input_tokens,
             "cache_write_tokens": self.cache_write_tokens,
@@ -675,6 +697,7 @@ def assemble_cbom(
             {"name": "bf-cbom:files-matched", "value": str(stats.files_matched)},
             {"name": "bf-cbom:files-sent", "value": str(stats.files_sent)},
             {"name": "bf-cbom:chunks-total", "value": str(stats.chunks_total)},
+            {"name": "bf-cbom:chunks-skipped", "value": str(stats.chunks_skipped)},
             {"name": "bf-cbom:requests", "value": str(stats.chunks_sent + stats.requests_failed)},
             {"name": "bf-cbom:requests-failed", "value": str(stats.requests_failed)},
             {"name": "bf-cbom:chunks-split", "value": str(stats.chunks_split)},
@@ -708,6 +731,10 @@ def assemble_cbom(
     }
 
 
+class LLMRequestError(RuntimeError):
+    """A request still failed after the provider's retries; the job is an `error`, never a partial CBOM."""
+
+
 def generate_cbom(
     provider: LLMProvider,
     repo_path: str | Path,
@@ -720,8 +747,14 @@ def generate_cbom(
     max_chunks: int = LLM_MAX_CHUNKS,
     deadline: float | None = None,
     on_progress: Callable[[], None] | None = None,
+    concurrency: int = LLM_CONCURRENCY,
 ) -> tuple[dict, GenerationStats]:
-    """Select, chunk, query and assemble. `deadline` is a time.monotonic() value; chunks past it are skipped."""
+    """Select, chunk, query and assemble. `concurrency` requests are in flight at once; assets keep chunk order.
+
+    `deadline` is a time.monotonic() value: a chunk not started by then raises TimeoutError (the run is a `timeout`,
+    never a partial `ok`). A request that fails after the provider's retries raises LLMRequestError (the run is an
+    `error`); an unparsable answer is retried once as two halves. Usage is kept in `trace.fields` after every
+    request, so failed and killed jobs still report what was billed."""
     repo_path = Path(repo_path)
     trace = trace or Trace()
     stats = GenerationStats()
@@ -730,62 +763,73 @@ def generate_cbom(
     chunks = render_chunks(repo_path, sel.files, max_chars=max_chunk_chars)
     stats.chunks_total = len(chunks)
     if len(chunks) > max_chunks:
+        stats.chunks_skipped = len(chunks) - max_chunks
         trace.add(f"llm: {len(chunks)} chunks exceed LLM_MAX_CHUNKS={max_chunks}; sending the first {max_chunks}")
         chunks = chunks[:max_chunks]
-    assets: list[dict] = []
     project = repo_info.full_name if repo_info else repo_path.name
-    last_error: list[str] = [""]
+    lock = threading.Lock()
 
     def ask(label: str, chunk: str) -> list[dict] | None:
-        """One request; None when the answer could not be parsed (API errors are recorded and count as None)."""
+        """One request; None when the answer could not be parsed; LLMRequestError when the request failed."""
         user = f"Project: {project}\n{label}\n\n{chunk}"
         try:
             text, usage = provider.complete(SYSTEM_PROMPT, user)
-        except Exception as e:  # network / API errors: keep what we have, record the failure
-            stats.requests_failed += 1
-            trace.fields["usage"] = stats.usage()
-            last_error[0] = f"{type(e).__name__}: {str(e)[:300]}"
-            trace.add(f"llm: {label} failed: {last_error[0][:200]}")
-            return None
-        stats.chunks_sent += 1
-        stats.add_usage(usage)
-        trace.fields["usage"] = stats.usage()  # after every request, so a failed or killed job keeps its usage
+        except Exception as e:
+            with lock:
+                stats.requests_failed += 1
+                trace.fields["usage"] = stats.usage()
+                trace.add(f"llm: {label} failed: {type(e).__name__}: {str(e)[:200]}")
+            raise LLMRequestError(
+                f"llm: request failed ({label.rstrip('.')}) to {provider.model}: {type(e).__name__}: {str(e)[:300]}"
+            ) from e
+        with lock:
+            stats.chunks_sent += 1
+            stats.add_usage(usage)
+            trace.fields["usage"] = stats.usage()  # after every request, so a failed or killed job keeps its usage
         try:
             return parse_assets(text)
         except (json.JSONDecodeError, ValueError) as e:
-            trace.add(f"llm: {label} answer not parsable: {e}")
+            with lock:
+                trace.add(f"llm: {label} answer not parsable: {e}")
             return None
 
-    for i, chunk in enumerate(chunks, start=1):
+    def work(i: int, chunk: str) -> list[dict]:
         if deadline is not None and time.monotonic() > deadline:
-            trace.add(f"llm: deadline reached after {i - 1}/{len(chunks)} chunks")
-            break
+            raise TimeoutError(f"llm_deadline: chunk {i} of {len(chunks)} not started before the job deadline")
         found = ask(f"Chunk {i} of {len(chunks)}.", chunk)
         if found is None:
             # Usually a truncated or malformed JSON answer for a dense chunk: retry once with two halves.
             halves = split_chunk(chunk)
+            found = []
             if len(halves) == 2:
-                stats.chunks_split += 1
-                found = []
+                with lock:
+                    stats.chunks_split += 1
                 for j, half in enumerate(halves, start=1):
                     part = ask(f"Chunk {i} of {len(chunks)}, part {j} of 2.", half)
                     if part is None:
-                        stats.assets_unparsable_chunks += 1
+                        with lock:
+                            stats.assets_unparsable_chunks += 1
                     else:
                         found.extend(part)
             else:
-                stats.assets_unparsable_chunks += 1
-                continue
-        stats.assets_raw += len(found)
-        assets.extend(found)
+                with lock:
+                    stats.assets_unparsable_chunks += 1
+        with lock:
+            stats.assets_raw += len(found)
         if on_progress:
             on_progress()
-    if stats.requests_failed and stats.chunks_sent == 0:
-        # Every request failed (wrong model, rejected parameters, auth, quota, network): an empty CBOM would look
-        # like a tool that found nothing, so fail the job instead.
-        raise RuntimeError(
-            f"llm: all {stats.requests_failed} requests to {provider.model} failed; last error: {last_error[0]}"
-        )
+        return found
+
+    assets: list[dict] = []
+    with ThreadPoolExecutor(max_workers=max(1, min(concurrency, len(chunks)))) as pool:
+        futures = [pool.submit(work, i, chunk) for i, chunk in enumerate(chunks, start=1)]
+        try:
+            for fut in futures:  # submission order = chunk order
+                assets.extend(fut.result())
+        except BaseException:
+            for fut in futures:  # fail fast: nothing queued behind the failure is sent
+                fut.cancel()
+            raise
     cbom = assemble_cbom(
         assets, tool_name=provider.name, model=provider.model, repo_info=repo_info, repo_path=repo_path, stats=stats
     )

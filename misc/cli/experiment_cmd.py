@@ -168,6 +168,7 @@ class _Session:
                 "cpus": os.cpu_count(),
                 "ram_total_mb": self.host.total_mb,
                 "ram_used_at_start_mb": self.host.start_used_mb,
+                "gitserver_memory": os.getenv("GITSERVER_MEMORY"),  # the git server's compose limit (Makefile)
             },
             **fields,
         }
@@ -204,7 +205,14 @@ def run(
     no_wait: bool = typer.Option(
         False, "--no-wait", help="Enqueue and return; collect later with `experiment collect`"
     ),
-    retry_failed: bool = typer.Option(False, "--retry-failed", help="Also redo stored runs whose status is not ok"),
+    retry_failed: bool = typer.Option(
+        False,
+        "--retry-failed",
+        help="Also redo stored runs whose status is not ok (an ok run with OOM kills counts as not ok)",
+    ),
+    rerun: str = typer.Option(
+        "", "--rerun", help="Comma-separated tools whose stored runs are all redone (e.g. after a worker change)"
+    ),
     skip_unsupported: bool = typer.Option(
         True,
         "--skip-unsupported/--run-unsupported",
@@ -270,7 +278,12 @@ def run(
                 fg=typer.colors.BLUE,
                 err=True,
             )
-    jobs, skipped = plan_jobs(spec, snapshots, exp_dir, new_id=lambda: str(uuid.uuid4()), retry_failed=retry_failed)
+    rerun_tools = {t.strip() for t in rerun.split(",") if t.strip()}
+    if unknown := rerun_tools - set(spec.tools):
+        _err(f"--rerun names tools outside the spec: {', '.join(sorted(unknown))}", 2)
+    jobs, skipped = plan_jobs(
+        spec, snapshots, exp_dir, new_id=lambda: str(uuid.uuid4()), retry_failed=retry_failed, rerun=rerun_tools
+    )
     covered = {(j.snapshot.full_name, j.snapshot.variant, j.tool, j.run_index) for j in pending.values()}
     jobs = [j for j in jobs if (j.snapshot.full_name, j.snapshot.variant, j.tool, j.run_index) not in covered]
     typer.secho(
@@ -682,6 +695,12 @@ def corpus_build(
     no_crypto_filter: bool = typer.Option(False, "--no-crypto-filter", help="Skip the clone+grep crypto pre-filter"),
     exclude: str = typer.Option("", help="Extra comma-separated regexes on full_name to exclude"),
     seed: int = typer.Option(20261015),
+    max_repo_size_mb: int | None = typer.Option(
+        None,
+        "--max-repo-size-mb",
+        help="Largest packed repo size (GitHub `size`) sampled; default CORPUS_MAX_REPO_SIZE_MB, else "
+        f"GITSERVER_MEMORY / {corpus_mod.SIZE_CAP_RATIO} (the git server must serve a full clone); 0 = no cap",
+    ),
 ):
     """Sample a stratified corpus (stars x size cells per language), pre-filter for crypto usage, pin commits."""
     params = corpus_mod.CorpusParams(
@@ -691,6 +710,8 @@ def corpus_build(
         crypto_filter=not no_crypto_filter,
         seed=seed,
     )
+    if max_repo_size_mb is not None:
+        params.max_repo_size_mb = max_repo_size_mb or None
     params.exclude_patterns += [x.strip() for x in exclude.split(",") if x.strip()]
     token = os.getenv("GITHUB_TOKEN") or None
     if not token:

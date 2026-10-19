@@ -25,6 +25,7 @@ from common.experiment import iter_results, repo_full_name
 
 from .costs import cost_usd, load_prices
 from .groundtruth import TruthProject, TruthScore
+from .levels import UNIT_LEVEL, identity
 from .matchers import MatchGroup, agreement
 from .normalize.record import RECORD_COLUMNS, NormRecord
 
@@ -33,18 +34,19 @@ ASSET_COMPONENT_TYPES = ("cryptographic-asset", "crypto-asset")  # the latter: I
 
 RUNS_COLUMNS = [
     "repo", "snapshot", "commit", "variant", "variant_commit", "language", "expect_crypto", "tool", "run", "tailored",
-    "status", "duration_sec", "size_bytes", "error", "peak_memory_mb", "memory_limit_mb", "oom_kills",
+    "status", "duration_sec", "size_bytes", "error", "workaround", "peak_memory_mb", "memory_limit_mb", "oom_kills",
     "enqueued_at", "started_at", "finished_at", "queue_sec", "received_at",
     "tool_version", "image_ref", "bfcbom_commit", "bom_format", "spec_version",
     "components", "crypto_assets", "algorithm_assets", "certificate_assets", "protocol_assets", "material_assets",
-    "other_assets", "located_assets",
-    "requests", "requests_failed", "input_tokens", "cached_input_tokens", "cache_write_tokens", "output_tokens",
-    "reasoning_tokens", "models_answered", "cost_usd", "priced_model", "price_period", "price_table_version",
+    "other_assets", "located_file_assets", "located_line_assets",
+    "requests", "requests_failed", "chunks_total", "chunks_sent", "chunks_skipped", "input_tokens",
+    "cached_input_tokens", "cache_write_tokens", "output_tokens", "reasoning_tokens", "models_answered", "cost_usd",
+    "priced_model", "price_period", "price_table_version",
 ]  # fmt: skip
 # JobResult.usage (common/llm_cbom.py:GenerationStats.usage) -> runs.csv columns
 USAGE_COLUMNS = (
-    "requests", "requests_failed", "input_tokens", "cached_input_tokens", "cache_write_tokens", "output_tokens",
-    "reasoning_tokens",
+    "requests", "requests_failed", "chunks_total", "chunks_sent", "chunks_skipped", "input_tokens",
+    "cached_input_tokens", "cache_write_tokens", "output_tokens", "reasoning_tokens",
 )  # fmt: skip
 RECORDS_COLUMNS = ["repo", "snapshot", "commit", "variant", "language", "tool", "run"] + RECORD_COLUMNS
 GROUP_KEY_COLUMNS = ["matcher", "repo", "snapshot", "commit", "variant", "run", "group_id", "k", "tools"]
@@ -57,6 +59,9 @@ GROUP_COLUMNS = GROUP_KEY_COLUMNS + [
     "voter_groups",
     "n_records",
     "n_sites",
+    "units",
+    "n_units",
+    "n_attached",
     "located_voters",
     "colocated_voters",
     "file",
@@ -67,7 +72,9 @@ GROUP_COLUMNS = GROUP_KEY_COLUMNS + [
     "similarity",
 ]  # fmt: skip  (exact: sites/located/parent columns; raqun: n_elements, similarity)
 EXACT_GROUP_COLUMNS = GROUP_COLUMNS
-MEMBERS_COLUMNS = ["matcher", "snapshot", "variant", "run", "group_id", "record_id", "tool", "implied", "matched"]
+MEMBERS_COLUMNS = [
+    "matcher", "snapshot", "variant", "run", "group_id", "record_id", "tool", "unit", "implied", "matched", "attached",
+]  # fmt: skip
 MATCHLEVELS_COLUMNS = [
     "matcher", "level", "run", "repos", "items", "records", "k1", "k2", "k3", "k4plus", "share_k2plus",
     *[f"{d}_groups" for d in ("key_size", "mode", "padding", "curve", "digest", "location")],
@@ -95,6 +102,20 @@ def _timeout_text(meta: dict) -> str | None:
         return None
     d = meta.get("duration_sec")
     return f"timed out after {d:.0f} s" if isinstance(d, int | float) else "timed out"
+
+
+WORKAROUND_PREFIX = "workaround: "
+
+
+def workaround_line(notes: str | None) -> str | None:
+    """The recorded setup workarounds of a run (worker note lines starting with `workaround: `, e.g. CryptoScan's
+    `--exclude` of files it panics on, CipherRadar's `.cradarignore`), joined; None when there is none."""
+    found = [
+        ln.strip()[len(WORKAROUND_PREFIX) :]
+        for ln in (notes or "").splitlines()
+        if ln.strip().startswith(WORKAROUND_PREFIX)
+    ]
+    return LIST_SEP.join(found) or None
 
 
 def error_line(text: str | None) -> str | None:
@@ -155,14 +176,19 @@ ASSET_TYPE_COLUMNS = {  # cryptoProperties.assetType as declared -> runs.csv col
 }
 
 
-def _located(component: dict) -> bool:
-    """The component carries a file location as the tool wrote it: CycloneDX `evidence.occurrences[].location`, or
-    `cryptoProperties.detectionContext[].filePath` in IBM's draft."""
-    occurrences = (component.get("evidence") or {}).get("occurrences") or []
-    if any(isinstance(o, dict) and o.get("location") for o in occurrences):
-        return True
-    contexts = (component.get("cryptoProperties") or {}).get("detectionContext") or []
-    return any(isinstance(c, dict) and c.get("filePath") for c in contexts)
+def _located(component: dict) -> tuple[bool, bool]:
+    """(names a file, names a file and a line) as the tool wrote it: CycloneDX `evidence.occurrences[].location`
+    (+ `line`), or `cryptoProperties.detectionContext[].filePath` (+ `lineNumbers`) in IBM's draft. A file alone is
+    a weaker claim than a file and a line, so the two are counted apart (RQ2 `located`, RQ1 traceability)."""
+    occurrences = [o for o in (component.get("evidence") or {}).get("occurrences") or [] if isinstance(o, dict)]
+    contexts = [
+        c for c in (component.get("cryptoProperties") or {}).get("detectionContext") or [] if isinstance(c, dict)
+    ]
+    file = any(o.get("location") for o in occurrences) or any(c.get("filePath") for c in contexts)
+    line = any(o.get("location") and o.get("line") is not None for o in occurrences) or any(
+        c.get("filePath") and c.get("lineNumbers") for c in contexts
+    )
+    return file, line
 
 
 def _cbom_counts(cbom: dict) -> dict:
@@ -175,7 +201,8 @@ def _cbom_counts(cbom: dict) -> dict:
         "spec_version": cbom.get("specVersion"),
         "components": len(comps),
         "crypto_assets": len(crypto),
-        "located_assets": sum(_located(c) for c in crypto),
+        "located_file_assets": sum(_located(c)[0] for c in crypto),
+        "located_line_assets": sum(_located(c)[1] for c in crypto),
         **dict.fromkeys(ASSET_TYPE_COLUMNS.values(), 0),
         "other_assets": 0,
     }
@@ -241,6 +268,7 @@ def run_rows(
             "duration_sec": meta.get("duration_sec"),
             "size_bytes": meta.get("size_bytes"),
             "error": error_line(meta.get("error")) or _timeout_text(meta),
+            "workaround": workaround_line(meta.get("notes")),
             "peak_memory_mb": meta.get("peak_memory_mb"),
             "memory_limit_mb": meta.get("memory_limit_mb"),
             "oom_kills": meta.get("oom_kills"),
@@ -319,8 +347,16 @@ def group_rows(
             }
         )
         for r in g.members:
-            member = {"group_id": g.group_id, "record_id": r.record_id, "tool": r.tool}
-            m_rows.append({**base, **member, "implied": r.record_id in g.implied, "matched": r.record_id in g.matched})
+            member = {"group_id": g.group_id, "record_id": r.record_id, "tool": r.tool, "unit": identity(r, UNIT_LEVEL)}
+            m_rows.append(
+                {
+                    **base,
+                    **member,
+                    "implied": r.record_id in g.implied,
+                    "matched": r.record_id in g.matched,
+                    "attached": r.record_id in g.attached,
+                }
+            )
         a_rows += [
             {**base, "repo": full_name(snapshot), "group_id": g.group_id, "scope": g.scope, "key": g.key, **row}
             for row in agreement(g, voter_of=voter_of)
@@ -332,7 +368,8 @@ def matchlevel_row(
     matcher: str, level: str, run: int, groups_by_snapshot: dict, voter_of: dict[str, str] | None = None
 ) -> dict:
     """One row of matchlevels-run<k>.csv (RQ3, matcher x level): over the repo groups of every snapshot, how many
-    items (algorithms, by their L4 identity) have 1 / 2 / 3 / 4+ voter groups in their largest group at that level,
+    items (algorithms, by their L4 identity: `extra.units` of the exact matcher's groups, else the group key) have
+    1 / 2 / 3 / 4+ voter groups in their largest group at that level,
     and per dimension the share of the groups with at least two
     voters reporting a value (admitted at the level) in which every reporting voter carries the majority value;
     `location`: of the groups with two located voters, the share with two voters at one call site."""
@@ -344,7 +381,8 @@ def matchlevel_row(
         for g in groups:
             if g.scope != "repo":
                 continue
-            best[(snapshot, g.key)] = max(best.get((snapshot, g.key), 0), len(g.voters(voter_of)))
+            for unit in g.extra.get("units") or [g.key]:
+                best[(snapshot, unit)] = max(best.get((snapshot, unit), 0), len(g.voters(voter_of)))
             records += len(g.members)
             for row in agreement(g, voter_of=voter_of, level=level):
                 if row["reporting"] >= 2:

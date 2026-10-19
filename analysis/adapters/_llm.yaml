@@ -9,11 +9,9 @@ sources:
   - property: {bf-cbom:digest: digest, bf-cbom:confidence: confidence, bf-cbom:primitive: primitive,
                bf-cbom:mode: mode, bf-cbom:padding: padding}
   - parse: name
-dictionary:
+dictionary:   # the worker's own former spelling (source: common/llm_cbom.py before ASSEMBLY_VERSION 2026-10-16.1)
   asset_type:
     key: {asset_type: related-crypto-material, material: key}    # CBOMs assembled before 2026-10-16
-  name:
-    Entropy: {material: seed, interpretive: true}    # the model's free text; a judgement, counts at L4 only
 context: [property:bf-cbom:evidence]
 notes: >
   One component per reported site (file and line verified against the clone where possible, see

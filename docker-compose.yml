@@ -36,7 +36,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256m
+          # GITSERVER_MEMORY (Makefile): git pack-objects for a full clone of a large repo runs in this cgroup;
+          # 256m was OOM-killed on keycloak and ansible (CBOMkit's JGit clone, 2026-10-19)
+          memory: ${GITSERVER_MEMORY:-4g}
     cap_drop: [ALL]
     cap_add: [CHOWN, SETUID, SETGID, NET_BIND_SERVICE, DAC_OVERRIDE]
     security_opt: [no-new-privileges:true]
@@ -71,6 +73,9 @@ services:
       # Sum of worker memory limits (tools.yaml memory_gb) a batch run feeds at once; tools beyond it run in
       # later waves. Set per machine in the Makefile / environment; 0 = no limit (one wave).
       - EXPERIMENT_MEMORY_BUDGET_GB=${EXPERIMENT_MEMORY_BUDGET_GB:-14}
+      # The git server's memory cap (recorded per session) and the corpus size cap derived from it (common/corpus.py)
+      - GITSERVER_MEMORY=${GITSERVER_MEMORY:-4g}
+      - CORPUS_MAX_REPO_SIZE_MB=${CORPUS_MAX_REPO_SIZE_MB:-}
     env_file: docker/env/coordinator.env  # GITHUB_TOKEN for the corpus builder
     volumes:
       - results-data:/data/results
@@ -241,8 +246,9 @@ services:
     deploy:
       resources:
         limits:
-          # 4g OOM-killed its Gradle runs on bisq/bisq2 (rc=-9, e1-icpc-corpus); 8g scans bisq without an OOM kill
-          memory: 8g
+          # 4g OOM-killed its Gradle runs on bisq/bisq2 (rc=-9, e1-icpc-corpus); 8g was still OOM-killed on
+          # Chat2DB, bisq, bisq2 and kafka with the runs stored ok (2026-10-19)
+          memory: 16g
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     profiles: [prod, all]
@@ -267,10 +273,12 @@ services:
       - BF_CBOM_IMAGE=bf-cbom/worker-deepseek:${VERSION:-latest}
       - REDIS_PORT=6379
       - WORKER_TIMEOUT_SEC=7200
-      # code-reading LLM budget (common/llm_cbom.py): files sent, chars per request, requests per repo
+      # code-reading LLM budget (common/llm_cbom.py): files sent, chars per request, chunks per repo (a safety
+      # valve: 100 cut bisq2's 312 chunks; a capped run is marked in runs.csv), requests in flight
       - LLM_MAX_FILES=1000
       - LLM_MAX_CHUNK_CHARS=40000
-      - LLM_MAX_CHUNKS=100
+      - LLM_MAX_CHUNKS=1000
+      - LLM_CONCURRENCY=4
       - LLM_MAX_OUTPUT_TOKENS=8192
       - LLM_API_TIMEOUT_SEC=300
       - LLM_TEMPERATURE=0  # deepseek-chat accepts it; keeps answers as stable as possible
@@ -303,10 +311,12 @@ services:
       - BF_CBOM_IMAGE=bf-cbom/worker-chatgpt:${VERSION:-latest}
       - REDIS_PORT=6379
       - WORKER_TIMEOUT_SEC=7200
-      # code-reading LLM budget (common/llm_cbom.py): files sent, chars per request, requests per repo
+      # code-reading LLM budget (common/llm_cbom.py): files sent, chars per request, chunks per repo (a safety
+      # valve: 100 cut bisq2's 312 chunks; a capped run is marked in runs.csv), requests in flight
       - LLM_MAX_FILES=1000
       - LLM_MAX_CHUNK_CHARS=40000
-      - LLM_MAX_CHUNKS=100
+      - LLM_MAX_CHUNKS=1000
+      - LLM_CONCURRENCY=4
       - LLM_MAX_OUTPUT_TOKENS=16000
       - LLM_API_TIMEOUT_SEC=300
       - OPENAI_MAX_TOKENS_PARAM=max_completion_tokens  # gpt-5 is a reasoning model (rejects max_tokens and temperature)
@@ -340,10 +350,12 @@ services:
       - BF_CBOM_IMAGE=bf-cbom/worker-claude:${VERSION:-latest}
       - REDIS_PORT=6379
       - WORKER_TIMEOUT_SEC=7200
-      # code-reading LLM budget (common/llm_cbom.py): files sent, chars per request, requests per repo
+      # code-reading LLM budget (common/llm_cbom.py): files sent, chars per request, chunks per repo (a safety
+      # valve: 100 cut bisq2's 312 chunks; a capped run is marked in runs.csv), requests in flight
       - LLM_MAX_FILES=1000
       - LLM_MAX_CHUNK_CHARS=40000
-      - LLM_MAX_CHUNKS=100
+      - LLM_MAX_CHUNKS=1000
+      - LLM_CONCURRENCY=4
       - LLM_MAX_OUTPUT_TOKENS=16000
       - LLM_API_TIMEOUT_SEC=300
     env_file: docker/env/worker-claude.env

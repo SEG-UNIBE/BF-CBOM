@@ -11,6 +11,11 @@ RUN apk add --no-cache git git-daemon nginx fcgiwrap spawn-fcgi openssl \
  && git config --system uploadpack.allowAnySHA1InWant true \
  && git config --system uploadpack.allowReachableSHA1InWant true \
  && git config --system http.receivepack false \
+ # upload-pack memory for full clones of large repos (a one-branch want set cannot reuse the whole pack):
+ # few delta threads, bounded delta windows and cache; the container limit is GITSERVER_MEMORY (compose)
+ && git config --system pack.threads 2 \
+ && git config --system pack.windowMemory 256m \
+ && git config --system pack.deltaCacheSize 128m \
  # mirrors are written by the runner (uid 1000) and served by the nginx user
  && git config --system --add safe.directory '*' \
  && mkdir -p /srv/git /run/nginx /certs \

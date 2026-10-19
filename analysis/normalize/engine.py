@@ -21,9 +21,25 @@ from .conformance import document_issues, schema_index
 from .locations import CODE_EXT, relative_location
 from .record import NormalizedCbom, NormRecord
 from .specs import AdapterSpec, SourceDef, load_adapter
-from .vocab import NO_INFO, Parsed, Vocabulary, load_vocabulary, rule_id_to_text
+from .vocab import ENTRY_FLAGS, NO_INFO, Parsed, Vocabulary, fold, load_vocabulary, rule_id_to_text
 
 _PATH_LINE = re.compile(r"^(.*?)(?::(\d+)(?::\d+)?|#L?(\d+))$")
+# SCANOSS names of the form `certificate:<line>:<line>:api=tls.LoadX509KeyPair:cryptoFunction=verify:library=OpenSSL`
+# (the extractor `kv_name` reads them; the name parser skips them)
+_KV_NAME = re.compile(r"^(?P<type>[a-z-]+):(?P<line>\d+):(?P<line_end>\d+):(?P<rest>.*)$")
+# What a record's name and fields amount to (the record's `resolution`): an algorithm identity (`mapped`), a list of
+# candidates (`ambiguous`), a code identifier or a tool's reference label without algorithm (`api`), a finding
+# outside cryptography (`non-crypto`), or a name nobody understands (`undefined`). Only `mapped` records are
+# algorithm items. `api` is recognised by shape (a qualified name `Cipher.getInstance`, `crypto/x509.ParseCertificate`,
+# or a camelCase identifier `getJavaAlgorithm`), never by a list of a tool's outputs; `kind: api` on a dictionary
+# entry covers labels a tool invented (`HashiCorp Vault Path`). Nothing is forced into a "right" class: the raw name
+# stays at L0/L1, and these categories only say what a name is.
+RESOLUTIONS = ("mapped", "ambiguous", "api", "non-crypto", "undefined")
+_IDENTIFIER = re.compile(
+    r"^(?:[A-Za-z_][\w$]*(?:[./#:]+[A-Za-z_][\w$]*)+(?:\(\))?"  # qualified: a.b, pkg/mod.Func, Class#method
+    r"|[a-z][a-z0-9]*(?:[A-Z][a-z0-9]+)+)$"  # camelCase: getJavaAlgorithm, parseCsvMap
+)
+_IDENTITY_TYPES = frozenset({"certificate", "protocol", "related-crypto-material", "library"})
 CONTEXT_MAX = 300
 _AE_MODES = frozenset({"GCM", "CCM", "OCB", "SIV", "GCM-SIV", "EAX"})
 _WRAP_MODES = frozenset({"KW", "KWP"})
@@ -57,6 +73,7 @@ class Val:
     issues: tuple = ()
     known: bool = False  # recognised although it carries no value (a dictionary entry `{}`)
     fill_only: bool = False  # supporting evidence: fills gaps, never conflicts
+    kind: str | None = None  # `api` | `non-crypto` from a dictionary or whole-name entry (vocab.KINDS)
 
 
 @dataclass
@@ -177,15 +194,23 @@ class _Reader:
     def _dict_vals(self, hit, raw, label: str, dim: str = "name", issues: tuple = ()) -> list[Val]:
         if isinstance(hit, dict):
             # `interpretive: true` marks a judgement rather than a spelling (CryptoScan's "Certificate Validation
-            # Bypass" read as protocol TLS): such values count at L4 only (analysis/levels.py)
+            # Bypass" read as protocol TLS): such values count at L4 only (analysis/levels.py). `kind` says what a
+            # name without algorithm is (an API, a non-crypto finding); the record's `resolution` reads it.
             via = "interpretive" if hit.get("interpretive") else "dictionary"
-            vals = [Val(d, self._canon(d, v), raw, label, via, issues) for d, v in hit.items() if d != "interpretive"]
-            return vals or [Val(dim, None, raw, label, via, issues, known=True)]
+            kind = hit.get("kind")
+            vals = [
+                Val(d, self._canon(d, v), raw, label, via, issues, kind=kind)
+                for d, v in hit.items()
+                if d not in ENTRY_FLAGS
+            ]
+            return vals or [Val(dim, None, raw, label, via, issues, known=True, kind=kind)]
         return [Val(dim, self._canon(dim, hit), raw, label, "dictionary", issues)]
 
     def _parsed(self, p: Parsed, text, label: str, *, quiet: bool, issues: tuple = (), via: str = "parse"):
-        vals = [Val(d, v, text, label, via, issues) for d, v in p.values.items()]
+        vals = [Val(d, v, text, label, via, issues, kind=p.kind) for d, v in p.values.items()]
         unmapped: list[Unmapped] = []
+        if p.kind and not vals:
+            vals.append(Val("name", None, text, label, via, issues, known=True, kind=p.kind))
         if p.candidates:  # a list of algorithms ("RSA, ECC, AES"): known, but not one asset
             vals.append(Val("ambiguous", "|".join(p.candidates), text, label, "parse", known=True))
         elif not quiet and not _no_info(text):
@@ -210,7 +235,12 @@ class _Reader:
         value = self.vocab.canonical(dim, raw)
         vals = [Val(dim, value, raw, label, "field", issues)]
         if value is None and dim in _REPARSE_EXTRA and isinstance(raw, str) and not _no_info(raw):
-            found = dict(self.vocab.parse(raw).values)
+            parsed = self.vocab.parse(raw)
+            if parsed.candidates and dim in ("family", "algorithm", "digest"):
+                vals[0].known = True  # a list of algorithms in one field: not one value, not unknown either
+                vals.append(Val("ambiguous", "|".join(parsed.candidates), raw, label, "parse", known=True))
+                return vals
+            found = dict(parsed.values)
             if dim not in ("family", "algorithm") and found.get("algorithm") in self.vocab.hashes:
                 found.setdefault("digest", found["algorithm"])  # the hash inside a padding or mode name
             main = found.get(dim)
@@ -246,9 +276,9 @@ class _Reader:
             return props.get(key), f"properties[{key}]"
         if kind == "field":
             return _get(comp, key), key
-        if kind == "rule":
-            value = props.get(key)
-            return (rule_id_to_text(str(value)) if value else None), f"properties[{key}]"
+        if kind == "rule":  # a scanner rule id (module path and prefixes dropped), in a property or the name itself
+            value = comp.get("name") if key == "name" else props.get(key)
+            return (rule_id_to_text(str(value)) if value else None), ("name" if key == "name" else f"properties[{key}]")
         return None, arg
 
     def evaluate(self, sdef: SourceDef, ci: int, comp: dict, occ: dict | None, props: dict):
@@ -264,6 +294,12 @@ class _Reader:
             text, label = self._text(str(sdef.arg), comp, occ, props)
             if text is None or not str(text).strip():
                 return [], []
+            if sdef.arg == "name" and self.spec.has_extractor("kv_name") and _KV_NAME.match(str(text)):
+                return [], []  # read by the extractor, not a name to parse
+            if str(sdef.arg).startswith("rule:") and self._non_crypto_rule(str(sdef.arg), comp, props):
+                vals = [Val("name", None, text, label, "taxonomy", known=True, kind="non-crypto")]
+                self._note(vals, [])
+                return vals, []
             hit = self.spec.lookup("name", text)
             if hit is not None:
                 vals = self._dict_vals(hit, text, label)
@@ -288,22 +324,36 @@ class _Reader:
         self._note(vals, unmapped)
         return vals, unmapped
 
+    def _non_crypto_rule(self, arg: str, comp: dict, props: dict) -> bool:
+        """The rule id behind a `rule:` source is one of the tool's generic (non-crypto) rules by the tool's own
+        taxonomy: it has a module path and none of its segments is a crypto segment (`rule_crypto_segments`)."""
+        segments = self.spec.rule_crypto_segments
+        if not segments:
+            return False
+        key = arg.partition(":")[2]
+        rule_id = comp.get("name") if key == "name" else props.get(key)
+        parts = [fold(p) for p in str(rule_id or "").split(".") if p]
+        return len(parts) >= 3 and not any(p in segments for p in parts)
+
     def _note(self, vals: list[Val], unmapped: list[Unmapped]) -> None:
         """Collect what each raw value mapped to (analysis/normalize/report.py turns this into vocab.csv)."""
         for v in vals:
             if v.dim in _PSEUDO or v.raw is None or v.via in ("dependency", "ref"):
                 continue
             entry = self.mappings.setdefault(
-                (v.src, str(_jsonable(v.raw))), {"mapped": {}, "via": set(), "tokens": (), "count": 0}
+                (v.src, str(_jsonable(v.raw))), {"mapped": {}, "via": set(), "tokens": (), "count": 0, "kind": None}
             )
             if v.value is not None and v.dim != "ambiguous":
                 entry["mapped"].setdefault(v.dim, v.value)
             if v.dim == "ambiguous":
                 entry["mapped"]["ambiguous"] = v.value
             entry["via"].add(v.via)
+            entry["kind"] = entry["kind"] or v.kind
             entry["count"] += 1
         for src, raw, tokens in unmapped:
-            entry = self.mappings.setdefault((src, raw), {"mapped": {}, "via": set(), "tokens": (), "count": 0})
+            entry = self.mappings.setdefault(
+                (src, raw), {"mapped": {}, "via": set(), "tokens": (), "count": 0, "kind": None}
+            )
             entry["tokens"] = tokens or ("*",)
             entry["count"] += 1
 
@@ -459,6 +509,9 @@ class _Reader:
                     rec.raw.setdefault(v.dim, _jsonable(v.raw))
                     rec.src.setdefault(v.dim, v.src)
         self._derive(rec)
+        flat = [v for vals in partials for v in vals]
+        rec.name_kind = next((v.kind for v in flat if v.kind and v.src == "name"), None)
+        rec.resolution = _resolution(rec, flat)
         rec.raw = {k: v for k, v in rec.raw.items() if v is not None}
         rec.conflicts = {d: {"value": _jsonable(v.value), "src": v.src} for d, v in conflicts.items()}
         rec.unmapped = [
@@ -529,6 +582,8 @@ class _Reader:
             info = self.vocab.family_info(vals["family"])
             algo = self.vocab.algorithms.get(vals.get("algorithm") or "", {})
             prim = algo.get("primitive") or (info.primitive if info else None)
+            if prim in NO_INFO:
+                prim = None
             if vals["family"] == "AES" and vals.get("mode") in _AE_MODES:
                 prim = "ae"
             elif vals["family"] == "AES" and vals.get("mode") in _WRAP_MODES:
@@ -544,6 +599,27 @@ class _Reader:
             rec.group = "CERT"
         elif rec.group is None and vals.get("protocol") in ("TLS", "SSL", "DTLS"):
             rec.group = "TLS"
+
+
+def _resolution(rec: NormRecord, vals: list[Val]) -> str:
+    """What the record amounts to (RESOLUTIONS). An algorithm identity makes it `mapped`; a finding the tool itself
+    files outside cryptography is `non-crypto`; a code identifier (by shape) or a tool's reference label (`kind: api`,
+    or a known entry without values) that carries no identity is `api`; other asset types, a protocol, a material type
+    or a group (CERT, TLS) are identities of their own kind; an unresolved list is `ambiguous`."""
+    kinds = {v.kind for v in vals if v.kind}
+    known_empty = any(v.known and v.value is None and v.dim == "name" for v in vals)
+    values = rec.values
+    if values.get("family") or values.get("algorithm"):
+        return "mapped"  # a named algorithm is the most literal reading of what was written
+    if "non-crypto" in kinds:
+        return "non-crypto"
+    if "api" in kinds or known_empty or _IDENTIFIER.match((rec.name or "").strip()):
+        return "api"
+    if values.get("asset_type") in _IDENTITY_TYPES or values.get("protocol") or values.get("material") or rec.group:
+        return "mapped"
+    if rec.ambiguous:
+        return "ambiguous"
+    return "undefined"
 
 
 def merge(partials: list[list[Val]], vocab: Vocabulary | None = None):
@@ -669,7 +745,36 @@ def _json_context(r: _Reader, comp: dict, occ: dict | None, props: dict) -> list
     return vals
 
 
-EXTRACTORS = {"json_context": _json_context}
+def _kv_name(r: _Reader, comp: dict, occ: dict | None, props: dict) -> list[Val]:
+    """A SCANOSS-style name `<type>:<line>:<line>:api=<call>:cryptoFunction=<fn>:library=<lib>` (an `X.509` segment
+    may stand alone): the leading type is the asset type, the API is looked up as supporting evidence, the function
+    is a cryptoFunctions value. The name is not parsed as an algorithm name (`evaluate`)."""
+    m = _KV_NAME.match(str(comp.get("name") or ""))
+    if not m:
+        return []
+    vals: list[Val] = []
+    label = "name"
+    if r.vocab.canonical("asset_type", m.group("type")):
+        vals.append(
+            Val("asset_type", r.vocab.canonical("asset_type", m.group("type")), m.group("type"), label, "parse")
+        )
+    for segment in m.group("rest").split(":"):
+        key, _, value = segment.partition("=")
+        if not value:
+            if key and r.vocab.parse(key).values.get("group"):
+                vals.append(Val("group", r.vocab.parse(key).values["group"], key, label, "parse"))
+            continue
+        if key == "api":
+            found, _ = r._parsed(r.vocab.api(value), value, f"{label}[api]", quiet=True, via="api")
+            vals += _supporting(found)
+        elif key == "cryptoFunction":
+            fn = r.vocab.canonical("functions", value)
+            if fn:
+                vals.append(Val("functions", fn, value, f"{label}[cryptoFunction]", "parse"))
+    return vals
+
+
+EXTRACTORS = {"json_context": _json_context, "kv_name": _kv_name}
 
 
 # ----- public API -----
@@ -713,6 +818,7 @@ def normalize_cbom(
         "with_unmapped": sum(1 for r in records if r.unmapped),
         "with_conflicts": sum(1 for r in records if r.conflicts),
         "ambiguous": sum(1 for r in records if r.ambiguous),
+        "resolution": {k: sum(1 for r in records if r.resolution == k) for k in RESOLUTIONS},
     }
     out = NormalizedCbom(
         tool=tool,

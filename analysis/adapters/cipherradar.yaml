@@ -13,23 +13,23 @@ sources:
   - refs
   - dependencies
 dictionary:
-  name:   # `interpretive: true` = a judgement, not a spelling (counts at L4 only; analysis/levels.py)
+  name:   # CipherRadar's own rule names and finding labels (source: its rules and its CBOM output, e1-pilot-corpus
+          # 2026-10-16), each read as it says; no judgements (CLAUDE.md Rules, 2026-10-19)
     Hardcoded secret:*: {material: credential}
     Weak keystore password: {material: password}
-    cipher-spec-inventory: {protocol: TLS, interpretive: true}
     tls-version-enforcement: {protocol: TLS}
-    Unpinned crypto library install: {}
-    Certificate Validation Disabled: {protocol: TLS, interpretive: true}
+    Unpinned crypto library install: {kind: api}   # a dependency finding, no algorithm
+    Unpinned OpenSSL install: {kind: api}
     weak-rand: {family: PRNG}                  # its rule names for math/rand and Math.random (moved from the
     math-random-security: {family: PRNG}       # shared vocabulary 2026-10-18: CipherRadar's spellings, not standards)
     X.509 Certificate: {group: CERT}
     X.509 Certificate (unparseable): {group: CERT}
     Certificate (unparsed): {group: CERT}
     ecb-mode-usage: {mode: ECB}
-    jca-cipher-getinstance: {}
-    jca-keygenerator-getinstance: {functions: [keygen]}
+    jca-cipher-getinstance: {kind: api}
+    jca-keygenerator-getinstance: {functions: [keygen], kind: api}
     ec-curve-from-ecgenparameterspec: {family: EC}
-    crypto-provider-registration: {}
+    crypto-provider-registration: {kind: api}
 notes: >
   CycloneDX 1.7 with algorithmFamily on most algorithms, but not always consistent with the name
   (RSA-ECB/OAEPWithSHA-256AndMGF1Padding is labelled RSASSA-PKCS1): the structured field wins, the name's value is

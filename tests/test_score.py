@@ -5,14 +5,21 @@ from analysis.matchers import ExactMatcher
 from analysis.normalize import NormRecord
 from analysis.stability import stability_rows
 
+FAMILIES = {"AES": ("AES", "AES"), "RSA": ("RSA", "RSA"), "SHA-256": ("SHA-2", "SHA-256"), "MD5": ("MD5", "MD5")}
+
 
 def _rec(i, tool, name, *, file=None, line=None, **values):
+    """A normalised record as the normaliser builds it: a known name has its family (so the L4 identity exists),
+    parameter values come from the parsed name (admitted from L3 on)."""
     vals = {"asset_type": "algorithm", **values}
-    via, src = ({k: "parse" for k in values}, {k: "name" for k in values})  # admitted from L3 on
+    if name in FAMILIES and "family" not in vals:
+        vals["family"], vals["algorithm"] = FAMILIES[name]
+    via, src = ({k: "parse" for k in values}, {k: "name" for k in values})
     return NormRecord(f"{tool}:{i}:0", tool, i, 0, name=name, values=vals, via=via, src=src, file=file, line=line)
 
 
 VOTERS = {"a": "ga", "b": "gb", "c": "gc", "a2": "ga"}
+LOW = {"min_repos": 1, "min_items": 1}  # two tiny snapshots: rank everything
 
 
 def _observations(tailored=None):
@@ -48,12 +55,25 @@ def test_confirmation_exclusivity_and_ranking():
     assert algo["a"] == (3, 2, 1)  # AES x2 confirmed, RSA exclusive
     assert algo["b"] == (3, 3, 0) and algo["c"] == (3, 2, 1)  # c: AES and SHA-256 confirmed, MD5 alone
     assert algo["a2"] == (1, 1, 0)  # confirmed by b and c, not by a (same voter group)
-    assert sc.ranking(algo)[:2] == ["a2", "b"]  # 100 % each, a2 first by name
+    rates = sc.repo_rates(obs, "algorithm")
+    assert rates["a"] == [0.5, 1.0] and rates["a2"] == [1.0] and sc.macro(rates["a"]) == 0.75
+    assert sc.ranking(rates, algo, **LOW)[:2] == ["a2", "b"]  # 100 % each, a2 first by name
+    assert sc.ranking(rates, algo) == []  # two snapshots: nobody has the support for a rank (3 repos, 10 items)
     key = sc.confirmation(obs, "key_size")
     assert key["a"] == (2, 1, 0) and key["c"] == (1, 0, 0)  # c's 128 in s1 disagrees but is not exclusive
     loc = sc.confirmation(obs, "location")
     assert loc["a"] == (2, 1, 1) and loc["c"] == (1, 0, 0)  # a+b share x.py:10-11; c's y.py site is alone
     assert loc["b"][1] == 1 and sc.confirmation(obs, "mode") == {t: (0, 0, 0) for t in obs.tools}
+
+
+def test_generic_reports_confirm_through_attachment_once_per_unit():
+    """SHA-2 (generic) next to SHA-256 and SHA-512: each specific item is confirmed once, the generic one too, and no
+    item is counted twice although the generic record sits in three clusters."""
+    recs = [_rec(0, "a", "SHA-256"), _rec(1, "b", "SHA-512", family="SHA-2", algorithm="SHA-512"),
+            _rec(2, "c", "SHA-2", family="SHA-2", algorithm="SHA-2")]  # fmt: skip
+    groups = {"s": ExactMatcher(level="L4", voter_of={}).match(recs)}
+    obs = sc.observe(groups, level="L4", voter_of={}, tools_ran={"s": {"a", "b", "c"}})
+    assert sc.confirmation(obs, "algorithm") == {"a": (1, 1, 0), "b": (1, 1, 0), "c": (1, 1, 0)}
 
 
 def test_tailored_pairs_neither_count_nor_confirm():
@@ -68,7 +88,7 @@ def test_kendall_tau_and_leave_one_out():
     assert sc.kendall_tau(["a", "b", "c"], ["c", "b", "a"]) == -1.0
     assert sc.kendall_tau(["a", "b", "c", "d"], ["a", "c", "b", "d"]) == 0.667
     assert sc.kendall_tau(["a"], ["a"]) is None
-    rows = {r["left_out"]: r for r in sc.leave_one_out(_observations(), "algorithm")}
+    rows = {r["left_out"]: r for r in sc.leave_one_out(_observations(), "algorithm", **LOW)}
     assert set(rows) == {"ga", "gb", "gc"} and all("a" not in r["ranking"] for r in [rows["ga"]])
     assert all(-1.0 <= r["kendall_tau"] <= 1.0 for r in rows.values())
 
@@ -76,8 +96,8 @@ def test_kendall_tau_and_leave_one_out():
 def test_bootstrap_ci_brackets_the_point_estimate():
     obs = _observations()
     cis = sc.bootstrap_ci(obs, "algorithm", samples=50)
-    n, c, _ = sc.confirmation(obs, "algorithm")["a"]
-    assert cis["a"][0] <= round(c / n, 3) <= cis["a"][1] and cis["b"] == (1.0, 1.0)
+    point = sc.macro(sc.repo_rates(obs, "algorithm")["a"])
+    assert cis["a"][0] <= round(point, 3) <= cis["a"][1] and cis["b"] == (1.0, 1.0)
 
 
 def test_dawid_skene_recovers_a_reliable_and_an_unreliable_voter():
@@ -97,8 +117,8 @@ def test_dawid_skene_recovers_a_reliable_and_an_unreliable_voter():
     voter_of = {t: t for t in reports}
     obs = sc.Observations(level="L3", voter_of=voter_of)
     obs.snapshots, obs.tools, obs.ran = {"s"}, set(reports), {"s": set(reports)}
-    for tool, keys in reports.items():
-        obs.items[("s", tool)]["algorithm"] = set(keys)
+    for key in real + fake:  # one cluster per algorithm, holding the voters that report it
+        obs.sets[("s", "algorithm")].append({t: {key} for t, keys in reports.items() if key in keys})
     ds = sc.dawid_skene(obs)
     quality = {v: ds["sensitivity"][v] + ds["specificity"][v] for v in reports}
     assert quality["good"] > quality["ok"] > quality["noisy"]
@@ -112,9 +132,19 @@ def test_score_rows_cover_every_dimension_with_items():
     dims = {r["dimension"] for r in rows}
     assert dims == {"algorithm", "key_size", "location"} and {r["dimension"] for r in loo} == dims
     a = next(r for r in rows if r["tool"] == "a" and r["dimension"] == "algorithm")
-    assert a["items"] == 3 and a["confirmation"] == 0.667 and a["exclusivity"] == 0.333 and a["rank"] >= 1
+    assert (a["repos"], a["items"], a["rate"], a["rate_pooled"], a["exclusivity"]) == (2, 3, 0.75, 0.667, 0.333)
+    assert a["rank"] is None and a["ci_low"] is None  # two repositories: below the support for a rank and a CI
     assert a["ds_support"] is not None and a["ds_sensitivity"] is not None
     assert all(r["ds_support"] is None for r in rows if r["dimension"] != "algorithm")
+    ranked, _ = sc.score_rows(_observations(), samples=20, **LOW)
+    a = next(r for r in ranked if r["tool"] == "a" and r["dimension"] == "algorithm")
+    assert a["rank"] >= 1 and a["ci_low"] is not None
+
+
+def test_consensus_restriction_drops_items_outside_the_set():
+    obs = _observations()
+    obs.restrict("s1", "a", {"AES"})  # RSA was not in a's consensus over repeated runs
+    assert sc.confirmation(obs, "algorithm")["a"] == (2, 2, 0)
 
 
 def test_stability_jaccard_and_consensus():

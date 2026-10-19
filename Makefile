@@ -13,6 +13,11 @@ DEV_WORKERS := skeleton,testing,mssbomtool
 # Laptop default 14 (Docker Desktop VM ~20 GiB); on a big VM set 0 (no limit) or e.g. 64.
 # Override per call: make experiment EXP=... EXPERIMENT_MEMORY_BUDGET_GB=0
 EXPERIMENT_MEMORY_BUDGET_GB ?= 14
+# Memory cap of the git server (compose limit). A full clone runs git pack-objects inside this cgroup; 256m killed it
+# on keycloak and ansible (CBOMkit's JGit clone, 2026-10-19). The cap also bounds the corpus: repos whose packed size
+# on GitHub exceeds CORPUS_MAX_REPO_SIZE_MB (default GITSERVER_MEMORY/4, i.e. 1024 MB) are not sampled.
+GITSERVER_MEMORY ?= 4g
+CORPUS_MAX_REPO_SIZE_MB ?=
 # Export everything defined above to downstream commands for cross-shell support
 .EXPORT_ALL_VARIABLES:
 # ====================================================

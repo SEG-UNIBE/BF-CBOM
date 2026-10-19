@@ -3,6 +3,7 @@
 Shared context for coworkers and for Claude Code (which loads this file automatically). Details live elsewhere:
 `notes.md` (build, operations, per-tool recipes and gotchas, implementation notes per work package),
 `docs/findings.md` (results so far), `experiments/README.md` (spec format, normalisation, analysis outputs),
+`analysis/README.md` (what a spec may contain, the ladder by example, how family and group are argued),
 `analysis/report/README.md` (plot recipes), `analysis/data/CHANGELOG.md` (vocabulary versions),
 `docs/pilot-2026-10-08/` (the colleague's pilot).
 
@@ -16,8 +17,9 @@ Shared context for coworkers and for Claude Code (which loads this file automati
 - **Nothing lands on the host unless exported.** Results and git mirrors stay in the named volumes `results-data` and
   `git-data`; `make experiment-export` is the only path out, which is why the CLI runs inside the `runner` container.
   A copied export can be analysed on the host: `RESULTS_DIR=exports uv run bf-cbom analysis report <exp>`.
-- **The laptop prepares, the VM runs.** Batch runs happen on the 64 GB VM (`EXPERIMENT_MEMORY_BUDGET_GB` about 52; the
-  prod worker limits sum to 61 GiB). The laptop is for code, configs and analysing copied exports.
+- **The laptop prepares, the VM runs.** Batch runs happen on the 64 GB VM with `EXPERIMENT_MEMORY_BUDGET_GB=0` for
+  now (one wave: the prod worker limits sum to 69 GiB, but limits are caps, and the measured peak with all 13 tools
+  in one wave was 21.5 of 60.5 GiB, 2026-10-19). The laptop is for code, configs and analysing copied exports.
 - **Results are disposable until the paper's runs.** One code path per feature, no compatibility with older result
   layouts; old experiments are rerun, not migrated.
 - **Benchmark every tool as shipped, in its best fair run** (refinement 15). Fix our setup, never the tool.
@@ -26,6 +28,15 @@ Shared context for coworkers and for Claude Code (which loads this file automati
 - **The vocabulary is frozen** (refinement 14): `analysis/data/algorithms.yaml` and `analysis/adapters/*.yaml` change
   only with a version bump and a reason in `analysis/data/CHANGELOG.md` (`tests/test_vocab_frozen.py`). The pilot
   corpus is the development set; ICPC and the E1 corpus are held out.
+- **Never force a tool's output into the "right" class** (decided 2026-10-19). The tools' heterogeneity and their
+  oddities are the findings; the L0-L4 ladder keeps the reality (L0/L1) next to the best-effort normalisation (L4),
+  and a record's `resolution` only says what a name is (an algorithm, a list, a code identifier, a non-crypto rule,
+  unreadable), never what it "really" meant. A spec holds the tool's output structure and the tool's own labels read
+  as they say (with their source); what the tool's metadata classifies is read structurally (securin-xbom's rule
+  path); code identifiers are recognised by shape; no list of one tool's output strings, no judgements (the
+  `interpretive` mechanism exists in the engine, no spec uses it, a test enforces this; the former level L4lit went
+  with the last judgement entry). A tool's field that contradicts its own name is a recorded conflict, not an error
+  to repair. Full policy and a worked ladder example: `analysis/README.md`.
 - **Lint, format, tests:** `uv run ruff check --fix`, `uv run ruff format`, `uv run pytest` (CI runs all three).
 
 ## How it works
@@ -66,11 +77,22 @@ Shared context for coworkers and for Claude Code (which loads this file automati
   `common/tools_registry.py:plan_waves` (UI: held jobs, `release_due_waves`, `coordinator/scheduler.py`).
   `EXPERIMENT_REPLICAS="tool=N,..."` counts replicas started with `docker compose up -d --scale` (README "Parallelism
   and memory").
+- **Later: memory-gated scheduling** (noted 2026-10-19, not built; the user may move the stack to Kubernetes
+  instead). Waves cap the *sum of limits*, so a 64 GB VM runs at ~21 GiB: each worker runs one job and most jobs use
+  a fraction of their cap. The design to turn RAM into throughput: replace waves by an admission loop that dispatches
+  a job when host used + the expected memory of the running jobs + the new job's cap fits the budget (expected =
+  p95 of the stored `peak_memory_mb` per tool x1.25, else the cap); concurrency from replicas (`experiment plan`
+  suggesting `EXPERIMENT_REPLICAS` from stored peaks and serial times); `oom_score_adj` so a host OOM kill hits a
+  worker job (recorded as `oom`, redone by `--retry-failed`), never redis or the git server. The corpus sampler
+  would then also stratify by number of developers (GitHub contributors) next to language, stars, last push and
+  size (size cap: `GITSERVER_MEMORY`, below).
 - **Corpus and fixtures** (`corpus/`, mounted read-only into the runner): `micro/<language>/` hand-written micro
   projects with `micro/ground_truth.yaml` (11 assets each, five languages); `pilot-2026-10-08.yaml` (16 pinned real
   projects, the development set); `icpc-2026.yaml` (the 23 ICPC paper repos at HEAD of 2026-10-18, held out);
   `exclusions.yaml` (repos the corpus builder never samples, with reasons). `make corpus` builds a stratified GitHub
-  corpus (`common/corpus.py`; needs `GITHUB_TOKEN` in `docker/env/coordinator.env`).
+  corpus (`common/corpus.py`; needs `GITHUB_TOKEN` in `docker/env/coordinator.env`). Repos above
+  `CORPUS_MAX_REPO_SIZE_MB` (default `GITSERVER_MEMORY`/4: the git server must serve CBOMkit's full clone from a
+  container with that limit; Makefile) are never sampled and listed as excluded with the reason.
 - **Analysis** (`analysis/`, offline, reads the results volume only; `make analysis ARGS="<command> <exp>"` writes
   `<exp>/_ANALYSIS/`; `experiment export` runs `report` first):
   - `normalize/`: CBOM -> normalised records (below); `normalize` also writes `run<k>.norm.json` next to each CBOM.
@@ -114,10 +136,10 @@ Scanner, decided 2026-10-17). Versions are pinned in the Dockerfiles and recorde
 |---|---|---|---|
 | `cbomkit` | cbomkit | Java, Python, Go | CBOMkit server image, cloned through the git server over TLS; Python covers pyca only; modules need a build file and `src/`; large repos need ~45 min and a 16 GB heap |
 | `cbomkit-jar` | cbomkit | Java, Python, Go | cbomkit-action, source only, the same engine (packaging differences are measured); `CBOMKIT_ENSURE_SRC=1` opt-in |
-| `cdxgen` | cdxgen | Java, Python, JS, Go | `--include-crypto --evidence`, `-t python` / `-t go` for those repos; algorithms carry locations only for JS/TS; Java code yields none (atom has no crypto sinks) |
+| `cdxgen` | cdxgen | Java, Python, JS, Go | `--include-crypto --evidence`, `-t python` / `-t go` for those repos; algorithms carry locations only for JS/TS; Java code yields none (atom has no crypto sinks); 16 GiB (OOM-killed at 8 on Chat2DB, bisq, bisq2, kafka) |
 | `cryptobomforge` | cryptobomforge | Python, C | CodeQL's crypto inventory queries, C with `--build-mode none`; writes IBM's draft `1.4-cbom-1.0`, not CycloneDX |
-| `deepseek`, `chatgpt`, `claude` | one each, `merge_group: llm` | all five | `common/llm_cbom.py` (below); `chatgpt` / `claude` need `make up-prod EXTRA_PROFILES=llm` and a key in `docker/env/worker-<provider>.env` |
-| `cryptoscan` | cryptoscan | eleven | always `--include-quantum-safe`; skips folders named demo, example, sample |
+| `deepseek`, `chatgpt`, `claude` | one each, `merge_group: llm` | all five | `common/llm_cbom.py` (below); `chatgpt` / `claude` need `make up-prod EXTRA_PROFILES=llm` and a key in `docker/env/worker-<provider>.env`; a request that fails after the provider's retries fails the job (no partial CBOMs), `LLM_MAX_CHUNKS` 1000, `LLM_CONCURRENCY` 4 |
+| `cryptoscan` | cryptoscan | eleven | always `--include-quantum-safe`; skips folders named demo, example, sample; on a Go panic (1.4.0, specific files) the worker bisects and reruns with `--exclude` of those files, recorded as a workaround |
 | `pqcheck` | pqcheck | Python, Go | |
 | `qdarpan` | qdarpan | Java, Go, C | the worker adapter moves `qdarpan:location.N` into `evidence.occurrences` |
 | `securin-xbom` | grep-rules | Java, Python | the registry rule sets it fetches online, frozen unfiltered at a semgrep-rules commit |
@@ -144,17 +166,29 @@ real projects.
 Decisions: mutants are hosted on the local git server; the LLM generator reads the code; the corpus is ~100 Java +
 ~100 Python repos, mutation runs on a ~30-repo subset.
 
-## Status (2026-10-18)
-- **Phases 1-3 are done** in code and tests. Waiting for the VM: rerun e1-icpc-corpus (new provenance, usage and memory
-  fields; traceability against the mirror), run e0-stability, build the E1 corpus with `GITHUB_TOKEN` and prune it,
-  check replicas.
+## Status (2026-10-19)
+- **Export review of 2026-10-19** (`docs/findings.md` "Export review"): the first VM runs of e0-stability,
+  e1-pilot-corpus and e1-icpc-corpus were checked for plausibility. Fixed since: the git server's 256 MiB limit killed
+  CBOMkit's full clones of keycloak and ansible (`GITSERVER_MEMORY`, 4g); cdxgen was OOM-killed at 8 GiB on four Java
+  repos while stored `ok` (16 GiB; an ok run with OOM kills counts as `oom` and is redone by `--retry-failed`);
+  DeepSeek runs with failed requests (the account ran out of credit) were stored `ok` and the 100-chunk cap truncated
+  four repos (requests now fail the job, chunks 1000, 4 in flight, deadline = `timeout`); CryptoScan 1.4.0 panics on
+  specific files (the worker bisects, excludes exactly those files and records the workaround). Analysis: the exact
+  matcher's clusters are per key and never merge through a bridging record (one bridging name had merged SHA-256
+  with SHA-512); scores use units (L4 identities) and the mean of per-repository rates with a support threshold for
+  ranks; names nobody understands are `undefined`, API names `api`, non-crypto rules `non-crypto` (never items);
+  RQ1 is per CycloneDX asset type and `located` is split into file and file+line; vocabulary 2026-10-19.1.
+- **Waiting for the VM:** `make up-prod`, then `make experiment EXP=experiments/e1-pilot-corpus.yaml
+  ARGS="--retry-failed --rerun deepseek" EXPERIMENT_MEMORY_BUDGET_GB=0`, the same for e1-icpc-corpus and
+  e0-stability (DeepSeek needs credit first; `make experiment-delete NAME=e0-micro`, superseded by e0-stability);
+  then build the E1 corpus with `GITHUB_TOKEN` and prune it, check replicas.
 - **Waiting for the user:** how RaQuN gets into the runner (see "Analysis", `matchers/`): a `pyproject.toml` in the
   PyQuN fork (draft in `notes.md` WP6), then pin it in the `raqun` extra and the misc-pyqun image, or the stopgap;
   an explicit DeepSeek model id (the default `deepseek-chat` is no longer on DeepSeek's model page and is priced as
   `deepseek-flash` meanwhile); human review of the micro ground truth, the hand-check
   verdicts and the `languages` lists (all AI-made); whether Go becomes a third paper language.
-- **External:** the SCANOSS research key, the Cryptoscope artifact, the two-rater reviews (`vocab.csv`, matcher
-  validation).
+- **External:** the SCANOSS research key, the Cryptoscope artifact, the two-rater review of the matcher validation
+  sample (a review of `vocab.csv` with Cohen's κ is an option, not decided).
 - **Small open analysis items:** CryptobomForge's IBM-draft windows are CodeQL's `contextRegion` (finding ±2 lines),
   so the exact line could be read as the window centre (one over-credit on micro-python); Jaro-Winkler candidates
   for curating the mapping table; per-field columns in `micro-run<k>.csv`; inferring `functions` from API names.
@@ -200,19 +234,33 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
     JOSE/SSH/JCA identifiers; code fragments stay unmapped (never guessed), lists are `ambiguous`.
   - `conformance.py` checks every standard-field value against the declared `specVersion`'s schema
     (`spec_issues`); `vocab.csv` is the reviewable mapping table.
+  - Every record has a `resolution` (2026-10-19): `mapped` (an algorithm identity), `ambiguous` (a list of
+    candidates), `api` (a code identifier such as `Cipher.getInstance`, recognised by shape for every tool, or a
+    reference label a tool invented, `kind: api` on its dictionary entry), `non-crypto` (a finding outside
+    cryptography reported as an asset: securin-xbom's audit rules), `undefined` (a name nobody understands; never
+    guessed). Only `mapped` records are algorithm items;
+    the shares per tool are reported. The asset types and their subtypes are CycloneDX's enums (`assetType`,
+    `relatedCryptoMaterialProperties.type`, `primitive`; a test keeps `cbom-norm.schema.json` equal to them).
   - `record_id` = `<tool>:<component>:<occurrence>`, `site_id` = `<tool>:<file>:<line>`.
 - **RQ1** (`schema.py`): whole-document validation against the vendored schemas (`jsonschema` with an offline
-  `referencing` registry), split by `native_cyclonedx` (refinement 3); "meaningful" shares from standard fields only
-  vs any source; traceability weak and strong (refinement 4).
+  `referencing` registry), split by `native_cyclonedx` (refinement 3); "meaningful" shares per CycloneDX asset type
+  with the standard's own fields for that type (standard fields vs any source; no tautological assetType column);
+  traceability per asset type, with `located_file` (names a file) and `located_line` (file and line) apart, weak and
+  strong on the records with a line (refinement 4); key material gets its own rows so secrets in configuration files
+  do not dominate.
 - **Match.** Several n-way matchers over the same records, compared against each other in RQ3. They are easy to
   confuse:
   - (a) the pilot's **call-site matcher** (same file, |Δline| ≤ 2, regex families): retired 2026-10-18; its line
     window lives on in (b).
-  - (b) the **exact matcher** (`matchers/exact.py`): its groups are the ladder's clusters at a level (records equal
-    under any key function up to `--level`, default L3), keyed by the algorithm's L4 identity, so location-less
-    tools take part; run at every level for `matchlevels-run<k>.csv` (RQ3: matcher × level); inside a group, located
-    records are chained into call-site groups (same file, lines within `--window`); `--closure` adds implied
-    memberships.
+  - (b) the **exact matcher** (`matchers/exact.py`): its groups are the ladder's clusters at a level, one per key
+    (records whose identity at some level up to `--level`, default L3, is that key; cumulative), so location-less
+    tools take part. Clusters never merge through a record with several keys (decided 2026-10-19: the earlier
+    union-find let `hmac.new` merge HMAC with SHA-1 and `SHA-2` merge SHA-256 with SHA-512); a cluster whose members
+    span several L4 identities is what the level declares "the same" (`units`, `multi_unit_clusters`); generic
+    identities (SHA-2, EC, the bare `SHA` marker) are *attached* to the specific clusters and confirm without
+    merging; records without an L4 identity are never matched. Run at every level for `matchlevels-run<k>.csv`
+    (RQ3: matcher × level); inside a group, located records are chained into call-site groups (same file, lines
+    within `--window`); `--closure` adds implied memberships (attached too).
   - (c) **RaQuN** (`matchers/raqun.py`): PyQuN's n-way matching with a structured similarity (Jaccard over
     `<dimension>=<value>` attributes), location-free, at most one asset per tool per group, run at every level like
     (b) with the values admitted at that level. Optional until PyQuN is packaged. The UI's "Find Similar Components" (`misc/pyqun`, BERT over a bag of strings) is a different thing and
@@ -221,11 +269,14 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
     `matchers/base.py`) must not assume (a)-(c) are the only ones.
   - Every matcher reports per group and dimension (algorithm, key size, mode, padding, curve, digest, location) how
     many voters report and agree (`base.py:agreement`); `compare.py` compares two matchers by co-membership.
-- **Score** (`score.py`, RQ4), per tool × dimension × level on the exact matcher's groups: confirmation rate (share
-  confirmed by at least one other voter), exclusivity, Dawid-Skene (binary EM without labels, seeded from the
-  majority vote) as a second model, leave-one-voter-out with Kendall τ, bootstrap CIs over repos. Tailored (tool,
-  repo) pairs are excluded (`--include-tailored`). `stability.py`: Jaccard across repeated runs and majority consensus
-  sets (`--consensus`).
+- **Score** (`score.py`, RQ4), per tool × dimension × level on the exact matcher's groups: items are units (L4
+  identities; a parameter: (unit, value); a location: (unit, file:line)), confirmed when a group holding the tool's
+  record also holds another voter group's (same value / same call site), so a group is never counted twice; the
+  point estimate is the **mean of the per-repository confirmation rates** (refinement 1; the pooled rate is a
+  column), with bootstrap CIs over repos of that mean; a **rank and a CI only with items in ≥ 3 repos and ≥ 10 items**
+  (`MIN_REPOS`, `MIN_ITEMS`); exclusivity; Dawid-Skene (binary EM without labels, seeded from the majority vote) as a
+  second model; leave-one-voter-out with Kendall τ. Tailored (tool, repo) pairs are excluded (`--include-tailored`).
+  `stability.py`: Jaccard across repeated runs and majority consensus sets (`--consensus`).
 - **Tables** (`tables.py`), flat long-format CSVs in three layers, so new matchers only add files: **runs**
   (`runs.csv`, one row per stored run with status, timing, memory, provenance, LLM usage and `cost_usd`), **records**
   (`records-run<k>.csv`), **matches** (`groups-`, `members-`, `agreement-<matcher>-run<k>.csv`, `matchers-run<k>.csv`).
@@ -324,19 +375,31 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
     reports count as the same algorithm*, on a fixed unit (an algorithm = its L4 identity) with a cumulative
     relation (a match is never lost at a higher level, so shares only grow and each step is attributable): L0 raw
     names, L1 case and separators ignored, L2 standard vocabulary (whole names, 1.7 `algorithmFamily`, JOSE/SSH/JCA
-    identifiers), L3 composite names parsed, L4 everything tool-specific; L4lit leaves out the interpretive
-    dictionary entries (judgements rather than synonyms, `interpretive: true`); parameters enter from L2.
+    identifiers), L3 composite names parsed, L4 everything tool-specific (the tools' own spellings and labels, no
+    judgements; the former L4lit level went with the last judgement entry on 2026-10-19); parameters enter from L2
+    (digest from L3: CycloneDX has no field for it). Clusters are per key and never merge through a bridging record (decided
+    2026-10-19); `confirmed_strict` and `multi_unit_clusters` say how much rests on generic attachments and on
+    spellings that cover several identities; records without an L4 identity (`resolution`) are not items.
     Hypotheses are tested at L2/L3, the L0 -> L4 gap is reported as representational heterogeneity, rankings are
     checked across levels (decided 2026-10-18 after review: the first ladder changed key *and* unit per level and
-    was not monotone; `notes.md` "Ladder and matcher on a fixed unit"). The vocabulary is frozen before E1 (Rules);
-    two raters review `vocab.csv`.
+    was not monotone; `notes.md` "Ladder and matcher on a fixed unit"). The vocabulary is frozen before E1 (Rules).
+    **Family and group:** `family` is the standard's own canonical level (CycloneDX 1.7 `algorithmFamily`, the
+    registry), so L2 normalises to the vocabulary the tools claim to implement; the additions (RSA, EC, CSPRNG,
+    PRNG, PBE, FN-DSA, NTRU-Prime, Hybrid-KEM, crypt, the generic SHA marker) are marked `registry: false`, listed
+    with their reasons, and the share of items resting on them is reported (the registry names schemes, tools report
+    key types without a scheme: a finding about the standard). `group` is ours (the ICPC paper's coarse families),
+    a deterministic many-to-one aggregation of families used for the micro ground truth and figure readability only;
+    no agreement or ranking claim depends on it, and CycloneDX `primitive` is the standard's own coarse axis where
+    one is needed (`analysis/README.md`).
 15. **Every tool gets its best fair run; no result may be BF-CBOM's fault** (decided 2026-10-17).
     - *Invocation:* the tool's documented best invocation for the repo at hand (queries, project types, flags),
       current pinned releases, robust workers (cwd outside the clone, timeouts, failure reporting), and everything
       that changes results in `tool_version` or the run notes.
     - *No repairs:* no source patches, no rewriting of a tool's input or output, no rule filtering, no files added to
-      scanned repos. A crash is a result about the tool; a minimal workaround that lets it produce output
-      (CipherRadar's `.cradarignore`) is allowed and recorded.
+      scanned repos. A crash is a result about the tool; a minimal workaround that lets it produce output is allowed
+      and recorded in the run notes (`workaround:` lines, the `workaround` column of runs.csv): CipherRadar's
+      `.cradarignore`, CryptoScan's `--exclude` of exactly the files its 1.4.0 release panics on (the worker finds
+      them by bisection; 4 of 39 repos, deterministic, no upstream fix).
     - *Analysis:* our analysis reads every location format a tool uses.
     - *Check a 0 before accepting it:* rerun the tool in a throwaway container with its debug output and find the
       cause; distinguish *by design* (cdxgen gives no Java locations) from *our setup* (cdxgen without `-t` never

@@ -123,7 +123,8 @@ def test_run_rows_counts_and_unsupported(tmp_path):
     assert 0 < rows["cbomkit"]["algorithm_assets"] <= rows["cbomkit"]["crypto_assets"]
     kinds = ("algorithm_assets", "certificate_assets", "protocol_assets", "material_assets", "other_assets")
     assert sum(rows["cbomkit"][k] for k in kinds) == rows["cbomkit"]["crypto_assets"]
-    assert 0 < rows["cbomkit"]["located_assets"] <= rows["cbomkit"]["crypto_assets"]
+    assert 0 < rows["cbomkit"]["located_line_assets"] <= rows["cbomkit"]["located_file_assets"]
+    assert rows["cbomkit"]["located_file_assets"] <= rows["cbomkit"]["crypto_assets"]
     rows = {r["tool"]: r for r in run_rows(tmp_path / "exp-tables", expects={"bfcbom/micro-java": "low"})}
     assert rows["cbomkit"]["expect_crypto"] == "low" and rows["pqcheck"]["expect_crypto"] == "low"
 
@@ -195,7 +196,7 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert (out / "stability.csv").exists() and _read_csv(out / "stability.csv") == []  # one run each: no rows
     scores = {(r["dimension"], r["tool"]): r for r in _read_csv(out / "score-run1.csv")}
     assert int(scores[("algorithm", "cbomkit")]["items"]) >= 11 and scores[("algorithm", "cipherradar")]["items"]
-    assert float(scores[("algorithm", "cbomkit")]["confirmation"]) >= 0.8  # CBOMkit and CipherRadar agree on micro-java
+    assert float(scores[("algorithm", "cbomkit")]["rate_pooled"]) >= 0.8  # CBOMkit and CipherRadar agree on micro-java
     assert scores[("algorithm", "cbomkit")]["ds_support"] and scores[("location", "cbomkit")]["items"]
     assert list(_read_csv(out / "coverage.csv")[0]) == COVERAGE_COLUMNS
     assert (out / "conformance.csv").read_text(encoding="utf-8").startswith(",".join(CONFORMANCE_COLUMNS))
@@ -273,7 +274,8 @@ def test_reported_section_shows_raw_counts_and_the_repo_matrix():
                     for k in (
                         "components",
                         "crypto_assets",
-                        "located_assets",
+                        "located_file_assets",
+                        "located_line_assets",
                         "algorithm_assets",
                         "certificate_assets",
                         "protocol_assets",
@@ -294,7 +296,8 @@ def test_reported_section_shows_raw_counts_and_the_repo_matrix():
             crypto_assets=10,
             algorithm_assets=8,
             certificate_assets=2,
-            located_assets=5,
+            located_file_assets=6,
+            located_line_assets=5,
         ),
         row("o/b", "t1", "ok", lang="Python", expect="low", components=3, crypto_assets=0),
         row("o/a", "t2", "unsupported"),
@@ -303,8 +306,8 @@ def test_reported_section_shows_raw_counts_and_the_repo_matrix():
     ]
     rows[-1]["run"] = "2"
     lines = sm._reported(rows, 1)
-    assert "| t1 | 2 | 43 | 10 | 8 | 2 | 0 | 0 | 0 | 50% | 1 | 5 |" in lines
-    assert "| t2 | 0 |  |  |  |  |  |  |  |  |  |  |" in lines
+    assert "| t1 | 2 | 43 | 10 | 8 | 2 | 0 | 0 | 0 | 60% | 50% | 1 | 5 |" in lines
+    assert "| t2 | 0 |  |  |  |  |  |  |  |  |  |  |  |" in lines
     assert "| repo | language | expect | t1 | t2 |" in lines
     assert "| o/a | java |  | 10 | – |" in lines and "| o/b | python | low | 0 | × |" in lines
     assert "| all |  |  | 10 |  |" in lines
@@ -402,3 +405,18 @@ def test_error_line_skips_the_echoed_command():
     assert error_line(text) == "RuntimeError: cdxgen_failed rc=-9: Downloading gradle"
     assert error_line("cdxgen cmd: cdxgen x\ncdxgen timeout during run") == "cdxgen timeout during run"
     assert error_line("cradar cmd: cradar scan x") is None and error_line(None) is None
+
+
+def test_workaround_line_collects_the_recorded_setup_workarounds():
+    from analysis.tables import workaround_line
+
+    notes = (
+        "cryptoscan cmd: cryptoscan scan /tmp/r\n"
+        "cryptoscan panics on a/b/bad.go\n"
+        "workaround: cryptoscan --exclude a/b/bad.go (Go panic in patterns.MatchWithContext on these files)\n"
+    )
+    assert (
+        workaround_line(notes)
+        == "cryptoscan --exclude a/b/bad.go (Go panic in patterns.MatchWithContext on these files)"
+    )
+    assert workaround_line("cradar cmd: cradar scan\n") is None and workaround_line(None) is None

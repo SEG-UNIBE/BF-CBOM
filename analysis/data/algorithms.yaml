@@ -12,7 +12,7 @@
 # API (registry, RFC 7518 JOSE, RFC 4253/8332 SSH, JCA standard names, OS and library APIs) stays, however many tools
 # use it; a label a tool invented (rule names, category labels) goes into that tool's spec, where `interpretive: true`
 # marks mappings that are judgements rather than spellings (they count at L4 only, analysis/levels.py).
-version: "2026-10-18.1"
+version: "2026-10-19.1"
 
 # Coarse groups (the family names of analysis/data/families.yaml, used by the call-site matcher and the micro ground
 # truth) -> the registry families and additions they contain. Every registry family must appear exactly once.
@@ -31,7 +31,7 @@ groups:
   SHA-2: [SHA-2]
   SHA-3: [SHA-3]
   MD5: [MD5]
-  HASH-other: [MD2, MD4, RIPEMD, Whirlpool, BLAKE2, BLAKE3, SM3]
+  HASH-other: [MD2, MD4, RIPEMD, Whirlpool, BLAKE2, BLAKE3, SM3, SHA]
   HMAC: [HMAC, CMAC, UMAC, SipHash, PBMAC1]
   PBKDF: [PBKDF1, PBKDF2, PBES1, PBES2, PBE]
   KDF-other: [HKDF, Argon2, bcrypt, scrypt, yescrypt, ANSI-KDF, SSH-KDF, TLS-PRF, IKE-PRF, SP800-108, SP800-56C, crypt]
@@ -48,6 +48,7 @@ additions:
   NTRU-Prime: {primitive: kem, note: "sntrup761 (OpenSSH hybrid key exchange)"}
   Hybrid-KEM: {primitive: kem, note: "a hybrid of a classical and a post-quantum key exchange"}
   crypt: {primitive: kdf, note: "Unix crypt(3) password hashing schemes (MD5-crypt, SHA-256-crypt, ...)"}
+  SHA: {primitive: hash, note: "a bare SHA (CipherRadar `Algorithm reference: SHA`, `HMAC-SHA`): SHA-1, SHA-2 or SHA-3 unspecified; a generic marker (generic_over) that attaches to the specific algorithms' clusters and never merges them"}
 
 # What `parameterSetIdentifier` means per family (CycloneDX: "in AES128, '128' identifies the key length in bits, in
 # SHA256, '256' identifies the digest length"). Families not listed: kept as `param_set` (raw), never as key size.
@@ -56,7 +57,7 @@ param:
         RC2, RC4, RC5, RC6, IDEA, CAMELLIA, ARIA, SEED, SM4, Twofish, Serpent, CAST5, CAST6, Skipjack, ChaCha,
         ChaCha20, Salsa20]
   curve: [EC, ECDSA, ECDH, ECIES, SM2, MQV]
-  digest: [SHA-1, SHA-2, SHA-3, MD2, MD4, MD5, RIPEMD, BLAKE2, BLAKE3, Whirlpool, SM3]
+  digest: [SHA-1, SHA-2, SHA-3, MD2, MD4, MD5, RIPEMD, BLAKE2, BLAKE3, Whirlpool, SM3, SHA]
 
 # Specific variants inside a family. `aliases` are extra spellings (case and separators never matter);
 # `hash: true` marks hash functions, which become the `digest` of a composite (HMAC-SHA-256, SHA256withECDSA).
@@ -74,6 +75,7 @@ algorithms:
   SHA3-384: {family: SHA-3, hash: true, aliases: [SHA3_384]}
   SHA3-512: {family: SHA-3, hash: true, aliases: [SHA3_512]}
   SHA-3: {family: SHA-3, hash: true, aliases: [SHA3]}
+  SHA: {family: SHA, hash: true}   # generic: which SHA is unspecified (never SHA-1 by default)
   SHAKE128: {family: SHA-3, hash: true, primitive: xof}
   SHAKE256: {family: SHA-3, hash: true, primitive: xof}
   SHAKE: {family: SHA-3, hash: true, primitive: xof}
@@ -100,6 +102,7 @@ algorithms:
   sntrup761: {family: NTRU-Prime, aliases: [SNTRUP761, sntrup761x25519-sha512]}
   ChaCha20-Poly1305: {family: ChaCha20, primitive: ae, aliases: [ChaCha20Poly1305, CHACHA20_POLY1305]}
   XChaCha20-Poly1305: {family: ChaCha20, primitive: ae}
+  XChaCha20: {family: ChaCha20}
   XSalsa20-Poly1305: {family: Salsa20, primitive: ae, aliases: [NaCl-SecretBox, secretbox]}
   Argon2id: {family: Argon2}
   Argon2i: {family: Argon2}
@@ -154,6 +157,12 @@ implies:
   Ed448: [SHAKE256]
   ECIES: [ECDH]
   X25519MLKEM768: [X25519, ML-KEM-768]
+
+# Generic markers: a name that stands for several families at once. Such a record is attached to the clusters of the
+# specific algorithms present in the repository and never merges them (analysis/levels.py); a more specific value of
+# the same record refines it instead of conflicting (Vocabulary.relation).
+generic_over:
+  SHA: [SHA-1, SHA-2, SHA-3]
 
 curves:   # extra spellings; the registry's OID-equal names are aliases already
   secp256r1: [nistp256, NIST-P-256, P256, prime-256-v1]
@@ -241,6 +250,12 @@ materials:    # CycloneDX relatedCryptoMaterialProperties.type enum values
   credential: []
   token: []
 
+# A more specific material type refines a generic one instead of conflicting: a tool's field `secret-key` next to our
+# dictionary's `credential` (CipherRadar `Hardcoded secret: ...`) keeps secret-key (Vocabulary.relation).
+material_hierarchy:
+  credential: [password, token, key, shared-secret]
+  key: [private-key, public-key, secret-key]
+
 asset_types:  # CycloneDX assetType enum values, plus `library` for library components
   algorithm: []
   certificate: []
@@ -258,6 +273,8 @@ protocols:    # CycloneDX protocolProperties.type values (TLS etc. upper case he
   QUIC: []
   SSTP: []
   WPA: []
+  OpenPGP: [PGP, GPG, GnuPG]   # CycloneDX protocol type `other`; a message format standard (RFC 9580)
+  OTR: [Off-the-Record]        # Off-the-Record Messaging (CycloneDX type `other`); SCANOSS reports it on ECDSA/Ed25519 Verify lines
 
 # Tokens naming a protocol version: token -> [protocol, version]
 protocol_versions:
@@ -304,6 +321,14 @@ names:
   ECDH-ES+A128KW: {family: ECDH}
   ECDH-ES+A192KW: {family: ECDH}
   ECDH-ES+A256KW: {family: ECDH}
+  ECDH-1PU: {family: ECDH}          # JOSE public-key authenticated encryption (draft-madden-jose-ecdh-1pu)
+  ECDH-1PU+A128KW: {family: ECDH}
+  ECDH-1PU+A192KW: {family: ECDH}
+  ECDH-1PU+A256KW: {family: ECDH}
+  C20P: {algorithm: ChaCha20-Poly1305}     # JOSE draft identifiers (draft-amringer-jose-chacha)
+  XC20P: {algorithm: XChaCha20-Poly1305}
+  S256: {kind: api}                 # PKCE code challenge method (RFC 7636), an identifier, not an algorithm name
+  PLAINTEXT: {kind: non-crypto}     # OAuth 1.0 / PKCE `plain`: no cryptography involved
   A128KW: {family: AES, key_size: 128, mode: KW, primitive: key-wrap}
   A192KW: {family: AES, key_size: 192, mode: KW, primitive: key-wrap}
   A256KW: {family: AES, key_size: 256, mode: KW, primitive: key-wrap}
@@ -324,8 +349,12 @@ names:
   JWT: {}
   JWS: {}
   JWE: {}
-  JWK: {}
-  JSON Web Key: {}
+  JWK: {material: key}
+  JSON Web Key: {material: key}
+  JWKS: {material: key}
+  JWK Set: {material: key}
+  OctKey: {material: secret-key}    # a JOSE symmetric (oct) key
+  KeyPair: {material: key}
   # SSH (RFC 4253, 5656, 8332, 8709)
   ssh-rsa: {family: RSASSA-PKCS1, digest: SHA-1}
   rsa-sha2-256: {family: RSASSA-PKCS1, digest: SHA-256}

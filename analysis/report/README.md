@@ -35,7 +35,7 @@ pd.melt(m, id_vars=["tool", "dimension"], value_vars=["standard_share", "any_sha
 ```python
 lv = pd.read_csv(f"{A}/levels-run1.csv")
 ladder = lv.query("dimension == 'algorithm' and tool != 'all'").pivot(index="tool", columns="level", values="share")
-ladder = ladder[["L0", "L1", "L2", "L3", "L4lit", "L4"]]       # one line per tool, levels on the x axis
+ladder = ladder[["L0", "L1", "L2", "L3", "L4"]]       # one line per tool, levels on the x axis
 params = lv.query("dimension != 'algorithm' and tool == 'all'").pivot(index="dimension", columns="level", values="share")
 ```
 

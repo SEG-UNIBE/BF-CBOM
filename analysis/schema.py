@@ -5,14 +5,18 @@
   `referencing` registry). Reported per CBOM: valid, number of errors, error kinds (`<keyword>:<path without
   indices>`). Tools whose CBOM our own adapter writes (`native_cyclonedx: false` in common/tools.yaml) are reported
   apart (refinement 3): their validity would measure us.
-- **Meaningful:** the share of crypto assets (components, not occurrences) that carry an asset type, a primitive, a
-  parameter (parameter set or curve), a key size, a mode and an OID: counted once from the standard CycloneDX fields
-  only (`via == field` and a `cryptoProperties.` source) and once from any source the normaliser reads (names,
-  properties, symbols, derivations). The gap is what sits outside the standard.
-- **Traceable:** a located record is traceable (weak) when its file exists at the commit and its line is inside the
-  file; strong (refinement 4) when lines line±k also hold a token of the vocabulary (algorithm and family spellings,
-  curve names, whole-name and API identifiers). File contents come from a `SnapshotStore` (the VM's git mirror or a
-  fetched snapshot cache); without one the traceability columns stay empty.
+- **Meaningful:** per CycloneDX asset type (`assetType`: algorithm, certificate, protocol, related-crypto-material),
+  the share of crypto assets (components, not occurrences) carrying the standard's own fields for that type
+  (`MEANINGFUL_FIELDS`: an algorithm's primitive, parameter set or curve, mode, padding, functions, OID, ...; a
+  key's type, size, algorithm; a certificate's subject, issuer, validity, signature algorithm; a protocol's type,
+  version, cipher suites), counted from the raw component (`standard`), and, where the normaliser reads such a value
+  from any source (names, properties, symbols, derivations), from the records (`any`). The gap is what sits outside
+  the standard. The asset-type set and the field sets are CycloneDX's, so the paper can cite them as such.
+- **Traceable:** per asset type: a record names a file (`located_file`) or a file and a line (`located_line`; a line
+  is an addition to the file, so both are counted); a record with a line is traceable (weak) when its file exists at
+  the commit and the line is inside it; strong (refinement 4) when lines line±k also hold a token of the vocabulary
+  (algorithm and family spellings, curve names, whole-name and API identifiers). File contents come from a
+  `SnapshotStore` (the VM's git mirror or a fetched snapshot cache); without one the traceability columns stay empty.
 """
 
 from __future__ import annotations
@@ -32,15 +36,55 @@ SCHEMA_COLUMNS = [
     "repo", "snapshot", "variant", "language", "tool", "run", "native_cyclonedx", "bom_format", "spec_version",
     "schema", "valid", "errors", "error_kinds",
 ]  # fmt: skip
-MEANINGFUL_DIMS = ("asset_type", "primitive", "parameter", "key_size", "mode", "oid")
+# Per CycloneDX asset type: (dimension label, standard JSON paths relative to `cryptoProperties`, record dimension the
+# normaliser fills from any source or None). The paths are the type's own property set in CycloneDX 1.6/1.7.
+MEANINGFUL_FIELDS: dict[str, tuple[tuple[str, tuple[str, ...], str | None], ...]] = {
+    "algorithm": (
+        ("primitive", ("algorithmProperties.primitive",), "primitive"),
+        ("parameter", ("algorithmProperties.parameterSetIdentifier", "algorithmProperties.curve",
+                       "algorithmProperties.ellipticCurve"), "parameter"),
+        ("key_size", ("algorithmProperties.parameterSetIdentifier",), "key_size"),
+        ("mode", ("algorithmProperties.mode",), "mode"),
+        ("padding", ("algorithmProperties.padding",), "padding"),
+        ("functions", ("algorithmProperties.cryptoFunctions",), "functions"),
+        ("oid", ("oid",), "oid"),
+        ("security_level", ("algorithmProperties.classicalSecurityLevel",
+                            "algorithmProperties.nistQuantumSecurityLevel"), None),
+    ),
+    "related-crypto-material": (
+        ("type", ("relatedCryptoMaterialProperties.type",), "material"),
+        ("size", ("relatedCryptoMaterialProperties.size",), "key_size"),
+        ("algorithm", ("relatedCryptoMaterialProperties.algorithmRef",), "family"),
+        ("format", ("relatedCryptoMaterialProperties.format",), None),
+        ("secured_by", ("relatedCryptoMaterialProperties.securedBy",), None),
+    ),
+    "certificate": (
+        ("subject", ("certificateProperties.subjectName",), None),
+        ("issuer", ("certificateProperties.issuerName",), None),
+        ("validity", ("certificateProperties.notValidBefore", "certificateProperties.notValidAfter"), None),
+        ("signature_algorithm", ("certificateProperties.signatureAlgorithmRef",), "family"),
+        ("public_key", ("certificateProperties.subjectPublicKeyRef",), None),
+        ("format", ("certificateProperties.certificateFormat",), None),
+    ),
+    "protocol": (
+        ("type", ("protocolProperties.type",), "protocol"),
+        ("version", ("protocolProperties.version",), "protocol_version"),
+        ("cipher_suites", ("protocolProperties.cipherSuites",), None),
+        ("crypto_refs", ("protocolProperties.cryptoRefArray",), None),
+    ),
+}  # fmt: skip
 MEANINGFUL_COLUMNS = [
-    "tool", "native_cyclonedx", "crypto_assets", "dimension", "standard", "any", "standard_share", "any_share",
+    "tool", "native_cyclonedx", "asset_type", "assets", "dimension", "standard", "any", "standard_share", "any_share",
 ]  # fmt: skip
 TRACE_COLUMNS = [
-    "repo", "snapshot", "variant", "language", "tool", "run", "source", "records", "located", "file_exists",
-    "line_in_range", "strong", "share_located", "share_weak", "share_strong",
+    "repo", "snapshot", "variant", "language", "tool", "run", "asset_type", "source", "records", "located_file",
+    "located_line", "file_exists", "line_in_range", "strong", "share_located_file", "share_located_line",
+    "share_weak", "share_strong",
 ]  # fmt: skip
 _CRYPTO_TYPES = {"algorithm", "certificate", "protocol", "related-crypto-material"}
+_NO_INFO = {"other", "unknown", "none", ""}
+# Protocols of the vocabulary that CycloneDX's protocolProperties.type enum has no value for (they are `other` there)
+PROTOCOLS_TYPE_OTHER = frozenset({"SSL", "OpenPGP", "OTR"})
 _STANDARD_SRC = "cryptoProperties."
 _MAX_KINDS = 6
 
@@ -105,54 +149,84 @@ def schema_row(meta: dict, cbom_path: Path, cbom: dict, *, language: str | None,
 # ----- meaningful -----
 
 
-def _component_values(records) -> dict[int, tuple[dict, dict, dict]]:
-    """{component index: (values, src, via)} of the crypto-asset components behind the records."""
-    out: dict[int, tuple[dict, dict, dict]] = {}
-    for r in records:
-        if r.values.get("asset_type") in _CRYPTO_TYPES and r.component_index not in out:
-            out[r.component_index] = (r.values, r.src, r.via)
-    return out
-
-
-def _has(values: dict, src: dict, via: dict, dim: str, *, standard: bool) -> bool:
-    dims = ("param_set", "curve") if dim == "parameter" else (dim,)
-    for d in dims:
-        if values.get(d) is None:
+def _present(component: dict, paths: tuple[str, ...]) -> bool:
+    """One of the standard fields holds a value that carries information (not `other`/`unknown`, not empty)."""
+    for path in paths:
+        cur: object = component.get("cryptoProperties") or {}
+        for part in path.split("."):
+            cur = cur.get(part) if isinstance(cur, dict) else None
+        if cur in (None, "", [], {}) or (isinstance(cur, str) and cur.strip().lower() in _NO_INFO):
             continue
-        if not standard or (via.get(d) == "field" and str(src.get(d) or "").startswith(_STANDARD_SRC)):
-            return True
+        return True
     return False
 
 
+def _record_has(values: dict, dim: str | None) -> bool:
+    if dim is None:
+        return False
+    # parameterSetIdentifier is read as a key size for keyed families, a parameter set or a curve otherwise
+    dims = ("param_set", "curve", "key_size") if dim == "parameter" else (dim,)
+    return any(values.get(d) not in (None, "", (), []) for d in dims)
+
+
 def meaningful_rows(normalized, native_of: dict[str, bool | None]) -> list[dict]:
-    """One row per (tool, dimension) over all CBOMs of `normalized` ((meta, path, NormalizedCbom) triples)."""
-    assets: Counter = Counter()
-    standard: dict[str, Counter] = defaultdict(Counter)
-    any_src: dict[str, Counter] = defaultdict(Counter)
-    for _, _, n in normalized:
-        for values, src, via in _component_values(n.records).values():
-            assets[n.tool] += 1
-            for dim in MEANINGFUL_DIMS:
-                standard[n.tool][dim] += _has(values, src, via, dim, standard=True)
-                any_src[n.tool][dim] += _has(values, src, via, dim, standard=False)
+    """One row per (tool, asset type, dimension) over all CBOMs of `normalized` ((meta, path, NormalizedCbom)
+    triples): `standard` counts assets whose raw component carries the field (the CBOM next to the normalised
+    one), `any` counts assets with a value from any source in the records (None for fields the normaliser does
+    not read). Components are counted once however many occurrences they have."""
+    assets: dict[tuple[str, str], int] = Counter()
+    standard: dict[tuple[str, str], Counter] = defaultdict(Counter)
+    any_src: dict[tuple[str, str], Counter] = defaultdict(Counter)
+    for _, cbom_path, n in normalized:
+        try:
+            comps = _flat(json.loads(Path(cbom_path).read_text(encoding="utf-8")))
+        except (OSError, json.JSONDecodeError):
+            comps = []
+        seen: set[int] = set()
+        for r in n.records:
+            at = r.values.get("asset_type")
+            if at not in MEANINGFUL_FIELDS or r.component_index in seen:
+                continue
+            seen.add(r.component_index)
+            key = (n.tool, at)
+            assets[key] += 1
+            comp = comps[r.component_index] if r.component_index < len(comps) else {}
+            for label, paths, dim in MEANINGFUL_FIELDS[at]:
+                standard[key][label] += _present(comp, paths)
+                if dim is not None:
+                    any_src[key][label] += _record_has(r.values, dim)
     rows = []
-    for tool in sorted(assets):
-        total = assets[tool]
-        for dim in MEANINGFUL_DIMS:
-            s, a = standard[tool][dim], any_src[tool][dim]
+    for (tool, at), total in sorted(assets.items()):
+        for label, _, dim in MEANINGFUL_FIELDS[at]:
+            s_, a = standard[(tool, at)][label], any_src[(tool, at)][label] if dim is not None else None
             rows.append(
                 {
                     "tool": tool,
                     "native_cyclonedx": native_of.get(tool),
-                    "crypto_assets": total,
-                    "dimension": dim,
-                    "standard": s,
+                    "asset_type": at,
+                    "assets": total,
+                    "dimension": label,
+                    "standard": s_,
                     "any": a,
-                    "standard_share": round(s / total, 3) if total else 0.0,
-                    "any_share": round(a / total, 3) if total else 0.0,
+                    "standard_share": round(s_ / total, 3) if total else 0.0,
+                    "any_share": round(a / total, 3) if total and a is not None else None,
                 }
             )
     return rows
+
+
+def _flat(cbom: dict) -> list[dict]:
+    """The components in the order the normaliser indexes them (nested components included, depth first)."""
+    out: list[dict] = []
+
+    def walk(components) -> None:
+        for c in components or []:
+            if isinstance(c, dict):
+                out.append(c)
+                walk(c.get("components"))
+
+    walk((cbom or {}).get("components"))
+    return out
 
 
 # ----- traceable -----
@@ -197,41 +271,52 @@ def traceability_rows(
     vocab: Vocabulary | None = None,
     window: int = 2,
 ) -> list[dict]:
-    """One row per (snapshot, variant, tool): how many records are located, exist at the commit, point inside the
-    file (weak) and near a vocabulary token (strong). Library records are left out."""
+    """One row per (snapshot, variant, tool, asset type): how many records name a file, a file and a line, exist at
+    the commit, point inside the file (weak) and near a vocabulary token (strong). Library records are left out; key
+    material gets its own rows (secrets in configuration files would otherwise dominate)."""
     tokens = alias_tokens(vocab)
     rows = []
     for meta, cbom_path, n in normalized:
         snapshot, variant = cbom_path.parents[2].name, cbom_path.parents[1].name
         repo = full_name(snapshot)
         commit = meta.get("variant_commit") or meta.get("base_commit")
-        counts = Counter()
-        records = [r for r in n.records if r.values.get("asset_type") != "library"]
-        for r in records:
-            located, exists, in_range, strong = trace_record(r, store, repo, commit, tokens, window=window)
-            counts["located"] += located
-            counts["file_exists"] += bool(exists)
-            counts["line_in_range"] += bool(in_range)
-            counts["strong"] += bool(strong)
         source = store.source(repo, commit)
-        total, located = len(records), counts["located"]
-        rows.append(
-            {
-                "repo": repo,
-                "snapshot": snapshot,
-                "variant": variant,
-                "language": languages.get(repo),
-                "tool": n.tool,
-                "run": meta.get("run_index"),
-                "source": source,
-                "records": total,
-                "located": located,
-                "file_exists": counts["file_exists"] if source else None,
-                "line_in_range": counts["line_in_range"] if source else None,
-                "strong": counts["strong"] if source else None,
-                "share_located": round(located / total, 3) if total else None,
-                "share_weak": round(counts["line_in_range"] / located, 3) if source and located else None,
-                "share_strong": round(counts["strong"] / located, 3) if source and located else None,
-            }
-        )
+        by_type: dict[str, list] = defaultdict(list)
+        for r in n.records:
+            at = r.values.get("asset_type")
+            if at != "library":
+                by_type[at or "unknown"].append(r)
+        for at in sorted(by_type):
+            records = by_type[at]
+            counts: Counter = Counter()
+            for r in records:
+                counts["located_file"] += bool(r.file)
+                located, exists, in_range, strong = trace_record(r, store, repo, commit, tokens, window=window)
+                counts["located_line"] += located
+                counts["file_exists"] += bool(exists)
+                counts["line_in_range"] += bool(in_range)
+                counts["strong"] += bool(strong)
+            total, with_line = len(records), counts["located_line"]
+            rows.append(
+                {
+                    "repo": repo,
+                    "snapshot": snapshot,
+                    "variant": variant,
+                    "language": languages.get(repo),
+                    "tool": n.tool,
+                    "run": meta.get("run_index"),
+                    "asset_type": at,
+                    "source": source,
+                    "records": total,
+                    "located_file": counts["located_file"],
+                    "located_line": with_line,
+                    "file_exists": counts["file_exists"] if source else None,
+                    "line_in_range": counts["line_in_range"] if source else None,
+                    "strong": counts["strong"] if source else None,
+                    "share_located_file": round(counts["located_file"] / total, 3) if total else None,
+                    "share_located_line": round(with_line / total, 3) if total else None,
+                    "share_weak": round(counts["line_in_range"] / with_line, 3) if source and with_line else None,
+                    "share_strong": round(counts["strong"] / with_line, 3) if source and with_line else None,
+                }
+            )
     return rows

@@ -32,6 +32,7 @@ from pathlib import Path
 
 import yaml
 
+from .corpus import SIZE_CAP_RATIO, repo_size_cap_mb
 from .jobs import tool_supports
 from .models import JobInstruction, JobResult, RepoInfo
 from .tools_registry import load_tools, plan_waves  # noqa: F401  plan_waves re-exported for the runner and tests
@@ -386,6 +387,12 @@ def ensure_scan_repo(
     return scan
 
 
+def mirror_size_mb(bare: Path) -> int:
+    """Size of a bare mirror's object store in MB (what a full clone through the git server has to pack)."""
+    objects = bare / "objects"
+    return sum(p.stat().st_size for p in objects.rglob("*") if p.is_file()) // 1024**2 if objects.is_dir() else 0
+
+
 def snapshot_files(full_name: str, commit: str | None, *, mirror_dir: Path = GIT_MIRROR_DIR) -> frozenset[str] | None:
     """Paths of all files of a snapshot (from the base mirror), or None when the mirror is not mounted
     (e.g. an exported copy on the host). Used by the normaliser for `file_exists` and path resolution."""
@@ -473,6 +480,7 @@ def resolve_snapshots(
     """
     locked = load_lock(exp_dir)
     snapshots: list[Snapshot] = []
+    cap_mb = repo_size_cap_mb()
     for repo in spec.repos:
         prior = locked.get(repo.full_name) or {}
         branch = repo.branch or prior.get("branch") or "main"
@@ -487,7 +495,12 @@ def resolve_snapshots(
             if not commit:
                 raise ExperimentError(f"cannot resolve {repo.full_name}@{branch} (unknown branch or unreachable)")
         log(f"  {repo.full_name}@{branch} -> {commit[:12]}")
-        ensure_mirror(repo, commit, mirror_dir=mirror_dir)
+        bare = ensure_mirror(repo, commit, mirror_dir=mirror_dir)
+        if cap_mb and (size := mirror_size_mb(bare)) > cap_mb:
+            log(
+                f"  warning: mirror of {repo.full_name} is {size} MB, above the repo size cap {cap_mb} MB "
+                f"(GITSERVER_MEMORY / {SIZE_CAP_RATIO}); a full clone through the git server may be killed"
+            )
         locked[repo.full_name] = {"branch": branch, "commit": commit, "source_url": repo.source_url}
         for variant in repo.variants:
             vc = variant_commit(repo, variant, commit, mirror_dir=mirror_dir)
@@ -532,18 +545,33 @@ class PlannedJob:
         return result_paths(exp_dir, s.full_name, s.commit, s.variant, self.tool, self.run_index)
 
 
+OOM = "oom"  # a stored `ok` run whose container was OOM-killed meanwhile: not a clean result (refinement 15)
+
+
 def _stored_status(meta_path: Path) -> str | None:
+    """The stored run's status, with `ok` demoted to `oom` when the cgroup recorded an OOM kill during the run."""
     try:
-        return json.loads(meta_path.read_text(encoding="utf-8")).get("status")
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
+    status = meta.get("status")
+    if status == "ok" and (meta.get("oom_kills") or 0) > 0:
+        return OOM
+    return status
 
 
 def plan_jobs(
-    spec: ExperimentSpec, snapshots: list[Snapshot], exp_dir: Path, *, new_id, retry_failed: bool = False
+    spec: ExperimentSpec,
+    snapshots: list[Snapshot],
+    exp_dir: Path,
+    *,
+    new_id,
+    retry_failed: bool = False,
+    rerun: set[str] | frozenset[str] = frozenset(),
 ) -> tuple[list[PlannedJob], int]:
-    """Jobs still to run. Resumable: a run whose meta file exists is skipped, unless `retry_failed`
-    and its stored status is not "ok" (then the stored files are removed and the run is redone).
+    """Jobs still to run. Resumable: a run whose meta file exists is skipped, unless `retry_failed` and its stored
+    status is not "ok" (an `ok` run with OOM kills counts as not ok), or its tool is in `rerun` (every stored run of
+    that tool is redone, unsupported pairs excepted). Redone runs have their stored files removed first.
     Returns (jobs, skipped)."""
     jobs: list[PlannedJob] = []
     skipped = 0
@@ -552,7 +580,11 @@ def plan_jobs(
             for k in range(1, spec.repetitions + 1):
                 cbom, meta = result_paths(exp_dir, snap.full_name, snap.commit, snap.variant, tool, k)
                 if meta.exists():
-                    if not (retry_failed and _stored_status(meta) not in ("ok", UNSUPPORTED)):
+                    status = _stored_status(meta)
+                    redo = (retry_failed and status not in ("ok", UNSUPPORTED)) or (
+                        tool in rerun and status != UNSUPPORTED
+                    )
+                    if not redo:
                         skipped += 1
                         continue
                     meta.unlink()

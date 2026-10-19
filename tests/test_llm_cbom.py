@@ -126,6 +126,9 @@ def test_generate_cbom_assembles_cyclonedx_and_verifies_locations(repo: Path):
     assert stats.usage() == {
         "requests": 1,
         "requests_failed": 0,
+        "chunks_total": 1,
+        "chunks_sent": 1,
+        "chunks_skipped": 0,
         "input_tokens": 100,
         "cached_input_tokens": 40,
         "cache_write_tokens": 0,
@@ -168,17 +171,51 @@ class FailingProvider:
 
 def test_generate_cbom_fails_when_every_request_fails(repo: Path):
     # an empty "ok" CBOM would look like a tool that found nothing
-    with pytest.raises(
-        RuntimeError, match="all .* requests to fake-1 failed; last error: RuntimeError: anthropic api 400"
-    ):
+    with pytest.raises(llm.LLMRequestError, match="request failed .Chunk 1 of .* to fake-1: RuntimeError: anthropic"):
         llm.generate_cbom(FailingProvider(), repo, language="python", max_chunk_chars=120)
 
 
-def test_generate_cbom_keeps_partial_results_and_counts_failures(repo: Path):
-    cbom, stats = llm.generate_cbom(FailingProvider(fail_first=1), repo, language="python", max_chunk_chars=120)
-    assert stats.requests_failed >= 1 and stats.chunks_sent >= 1
-    props = {p["name"]: p["value"] for p in cbom["metadata"]["properties"]}
-    assert props["bf-cbom:requests-failed"] == str(stats.requests_failed)
+def test_a_failed_request_fails_the_job_fast(repo: Path):
+    # a CBOM from a subset of the chunks would look like a tool that found less: the job fails at the first failure
+    provider = FailingProvider(fail_first=1)
+    trace = llm.Trace()
+    with pytest.raises(llm.LLMRequestError):
+        llm.generate_cbom(provider, repo, language="python", max_chunk_chars=120, concurrency=1, trace=trace)
+    assert provider.n == 1  # nothing queued behind the failure was sent
+    assert trace.fields["usage"]["requests_failed"] == 1 and trace.fields["usage"]["chunks_total"] > 1
+    assert any("Chunk 1 of" in line and "failed" in line for line in trace.text().splitlines())
+
+
+class LabelProvider:
+    """Answers one asset named after the chunk label, so the order of the assembled CBOM can be checked."""
+
+    name = "fake"
+    model = "fake-1"
+
+    def complete(self, system, user):
+        import re
+        import time
+
+        i = int(re.search(r"Chunk (\d+) of", user).group(1))
+        time.sleep(0.01 * ((7 * i) % 4))  # finish out of order
+        return json.dumps({"assets": [{"name": f"ALG{i}", "assetType": "algorithm"}]}), llm.request_usage(
+            model="fake-1", input_tokens=1, output_tokens=1
+        )
+
+
+def test_concurrent_requests_keep_chunk_order(repo: Path):
+    cbom, stats = llm.generate_cbom(LabelProvider(), repo, language="python", max_chunk_chars=120, concurrency=4)
+    n = stats.chunks_total
+    assert n > 2 and stats.chunks_sent == n
+    assert [c["name"] for c in cbom["components"]] == [f"ALG{i}" for i in range(1, n + 1)]
+
+
+def test_deadline_is_a_timeout_not_a_partial_result(repo: Path):
+    import time
+
+    provider = FakeProvider(['{"assets": []}'] * 10)
+    with pytest.raises(TimeoutError, match="llm_deadline"):
+        llm.generate_cbom(provider, repo, language="python", max_chunk_chars=120, deadline=time.monotonic() - 1)
 
 
 def test_truncated_answer_is_retried_in_halves(repo: Path):
@@ -198,10 +235,13 @@ def test_truncated_answer_is_retried_in_halves(repo: Path):
     assert "part 1 of 2" in provider.calls[1] and "part 2 of 2" in provider.calls[2]
 
 
-def test_generate_cbom_respects_max_chunks(repo: Path):
+def test_generate_cbom_respects_max_chunks_and_records_the_cut(repo: Path):
     provider = FakeProvider(['{"assets": []}'] * 2)
-    _, stats = llm.generate_cbom(provider, repo, language="python", max_chunk_chars=120, max_chunks=2)
+    cbom, stats = llm.generate_cbom(provider, repo, language="python", max_chunk_chars=120, max_chunks=2)
     assert stats.chunks_sent == 2 and stats.chunks_total > 2
+    assert stats.chunks_skipped == stats.chunks_total - 2 == stats.usage()["chunks_skipped"]
+    props = {p["name"]: p["value"] for p in cbom["metadata"]["properties"]}
+    assert props["bf-cbom:chunks-skipped"] == str(stats.chunks_skipped)
 
 
 class _Resp:
@@ -251,11 +291,28 @@ def test_anthropic_provider_request_and_usage():
     p0.complete("SYS", "USER")
     assert calls[-1][2]["temperature"] == 0.0
 
+    attempts = []
+
     def failing_post(url, headers, json, timeout):
+        attempts.append(1)
         return _Resp(429, {"error": "rate limited"})
 
+    slept = []
+    retrying = llm.AnthropicProvider(name="claude", model="m", api_key="k", post=failing_post, sleep=slept.append)
     with pytest.raises(RuntimeError, match="anthropic api 429"):
-        llm.AnthropicProvider(name="claude", model="m", api_key="k", post=failing_post).complete("S", "U")
+        retrying.complete("S", "U")
+    assert len(attempts) == llm.LLM_MAX_RETRIES + 1 and slept == [1.0, 2.0, 4.0][: llm.LLM_MAX_RETRIES]
+
+    def rejecting_post(url, headers, json, timeout):
+        attempts.append(2)
+        return _Resp(400, {"error": "bad request"})
+
+    attempts.clear()
+    with pytest.raises(RuntimeError, match="anthropic api 400"):
+        llm.AnthropicProvider(name="claude", model="m", api_key="k", post=rejecting_post, sleep=slept.append).complete(
+            "S", "U"
+        )
+    assert attempts == [2]  # a 400 is not transient: no retry
 
 
 def test_openai_provider_temperature_and_max_tokens_param():

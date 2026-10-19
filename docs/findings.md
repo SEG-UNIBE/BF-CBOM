@@ -174,3 +174,86 @@ groups with two located voters, 63 % share a call site at L0 (210 groups), 50 % 
 voter pairs are located but not at the same place. ICPC corpus, 289 algorithms: k >= 2 from 37 % to 47 %, k >= 4 from
 20 % to 37 %; key-size agreement 79 % (19) at L2 to 36 % (39) at L4, location 78 % (144) to 73 % (135). The exact vs
 RaQuN comparison per level is produced when RaQuN is available (VM).
+
+## Export review 2026-10-19
+The first VM exports (`e0-stability`, `e1-pilot-corpus`, `e1-icpc-corpus`, runs of 2026-10-18/19) were checked for
+plausibility before anyone cites them. The numbers below come from those exports and from the re-report with the
+code of 2026-10-19 (per-key clusters, `resolution`, macro rates); the runs themselves are to be redone on the VM
+(CLAUDE.md Status), so they are a snapshot, not results.
+- **Runs that were not what they looked like.** DeepSeek's account ran out of credit on 2026-10-18 ~21:46 UTC: all 15
+  pilot runs and 7 E0 runs failed with 402, and two E0 runs on MinerU were stored `ok` with 75 of 100 and 139 of 144
+  requests failed, so E0's DeepSeek stability (Jaccard mean 0.86, min 0.25, 44 unstable algorithms) measured the
+  outage; each failed run fired 300 requests because API errors took the split-and-retry path. cdxgen was OOM-killed
+  at its 8 GiB limit on Chat2DB, bisq, bisq2 and kafka with the runs stored `ok` (peaks at the limit). CBOMkit's two
+  pilot errors (keycloak, ansible) were "Git clone from http://gitserver/... failed" in under a minute while
+  cbomkit-jar scanned both: the git server's 256 MiB limit against a full JGit clone. All three are fixed in the
+  setup (notes.md "Export review follow-up").
+- **CBOMkit's two packagings agree exactly** wherever both ran: 130 of 130 (repo, tool) cells on ICPC and all 9 E0
+  repos give identical algorithm sets; the server variant takes ~4.9 GB resident and is slower.
+- **Tool crashes to report, not fix:** CryptoScan 1.4.0 panics in `patterns.MatchWithContext` on allure2, bisq,
+  docling and keycloak (4 of 39 repos; deterministic: E0's three repetitions on 15 repos were identical). cdxgen
+  12.8.5 crashes in `parsePyLockData` on docling's lock file. CipherRadar's 30-minute timeout on uCrop is a hang, not
+  size (a tiny repo, 359 MB resident). cdxgen timed out on keycloak and took 22 minutes on Sa-Token.
+- **DeepSeek saw only part of the big repos:** the 100-chunk cap cut bisq2 to 100 of 312 chunks, bisq 100 of 198,
+  parse-server 100 of 182, smallstep 100 of 113; the whole ICPC run cost 0.15 USD (E0 1.20 USD), but repetitions 2/3
+  and the ICPC rerun were ~98 % cache hits, so a fresh run costs more. The model answered as `deepseek-flash`.
+- **Resources.** Peak VM RAM 21.0 GiB (ICPC, budget 64, one wave), 17.0 (E0), 20.8 (pilot, budget 52) of 60.5 GiB
+  with 64 CPUs; measured per-tool peaks (max over all runs, GiB): cdxgen 8.0 (the limit), cbomkit 7.6, cbomkit-jar
+  6.8, cryptobomforge 2.7, xgrep 2.6, cipherradar 1.5, pqcheck 1.4, scanoss 1.3, ciphersift 1.3, securin-xbom 1.2,
+  qdarpan 0.9, deepseek 0.7, cryptoscan 0.7; medians far below. The wall time is cdxgen's serial queue (80 min summed
+  on ICPC = the whole run) and DeepSeek's in E0 (71 min).
+- **Item inflation, now removed.** The 2026-10-18 clusters merged through any shared key: on ICPC 48 of 312 repo
+  groups were duplicates (the same member set under several algorithms), authlib had one cluster spanning EC, ECDH,
+  ECDSA, Ed25519, X25519 and X448 and one spanning HMAC and five SHA variants with ten voters (bridged by names like
+  CipherSift's `hmac.new`, CryptoScan's `SHA-2` and DeepSeek's `HS256`), cbomkit had 85 items for 61 algorithms, and
+  location items exceeded located records (CryptoScan 7,685 items for 5,284 records). Confirmation by strict identity
+  was 80 % against 81 % by cluster (CipherRadar 71 vs 79, CipherSift 84 vs 87, CryptobomForge 90 vs 93). With per-key
+  clusters (2026-10-19) the pilot has 343 repo groups with 342 distinct member sets, cbomkit 50 items, and location
+  items at most the located records (CryptoScan 12,548 of 13,208).
+- **Names that were items.** Share of a tool's L4 items without a known family on ICPC (2026-10-18 code): securin-xbom
+  41 % (rule ids, among them SQL injection, XXE, reflection, deserialization), DeepSeek 23 %, CryptoScan 19 %,
+  Q-DARPAN 16 % (`jca`), CipherSift 13 % (API names), CipherRadar 8 %, CryptobomForge 7 %, CBOMkit 5 %. With
+  `resolution` (2026-10-19; code identifiers are `api` by shape, securin-xbom's non-crypto rules by its registry's
+  own path, no tool-specific lists, no judgement entries), pilot algorithm records: CipherSift 80 % mapped / 20 % api
+  (its names are often the API call), securin-xbom 59 % mapped / 30 % non-crypto / 11 % undefined (TLS configuration
+  rules we do not interpret), Q-DARPAN 90 / 10 % api, CryptobomForge 90 % mapped / 10 % undefined (its `UNKNOWN`
+  components), CryptoScan 94 % mapped / 5 % api, the rest 99-100 % mapped. ICPC: securin-xbom 45 % mapped / 37 %
+  non-crypto / 18 % undefined, Q-DARPAN 64 / 36 % api, CipherSift 93 / 7 % api, DeepSeek 91 % mapped / 4 % api / 4 %
+  undefined / 1 % non-crypto (`PLAINTEXT`), CryptobomForge 94 / 6 % undefined. These shares are
+  findings about the tools, not defects to repair: CipherSift's `hmac.new` records keep their recorded conflict
+  (name HMAC, field SHA-2; 120 family conflicts on the pilot). CipherRadar's 14,786 material conflicts, by contrast,
+  were our own dictionary (`Hardcoded secret: ...` -> credential against its field `secret-key`): 0 with the
+  hierarchy.
+- **Ladder after the change** (confirmed share of a tool's algorithms, L0 / L1 / L2 / L3 / L4, algorithms; the former
+  L4lit level is gone with the last judgement entry; tailored pairs excluded, so CipherSift is absent on the pilot).
+  Pilot, pooled 61 / 70 / 83 / 90 / 90 % (914): CBOMkit 70 -> 100 (50), cbomkit-jar 66 -> 96 (67), cdxgen 0 -> 100
+  (10), CipherRadar 69 -> 90 (134), CryptobomForge 39 -> 100 (28), CryptoScan 35 -> 72 (229), pqcheck 79 -> 99 (86),
+  Q-DARPAN 86 -> 100 (55), SCANOSS 67 -> 96 (100), securin-xbom 83 -> 96 (23), xgrep 72 -> 98 (132); confirmed
+  through members alone 61 / 70 / 73 / 80 / 87 %; clusters spanning several identities 65 / 68 / 75 / 63 / 63. ICPC
+  (held out), pooled 70 / 76 / 90 / 96 / 96 % (729): CipherSift 45 -> 100 (95), CryptoScan 46 -> 86 (85), DeepSeek
+  74 -> 95 (116), CipherRadar 73 -> 90 (96), securin-xbom 83 -> 100 (48), xgrep 87 -> 100 (76), CBOMkit 86 -> 97
+  (59); members alone 70 / 76 / 86 / 92 / 95 %. Parameters pooled L2 / L3 / L4, pilot: key size 23 / 31 / 80 % (249
+  pairs), mode 42 / 61 / 85 (66), padding 46 / 70 / 85 (46), curve 12 / 58 / 83 (159), digest n/a / 22 / 42 (123;
+  the standard has no digest field). The shares are higher than on 2026-10-18 because undefined and API names are no
+  longer items nobody can confirm.
+- **Scores after the change** (algorithm dimension, L3, mean of the per-repository rates [95 % CI], pooled; a rank
+  needs ≥ 3 repos and ≥ 10 items). ICPC: CipherSift 100 [100, 100], CryptobomForge 100, pqcheck 100, Q-DARPAN 100,
+  xgrep 100, securin-xbom 100, CBOMkit 98 [96, 100] (pooled 97), DeepSeek 98 [96, 100] (95), CipherRadar 86 [71,
+  96] (90), CryptoScan 82 [64, 92] (86); cdxgen 100 % unranked (3 repos, 6 items). Pilot: CBOMkit 100, cdxgen 100 (5
+  repos, 10 items), CryptobomForge 100, Q-DARPAN 100, pqcheck 99 [96, 100], cbomkit-jar 98 [94, 100], xgrep 98 [92,
+  100], securin-xbom 96 [88, 100], SCANOSS 96 [91, 100], CipherRadar 89 [82, 94], CryptoScan 78 [63, 88] (pooled
+  72). Location (ICPC): Q-DARPAN 100,
+  xgrep 100, CryptobomForge 100, pqcheck 93, securin-xbom 93 (pooled 82), CBOMkit 90 (78), DeepSeek 84 (47),
+  CipherSift 70 (42), CipherRadar 65 (38, exclusivity 54 %), CryptoScan 57 (32): the macro and pooled rates differ
+  most where a few repositories hold most of a tool's records.
+- **Low-expectation repositories** (ICPC, 6 repos the spec marks `expect_crypto: low`): crypto assets reported,
+  securin-xbom 26 (8 algorithms; 19 in one repo), CryptoScan 25 (12), CipherRadar 25 (19), DeepSeek 20 (15),
+  CipherSift 10 (6), xgrep 7, pqcheck 6, Q-DARPAN 3, CryptobomForge 3, CBOMkit 2, cdxgen 1 (no algorithm). A
+  false-positive proxy, not ground truth (now a table in every summary).
+- **RQ1 details.** securin-xbom: 17 of 23 CBOMs invalid (enum `relatedCryptoMaterialProperties.type`, 222 errors),
+  xgrep 4 invalid (`type: dependencies`), Q-DARPAN 14 CBOMs with deprecated fields; CryptobomForge's 2 "CycloneDX
+  1.6" documents were empty shells our adapter wrote. Two readings of "located" existed (cdxgen 84 % with a file
+  vs 9 % with a line): both are columns now. CipherRadar's traceability was dominated by 14,825 "Hardcoded secret"
+  records (14,469 on bisq2, i18n keys): key material has its own rows now.
+- **Micro:** CryptoScan finds only EC and RSA of the 11 micro-c assets although C is in its languages (OpenSSL EVP
+  API): a refinement-15 check of its patterns is open.

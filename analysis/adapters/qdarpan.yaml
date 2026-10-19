@@ -14,10 +14,11 @@ sources:
   - dependencies
 context: [property:qdarpan:matchers]
 dictionary:
-  name:
-    jca: {}                     # the Java crypto API as a whole, no algorithm (library and algorithm components)
-    openssl: {}
-    bouncycastle: {}
+  name:   # Q-DARPAN's own library names (source: its CBOM output, e1-pilot-corpus 2026-10-16): APIs and libraries as
+          # a whole, no algorithm (library and algorithm components)
+    jca: {kind: api}
+    openssl: {kind: api}
+    bouncycastle: {kind: api}
 notes: >
   One component per algorithm with up to 30+ locations; Q-DARPAN itself writes them only into the properties
   qdarpan:location.N (absolute paths), which the worker copies into evidence.occurrences (property_locations is the

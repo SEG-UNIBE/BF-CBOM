@@ -1,13 +1,18 @@
 spec: securin-xbom
 inherits: _cyclonedx
-version: 1
+version: 2
 declared: [{bomFormat: CycloneDX, specVersion: "1.6"}]
-checked_on: "e1-pilot-corpus 2026-10-16 (xbom 0.1.0, 8 CBOMs)"
+checked_on: "e1-pilot-corpus 2026-10-16 (xbom 0.1.0, 8 CBOMs); rule taxonomy 2026-10-19"
 sources:
   - fields: standard
-  - parse: name
+  - {parse: "rule:name"}                                 # the name is the rule id of the semgrep finding
   - {parse: "rule:xbom:crypto:rule_id", quiet: true}
-dictionary:
+# xbom's own crypto rules live in its cbom module (opt.xbom.lib.../xbom.modules.cbom.rules.xbom-python-hash-sha256);
+# the registry files its rules by topic (opt.xbom-registry.rules.<lang>.lang.security.audit.crypto.<rule>,
+# ...python.cryptography.security.<rule>). A rule whose path has none of these segments is one of the registry's
+# generic security audit rules (SQL injection, XXE, reflection, ...): the tool's own taxonomy, read from the id.
+rule_crypto_segments: [cbom, crypto, cryptography]
+dictionary:   # the tool's own spellings, read as they say (source: its CycloneDX output, e1-pilot-corpus 2026-10-16)
   primitive:
     pk: pke
     dsa: signature
@@ -15,5 +20,11 @@ dictionary:
     prng: {family: PRNG}       # random generators reported as related-crypto-material of type prng/csprng
     csprng: {family: CSPRNG}
 notes: >
-  One component per semgrep finding. Out-of-spec primitives `pk` and `dsa` and related-material types `prng` and
-  `csprng` (random generators); the rule id (xbom-python-hash-sha256) is the fallback name.
+  One component per semgrep finding, named after the full rule id (opt.xbom-registry.rules.java.lang.security.audit.
+  crypto.use-of-sha1.use-of-sha1); the last segment is the rule name, which parses (use of sha1 -> SHA-1). The
+  registry rule set is frozen unfiltered, so audit rules outside cryptography arrive as cryptographic-asset
+  components; `rule_crypto_segments` reads the registry's own topic path, so they are `non-crypto` (countable, never
+  algorithm items) without a list of ours. Rules about TLS configuration (insecure-trust-manager, weak-ssl-context,
+  unencrypted-socket) and GCM detection sit under `crypto` and are read as they parse, not interpreted: what the tool
+  reports is the finding. Out-of-spec primitives `pk` and `dsa` and related-material types `prng` and `csprng`;
+  short rule ids (xbom-python-hash-sha256) parse after the prefix is dropped.

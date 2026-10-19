@@ -16,28 +16,35 @@ varies only *when two reports count as the same algorithm*; the unit stays fixed
   - L2 standard:   the whole name, or CycloneDX 1.7 `algorithmFamily`, mapped through the shared standard
                    vocabulary (CycloneDX registry, JOSE/SSH/JCA identifiers: DESede -> 3DES, HS256 -> HMAC)
   - L3 parsed:     composite names parsed (AES-256-GCM -> AES, SHA256withECDSA -> ECDSA)
-  - L4lit:         L4 without the interpretive dictionary entries (`interpretive: true` in a tool spec: a judgement
-                   such as "Certificate Validation Bypass" -> TLS); such records keep their L3 identity
   - L4 tool specs: the full normalised record: tool-specific sources (CryptoScan symbols, properties, refs,
-                   dependencies), tool dictionaries and API context (analysis/adapters/<tool>.yaml)
+                   dependencies), tool dictionaries and API context (analysis/adapters/<tool>.yaml). The specs hold
+                   the tools' own spellings and labels, never judgements (CLAUDE.md Rules, 2026-10-19); a former
+                   level L4lit (L4 without `interpretive` entries) went with the last judgement entry, since the
+                   two had become identical.
 
-  The records of a repository fall into *clusters* at each level: the connected sets under the relation (a
-  union-find over all algorithm records, extended level by level, so clusters only ever merge). An item's clusters
-  at L are the clusters holding one of its records; a cluster may also hold records of another item that matched in
-  through a lower level (two tools wrote the same string, one tool's spec resolves it differently). An item is
-  *confirmed* for a tool at level L when a cluster holding one of the tool's records of that item also holds a
-  record of another voter group (common/tools.yaml `voter_group`). Matches are never lost at a higher level (two
-  tools that wrote the same string agree at every level), so a tool's confirmed share is non-decreasing and each
-  step's gain is attributable to one normalisation step. The L0 share has a plain reading: the share of a tool's
-  algorithms for which another tool uses a verbatim identical spelling. The L0 to L4 gap is the agreement
-  normalisation creates (representational heterogeneity); hypotheses are tested at a conservative level (L2/L3),
-  rankings checked for stability across levels. The L4lit to L4 gap is the part that rests on judgement entries.
-  The symmetric view, "how many voter groups report this algorithm at level L", is the largest cluster of the item
-  in voter groups (`Item.k_at`): at L4 every record of the item is in one cluster, so it is the plain count.
+  The records of a repository fall into *clusters* at each level, one per key: the cluster of key k at level L
+  holds every record whose identity at some level up to L is k. A record with several keys (`hmac.new`: SHA-1 at
+  L3, HMAC at L4) sits in several clusters, but clusters never merge through it (decided 2026-10-19: the earlier
+  union-find let one bridging name merge SHA-256 with SHA-512 and HMAC with SHA-1). A cluster may hold records of
+  several items (two tools wrote the same string, one tool's spec resolves it differently); such multi-unit
+  clusters are counted per level (`multi_unit_clusters`): what the level declares "the same". From L2 on a record
+  with a generic identity (SHA-2, EC, the bare `SHA` marker) is *attached* to the clusters of the specific
+  algorithms it may stand for that exist in the repository: it confirms them and is confirmed by them, but brings no
+  key. An item is *confirmed* for a tool at level L when a cluster holding one of the tool's records of that item
+  also holds a record of another voter group (common/tools.yaml `voter_group`); `confirmed_strict` counts the
+  confirmations that rest on members alone. Matches are never lost at a higher level (two tools that wrote the same
+  string agree at every level), so a tool's confirmed share is non-decreasing and each step's gain is attributable
+  to one normalisation step. The L0 share has a plain reading: the share of a tool's algorithms for which another
+  tool uses a verbatim identical spelling. The L0 to L4 gap is the agreement normalisation creates
+  (representational heterogeneity); hypotheses are tested at a conservative level (L2/L3), rankings checked for
+  stability across levels. The symmetric view,
+  "how many voter groups report this algorithm at level L", is the largest cluster of the item in voter groups
+  (`Item.k_at`). Records without an L4 identity (`undefined`, `api`, `non-crypto`, `ambiguous`: the record's
+  `resolution`) are not items and never match.
 
 Parameters (key size, mode, padding, curve, digest) get the same ladder from L2 on, with the unit (item, value) over
 values from any source: a pair counts as confirmed at L when the tool's value is *admitted* at L (L2: from a
-standard field, L3: also parsed from the name, L4lit: any source but interpretive entries, L4: any source) and a
+standard field, L3: also parsed from the name, L4: any source) and a
 record of another voter group in the tool's cluster carries the same admitted value. `closure=True` adds the
 algorithms a record implies (Vocabulary.implied, refinement 2) as items of the tool: an implication is parsed
 knowledge, so such a record joins the implied item's clusters from L3 on (it never merges clusters: HMAC-SHA256
@@ -58,7 +65,7 @@ from common.experiment import repo_full_name as full_name
 from .normalize.record import NormRecord
 from .normalize.vocab import Vocabulary, fold, load_vocabulary
 
-LEVELS = ("L0", "L1", "L2", "L3", "L4lit", "L4")
+LEVELS = ("L0", "L1", "L2", "L3", "L4")
 LEVEL_INDEX = {lv: i for i, lv in enumerate(LEVELS)}
 UNIT_LEVEL = "L4"
 LEVEL_NAMES = {
@@ -66,13 +73,18 @@ LEVEL_NAMES = {
     "L1": "case and separators ignored",
     "L2": "standard vocabulary (whole names, algorithmFamily)",
     "L3": "composite names parsed",
-    "L4lit": "tool specs without interpretive entries (judgements keep their L3 identity)",
     "L4": "tool specs (tool-specific sources, dictionaries, context)",
 }
 PARAMETER_DIMS = ("key_size", "mode", "padding", "curve", "digest")
-PARAMETER_LEVELS = ("L2", "L3", "L4lit", "L4")  # parameters do not exist in a raw name
-CLOSURE_LEVELS = ("L3", "L4lit", "L4")  # an implied algorithm is a parsed fact: it exists from L3 on
-LEVEL_COLUMNS = ["dimension", "level", "tool", "voter_group", "algorithms", "confirmed", "share"]
+PARAMETER_LEVELS = ("L2", "L3", "L4")  # parameters do not exist in a raw name
+# A dimension the standard has no field for exists only once a name is parsed: CycloneDX carries no digest of a
+# composite (HMAC-SHA256), so a digest row at L2 would be 0 % by construction; it starts at L3.
+DIM_FIRST_LEVEL = {"digest": "L3"}
+CLOSURE_LEVELS = ("L3", "L4")  # an implied algorithm is a parsed fact: it exists from L3 on
+LEVEL_COLUMNS = [
+    "dimension", "level", "tool", "voter_group", "algorithms", "confirmed", "share", "confirmed_strict",
+    "multi_unit_clusters",
+]  # fmt: skip
 ALGORITHM_COLUMNS = [
     "repo", "snapshot", "variant", "run", "language", "tool", "voter_group", "tailored", "algorithm", "implied",
     "records", "spellings", *[f"k_{lv}" for lv in LEVELS],
@@ -84,7 +96,9 @@ _STANDARD_SRC = "cryptoProperties."
 def identity(rec: NormRecord, level: str, vocab: Vocabulary | None = None) -> str | None:
     """The algorithm a record names, as seen at `level` (None when the record has no name and no algorithm)."""
     vocab = vocab or load_vocabulary()
-    name = (rec.name or "").strip()
+    # an API or non-crypto name (`name_kind`, e.g. CipherSift's `hmac.new`) spells no algorithm: nothing is read
+    # from it at any level, the identity comes from the fields alone
+    name = "" if rec.name_kind else (rec.name or "").strip()
     folded = fold(name) or None
     if level == "L0":
         return name or None
@@ -105,9 +119,7 @@ def identity(rec: NormRecord, level: str, vocab: Vocabulary | None = None) -> st
         if rec.src.get("family") == _FAMILY_FIELD:
             return rec.values.get("family")
         return folded
-    if level == "L4lit" and "interpretive" in (rec.via.get("algorithm"), rec.via.get("family")):
-        return identity(rec, "L3", vocab)
-    return rec.values.get("algorithm") or rec.values.get("family") or folded
+    return rec.values.get("algorithm") or rec.values.get("family")  # no family: no unit (`undefined`, `api`)
 
 
 def keys(rec: NormRecord, vocab: Vocabulary | None = None) -> dict[str, str]:
@@ -123,7 +135,7 @@ def keys(rec: NormRecord, vocab: Vocabulary | None = None) -> dict[str, str]:
 
 def parameter_at(rec: NormRecord, level: str, dim: str):
     """The record's value of a dimension as admitted at `level`, else None: L2 standard fields, L3 also the parsed
-    name, L4lit any source but interpretive entries, L4 any source (including our derivations). Nothing below L2:
+    name, L4 any source (including our derivations). Nothing below L2:
     a raw name carries no normalised value."""
     value, via, src = rec.values.get(dim), rec.via.get(dim), rec.src.get(dim) or ""
     if value is None or level not in PARAMETER_LEVELS:
@@ -133,82 +145,119 @@ def parameter_at(rec: NormRecord, level: str, dim: str):
     if level == "L3":
         standard = via == "field" and src.startswith(_STANDARD_SRC)
         return value if standard or (via == "parse" and src == "name") else None
-    if level == "L4lit" and via == "interpretive":
-        return None
     return value
 
 
 @dataclass
+class Cluster:
+    """The records carrying one key at one level. `members` have the key at that level or below; `attached` records
+    carry no key here but belong by vocabulary knowledge: a generic report (SHA-2 next to SHA-256, `generic_over`
+    markers) or, with closure, a record implying the key's algorithm (HMAC-SHA256 -> SHA-256). Attached records
+    confirm and are confirmed inside the cluster but never bring their own keys, so clusters never merge."""
+
+    key: str
+    level: str
+    members: list[NormRecord] = field(default_factory=list)
+    attached: list[NormRecord] = field(default_factory=list)
+    reason: dict[str, str] = field(default_factory=dict)  # attached record id -> generic | implied
+    _ids: set[str] = field(default_factory=set, repr=False)
+
+    def add(self, rec: NormRecord) -> None:
+        if rec.record_id not in self._ids:
+            self._ids.add(rec.record_id)
+            self.members.append(rec)
+
+    def attach(self, rec: NormRecord, why: str) -> None:
+        if rec.record_id not in self._ids:
+            self._ids.add(rec.record_id)
+            self.attached.append(rec)
+            self.reason[rec.record_id] = why
+
+    def holds(self, record_id: str) -> bool:
+        return record_id in self._ids
+
+    def is_member(self, record_id: str) -> bool:
+        return record_id in self._ids and record_id not in self.reason
+
+    @property
+    def records(self) -> list[NormRecord]:
+        return self.members + self.attached
+
+    def units(self, vocab: Vocabulary) -> set[str]:
+        """The L4 identities of the members: more than one means the level calls distinct algorithms the same."""
+        return {u for r in self.members if (u := identity(r, UNIT_LEVEL, vocab))}
+
+    def voters(self, voter_of: dict[str, str]) -> set[str]:
+        return {voter_of.get(r.tool, r.tool) for r in self.records}
+
+
+@dataclass
 class Item:
-    """One algorithm of one repository (the unit): the tools reporting it and, per level, the clusters holding its
-    records (every record of a cluster, those of other items included)."""
+    """One algorithm of one repository (the unit): the tools reporting it and, per level, the clusters holding one of
+    its records (as a member, or attached as a generic or implying record)."""
 
     key: str
     own: dict[str, list[NormRecord]] = field(default_factory=lambda: defaultdict(list))  # tool -> its records
     implied: set[str] = field(default_factory=set)  # record ids that are own records only by implication (closure)
-    clusters: dict[str, list[list[NormRecord]]] = field(default_factory=dict)  # level -> clusters (sorted)
+    clusters: dict[str, list[Cluster]] = field(default_factory=dict)  # level -> clusters (sorted)
 
     @property
     def tools(self) -> list[str]:
         return sorted(self.own)
 
-    def clusters_at(self, level: str) -> list[list[NormRecord]]:
+    def clusters_at(self, level: str) -> list[Cluster]:
         return self.clusters.get(level, [])
 
-    def clusters_of(self, level: str, tool: str) -> list[list[NormRecord]]:
+    def clusters_of(self, level: str, tool: str) -> list[Cluster]:
         """The item's clusters at `level` that hold one of the tool's records of the item."""
         mine = {r.record_id for r in self.own.get(tool, [])}
-        return [c for c in self.clusters_at(level) if any(r.record_id in mine for r in c)]
+        return [c for c in self.clusters_at(level) if any(c.holds(rid) for rid in mine)]
 
     def k_at(self, level: str, voter_of: dict[str, str]) -> int:
         """Voter groups in the item's largest cluster at `level` (1 when it has no cluster yet, e.g. an implied item
         below L3: its tool reports it, nobody can match it)."""
-        return max((len({voter_of.get(r.tool, r.tool) for r in c}) for c in self.clusters_at(level)), default=1)
+        return max((len(c.voters(voter_of)) for c in self.clusters_at(level)), default=1)
 
     def confirmed_at(self, level: str, tool: str, voter_of: dict[str, str]) -> bool:
         """A cluster holding one of the tool's records of the item also holds a record of another voter group."""
         mine = voter_of.get(tool, tool)
-        return any(any(voter_of.get(r.tool, r.tool) != mine for r in c) for c in self.clusters_of(level, tool))
+        return any(any(voter_of.get(r.tool, r.tool) != mine for r in c.records) for c in self.clusters_of(level, tool))
+
+    def confirmed_strictly_at(self, level: str, tool: str, voter_of: dict[str, str]) -> bool:
+        """Confirmed through members alone: the tool's record is a member of a cluster whose members include another
+        voter group (no generic or implied attachment involved)."""
+        mine = voter_of.get(tool, tool)
+        own = {r.record_id for r in self.own.get(tool, [])}
+        return any(
+            any(c.is_member(rid) for rid in own) and any(voter_of.get(r.tool, r.tool) != mine for r in c.members)
+            for c in self.clusters_of(level, tool)
+        )
 
 
-class _UnionFind:
-    def __init__(self):
-        self.parent: dict[str, str] = {}
-
-    def add(self, x: str) -> None:
-        self.parent.setdefault(x, x)
-
-    def find(self, x: str) -> str:
-        root = x
-        while self.parent[root] != root:
-            root = self.parent[root]
-        while self.parent[x] != root:
-            self.parent[x], x = root, self.parent[x]
-        return root
-
-    def union(self, a: str, b: str) -> None:
-        ra, rb = self.find(a), self.find(b)
-        if ra != rb:
-            self.parent[rb] = ra
+ATTACH_LEVELS = ("L2", "L3", "L4")  # a generic identity is vocabulary knowledge: it exists from L2 on
 
 
 def level_matches(
     records: list[NormRecord], vocab: Vocabulary | None = None, *, closure: bool = False
 ) -> dict[str, Item]:
     """The algorithm records of one repository (every tool) -> {L4 identity: Item} with the clusters per level.
-    With `closure` a record is also an own record (flagged implied) of every algorithm it implies and joins that
-    item's clusters from L3 on (attached, never merging clusters)."""
+
+    Only `mapped` records with an L4 identity take part (a name nobody understands is `undefined`, an API name
+    `api`: never an item, analysis/normalize/engine.py). At level L the cluster of key k holds every record whose
+    identity at some level up to L is k (cumulative, so a match is never lost); a record with several keys sits in
+    several clusters, and clusters never merge through it: `hmac.new` (L3 SHA-1, L4 HMAC) is in the SHA-1 and the
+    HMAC cluster without making them one. From L2 on a record with a generic identity (SHA-2, EC, the `SHA` marker:
+    `Vocabulary.generic`) is attached to the clusters of the specific algorithms it may mean (`specifics`) that
+    exist in the repository. With `closure` a record is also an own record (flagged implied) of every algorithm it
+    implies and is attached to that algorithm's cluster from L3 on."""
     vocab = vocab or load_vocabulary()
-    algorithms = [r for r in records if r.values.get("asset_type") == "algorithm"]
+    algorithms = [r for r in records if r.values.get("asset_type") == "algorithm" and r.resolution in (None, "mapped")]
     rec_keys = {r.record_id: keys(r, vocab) for r in algorithms}
+    real = sorted((r for r in algorithms if rec_keys[r.record_id].get(UNIT_LEVEL)), key=lambda r: (r.tool, r.record_id))
     items: dict[str, Item] = {}
     implied_by: dict[str, list[NormRecord]] = defaultdict(list)  # implied item -> records implying it
-    uf = _UnionFind()
-    for r in algorithms:
-        unit = rec_keys[r.record_id].get(UNIT_LEVEL)
-        if not unit:
-            continue
-        uf.add(r.record_id)
+    for r in real:
+        unit = rec_keys[r.record_id][UNIT_LEVEL]
         items.setdefault(unit, Item(unit)).own[r.tool].append(r)
         if closure:
             for other in vocab.implied(r.values):
@@ -217,31 +266,82 @@ def level_matches(
                     item.own[r.tool].append(r)
                     item.implied.add(r.record_id)
                     implied_by[other].append(r)
-    real = [r for r in algorithms if r.record_id in uf.parent]
     for lv in LEVELS:
-        by_key: dict[str, list[str]] = defaultdict(list)
+        upto = LEVELS[: LEVEL_INDEX[lv] + 1]
+        clusters: dict[str, Cluster] = {}
+        keyset: dict[str, set[str]] = {}
         for r in real:
-            k = rec_keys[r.record_id].get(lv)
-            if k:
-                by_key[k].append(r.record_id)
-        for ids in by_key.values():
-            for other in ids[1:]:
-                uf.union(ids[0], other)
-        members: dict[str, list[NormRecord]] = defaultdict(list)
-        for r in real:
-            members[uf.find(r.record_id)].append(r)
+            ks = {k for level in upto if (k := rec_keys[r.record_id].get(level))}
+            keyset[r.record_id] = ks
+            for k in ks:
+                clusters.setdefault(k, Cluster(k, lv)).add(r)
+        clusters = _maximal(clusters, rec_keys)
+        if lv in ATTACH_LEVELS:
+            for r in real:
+                for k in keyset[r.record_id]:
+                    if vocab.generic(k):
+                        for specific in vocab.specifics(k):
+                            c = clusters.get(specific)
+                            if c is not None:
+                                c.attach(r, "generic")
+        if closure and lv in CLOSURE_LEVELS:
+            for other, recs in implied_by.items():
+                c = clusters.setdefault(other, Cluster(other, lv))
+                for r in recs:
+                    c.attach(r, "implied")
+        by_record: dict[str, list[Cluster]] = defaultdict(list)
+        for c in clusters.values():
+            for r in c.records:
+                by_record[r.record_id].append(c)
         for unit, item in items.items():
-            real_own = [r for recs in item.own.values() for r in recs if r.record_id not in item.implied]
-            roots = sorted({uf.find(r.record_id) for r in real_own})
-            clusters = [sorted(members[root], key=lambda r: (r.tool, r.record_id)) for root in roots]
-            if lv in CLOSURE_LEVELS and implied_by.get(unit):
-                extra = sorted(implied_by[unit], key=lambda r: (r.tool, r.record_id))
-                if clusters:
-                    clusters = [sorted(c + extra, key=lambda r: (r.tool, r.record_id)) for c in clusters]
-                else:
-                    clusters = [extra]
-            item.clusters[lv] = sorted(clusters, key=lambda c: (c[0].tool, c[0].record_id))
+            held: dict[int, Cluster] = {}
+            for recs in item.own.values():
+                for r in recs:
+                    for c in by_record.get(r.record_id, []):
+                        if r.record_id in item.implied and c.key != unit:
+                            continue  # an implying record belongs to the implied item through that cluster only
+                        held[id(c)] = c
+            item.clusters[lv] = sorted(held.values(), key=lambda c: (c.records[0].tool, c.records[0].record_id))
     return items
+
+
+def _maximal(clusters: dict[str, Cluster], rec_keys: dict[str, dict[str, str]]) -> dict[str, Cluster]:
+    """Drop clusters whose members are a subset of another cluster's members (a lower-level key that brings nothing
+    together the higher key does not: `aes` inside AES). Of two clusters with the same members the key of the higher
+    level survives (SHA-256 over sha256). What stays are the clusters that say something of their own."""
+    by_record: dict[str, list[Cluster]] = defaultdict(list)
+    for c in clusters.values():
+        for r in c.members:
+            by_record[r.record_id].append(c)
+
+    def rank(c: Cluster) -> tuple[int, str]:  # the highest level at which a member carries the key, then the key
+        best = max(
+            (LEVEL_INDEX[lv] for r in c.members for lv, k in rec_keys[r.record_id].items() if k == c.key), default=-1
+        )
+        return (best, c.key)
+
+    keep: dict[str, Cluster] = {}
+    for c in clusters.values():
+        ids = c._ids
+        covered = False
+        for other in by_record[c.members[0].record_id]:
+            if other is c or len(other._ids) < len(ids) or not ids <= other._ids:
+                continue
+            if len(other._ids) > len(ids) or rank(other) > rank(c):
+                covered = True
+                break
+        if not covered:
+            keep[c.key] = c
+    return keep
+
+
+def clusters_at(items: dict[str, Item], level: str) -> list[Cluster]:
+    """Every cluster of a repository at `level`, once, sorted by key (the exact matcher's groups)."""
+    seen: dict[int, Cluster] = {}
+    for item in items.values():
+        for c in item.clusters_at(level):
+            seen.setdefault(id(c), c)
+    return sorted(seen.values(), key=lambda c: c.key)
 
 
 @dataclass
@@ -252,6 +352,8 @@ class LevelRow:
     algorithms: int  # the tool's items (distinct algorithms per repository); for a parameter: (item, value) pairs
     confirmed: int  # ... that a record of another voter group matches at this level or below
     dimension: str = "algorithm"  # `algorithm`, or one of PARAMETER_DIMS
+    confirmed_strict: int = 0  # ... confirmed through cluster members alone (no generic or implied attachment)
+    multi_unit_clusters: int = 0  # clusters at this level whose members span several L4 identities (all repos)
 
     @property
     def share(self) -> float:
@@ -266,7 +368,15 @@ class LevelRow:
             "algorithms": self.algorithms,
             "confirmed": self.confirmed,
             "share": round(self.share, 3),
+            "confirmed_strict": self.confirmed_strict,
+            "multi_unit_clusters": self.multi_unit_clusters,
         }
+
+
+def parameter_levels(dim: str) -> tuple[str, ...]:
+    """The ladder levels a parameter dimension exists at (from L2, or later when the standard has no field for it)."""
+    first = LEVEL_INDEX[DIM_FIRST_LEVEL.get(dim, PARAMETER_LEVELS[0])]
+    return tuple(lv for lv in PARAMETER_LEVELS if LEVEL_INDEX[lv] >= first)
 
 
 def algorithms_at(
@@ -277,7 +387,11 @@ def algorithms_at(
     vocab = vocab or load_vocabulary()
     out: Counter = Counter()
     for r in records:
-        if r.values.get("asset_type") == "algorithm":
+        if (
+            r.values.get("asset_type") == "algorithm"
+            and r.resolution in (None, "mapped")
+            and identity(r, UNIT_LEVEL, vocab)
+        ):
             key = identity(r, level, vocab)
             if key:
                 out[key] += 1
@@ -299,7 +413,7 @@ def _pair_confirmed(item: Item, tool: str, dim: str, value, level: str, voter_of
     return any(
         voter_of.get(r.tool, r.tool) != mine and parameter_at(r, level, dim) == value
         for c in item.clusters_of(level, tool)
-        for r in c
+        for r in c.records
     )
 
 
@@ -325,11 +439,15 @@ def ladder(
     tools = sorted({t for _, t in records})
     rows: list[LevelRow] = []
     for dim in dims:
-        for level in LEVELS if dim == "algorithm" else PARAMETER_LEVELS:
-            total_n = total_conf = 0
+        for level in LEVELS if dim == "algorithm" else parameter_levels(dim):
+            multi = 0
+            if dim == "algorithm":
+                for items in items_by_snap.values():
+                    multi += sum(len(c.units(vocab)) > 1 for c in clusters_at(items, level))
+            total_n = total_conf = total_strict = 0
             for tool in tools:
                 group = voter_of.get(tool, tool)
-                n = conf = 0
+                n = conf = strict = 0
                 for items in items_by_snap.values():
                     for item in items.values():
                         if tool not in item.own:
@@ -337,14 +455,16 @@ def ladder(
                         if dim == "algorithm":
                             n += 1
                             conf += item.confirmed_at(level, tool, voter_of)
+                            strict += item.confirmed_strictly_at(level, tool, voter_of)
                         else:
                             pairs = _parameter_pairs(item, tool, dim)
                             n += len(pairs)
                             conf += sum(_pair_confirmed(item, tool, dim, v, level, voter_of) for _, v in pairs)
-                rows.append(LevelRow(level, tool, group, n, conf, dim))
+                rows.append(LevelRow(level, tool, group, n, conf, dim, strict, multi))
                 total_n += n
                 total_conf += conf
-            rows.append(LevelRow(level, "all", "-", total_n, total_conf, dim))
+                total_strict += strict
+            rows.append(LevelRow(level, "all", "-", total_n, total_conf, dim, total_strict, multi))
     return rows
 
 

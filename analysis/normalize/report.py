@@ -15,7 +15,7 @@ from collections import Counter, defaultdict
 
 from .record import ASSET_DIMS, NormalizedCbom, unmapped_text
 
-VOCAB_COLUMNS = ["tool", "source", "raw", "status", "mapped", "unmapped_tokens", "via", "interpretive", "count"]
+VOCAB_COLUMNS = ["tool", "source", "raw", "status", "mapped", "unmapped_tokens", "via", "interpretive", "kind", "count"]
 COVERAGE_COLUMNS = [
     "tool", "cboms", "algorithm_records", "dimension", "reported", "derived", "reported_share", "derived_share",
 ]  # fmt: skip
@@ -65,6 +65,7 @@ class Report:
             "spec_issues": Counter(),
             "conflicts": Counter(),
             "unmapped": Counter(),
+            "resolution": Counter(),
         }
 
     def add(self, n: NormalizedCbom) -> None:
@@ -91,6 +92,7 @@ class Report:
                 t["unmapped"][unmapped_text(u)] += 1
             if at != "algorithm":
                 continue
+            t["resolution"][r.resolution or "undefined"] += 1
             t["counts"]["algorithm_records"] += 1
             for d in FILL_DIMS + ("protocol",):
                 if r.values.get(d) is None:
@@ -107,11 +109,12 @@ class Report:
                 t["fill"]["location"] += 1
         for (src, raw), entry in n.mappings.items():
             key = (n.tool, src, raw)
-            row = self.vocab.setdefault(key, {"mapped": {}, "via": set(), "tokens": (), "count": 0})
+            row = self.vocab.setdefault(key, {"mapped": {}, "via": set(), "tokens": (), "count": 0, "kind": None})
             for d, v in entry["mapped"].items():
                 row["mapped"].setdefault(d, v)
             row["via"] |= entry["via"]
             row["tokens"] = row["tokens"] or entry["tokens"]
+            row["kind"] = row["kind"] or entry.get("kind")
             row["count"] += entry["count"]
 
     def to_dict(self) -> dict:
@@ -138,6 +141,9 @@ class Report:
                 "spec_issues_top": dict(t["spec_issues"].most_common(15)),
                 "conflicts": dict(t["conflicts"]),
                 "unmapped_top": dict(t["unmapped"].most_common(25)),
+                "resolution": dict(
+                    t["resolution"]
+                ),  # algorithm records: mapped | ambiguous | api | non-crypto | undefined
             }
         return out
 
@@ -189,7 +195,7 @@ class Report:
             elif mapped:
                 status = "mapped"
             else:
-                status = "known"
+                status = e.get("kind") or "known"
             rows.append(
                 {
                     "tool": tool,
@@ -200,6 +206,7 @@ class Report:
                     "unmapped_tokens": " ".join(t for t in e["tokens"] if t != "*"),
                     "via": ";".join(sorted(e["via"])),
                     "interpretive": "interpretive" in e["via"],
+                    "kind": e.get("kind") or "",
                     "count": e["count"],
                 }
             )

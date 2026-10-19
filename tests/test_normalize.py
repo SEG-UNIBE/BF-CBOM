@@ -130,10 +130,29 @@ def test_parse_names(name, expected):
     assert {k: got.get(k) for k in expected} == expected
 
 
-@pytest.mark.parametrize("garbage", ["parseCsvMap", 'SHA-" + this.strength', "0"])
+@pytest.mark.parametrize("garbage", ["parseCsvMap", "getJavaAlgorithm", "0", "DigestUtil.hash"])
 def test_code_fragments_stay_unmapped(garbage):
     p = V.parse(garbage)
     assert not p.values and not p.known
+
+
+def test_a_bare_sha_is_the_generic_marker_never_a_specific_hash():
+    # xgrep's `SHA-" + this.strength`: some SHA with a dynamic length; CipherRadar's `Algorithm reference: SHA`
+    for text in ('SHA-" + this.strength', "Algorithm reference: SHA", "SHA"):
+        assert (V.parse(text).values.get("algorithm"), V.parse(text).values.get("family")) == ("SHA", "SHA")
+    assert (
+        V.parse("HMAC-SHA").values == {"family": "HMAC", "algorithm": "HMAC", "digest": "SHA"}
+        or V.parse("HMAC-SHA").values.get("digest") == "SHA"
+    )
+    assert V.generic("SHA") and V.generic("SHA-2") and V.generic("EC") and V.generic("RSA")
+    assert not V.generic("SHA-256") and not V.generic("Ed25519") and not V.generic("ChaCha20-Poly1305")
+    assert V.specifics("HMAC") == {"TOTP", "HOTP"}  # HMAC-based schemes are its only specifics (digests are parameters)
+    assert {"SHA-1", "SHA-256", "SHA3-256", "SHA-2"} <= V.specifics("SHA")
+    assert {"ECDSA", "ECDH", "EdDSA", "Ed25519", "X25519"} <= V.specifics("EC")
+    assert (
+        V.relation("algorithm", "SHA", "SHA-256") == "refines" and V.relation("digest", "SHA-512", "SHA") == "coarser"
+    )
+    assert V.relation("algorithm", "SHA-256", "SHA-512") is None
 
 
 def test_list_of_algorithms_is_ambiguous():
@@ -246,8 +265,11 @@ def test_ciphersift_rule_family_fills_the_gap_and_api_names_stay_quiet():
     lib = next(r for r in recs if r.values["asset_type"] == "library")
     assert (lib.file, lib.values["purl"]) == ("go.mod", "pkg:golang/golang.org/x/crypto@v0.17.0")
     assert not any(r.unmapped or r.spec_issues for r in recs)
-    # hmac.new names the API, not the algorithm: the SHA-2 component keeps its field, the name is a recorded conflict
-    assert by[("hmac.new", "SHA-2")].conflicts["family"]["value"] == "HMAC"
+    # hmac.new: the name parses to HMAC, CipherSift's field says SHA-2; the field stands and the conflict is recorded
+    # (what the tool wrote is the finding; nothing is read as "really" meaning something else)
+    hm = by[("hmac.new", "SHA-2")]
+    assert hm.conflicts["family"]["value"] == "HMAC" and hm.resolution == "mapped" and hm.name_kind is None
+    assert all(r.resolution == "mapped" for r in recs if r.values.get("asset_type") == "algorithm")
 
 
 def test_cbomkit_micro_java_against_the_ground_truth():
@@ -383,3 +405,130 @@ def test_scanoss_registry_and_api_spellings_and_byte_key_length():
     assert by["AES"].values["key_size"] == 32  # the tool's byte length, read as reported (not corrected)
     assert all(r.file in ("main.go", "crypto_demo.c") and r.line for r in recs)
     assert not any(r.unmapped or r.spec_issues for r in recs)
+
+
+# ----- kinds, resolution, hierarchies (vocabulary 2026-10-19.1) -----
+
+
+XBOM_MODULE = "opt.xbom.lib.python3.12.site-packages.xbom.modules.cbom.rules"  # where xbom's own rules live
+
+
+def test_securin_xbom_rule_names_resolve_or_are_non_crypto():
+    prefix = "opt.xbom-registry.rules.java.lang.security.audit."
+    rid = lambda rule: {"xbom:crypto:rule_id": prefix + rule}  # noqa: E731
+    bom = _bom(
+        _comp(prefix + "crypto.use-of-sha1.use-of-sha1", props=rid("crypto.use-of-sha1.use-of-sha1")),
+        _comp(prefix + "unsafe-reflection.unsafe-reflection", props=rid("unsafe-reflection.unsafe-reflection")),
+        _comp(prefix + "sqli.jpa-sqli.jpa-sqli", props=rid("sqli.jpa-sqli.jpa-sqli")),
+        _comp(prefix + "crypto.ssl.insecure-trust-manager.insecure-trust-manager"),
+        _comp(prefix + "crypto.gcm-detection.gcm-detection"),
+        _comp("SHA-256", props={"xbom:crypto:rule_id": "xbom-python-hash-sha256"}),
+        _comp(  # xbom's own rules live in its cbom module: a module path with no `crypto` segment, still a crypto rule
+            "PRNG",
+            props={"xbom:crypto:rule_id": f"{XBOM_MODULE}.xbom-java-insecure-random"},
+        ),
+    )
+    bom["components"] += [
+        _comp(prefix + "cookie-missing-secure-flag.cookie-missing-secure-flag"),  # a rule nobody listed
+        _comp(prefix + "crypto.unencrypted-socket.unencrypted-socket"),  # under `crypto`: the tool calls it crypto
+    ]
+    recs = normalize_cbom(bom, "securin-xbom").records
+    by = {r.name.rsplit(".", 1)[-1]: r for r in recs}
+    assert (by["use-of-sha1"].values["algorithm"], by["use-of-sha1"].resolution) == ("SHA-1", "mapped")
+    # the registry's own taxonomy (the rule path) says which rules are crypto rules: no list of ours
+    assert by["unsafe-reflection"].resolution == by["jpa-sqli"].resolution == "non-crypto"
+    assert by["cookie-missing-secure-flag"].resolution == "non-crypto"
+    assert by["unencrypted-socket"].resolution == "undefined"
+    assert not by["unsafe-reflection"].values.get("family") and not by["unsafe-reflection"].unmapped
+    # TLS configuration rules and GCM detection are read as they parse, not interpreted (no judgement entries)
+    assert (
+        by["insecure-trust-manager"].resolution == "undefined" and "protocol" not in by["insecure-trust-manager"].values
+    )
+    assert by["gcm-detection"].values.get("mode") == "GCM" and not by["gcm-detection"].values.get("family")
+    assert (by["SHA-256"].values["algorithm"], by["SHA-256"].resolution) == ("SHA-256", "mapped")
+    assert (by["PRNG"].values["family"], by["PRNG"].resolution) == ("PRNG", "mapped")
+
+
+def test_api_names_resolve_as_api_not_undefined():
+    jca = normalize_cbom(_bom(_comp("jca", ap={"primitive": "unknown"}), version="1.7"), "qdarpan").records[0]
+    assert jca.resolution == "api" and not jca.values.get("family") and not jca.unmapped
+    # code identifiers are recognised by shape for every tool, never by a list of a tool's outputs
+    for tool, name in (("ciphersift", "Cipher.getInstance"), ("ciphersift", "crypto/x509.ParseCertificate"),
+                       ("xgrep", "getJavaAlgorithm"), ("deepseek", "DigestUtil.hash")):  # fmt: skip
+        r = normalize_cbom(_bom(_comp(name), version="1.7"), tool).records[0]
+        assert r.resolution == "api" and not r.values.get("family"), name
+    vault = normalize_cbom(_bom(_comp("HashiCorp Vault Path")), "cryptoscan").records[0]
+    assert vault.resolution == "api"
+    for name in ("Sig", "0", "UNKNOWN", "signature key pair"):  # free text nobody can read
+        assert normalize_cbom(_bom(_comp(name)), "deepseek").records[0].resolution == "undefined", name
+    listed = normalize_cbom(_bom(_comp("RSA, ECC, AES, ChaCha20")), "cryptoscan").records[0]
+    assert listed.resolution == "ambiguous"
+    for name, kind in (("S256", "api"), ("PLAINTEXT", "non-crypto")):
+        r = normalize_cbom(_bom(_comp(name)), "deepseek").records[0]
+        assert r.resolution == kind, name
+
+
+def test_material_hierarchy_refines_instead_of_conflicting():
+    comp = _comp(
+        "Hardcoded secret: ssl.keystore.password",
+        asset="related-crypto-material",
+        cryptoProperties={
+            "assetType": "related-crypto-material",
+            "relatedCryptoMaterialProperties": {"type": "secret-key"},
+        },
+        occ=[{"location": "kafka.properties", "line": 73}],
+    )
+    r = normalize_cbom(_bom(comp, version="1.7"), "cipherradar").records[0]
+    assert r.values["material"] == "secret-key" and r.conflicts == {} and r.resolution == "mapped"
+    assert V.relation("material", "credential", "password") == "refines"
+    assert V.relation("material", "private-key", "key") == "coarser"
+    assert V.relation("material", "salt", "nonce") is None
+
+
+def test_scanoss_key_value_certificate_names():
+    occ = [{"location": "lib/vtls/openssl.c", "line": 1560, "additionalContext": "scanoss:match,X509_get_pubkey(x)"}]
+    cert = _comp(
+        "certificate:1560:1560::X.509:library=OpenSSL",
+        asset="certificate",
+        cryptoProperties={"assetType": "certificate", "certificateProperties": {"certificateFormat": "X.509"}},
+        occ=occ,
+    )
+    verify = _comp(
+        "certificate:1137:1137:api=Certificate.CheckSignature:cryptoFunction=verify:findingType=certificate_handling",
+        asset="certificate",
+        cryptoProperties={"assetType": "certificate"},
+        occ=[{"location": "x/cert.go", "line": 1137}],
+    )
+    recs = normalize_cbom(_bom(cert, verify, version="1.7"), "scanoss").records
+    assert all(r.values["asset_type"] == "certificate" and r.group == "CERT" and not r.unmapped for r in recs)
+    assert recs[1].values["functions"] == ("verify",) and recs[1].resolution == "mapped"
+    assert (recs[0].file, recs[0].line) == ("lib/vtls/openssl.c", 1560)
+
+
+@pytest.mark.parametrize(
+    "name, expected",
+    [
+        ("XChaCha20", {"family": "ChaCha20", "algorithm": "XChaCha20"}),
+        ("ECDH-1PU+A128KW", {"family": "ECDH"}),
+        ("ECDH-1PU", {"family": "ECDH"}),
+        ("C20P", {"algorithm": "ChaCha20-Poly1305"}),
+        ("XC20P", {"algorithm": "XChaCha20-Poly1305"}),
+        ("OTR", {"protocol": "OTR"}),
+        ("PGP private key", {"protocol": "OpenPGP", "material": "private-key"}),
+        ("OpenPGP signature verification", {"protocol": "OpenPGP"}),
+        ("BLAKE2b-256", {"algorithm": "BLAKE2b", "param_set": "256"}),
+        ("OctKey", {"material": "secret-key"}),
+        ("JWKS", {"material": "key"}),
+        ("HMAC-SHA", {"family": "HMAC", "digest": "SHA"}),
+    ],
+)
+def test_parse_names_added_2026_10_19(name, expected):
+    got = V.parse(name).values
+    assert {k: got.get(k) for k in expected} == expected
+
+
+def test_a_list_in_a_field_is_ambiguous_not_unknown():
+    comp = _comp("Hash160", props={"bf-cbom:digest": "SHA-256, RIPEMD-160"})
+    r = normalize_cbom(_bom(comp), "deepseek").records[0]
+    assert r.values.get("digest") is None and r.resolution == "ambiguous" and r.ambiguous.startswith("SHA-256, RIPEMD")
+    assert all(u["src"] != "properties[bf-cbom:digest]" for u in r.unmapped)  # the list is understood, not unknown
