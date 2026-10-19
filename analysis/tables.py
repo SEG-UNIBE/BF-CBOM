@@ -22,6 +22,7 @@ from datetime import datetime
 from pathlib import Path
 
 from common.experiment import iter_results, repo_full_name
+from common.tools_registry import votes
 
 from .costs import cost_usd, load_prices
 from .groundtruth import TruthProject, TruthScore
@@ -381,9 +382,12 @@ def matchlevel_row(
         for g in groups:
             if g.scope != "repo":
                 continue
-            for unit in g.extra.get("units") or [g.key]:
+            voting = [r for r in g.members if votes(voter_of, r.tool)]  # observers are in no k and no count
+            if not voting:
+                continue
+            for unit in g.extra.get("units") or [g.key]:  # the exact matcher's units are the voters' already
                 best[(snapshot, unit)] = max(best.get((snapshot, unit), 0), len(g.voters(voter_of)))
-            records += len(g.members)
+            records += len(voting)
             for row in agreement(g, voter_of=voter_of, level=level):
                 if row["reporting"] >= 2:
                     reporting[row["dimension"]] += 1

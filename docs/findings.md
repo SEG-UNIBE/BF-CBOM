@@ -56,7 +56,9 @@ Lenient call-site recall out of 11; all runs ok.
   grades (C pass, JS fail).
 - This reproduces the colleague's micro table (their pilot scorer matches our lenient column) except CBOMkit Python
   (5 vs 6), CryptoScan Go (10 vs 9) and CryptobomForge (by design: no window shrinking).
-- **cdxgen** by design: algorithms with locations only for JS. With `-t` it reports 5 / 6 algorithms on micro-python /
+- **cdxgen** by design: algorithms with locations only for JS (corrected 2026-10-20: and Go, where 12.8.5 writes the
+  location into the property `cdx:golem:crypto:sourceLocation`, which our cdxgen spec ignored until then; on the pilot
+  export 29 Go records of golang-jwt gained file and line). With `-t` it reports 5 / 6 algorithms on micro-python /
   micro-go without locations, which count at repository level. Java gives nothing with any invocation: atom 2.5.6 tags
   Java crypto APIs `crypto`/`crypto-algorithm` but has no `crypto-generate` sinks, and Java's reachable-flow search
   uses only generic sources and sinks (framework input, CLI, network, ...), so micro-java has 0 reachable flows. On

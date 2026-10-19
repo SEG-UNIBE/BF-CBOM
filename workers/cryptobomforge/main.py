@@ -102,10 +102,11 @@ def _detect_language(repo_path: str) -> str | None:
 
 
 def _empty_cbom(reason: str) -> dict:
-    """A valid CycloneDX 1.6 CBOM with no components, annotated with why it is empty."""
+    """A valid CycloneDX 1.7 CBOM with no components, annotated with why it is empty (ours, not the tool's: the
+    same version as every CBOM BF-CBOM itself writes)."""
     return {
         "bomFormat": "CycloneDX",
-        "specVersion": "1.6",
+        "specVersion": "1.7",
         "version": 1,
         "metadata": {
             "tools": {"components": [{"type": "application", "name": "cryptobom-forge"}]},

@@ -106,7 +106,7 @@ def test_generate_cbom_assembles_cyclonedx_and_verifies_locations(repo: Path):
     provider = FakeProvider([answer])
     ri = RepoInfo(full_name="o/r", git_url="http://gs/o/r.git", branch="bfcbom/x", size_kb=1, commit="a" * 40)
     cbom, stats = llm.generate_cbom(provider, repo, repo_info=ri, language="Python")
-    assert cbom["bomFormat"] == "CycloneDX" and cbom["specVersion"] == "1.6"
+    assert cbom["bomFormat"] == "CycloneDX" and cbom["specVersion"] == "1.7"
     assert len(provider.calls) == 1 and "Project: o/r" in provider.calls[0]
     names = [c["name"] for c in cbom["components"]]
     assert names == ["SHA-256", "AES", "RSA", "TLS"]
@@ -419,19 +419,7 @@ def test_select_files_covers_all_micro_languages():
         assert [p.name for p in sel.files] == [expected], lang
 
 
-def _cyclonedx_16_validator():
-    """Official CycloneDX 1.6 JSON schema (vendored in analysis/data/cyclonedx/) with its local references."""
-    jsonschema = pytest.importorskip("jsonschema")
-    from referencing import Registry, Resource
-
-    schema_dir = Path(__file__).resolve().parents[1] / "analysis" / "data" / "cyclonedx"
-    docs = {n: json.loads((schema_dir / n).read_text(encoding="utf-8")) for n in
-            ("bom-1.6.schema.json", "spdx.schema.json", "jsf-0.82.schema.json")}  # fmt: skip
-    registry = Registry().with_resources((d["$id"], Resource.from_contents(d)) for d in docs.values())
-    return jsonschema.Draft7Validator(docs["bom-1.6.schema.json"], registry=registry)
-
-
-def test_model_values_become_valid_cyclonedx_16(repo: Path):
+def test_model_values_become_valid_cyclonedx_17(repo: Path):
     answer = json.dumps(
         {
             "assets": [
@@ -458,14 +446,18 @@ def test_model_values_become_valid_cyclonedx_16(repo: Path):
                     "padding": "NoPadding",
                 },
                 {"name": "A128KW", "assetType": "algorithm", "primitive": "key-wrap", "mode": "KW"},
+                {"name": "ECDSA", "assetType": "algorithm", "algorithmFamily": "ecdsa", "curve": "P-256"},
+                {"name": "ECDH", "assetType": "algorithm", "algorithmFamily": "ECDH", "curve": "X25519"},
+                {"name": "RSA-2048", "assetType": "algorithm", "algorithmFamily": "RSA", "keySize": 2048},
                 {"name": "salt", "assetType": "related-crypto-material"},
                 {"name": "crypto-js", "assetType": "library"},
             ]
         }
     )
     cbom, stats = llm.generate_cbom(FakeProvider([answer]), repo, language="Python")
-    errors = [f"{list(e.absolute_path)}: {e.message}" for e in _cyclonedx_16_validator().iter_errors(cbom)]
-    assert errors == []
+    from analysis.schema import validate_document  # the official 1.7 schema with the registry (analysis/data/cyclonedx)
+
+    assert validate_document(cbom) == {"schema": "1.7", "valid": True, "errors": 0, "error_kinds": {}}
     comps = {c["name"]: c for c in cbom["components"]}
 
     def props(name):
@@ -485,13 +477,21 @@ def test_model_values_become_valid_cyclonedx_16(repo: Path):
     assert comps["AES"]["cryptoProperties"]["algorithmProperties"] == {
         "primitive": "block-cipher", "mode": "cbc", "padding": "raw"}  # fmt: skip
     kw = comps["A128KW"]["cryptoProperties"]["algorithmProperties"]
-    assert (kw["primitive"], kw["mode"]) == ("other", "other")
-    assert (props("A128KW")["bf-cbom:primitive"], props("A128KW")["bf-cbom:mode"]) == ("key-wrap", "KW")
+    assert (kw["primitive"], kw["mode"]) == ("key-wrap", "other")  # key-wrap is a 1.7 primitive; KW is no mode
+    assert "bf-cbom:primitive" not in props("A128KW") and props("A128KW")["bf-cbom:mode"] == "KW"
+    # the registry-bound 1.7 fields: the registry's spelling, else left out and the model's value kept
+    ecdsa = comps["ECDSA"]["cryptoProperties"]["algorithmProperties"]
+    assert ecdsa == {"algorithmFamily": "ECDSA", "ellipticCurve": "nist/P-256"}
+    ecdh = comps["ECDH"]["cryptoProperties"]["algorithmProperties"]
+    assert ecdh == {"algorithmFamily": "ECDH"} and props("ECDH")["bf-cbom:curve"] == "X25519"
+    rsa = comps["RSA-2048"]["cryptoProperties"]["algorithmProperties"]
+    assert rsa == {"parameterSetIdentifier": "2048"} and props("RSA-2048")["bf-cbom:algorithm-family"] == "RSA"
+    assert "algorithmFamily" in llm.SYSTEM_PROMPT and "RSASSA-PSS" in llm.SYSTEM_PROMPT  # the registry is offered
     assert comps["salt"]["cryptoProperties"]["relatedCryptoMaterialProperties"] == {"type": "salt"}
     assert comps["crypto-js"]["cryptoProperties"] == {"assetType": "related-crypto-material"}
     assert props("crypto-js")["bf-cbom:asset-type"] == "library"
     meta = {p["name"]: p["value"] for p in cbom["metadata"]["properties"]}
     assert meta["bf-cbom:assembly-version"] == llm.ASSEMBLY_VERSION
     assert (
-        meta["bf-cbom:values-not-in-enum"] == str(stats.values_not_in_enum) == "6"
-    )  # key x2, PSS, key-wrap, KW, library
+        meta["bf-cbom:values-not-in-enum"] == str(stats.values_not_in_enum) == "7"
+    )  # key x2, PSS, KW, library, curve X25519, family RSA

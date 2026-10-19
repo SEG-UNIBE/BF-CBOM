@@ -61,13 +61,13 @@ Uses SonarQube for static analysis and supports compliance policy checks.
 the same sonar-cryptography engine packaged as a standalone jar, run without the server and database and with the languages (Java, Python, Go) chosen per repository. Kept as a second worker so differences between the two packagings are measured; in agreement-based scoring both count as one voter (`voter_group` in `common/tools.yaml`).
 
 - **[`cdxgen`](https://github.com/CycloneDX/cdxgen)**:
-CycloneDX's official generator, primarily for SBOMs but with CBOM extensions since April 2024. Its crypto output is mostly crypto libraries and key/certificate files; algorithms come with file and line only for JavaScript/TypeScript. For Python and Go repos the worker passes `-t python` / `-t go`, since otherwise cdxgen's code analysis falls back to Java.
+CycloneDX's official generator, primarily for SBOMs but with CBOM extensions since April 2024. Its crypto output is mostly crypto libraries and key/certificate files; algorithms come with file and line only for JavaScript/TypeScript and Go. For Python and Go repos the worker passes `-t python` / `-t go`, since otherwise cdxgen's code analysis falls back to Java.
 
 - **[`CryptobomForge`](https://github.com/Santandersecurityresearch/cryptobom-forge)**:
 Santander Security Research's CLI tool that turns CodeQL SARIF output into a CBOM (IBM's pre-standard draft format). The worker runs CodeQL's experimental crypto queries, which exist for Python and C/C++ only.
 
 - **[`DeepSeek`](https://www.deepseek.com/)**:
-LLM-based approach: the worker clones the repository, selects source files that reference crypto APIs, sends them with line numbers to DeepSeek's model (temperature 0; for models that reject it, no temperature is sent) and assembles a CycloneDX 1.6 CBOM with file and line per asset (`common/llm_cbom.py`; other providers plug in as thin adapters).
+LLM-based approach: the worker clones the repository, selects source files that reference crypto APIs, sends them with line numbers to DeepSeek's model (temperature 0; for models that reject it, no temperature is sent) and assembles a CycloneDX 1.7 CBOM with file and line per asset, the algorithm families and curves mapped onto the 1.7 registry (`common/llm_cbom.py`; other providers plug in as thin adapters).
 
 - **`ChatGPT` / `Claude`** (prepared, opt-in): the same code-reading pipeline with OpenAI or Anthropic models. Put the API key into `docker/env/worker-chatgpt.env` or `docker/env/worker-claude.env` and start with `make up-prod EXTRA_PROFILES=llm`; without keys these workers are not started.
 
@@ -94,6 +94,14 @@ tree-sitter and YAML-rule scanner for Java, Python and Go source and their depen
 
 - **[`SCANOSS crypto-finder`](https://github.com/scanoss/crypto-finder)** (GPL-2.0-only):
 opengrep rules plus call-graph reachability, CycloneDX 1.7 with file and line per asset. Its full rule set comes from the SCANOSS API and needs a key; without one the worker runs the documented offline mode with the public open rules ([`open-crypto-rules`](https://github.com/scanoss/open-crypto-rules), GPL-3.0), which cover Go, C, JavaScript and Rust but not Java or Python. The image holds the unmodified release binary (0.37.1), the opengrep release SCANOSS's own image ships (1.22.0) and the rules at a pinned commit, all checksum- or commit-verified; the Dockerfile names their sources. A research key for the Java and Python rules has been requested.
+
+**Observers** (`role: observer` in `common/tools.yaml`): tools that failed the pilot's inclusion bar. They run in the experiments and are analysed like every tool, and the other tools confirm their findings, but they confirm nobody and are never ranked (`--observers-vote` turns them into voters).
+
+- **[`qelens`](https://github.com/qelens/cbom)** (MPL-2.0): Rust/tree-sitter scanner for Python and JavaScript, crate `cbom` 0.1.2, CycloneDX 1.6 with file and line per asset.
+
+- **[`cryptarium`](https://github.com/sgoveia/cryptarium)** (Apache-2.0): Go/tree-sitter scanner with embedded YAML rule packs for Java, Python, Go, JS/TS and C/C++ (v0.3.0), CycloneDX 1.6; its CBOM carries no locations (its JSON format does).
+
+- **[`qScan`](https://github.com/quantakrypto/pqc-tools)** (quantakrypto, Apache-2.0): TypeScript pattern scanner for quantum-vulnerable cryptography in many languages (npm 0.12.0), CycloneDX 1.6 with `file:line` locations; run offline, its optional LLM triage is never used.
 
 **Not yet integrated, blocked on access:**
 

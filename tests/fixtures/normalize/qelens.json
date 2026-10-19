@@ -1,0 +1,311 @@
+{
+ "bomFormat": "CycloneDX",
+ "specVersion": "1.6",
+ "serialNumber": "urn:uuid:9c395094-0d03-48e0-8001-000000000000",
+ "version": 1,
+ "components": [
+  {
+   "type": "cryptographic-asset",
+   "name": "HASHING (see usage)",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {
+     "primitive": "hash"
+    }
+   },
+   "evidence": {
+    "occurrences": [
+     {
+      "location": "/tmp/qelens-x/repo/app/crypto_demo.py",
+      "line": 1,
+      "additionalContext": "library=hashlib, detection=SourceCode"
+     }
+    ]
+   }
+  },
+  {
+   "type": "cryptographic-asset",
+   "name": "HMAC",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {
+     "primitive": "mac"
+    },
+    "oid": "1.2.840.113549.2.9"
+   },
+   "evidence": {
+    "occurrences": [
+     {
+      "location": "/tmp/qelens-x/repo/app/crypto_demo.py",
+      "line": 2,
+      "additionalContext": "library=hmac, detection=SourceCode"
+     }
+    ]
+   }
+  },
+  {
+   "type": "cryptographic-asset",
+   "name": "HASHES",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {}
+   },
+   "evidence": {
+    "occurrences": [
+     {
+      "location": "/tmp/qelens-x/repo/app/crypto_demo.py",
+      "line": 5,
+      "additionalContext": "library=cryptography, detection=SourceCode"
+     }
+    ]
+   }
+  },
+  {
+   "type": "cryptographic-asset",
+   "name": "SERIALIZATION",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {}
+   },
+   "evidence": {
+    "occurrences": [
+     {
+      "location": "/tmp/qelens-x/repo/app/crypto_demo.py",
+      "line": 5,
+      "additionalContext": "library=cryptography, detection=SourceCode"
+     }
+    ]
+   }
+  },
+  {
+   "type": "cryptographic-asset",
+   "name": "EC",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {}
+   },
+   "evidence": {
+    "occurrences": [
+     {
+      "location": "/tmp/qelens-x/repo/app/crypto_demo.py",
+      "line": 6,
+      "additionalContext": "library=cryptography, detection=SourceCode"
+     }
+    ]
+   }
+  },
+  {
+   "type": "cryptographic-asset",
+   "name": "PADDING",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {}
+   },
+   "evidence": {
+    "occurrences": [
+     {
+      "location": "/tmp/qelens-x/repo/app/crypto_demo.py",
+      "line": 6,
+      "additionalContext": "library=cryptography, detection=SourceCode"
+     }
+    ]
+   }
+  },
+  {
+   "type": "cryptographic-asset",
+   "name": "RSA",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {
+     "primitive": "signature"
+    },
+    "oid": "1.2.840.113549.1.1.1"
+   },
+   "evidence": {
+    "occurrences": [
+     {
+      "location": "/tmp/qelens-x/repo/app/crypto_demo.py",
+      "line": 6,
+      "additionalContext": "library=cryptography, detection=SourceCode"
+     }
+    ]
+   }
+  },
+  {
+   "type": "cryptographic-asset",
+   "name": "CIPHER",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {}
+   },
+   "evidence": {
+    "occurrences": [
+     {
+      "location": "/tmp/qelens-x/repo/app/crypto_demo.py",
+      "line": 7,
+      "additionalContext": "library=cryptography, detection=SourceCode"
+     }
+    ]
+   }
+  },
+  {
+   "type": "cryptographic-asset",
+   "name": "ALGORITHMS",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {}
+   },
+   "evidence": {
+    "occurrences": [
+     {
+      "location": "/tmp/qelens-x/repo/app/crypto_demo.py",
+      "line": 7,
+      "additionalContext": "library=cryptography, detection=SourceCode"
+     }
+    ]
+   }
+  },
+  {
+   "type": "cryptographic-asset",
+   "name": "MODES",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {
+     "primitive": "block-cipher"
+    }
+   },
+   "evidence": {
+    "occurrences": [
+     {
+      "location": "/tmp/qelens-x/repo/app/crypto_demo.py",
+      "line": 7,
+      "additionalContext": "library=cryptography, detection=SourceCode"
+     }
+    ]
+   }
+  },
+  {
+   "type": "cryptographic-asset",
+   "name": "AESGCM",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {
+     "primitive": "block-cipher"
+    }
+   },
+   "evidence": {
+    "occurrences": [
+     {
+      "location": "/tmp/qelens-x/repo/app/crypto_demo.py",
+      "line": 8,
+      "additionalContext": "library=cryptography, detection=SourceCode"
+     }
+    ]
+   }
+  },
+  {
+   "type": "cryptographic-asset",
+   "name": "PBKDF2HMAC",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {
+     "primitive": "mac"
+    }
+   },
+   "evidence": {
+    "occurrences": [
+     {
+      "location": "/tmp/qelens-x/repo/app/crypto_demo.py",
+      "line": 9,
+      "additionalContext": "library=cryptography, detection=SourceCode"
+     }
+    ]
+   }
+  },
+  {
+   "type": "cryptographic-asset",
+   "name": "SHA256",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {
+     "primitive": "hash"
+    },
+    "oid": "2.16.840.1.101.3.4.2.1"
+   },
+   "evidence": {
+    "occurrences": [
+     {
+      "location": "/tmp/qelens-x/repo/app/crypto_demo.py",
+      "line": 23,
+      "additionalContext": "library=hashlib, detection=SourceCode"
+     }
+    ]
+   }
+  },
+  {
+   "type": "cryptographic-asset",
+   "name": "MD5",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {
+     "primitive": "hash"
+    },
+    "oid": "1.2.840.113549.2.5"
+   },
+   "evidence": {
+    "occurrences": [
+     {
+      "location": "/tmp/qelens-x/repo/app/crypto_demo.py",
+      "line": 24,
+      "additionalContext": "library=hashlib, detection=SourceCode"
+     }
+    ]
+   }
+  },
+  {
+   "type": "cryptographic-asset",
+   "name": "HMAC",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {
+     "primitive": "mac"
+    },
+    "oid": "1.2.840.113549.2.9"
+   },
+   "evidence": {
+    "occurrences": [
+     {
+      "location": "/tmp/qelens-x/repo/app/crypto_demo.py",
+      "line": 26,
+      "additionalContext": "library=hmac, detection=SourceCode"
+     }
+    ]
+   }
+  },
+  {
+   "type": "cryptographic-asset",
+   "name": "DEPENDENCY:CRYPTOGRAPHY",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {}
+   },
+   "evidence": {
+    "occurrences": [
+     {
+      "location": "/tmp/qelens-x/repo/requirements.txt",
+      "line": 1,
+      "additionalContext": "library=cryptography, detection=Dependency"
+     }
+    ]
+   }
+  }
+ ],
+ "metadata": {
+  "properties": [
+   {
+    "name": "bf-cbom:fixture-origin",
+    "value": "qelens cbom 0.1.2 on corpus/micro/python (cloned to <tmp>/repo), 2026-10-19; complete CBOM"
+   }
+  ]
+ }
+}

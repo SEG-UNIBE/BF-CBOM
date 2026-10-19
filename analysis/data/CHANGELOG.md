@@ -5,6 +5,27 @@ refinement 14): they were developed on the pilot corpus (the development set); t
 change bumps `version` in `algorithms.yaml`, adds an entry here with the fingerprint `python -m analysis.freeze`
 prints and the reason, and the tests fail otherwise (`tests/test_vocab_frozen.py`). Newest entry first.
 
+## 2026-10-20.1 (2026-10-20) fingerprint `0feb566720a73894da61d5dfc5f8fe9d369b0c4a9cbb8d8914641acb04608a7f`
+CycloneDX versions harmonised where BF-CBOM writes the CBOM itself; the tools' own versions are untouched (a tool's
+choice of 1.6, 1.7 or IBM's draft is part of what it ships and what RQ1 measures).
+- `_llm.yaml`: the LLM workers assemble CycloneDX 1.7 (common/llm_cbom.py ASSEMBLY_VERSION and PROMPT_VERSION
+  2026-10-20.1): registry values in algorithmFamily and ellipticCurve, the model's other answers in
+  bf-cbom:algorithm-family and bf-cbom:curve, which the spec now reads. The dictionary entry for assetType `key` (LLM
+  CBOMs assembled before 2026-10-16) is gone: no stored run has that layout (results are disposable).
+- `cryptobomforge.yaml`: the worker's empty placeholder CBOM (CodeQL returned no results) is CycloneDX 1.7.
+- `cdxgen.yaml`: declared version and notes corrected for the pinned 12.8.5 (it writes 1.7; the spec still described
+  11.7.0 and 1.6), and its Go locations are read: the property cdx:golem:crypto:sourceLocation (`property_locations`,
+  `<path>:<line>:<col>`) was ignored, so cdxgen's Go records had no location (refinement 15: our analysis reads every
+  location format a tool uses).
+
+## 2026-10-19.2 (2026-10-19) fingerprint `d5276ebc4f7d58767ec86a5e75b1440a9b7263c18ba368e8cf068a7b0beeaaf3`
+Three new adapter specs for the observer tools (common/tools.yaml `role: observer`): `qelens.yaml`, `cryptarium.yaml`,
+`qscan.yaml`, written on their CBOMs of the five micro projects (development data; fixtures in
+tests/fixtures/normalize/). Each only declares the format and inherits the generic CycloneDX reading: no dictionary,
+no extractor. Their oddities stay what they are and are described in the specs' notes: qelens' category names
+(`HASHING (see usage)`) are `undefined`, cryptarium's CBOM has no locations, qScan writes the algorithm name into
+parameterSetIdentifier. The shared vocabulary is unchanged.
+
 ## 2026-10-19.1 (2026-10-19) fingerprint `187dc9cd9193cb720976cc21b84465efa37415561dad05efb5059987c108235c`
 Prompted by the review of e1-pilot-corpus (development set) and e1-icpc-corpus (held out; the items it prompted are
 marked ICPC): the records a name produces are now classified (`resolution`: mapped, ambiguous, api, non-crypto,

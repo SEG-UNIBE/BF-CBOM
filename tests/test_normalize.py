@@ -176,9 +176,9 @@ def test_spec_issues_against_the_declared_version():
     assert "enum:cryptoProperties.algorithmProperties.padding=PSS" in r16.spec_issues
     r17 = normalize_cbom(_bom(_comp("EC", ap={"curve": "P-256"}), version="1.7"), "x").records[0]
     assert r17.spec_issues == ["deprecated:cryptoProperties.algorithmProperties.curve"]
-    key = normalize_cbom(_bom(_comp("RSA", asset="key")), "deepseek").records[0]
-    assert key.spec_issues == ["enum:cryptoProperties.assetType=key"]
-    assert (key.values["asset_type"], key.values["material"]) == ("related-crypto-material", "key")
+    key = normalize_cbom(_bom(_comp("RSA", asset="key")), "x").records[0]
+    assert key.spec_issues == ["enum:cryptoProperties.assetType=key"]  # recorded, and no asset type is invented
+    assert "asset_type" not in key.values
     old = normalize_cbom(_bom(_comp("AES"), version="1.5"), "x")
     assert old.document_issues == ["version:1.5"] and old.checked_against is None
 
@@ -270,6 +270,26 @@ def test_ciphersift_rule_family_fills_the_gap_and_api_names_stay_quiet():
     hm = by[("hmac.new", "SHA-2")]
     assert hm.conflicts["family"]["value"] == "HMAC" and hm.resolution == "mapped" and hm.name_kind is None
     assert all(r.resolution == "mapped" for r in recs if r.values.get("asset_type") == "algorithm")
+
+
+def test_observer_specs_read_their_tools_as_shipped():
+    """qelens, cryptarium and qScan (observers, 2026-10-19) need no dictionary: the generic CycloneDX reading takes
+    their names and fields; their oddities stay visible instead of being repaired."""
+    qe = normalize_cbom(_load("fixtures/normalize/qelens.json"), "qelens").records
+    assert all(
+        r.file in ("app/crypto_demo.py", "requirements.txt") and r.line for r in qe
+    )  # absolute path cut at the clone
+    by = {r.name: r for r in qe}
+    assert by["HASHING (see usage)"].resolution == "undefined" and by["SHA256"].values["algorithm"] == "SHA-256"
+    cr = normalize_cbom(_load("fixtures/normalize/cryptarium.json"), "cryptarium").records
+    assert not any(r.file or r.line for r in cr)  # its CBOM has no locations (only its JSON format does)
+    assert {r.name: r.values.get("key_size") for r in cr}["AES-256"] == 256
+    assert {r.resolution for r in cr if r.name == "UNKNOWN"} == {"undefined"}
+    qs = normalize_cbom(_load("fixtures/normalize/qscan.json"), "qscan").records
+    rsa = next(r for r in qs if r.name == "RSA (kem)")
+    assert (rsa.file, rsa.line, rsa.values["family"]) == ("app/crypto_demo.py", 15, "RSA")  # `<file>:<line>` read
+    assert rsa.values["param_set"] == "RSA"  # its algorithm name in parameterSetIdentifier: kept, not repaired
+    assert not any(r.spec_issues for r in qe + cr + qs)
 
 
 def test_cbomkit_micro_java_against_the_ground_truth():
@@ -383,6 +403,16 @@ def test_llm_cbom_assembled_valid_keeps_the_models_values():
         },
         {"name": "A128KW", "assetType": "algorithm", "primitive": "key-wrap", "mode": "KW", "file": "a.go", "line": 4},
         {"name": "RSA private key", "assetType": "key", "keySize": 2048, "file": "a.go", "line": 5},
+        {
+            "name": "ECDSA",
+            "assetType": "algorithm",
+            "algorithmFamily": "ecdsa",
+            "curve": "P-256",
+            "file": "a.go",
+            "line": 6,
+        },
+        {"name": "ECDH", "assetType": "algorithm", "curve": "X25519", "file": "a.go", "line": 7},
+        {"name": "signing", "assetType": "algorithm", "algorithmFamily": "RSA", "file": "a.go", "line": 8},
     ]
     cbom = llm.assemble_cbom(answer, tool_name="deepseek", model="m", repo_info=None, repo_path=None,
                              stats=llm.GenerationStats())  # fmt: skip
@@ -393,6 +423,12 @@ def test_llm_cbom_assembled_valid_keeps_the_models_values():
     key = recs["RSA private key"]
     assert (key.values["asset_type"], key.values["material"], key.values["key_size"]) == (
         "related-crypto-material", "private-key", 2048)  # fmt: skip
+    # CycloneDX 1.7: registry values in the standard fields, the model's other answers from the bf-cbom properties
+    ecdsa = recs["ECDSA"]
+    assert (ecdsa.values["family"], ecdsa.values["curve"]) == ("ECDSA", "secp256r1")
+    assert ecdsa.src["curve"] == "cryptoProperties.algorithmProperties.ellipticCurve"
+    assert (recs["ECDH"].values["curve"], recs["ECDH"].src["curve"]) == ("Curve25519", "properties[bf-cbom:curve]")
+    assert recs["signing"].src["family"] == "properties[bf-cbom:algorithm-family]"
 
 
 def test_scanoss_registry_and_api_spellings_and_byte_key_length():

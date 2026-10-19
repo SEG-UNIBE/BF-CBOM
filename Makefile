@@ -5,7 +5,7 @@ BASE_IMAGE := bf-cbom/base
 # `-dirty` means the images were built from uncommitted changes
 BF_CBOM_COMMIT := $(shell git describe --always --dirty --abbrev=12 2>/dev/null || echo unknown)
 # Comma-separated list of all workers available in the repo
-AVAILABLE_WORKERS := skeleton,testing,mssbomtool,cbomkit,cdxgen,cryptobomforge,deepseek,cryptoscan,chatgpt,claude,pqcheck,qdarpan,securin-xbom,cipherradar,xgrep,cbomkit-jar,ciphersift,scanoss
+AVAILABLE_WORKERS := skeleton,testing,mssbomtool,cbomkit,cdxgen,cryptobomforge,deepseek,cryptoscan,chatgpt,claude,pqcheck,qdarpan,securin-xbom,cipherradar,xgrep,cbomkit-jar,ciphersift,scanoss,qelens,cryptarium,qscan
 # Comma-separated list of dev-only workers
 DEV_WORKERS := skeleton,testing,mssbomtool
 # Batch runs (make experiment): memory budget in GiB = sum of the compose memory limits of the workers

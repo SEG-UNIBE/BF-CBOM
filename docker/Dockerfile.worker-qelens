@@ -1,0 +1,38 @@
+# syntax=docker/dockerfile:1.7
+# docker/Dockerfile.worker-qelens
+# qelens `cbom` (MPL-2.0): Rust/tree-sitter scanner, CycloneDX output with --format cyclonedx.
+# Built from the pinned crates.io release with its own lockfile (--locked). Observer (common/tools.yaml role).
+ARG BASE_IMAGE=base
+ARG BASE_TAG=latest
+
+# ---- build stage (image index digest of rust:1-bookworm = rustc 1.99.1, 2026-10-19)
+FROM rust:1-bookworm@sha256:e12566d5abc17a0da741628782cdb504b68b8961f5bfcf677936bf3e8b32de29 AS rustbuild
+ARG QELENS_VERSION=0.1.2
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    cargo install --locked --root /out cbom --version "${QELENS_VERSION}" \
+ && /out/bin/cbom --version
+
+# ---- runtime
+FROM ${BASE_IMAGE}:${BASE_TAG}
+ARG QELENS_VERSION=0.1.2
+USER root
+COPY --from=rustbuild /out/bin/cbom /usr/local/bin/cbom
+RUN cbom --version
+ENV TOOL_VERSION="qelens cbom ${QELENS_VERSION}"
+
+USER appuser
+WORKDIR /app
+ENV PYTHONPATH=/app
+
+COPY --chown=appuser:appuser pyproject.toml uv.lock ./
+COPY --chown=appuser:appuser common/ ./common/
+RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=1000,gid=1000 \
+    uv sync --frozen --no-dev
+
+COPY --chown=appuser:appuser workers/qelens/ ./workers/qelens/
+
+ENTRYPOINT ["tini", "-g", "--", "uv", "run", "--frozen", "--no-dev", "workers/qelens/main.py"]
+
+# BF-CBOM commit this image was built from (compose/bake pass it; last, so it never invalidates the layers above)
+ARG BF_CBOM_COMMIT=unknown
+ENV BF_CBOM_COMMIT=${BF_CBOM_COMMIT}

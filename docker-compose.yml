@@ -633,6 +633,93 @@ services:
     security_opt: [no-new-privileges:true]
     profiles: [prod, all]
 
+  worker-qelens:   # observer (common/tools.yaml role): harvested, not a voter
+    image: bf-cbom/worker-qelens:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-qelens
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+        BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-qelens:${VERSION:-latest}
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=900
+    env_file: docker/env/worker-qelens.env
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    profiles: [prod, all]
+
+  worker-cryptarium:   # observer (common/tools.yaml role): harvested, not a voter
+    image: bf-cbom/worker-cryptarium:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-cryptarium
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+        BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-cryptarium:${VERSION:-latest}
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=900
+    env_file: docker/env/worker-cryptarium.env
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    profiles: [prod, all]
+
+  worker-qscan:   # observer (common/tools.yaml role): harvested, not a voter
+    image: bf-cbom/worker-qscan:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-qscan
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+        BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-qscan:${VERSION:-latest}
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=900
+    env_file: docker/env/worker-qscan.env
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    profiles: [prod, all]
+
   worker-mssbomtool:
     image: bf-cbom/worker-mssbomtool:${VERSION:-latest}
     build:

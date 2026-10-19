@@ -277,7 +277,10 @@ with items in at least 3 repositories and 10 items in total; others show their r
 the algorithm dimension a **Dawid-Skene** weighted
 support (an EM without labels estimates every voter group's sensitivity and specificity; a tool's support is the mean
 posterior of its items). `loo-run<k>.csv` recomputes the ranking without each voter group with Kendall's tau against
-the full ranking. Pairs a tool was tuned on are excluded (`--include-tailored` keeps them). `stability.csv` covers
+the full ranking. Pairs a tool was tuned on are excluded (`--include-tailored` keeps them). Observers (`role:
+observer` in `common/tools.yaml`: qelens, cryptarium, qScan) are scored like every tool and confirmed by the voters,
+but confirm nobody, make nothing non-exclusive, are no Dawid-Skene annotators and get no rank (`role` column; every
+voter number is the same with and without them); `--observers-vote` makes them voters. `stability.csv` covers
 every (tool, repository) with repeated runs: Jaccard of the algorithm sets between runs, the record-count CV and the
 consensus set (algorithms in more than half of the runs); with repetitions the scores use that consensus set
 (`--no-consensus` scores run k alone). LLM costs come from the stored token usage and the dated price table
@@ -287,14 +290,16 @@ summary adds cost per repository, per found and per confirmed asset).
 **`levels <exp>`** computes the normalisation ladder (L0-L4, see [Normalisation](#normalisation)): per repository the
 algorithms each tool reports, and the share that a tool of another voter group (`voter_group` in `common/tools.yaml`)
 also reports. It prints a tools x levels table and writes `_ANALYSIS/levels-run<k>.csv` (dimension, level, tool,
-voter_group, algorithms, confirmed, share; tool `all` pools all tools; `dimension` is `algorithm` or a parameter:
+voter_group, role, algorithms, confirmed, share; tool `all` pools the voters, an observer has rows of its own;
+`dimension` is `algorithm` or a parameter:
 key_size, mode, padding, curve, digest, which exist from L2 on) and `_ANALYSIS/algorithms-run<k>.csv`: one row per
-(snapshot, variant, tool, algorithm) with the tool's voter group, whether the tool was tuned on the repo
+(snapshot, variant, tool, algorithm) with the tool's voter group and role, whether the tool was tuned on the repo
 (`tailored`), whether the row is only implied (`implied`, with `--closure`), the repo's language, the number of
 records and distinct spellings behind it, and per level the voter groups in the algorithm's largest cluster (`k_L0`
-.. `k_L4`). That table is location-free, so every tool takes part; it is the basis for UpSet plots and the
+.. `k_L4`; observers are no voter groups, so an algorithm only observers report has k 0). That table is
+location-free, so every tool takes part; it is the basis for UpSet plots and the
 tools-per-algorithm distribution. Options: `--run K` for another repetition, `--merge-llm` (every LLM worker one
-voter), `--include-tailored`, `--closure` (refinement 2).
+voter), `--observers-vote`, `--include-tailored`, `--closure` (refinement 2).
 
 **`micro <exp>`** scores every tool on the micro projects (`corpus/micro`, repos named `<owner>/micro-<language>`)
 against `corpus/micro/ground_truth.yaml`, 11 known crypto assets per project, from the normalised records
@@ -371,11 +376,11 @@ files and never change these:
 |---|---|---|---|
 | `runs.csv` | runs | stored run, every repetition, incl. failed, timed-out and `unsupported` | repo, snapshot, commit, variant, tool, run, tailored (the tool was tuned on this repo), status, duration_sec, size_bytes, error (the most telling line), peak_memory_mb, memory_limit_mb, oom_kills, enqueued_at, started_at, finished_at, queue_sec, tool_version, image_ref, bfcbom_commit, bom_format, spec_version (as the CBOM declares), components, crypto_assets and, by the declared `assetType`, algorithm_assets, certificate_assets, protocol_assets, material_assets, other_assets, plus located_file_assets and located_line_assets (crypto assets with a file, and with a file and a line, in the CBOM), expect_crypto (from the spec), workaround (recorded setup workarounds: CryptoScan `--exclude`, CipherRadar `.cradarignore`); for LLM workers requests, requests_failed, chunks_total, chunks_sent, chunks_skipped (over `LLM_MAX_CHUNKS`, never sent), input_tokens, cached_input_tokens, cache_write_tokens, output_tokens, reasoning_tokens, models_answered |
 | `records-run<k>.csv` | records | normalised record: one (component, occurrence) of one tool | snapshot, variant, tool, run, record_id (`<tool>:<component>:<occurrence>`), site_id (`<tool>:<file>:<line>` when located), every record dimension, resolution (`mapped`, `ambiguous`, `api`, `non-crypto`, `undefined`; only `mapped` records are algorithm items), `raw_*`, `src_*`, unmapped, conflicts, spec_issues |
-| `groups-exact-run<k>.csv` | matches | group of the exact matcher: `repo` scope = one cluster per key at the level (its members plus attached records), `site` scope = its located records at one call site | matcher, repo, snapshot, commit, variant, run, group_id (`E00001`, clusters sorted by key; sites `E00001.001`), k (tools), tools, language, level, scope, key (the level's key: a raw name at L0, an identity at L4), voters, voter_groups, n_records, n_sites, units (L4 identities of the members), n_units, n_attached, located_voters, colocated_voters (repo scope), file, line_min, line_max, parent (site scope) |
+| `groups-exact-run<k>.csv` | matches | group of the exact matcher: `repo` scope = one cluster per key at the level (its members plus attached records), `site` scope = its located records at one call site | matcher, repo, snapshot, commit, variant, run, group_id (`E00001`, clusters sorted by key; sites `E00001.001`), k (tools, observers included), tools, language, level, scope, key (the level's key: a raw name at L0, an identity at L4), voters, voter_groups (observers are none), n_records, n_sites, units (L4 identities of the voting members; of all members when only observers are in), n_units, n_attached, located_voters, colocated_voters (repo scope; voters only), file, line_min, line_max, parent (site scope) |
 | `members-exact-run<k>.csv` | matches | (group, record) pair | matcher, snapshot, variant, run, group_id, record_id, tool, unit (the record's L4 identity), implied (attached through `--closure`), matched (its own identity differs from the group's key: joined through a lower level), attached (a generic or implying record, no key of its own in the group) |
 | `groups-raqun-run<k>.csv`, `members-raqun-run<k>.csv`, `agreement-raqun-run<k>.csv` | matches | RaQuN's groups (repo scope only; `n_elements`, `similarity` = Jaccard of the attribute sets) | as the exact tables |
 | `matchers-run<k>.csv` | matches | (repository, level): exact vs RaQuN | repo, snapshot, variant, run, level, matcher_a, matcher_b, records_common, groups_a, groups_b, pairs_a, pairs_b, pairs_both, pair_jaccard, a_in_one_b, b_in_one_a |
-| `score-run<k>.csv` | scores | (dimension, tool) at the matcher's level | dimension, level, tool, voter_group, repos (with items), items, confirmed, rate (mean of the per-repository confirmation rates), rate_pooled, ci_low, ci_high (bootstrap of the mean over repositories; only with enough support), exclusive, exclusivity, rank (only with items in ≥ 3 repos and ≥ 10 items), ds_support, ds_sensitivity, ds_specificity (algorithm dimension only) |
+| `score-run<k>.csv` | scores | (dimension, tool) at the matcher's level | dimension, level, tool, voter_group, role (voter, observer), repos (with items), items, confirmed, rate (mean of the per-repository confirmation rates), rate_pooled, ci_low, ci_high (bootstrap of the mean over repositories; only with enough support), exclusive, exclusivity, rank (only with items in ≥ 3 repos and ≥ 10 items), ds_support, ds_sensitivity, ds_specificity (algorithm dimension only) |
 | `loo-run<k>.csv` | scores | (dimension, left-out voter group) | dimension, level, left_out, kendall_tau, ranking |
 | `stability.csv` | scores | (tool, snapshot, variant) with >= 2 runs | repo, snapshot, variant, tool, level, runs, records_mean, records_cv, algorithms_mean, jaccard_mean, jaccard_min, consensus, unstable |
 | `agreement-exact-run<k>.csv` | matches | (group, dimension) | matcher, repo, snapshot, variant, run, group_id, scope, key, dimension (key_size, mode, padding, curve, digest; location for repo groups), reporting (voters with a value), agreeing (voters carrying the majority value), majority, values |

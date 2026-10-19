@@ -38,6 +38,9 @@ group "default" {
     "worker-cbomkit-jar",
     "worker-ciphersift",
     "worker-scanoss",
+    "worker-qelens",
+    "worker-cryptarium",
+    "worker-qscan",
     "misc-pyqun",
     "gitserver",
     "runner",
@@ -195,4 +198,22 @@ target "worker-scanoss" {
   inherits   = ["_from-base"]
   dockerfile = "docker/Dockerfile.worker-scanoss"
   tags       = ["${REGISTRY}-worker-scanoss:${VERSION}"]
+}
+
+target "worker-qelens" {
+  inherits   = ["_from-base"]
+  dockerfile = "docker/Dockerfile.worker-qelens"
+  tags       = ["${REGISTRY}-worker-qelens:${VERSION}"]
+}
+
+target "worker-cryptarium" {
+  inherits   = ["_from-base"]
+  dockerfile = "docker/Dockerfile.worker-cryptarium"
+  tags       = ["${REGISTRY}-worker-cryptarium:${VERSION}"]
+}
+
+target "worker-qscan" {
+  inherits   = ["_from-base"]
+  dockerfile = "docker/Dockerfile.worker-qscan"
+  tags       = ["${REGISTRY}-worker-qscan:${VERSION}"]
 }

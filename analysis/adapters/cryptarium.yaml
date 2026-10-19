@@ -1,0 +1,11 @@
+spec: cryptarium
+inherits: _cyclonedx
+version: 1
+declared: [{bomFormat: CycloneDX, specVersion: "1.6"}]
+checked_on: "corpus/micro 2026-10-19 (cryptarium 0.3.0, 5 CBOMs; fixture tests/fixtures/normalize/cryptarium.json)"
+notes: >
+  Observer (tools.yaml role). Its CBOM carries no locations: the file, line and rule id of each finding exist only in
+  its JSON format (`-format json`), which is not a CBOM and is not read (the CBOM is benchmarked as shipped). One
+  component per distinct finding id (bom-ref crypto/algorithm/<id>); names are registry-style (RSA-2048, AES-256,
+  SHA-512) or UNKNOWN with a primitive `other` and a cryptoFunctions entry (`undefined`); AES carries primitive `ae`
+  and the key length in parameterSetIdentifier.

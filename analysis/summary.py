@@ -127,6 +127,17 @@ def _false(v) -> bool:
     return str(v).strip().lower() == "false"
 
 
+OBSERVER_NOTE = (
+    "`°` = observer (tools.yaml `role`): confirmed by the voters like every tool, but it confirms nobody, is in no "
+    "pooled row and no k, and gets no rank (`--observers-vote` makes it a voter)."
+)
+
+
+def _tool(r: dict) -> str:
+    """The tool's name, marked when it is an observer in this report."""
+    return f"{r['tool']} °" if r.get("role") == "observer" else r["tool"]
+
+
 def _lang_key(lang: str) -> tuple[int, str]:
     return (LANGUAGE_ORDER.index(lang) if lang in LANGUAGE_ORDER else len(LANGUAGE_ORDER), lang)
 
@@ -738,7 +749,7 @@ def _scores(rows: list[dict], loo: list[dict]) -> list[str]:
             ci = f" [{_pct(r['ci_low'])}, {_pct(r['ci_high'])}]" if r.get("ci_low") not in (None, "") else ""
             row = [
                 r.get("rank") or "–",
-                r["tool"],
+                _tool(r),
                 r["voter_group"],
                 r.get("repos", ""),
                 r["items"],
@@ -753,6 +764,8 @@ def _scores(rows: list[dict], loo: list[dict]) -> list[str]:
         if dim == "algorithm":
             header += ["DS support", "DS sens. / spec."]
         lines += [f"**{dim}**", ""] + md_table(header, table, "rllrrrrr" + "rr" * (dim == "algorithm")) + [""]
+    if any(r.get("role") == "observer" for r in rows):
+        lines += [OBSERVER_NOTE, ""]
     if loo:
         by_dim: dict[str, list[dict]] = defaultdict(list)
         for r in loo:
@@ -819,7 +832,7 @@ def _ladder(all_rows: list[dict]) -> list[str]:
     for t in tools:
         first = by.get((t, levels[0]), {})
         table.append(
-            [t, first.get("voter_group", "")]
+            [_tool({"tool": t, "role": first.get("role")}), first.get("voter_group", "")]
             + [_pct(by.get((t, lv), {}).get("share")) for lv in levels]
             + [first.get("algorithms", "")]
         )
@@ -835,6 +848,8 @@ def _ladder(all_rows: list[dict]) -> list[str]:
         "",
     ]
     lines += md_table(["tool", "voter group", *levels, "algorithms"], table, "ll" + "r" * (len(levels) + 1))
+    if any(r.get("role") == "observer" for r in rows):
+        lines += ["", OBSERVER_NOTE]
     alls = {r["level"]: r for r in rows if r["tool"] == "all"}
     if alls and any(r.get("multi_unit_clusters") not in (None, "") for r in alls.values()):
         strict = ", ".join(
@@ -844,7 +859,7 @@ def _ladder(all_rows: list[dict]) -> list[str]:
         multi = ", ".join(f"{lv} {_int(r.get('multi_unit_clusters'))}" for lv, r in alls.items())
         lines += [
             "",
-            f"Confirmed through cluster members alone, all tools (no generic or implied attachment): {strict}. "
+            f"Confirmed through cluster members alone, all voters (no generic or implied attachment): {strict}. "
             f"Clusters whose members span several L4 identities (what the level declares the same): {multi}. "
             "Records without an L4 identity (`resolution` undefined, api, non-crypto, ambiguous) are not items.",
         ]
@@ -859,7 +874,7 @@ def _ladder(all_rows: list[dict]) -> list[str]:
             ptable.append([d, *cells, by_dim.get((d, plevels[-1]), {}).get("algorithms", "")])
         lines += [
             "",
-            "**Parameters**, pooled over all tools: share of (algorithm, value) pairs, values from any source, for "
+            "**Parameters**, pooled over the voters: share of (algorithm, value) pairs, values from any source, for "
             "which another voter group reports the same value inside the algorithm's group at that level; a value "
             "is admitted at L2 from a standard field, at L3 also parsed from the name, at L4 from any source "
             "(per-tool rows in `levels-run<k>.csv`). n/a: the standard has no field for the value (CycloneDX carries "
@@ -883,6 +898,8 @@ def _overlap(groups: list[dict]) -> list[str]:
     def line(label: str, rows: list[dict]) -> list:
         best: dict[tuple, int] = {}  # (snapshot, algorithm) -> voter groups of its largest group
         for g in rows:
+            if not _int(g["voter_groups"]):
+                continue  # only observers report it: no voter group, not counted
             for unit in (g.get("units") or g["key"]).split(";"):  # the L4 identities inside the group
                 key = (g["snapshot"], g.get("variant"), unit)
                 best[key] = max(best.get(key, 0), _int(g["voter_groups"]))

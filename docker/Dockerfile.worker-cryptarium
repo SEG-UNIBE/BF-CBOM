@@ -1,0 +1,39 @@
+# syntax=docker/dockerfile:1.7
+# docker/Dockerfile.worker-cryptarium
+# cryptarium (Apache-2.0): Go/tree-sitter scanner with embedded YAML rule packs, CycloneDX CBOM output.
+# Built with `go install` at the pinned release tag (go.sum pins the dependencies). Observer (common/tools.yaml role).
+ARG BASE_IMAGE=base
+ARG BASE_TAG=latest
+
+# ---- build stage: Go toolchain (image index digest of golang:1.26-bookworm, 2026-10-15)
+FROM golang:1.26-bookworm@sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c AS gobuild
+ARG CRYPTARIUM_VERSION=v0.3.0
+# cgo for the tree-sitter grammars; the binary links against glibc, which the runtime image also has
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=1 GOBIN=/out go install -trimpath "github.com/sgoveia/cryptarium/cmd/cryptarium@${CRYPTARIUM_VERSION}" \
+ && /out/cryptarium --version
+
+# ---- runtime
+FROM ${BASE_IMAGE}:${BASE_TAG}
+ARG CRYPTARIUM_VERSION=v0.3.0
+USER root
+COPY --from=gobuild /out/cryptarium /usr/local/bin/cryptarium
+RUN cryptarium --version
+ENV TOOL_VERSION="cryptarium ${CRYPTARIUM_VERSION}"
+
+USER appuser
+WORKDIR /app
+ENV PYTHONPATH=/app
+
+COPY --chown=appuser:appuser pyproject.toml uv.lock ./
+COPY --chown=appuser:appuser common/ ./common/
+RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=1000,gid=1000 \
+    uv sync --frozen --no-dev
+
+COPY --chown=appuser:appuser workers/cryptarium/ ./workers/cryptarium/
+
+ENTRYPOINT ["tini", "-g", "--", "uv", "run", "--frozen", "--no-dev", "workers/cryptarium/main.py"]
+
+# BF-CBOM commit this image was built from (compose/bake pass it; last, so it never invalidates the layers above)
+ARG BF_CBOM_COMMIT=unknown
+ENV BF_CBOM_COMMIT=${BF_CBOM_COMMIT}

@@ -169,3 +169,24 @@ def test_generic_reports_attach_without_merging_and_bridges_do_not_merge():
     ).records
     assert rec.name_kind is None
     assert [identity(rec, lv) for lv in LEVELS] == ["hmac.new", "hmacnew", "SHA-2", "HMAC", "SHA-2"]
+
+
+def test_observers_get_ladder_rows_but_confirm_nobody():
+    from common.tools_registry import VoterMap, voter_groups
+
+    records = {("s", "a"): _records("a", "AES", "SHA-256"), ("s", "b"): _records("b", "aes")}
+    observer = {("s", "o"): _records("o", "AES", "SHA-256", "MD5")}
+    plain = {(r.dimension, r.level, r.tool): r.to_dict() for r in ladder(records, VoterMap({}))}
+    voter_of = VoterMap({}, observers={"o"})
+    rows = {(r.dimension, r.level, r.tool): r.to_dict() for r in ladder({**records, **observer}, voter_of)}
+    assert {k: v for k, v in rows.items() if k[2] != "o"} == plain  # voters and the pooled `all` rows: unchanged
+    o = rows[("algorithm", "L4", "o")]
+    assert (o["algorithms"], o["confirmed"], o["role"]) == (3, 2, "observer")  # AES and SHA-256 confirmed by a, b
+    assert rows[("algorithm", "L4", "a")]["confirmed"] == 1  # a's SHA-256: only the observer reports it, no vote
+    algos = algorithm_rows(
+        {("s", "original", t): recs for (_, t), recs in {**records, **observer}.items()}, voter_of, run=1
+    )
+    md5 = next(r for r in algos if r["algorithm"] == "MD5")
+    assert (md5["role"], md5["k_L4"]) == ("observer", 0)  # only an observer reports it: no voter group
+    assert voter_groups({"x": {"role": "observer"}, "y": {}}).observers == {"x"}
+    assert voter_groups({"x": {"role": "observer"}}, observers_vote=True).observers == frozenset()

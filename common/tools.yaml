@@ -8,6 +8,9 @@
 # `status`: integrated (worker exists) | candidate (passed the pilot's inclusion bar, worker pending)
 #          | blocked (needs access, see CLAUDE.md) | excluded (failed the bar; kept for RQ1/RQ2 only)
 #          | prepared (worker ready, but kept out of AVAILABLE_WORKERS and the specs until its source is public).
+# `role`: voter (default) | observer (decided 2026-10-19: tools that failed the pilot's inclusion bar are run and
+#   analysed like every tool, and the panel confirms their findings, but they never confirm another tool, never count
+#   in k, exclusivity or Dawid-Skene and are never ranked; `--observers-vote` makes them voters, the sensitivity check).
 # Pilot verdicts (2026-10-08, docs/pilot-2026-10-08/README.md): pass/borderline/fail per language.
 # `micro_<date>`: lenient call-site recall on e0-micro (`make analysis ARGS="micro e0-micro"`; the inclusion bar is 6/11);
 #   scored from the normalised records since 2026-10-18.
@@ -60,7 +63,7 @@ tools:
     engine: codeql                  # Santander cryptobom-forge on CodeQL crypto queries
     memory_gb: 6
     approach: data flow (CodeQL)
-    native_cyclonedx: false         # emits IBM's pre-standard draft `1.4-cbom-1.0` (bomFormat CBOM, type crypto-asset), not CycloneDX 1.6
+    native_cyclonedx: false         # emits IBM's pre-standard draft `1.4-cbom-1.0` (bomFormat CBOM, type crypto-asset), not CycloneDX
     languages: [python, c]          # upstream CodeQL crypto queries exist for Python and C/C++ only (no Java query)
     status: integrated              # runs experimental/cryptography/inventory/new_models (before 2026-10-17: CodeQL's default security suite by mistake)
     pilot: {java: fail, python: fail}   # exact line lost, algorithms relabelled; RQ1 (non-conformance example) and RQ2 only
@@ -193,9 +196,40 @@ tools:
     languages: [java]
     status: blocked
 
-  # ---- failed the pilot's inclusion bar on every language tested (kept for the landscape table only)
-  # qelens (borderline Java, fail elsewhere: import lines), pqc-mat (fail; systematic -2 line offset),
-  # cryptarium, qScan (fail)
+  # ---- observers (integrated 2026-10-19): failed the pilot's inclusion bar on every language tested, which rested on
+  # the AI-made micro ground truth; their data is harvested, they do not vote (`role`, above)
+  qelens:
+    engine: qelens                  # qelens/cbom (ex keylens, MPL-2.0), crate `cbom` 0.1.2
+    memory_gb: 4
+    approach: syntax tree (tree-sitter), dependency lockfiles
+    native_cyclonedx: true          # `--format cyclonedx` (specVersion 1.6; its docs say 1.5)
+    languages: [python, javascript] # its SUPPORTED_LANGUAGES.md; Rust only through Cargo.lock
+    status: integrated              # workers/qelens; release pinned in docker/Dockerfile.worker-qelens
+    role: observer
+    pilot: {java: borderline, python: fail, go: fail, c: fail, javascript: fail}
+  cryptarium:
+    engine: cryptarium              # sgoveia/cryptarium v0.3.0 (Apache-2.0)
+    memory_gb: 4
+    approach: syntax tree (tree-sitter) + YAML rule packs (embedded); also certificates, keys, nginx/SSH/JWT configs
+    native_cyclonedx: true
+    languages: [java, python, go, javascript, c]
+    status: integrated              # workers/cryptarium; release tag pinned in docker/Dockerfile.worker-cryptarium
+    role: observer
+    pilot: {java: fail, python: fail, go: fail, c: fail, javascript: fail}
+  qscan:
+    engine: qscan                   # quantakrypto/pqc-tools, npm @quantakrypto/qscan 0.12.0 (Apache-2.0)
+    memory_gb: 4
+    approach: patterns (own TypeScript detectors); dependency manifests, keys, TLS and IaC configs
+    native_cyclonedx: true          # `--format cbom` (CycloneDX 1.6)
+    languages: [java, python, go, javascript, c, rust, csharp, ruby, php]   # of its 14 claimed languages, those in our list
+    status: integrated              # workers/qscan; npm release pinned in docker/Dockerfile.worker-qscan
+    role: observer
+    pilot: {java: fail, python: fail, go: fail, c: fail, javascript: fail}
+    notes: offline by default; the optional LLM triage (--triage) and supply-chain audit (--audit) are never enabled
+
+  # ---- not integrated: pqc-mat (decided 2026-10-19). Its code scanner VECTOR-Code (AbstractionsLab/pqc-mat, AGPL-3.0)
+  # runs CodeQL's crypto inventory queries and converts the SARIF with cryptobom-forge: the engine of our
+  # cryptobomforge worker, repackaged (the pilot's -2 line offset is cryptobom-forge's context window). Failed the pilot.
   # ---- not integrated by decision (2026-10-17)
   # OQS Scanner (jimbo111/open-quantum-secure, MIT): an orchestrator over third-party engines (semgrep, ast-grep,
   # cipherscope; optionally CryptoScan and cdxgen); failed the pilot, passed the coworker's audit (micro 11/9/11)

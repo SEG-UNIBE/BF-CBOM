@@ -1,19 +1,22 @@
 spec: cdxgen
 inherits: _cyclonedx
 version: 1
-declared: [{bomFormat: CycloneDX, specVersion: "1.6"}]
-checked_on: "e1-pilot-corpus 2026-10-16 (cdxgen 11.7.0, 12 CBOMs)"
+declared: [{bomFormat: CycloneDX, specVersion: "1.7"}]
+checked_on: "e1-pilot-corpus and e1-icpc-corpus 2026-10-19 (cdxgen 12.8.5, 34 CBOMs, all CycloneDX 1.7)"
 findings:
   component_types: [cryptographic-asset]
   libraries: tagged
   library_tags: [crypto, encrypt]
-locations: [evidence_occurrences, src_file_property]
+locations: [evidence_occurrences, property_locations, src_file_property]   # Go: cdx:golem:crypto:sourceLocation
 sources:
   - fields: standard
   - {parse: name, quiet: true}     # crypto file names (openssl.rsa2048.pem): algorithm hints only
 notes: >
-  A full dependency SBOM (thousands of libraries, frameworks, GitHub actions) with `--include-crypto`. The only
-  crypto assets are files found in the repo (cert.pem, client.key, kafka.keystore.jks), typed `certificate`,
-  located by the property SrcFile (no line), with empty algorithmProperties (executionEnvironment/
-  implementationPlatform `unknown`). Library import sites appear as occurrences `path#line`; only libraries cdxgen
-  tags crypto/encrypt become records. No algorithm is ever reported with a line.
+  A full dependency SBOM (thousands of libraries, frameworks, GitHub actions) with `--include-crypto`, CycloneDX
+  1.7. Crypto assets (12.8.5): files found in the repo (cert.pem, client.key, willyko.gpg), typed `certificate` and
+  located by the property SrcFile (no line); algorithms named in lower case with an OID (sha-256, aes, hmacSHA),
+  located in evidence.occurrences only for JS/TS (symbol node:crypto.createHash); from Go code (its `golem`
+  analyser) algorithms, certificates and key material (`ErrInvalidKey`) whose location is the property
+  cdx:golem:crypto:sourceLocation `<abs path>:<line>:<col>` (read since 2026-10-20; before, those records had no
+  location). Java and Python algorithms carry no location. Library import sites appear as occurrences
+  `path#line`; only libraries cdxgen tags crypto/encrypt become records.

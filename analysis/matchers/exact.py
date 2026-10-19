@@ -18,6 +18,8 @@ column for that level and the k distribution are one definition.
 
 from __future__ import annotations
 
+from common.tools_registry import votes
+
 from ..levels import UNIT_LEVEL, clusters_at, identity, level_matches
 from ..normalize.record import NormRecord
 from ..normalize.vocab import Vocabulary, load_vocabulary
@@ -49,15 +51,20 @@ class ExactMatcher:
         for n, cluster in enumerate(clusters_at(items, self.level), start=1):
             gid = f"E{n:05d}"
             members = cluster.records
-            units = sorted(cluster.units(self.vocab))
+            # the L4 identities the level declares the same, among the voters (observers only when nobody else is in)
+            voting = [r for r in cluster.members if votes(self.voter_of, r.tool)] or cluster.members
+            units = sorted({u for r in voting if (u := identity(r, UNIT_LEVEL, self.vocab))})
             attached = frozenset(cluster.reason)
             implied = frozenset(rid for rid, why in cluster.reason.items() if why == "implied")
             matched = frozenset(
                 r.record_id for r in cluster.members if identity(r, UNIT_LEVEL, self.vocab) != cluster.key
             )
             sites = self._site_groups(members, cluster.key, gid)
-            located = {self._voter(r.tool) for r in members if r.file and r.line}
-            colocated = max((len({self._voter(r.tool) for r in s.members}) for s in sites), default=0)
+            located = {self._voter(r.tool) for r in members if r.file and r.line and votes(self.voter_of, r.tool)}
+            colocated = max(
+                (len({self._voter(r.tool) for r in s.members if votes(self.voter_of, r.tool)}) for s in sites),
+                default=0,
+            )
             extra = {
                 "level": self.level,
                 "n_records": len(members),

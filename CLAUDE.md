@@ -130,15 +130,21 @@ Shared context for coworkers and for Claude Code (which loads this file automati
 New worker: `workers/<tool>/main.py` with `run_worker`, `docker/Dockerfile.worker-<tool>`, a compose service,
 `AVAILABLE_WORKERS` in the Makefile, a `docker-bake.hcl` target, a `tools.yaml` entry, an adapter spec, and a worker
 adapter if the native output isn't CycloneDX. Tools that only orchestrate other scanners are not integrated (OQS
-Scanner, decided 2026-10-17). Versions are pinned in the Dockerfiles and recorded per run; recipes in `notes.md`.
+Scanner, decided 2026-10-17; pqc-mat, whose code scanner is CodeQL's crypto queries through cryptobom-forge, the
+CryptobomForge engine repackaged, decided 2026-10-19). Versions are pinned in the Dockerfiles and recorded per run;
+recipes in `notes.md`. **Observers** (`role: observer` in `tools.yaml`, decided 2026-10-19): tools that failed the
+pilot's inclusion bar (AI-made micro ground truth) are run and analysed like every tool and confirmed by the voters,
+but they never confirm another tool, count in no k, exclusivity or Dawid-Skene and are never ranked, so the voters'
+numbers are identical with and without them; `--observers-vote` makes them voters (sensitivity check). Whether they
+appear in the paper's figures is decided later.
 
 | Worker | Voter group | Languages | Invocation and caveats |
 |---|---|---|---|
 | `cbomkit` | cbomkit | Java, Python, Go | CBOMkit server image, cloned through the git server over TLS; Python covers pyca only; modules need a build file and `src/`; large repos need ~45 min and a 16 GB heap |
 | `cbomkit-jar` | cbomkit | Java, Python, Go | cbomkit-action, source only, the same engine (packaging differences are measured); `CBOMKIT_ENSURE_SRC=1` opt-in |
-| `cdxgen` | cdxgen | Java, Python, JS, Go | `--include-crypto --evidence`, `-t python` / `-t go` for those repos; algorithms carry locations only for JS/TS; Java code yields none (atom has no crypto sinks); 16 GiB (OOM-killed at 8 on Chat2DB, bisq, bisq2, kafka) |
+| `cdxgen` | cdxgen | Java, Python, JS, Go | `--include-crypto --evidence`, `-t python` / `-t go` for those repos; algorithms carry locations only for JS/TS (occurrences) and Go (property `cdx:golem:crypto:sourceLocation`); Java code yields none (atom has no crypto sinks); 16 GiB (OOM-killed at 8 on Chat2DB, bisq, bisq2, kafka) |
 | `cryptobomforge` | cryptobomforge | Python, C | CodeQL's crypto inventory queries, C with `--build-mode none`; writes IBM's draft `1.4-cbom-1.0`, not CycloneDX |
-| `deepseek`, `chatgpt`, `claude` | one each, `merge_group: llm` | all five | `common/llm_cbom.py` (below); `chatgpt` / `claude` need `make up-prod EXTRA_PROFILES=llm` and a key in `docker/env/worker-<provider>.env`; a request that fails after the provider's retries fails the job (no partial CBOMs), `LLM_MAX_CHUNKS` 1000, `LLM_CONCURRENCY` 4 |
+| `deepseek`, `chatgpt`, `claude` | one each, `merge_group: llm` | all five | `common/llm_cbom.py` (below), CycloneDX 1.7 assembled by us; `chatgpt` / `claude` need `make up-prod EXTRA_PROFILES=llm` and a key in `docker/env/worker-<provider>.env`; a request that fails after the provider's retries fails the job (no partial CBOMs), `LLM_MAX_CHUNKS` 1000, `LLM_CONCURRENCY` 4 |
 | `cryptoscan` | cryptoscan | eleven | always `--include-quantum-safe`; skips folders named demo, example, sample; on a Go panic (1.4.0, specific files) the worker bisects and reruns with `--exclude` of those files, recorded as a workaround |
 | `pqcheck` | pqcheck | Python, Go | |
 | `qdarpan` | qdarpan | Java, Go, C | the worker adapter moves `qdarpan:location.N` into `evidence.occurrences` |
@@ -147,6 +153,9 @@ Scanner, decided 2026-10-17). Versions are pinned in the Dockerfiles and recorde
 | `scanoss` | grep-rules | Go, C, JS, Rust | crypto-finder with the public open rules; Java/Python rules need an API key (research key requested) |
 | `ciphersift` | ciphersift | Java, Python, Go | benchmark-informed: `tailored_on` the micro projects and the pilot corpus (refinement 13) |
 | `xgrep` | xgrep | Java, Python, Go, JS | |
+| `qelens` | observer | Python, JS | crate `cbom` 0.1.2, CycloneDX on stdout; many findings on import lines; category names such as `HASHING (see usage)` stay `undefined` |
+| `cryptarium` | observer | Java, Python, Go, JS, C | v0.3.0, `-deterministic`; its CBOM has no locations (only its JSON format has them; benchmarked as shipped) |
+| `qscan` | observer | Java, Python, Go, JS, C, Rust, C#, Ruby, PHP | quantakrypto npm 0.12.0, offline (no `--triage`/`--audit`); quantum-vulnerable crypto only; exit 1 = findings |
 | `cryptoscope` | – | Java | blocked: the implementation is not public; artifact requested from Moffie et al. |
 
 ---
@@ -166,6 +175,10 @@ real projects.
 Decisions: mutants are hosted on the local git server; the LLM generator reads the code; the corpus is ~100 Java +
 ~100 Python repos, mutation runs on a ~30-repo subset.
 
+**Paper languages (decided 2026-10-20):** the paper analyses Java and Python, at most also Go; every other language
+(C, JavaScript/TypeScript, Rust, ...) is irrelevant for now: tools still run where they declare support, but no
+analysis, figure or tuning effort goes into those languages.
+
 ## Status (2026-10-19)
 - **Export review of 2026-10-19** (`docs/findings.md` "Export review"): the first VM runs of e0-stability,
   e1-pilot-corpus and e1-icpc-corpus were checked for plausibility. Fixed since: the git server's 256 MiB limit killed
@@ -178,6 +191,14 @@ Decisions: mutants are hosted on the local git server; the LLM generator reads t
   with SHA-512); scores use units (L4 identities) and the mean of per-repository rates with a support threshold for
   ranks; names nobody understands are `undefined`, API names `api`, non-crypto rules `non-crypto` (never items);
   RQ1 is per CycloneDX asset type and `located` is split into file and file+line; vocabulary 2026-10-19.1.
+- **CycloneDX versions (2026-10-20):** the tools' versions stay as shipped (1.6: CBOMkit, cbomkit-jar, CryptoScan,
+  pqcheck, securin-xbom, xgrep and the observers; 1.7: cdxgen, CipherRadar, CipherSift, Q-DARPAN, SCANOSS;
+  CryptobomForge IBM's draft); what BF-CBOM writes itself is 1.7 (the LLM assembly, `PROMPT_VERSION` and
+  `ASSEMBLY_VERSION` 2026-10-20.1; CryptobomForge's empty placeholder). cdxgen's Go locations are read now (they
+  were ignored). Vocabulary 2026-10-20.1. The DeepSeek rerun below picks up the new assembly.
+- **Observers added (2026-10-19):** qelens, cryptarium and qScan are workers with `role: observer` and are in the
+  three experiment specs; the reruns below pick them up (their runs are missing, so `--retry-failed` schedules
+  them). Vocabulary 2026-10-19.2 (their specs only).
 - **Waiting for the VM:** `make up-prod`, then `make experiment EXP=experiments/e1-pilot-corpus.yaml
   ARGS="--retry-failed --rerun deepseek" EXPERIMENT_MEMORY_BUDGET_GB=0`, the same for e1-icpc-corpus and
   e0-stability (DeepSeek needs credit first; `make experiment-delete NAME=e0-micro`, superseded by e0-stability);
@@ -186,7 +207,8 @@ Decisions: mutants are hosted on the local git server; the LLM generator reads t
   PyQuN fork (draft in `notes.md` WP6), then pin it in the `raqun` extra and the misc-pyqun image, or the stopgap;
   an explicit DeepSeek model id (the default `deepseek-chat` is no longer on DeepSeek's model page and is priced as
   `deepseek-flash` meanwhile); human review of the micro ground truth, the hand-check
-  verdicts and the `languages` lists (all AI-made); whether Go becomes a third paper language.
+  verdicts and the `languages` lists (all AI-made); whether Go becomes a third paper language (Java and Python
+  are fixed; nothing beyond Go).
 - **External:** the SCANOSS research key, the Cryptoscope artifact, the two-rater review of the matcher validation
   sample (a review of `vocab.csv` with Cohen's κ is an option, not decided).
 - **Small open analysis items:** CryptobomForge's IBM-draft windows are CodeQL's `contextRegion` (finding ±2 lines),
@@ -208,8 +230,8 @@ exclusion is recorded with its reason (refinement 11); `make corpus-prune` drops
 ### Phase 2: generators
 - **LLM workers, one per provider.** The shared logic is `common/llm_cbom.py`: clone from the git server, pre-filter
   files with crypto API patterns, send line-numbered chunks with file paths, require file and line per asset,
-  assemble CycloneDX 1.6 (free-text values mapped onto the enums, originals kept in `bf-cbom:<field>`;
-  `PROMPT_VERSION`, `ASSEMBLY_VERSION` in the metadata). Each provider worker is a thin adapter (client, model id,
+  assemble CycloneDX 1.7 (free-text values mapped onto the enums, algorithm family and curve onto the 1.7 registry,
+  originals kept in `bf-cbom:<field>`; `PROMPT_VERSION`, `ASSEMBLY_VERSION` in the metadata). Each provider worker is a thin adapter (client, model id,
   key), so all providers share prompts and file selection and differences come from the model. Temperature 0 where
   the API accepts it, 3 repetitions, since temperature 0 is not determinism (refinement 10).
 - **Costs are computed offline, never in the worker:** prices change and differ per model, cache hit and time of day.
@@ -276,6 +298,9 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
   column), with bootstrap CIs over repos of that mean; a **rank and a CI only with items in ≥ 3 repos and ≥ 10 items**
   (`MIN_REPOS`, `MIN_ITEMS`); exclusivity; Dawid-Skene (binary EM without labels, seeded from the majority vote) as a
   second model; leave-one-voter-out with Kendall τ. Tailored (tool, repo) pairs are excluded (`--include-tailored`).
+  Observers (`role: observer`) get rates and CIs, confirmed by the voters, but confirm nobody and get no rank; the
+  rule is `common/tools_registry.py:votes` on the voter map, used by the ladder, the matchers' agreement and k, and
+  the scores; the `role` column marks them in `levels-`, `algorithms-` and `score-run<k>.csv`.
   `stability.py`: Jaccard across repeated runs and majority consensus sets (`--consensus`).
 - **Tables** (`tables.py`), flat long-format CSVs in three layers, so new matchers only add files: **runs**
   (`runs.csv`, one row per stored run with status, timing, memory, provenance, LLM usage and `cost_usd`), **records**

@@ -1,0 +1,12 @@
+spec: qelens
+inherits: _cyclonedx
+version: 1
+declared: [{bomFormat: CycloneDX, specVersion: "1.6"}]
+checked_on: "corpus/micro 2026-10-19 (qelens cbom 0.1.2, 5 CBOMs; fixture tests/fixtures/normalize/qelens.json)"
+notes: >
+  Observer (tools.yaml role). One component per finding, every one with evidence.occurrences (absolute path under the
+  scanned directory, line) and additionalContext `library=<lib>, detection=<SourceCode|...>`, read as context. Many
+  findings sit on import lines. Besides algorithm names (SHA256, ECC, AES-GCM, X_CRYPTO/PBKDF2, HMACSHA512) it names
+  categories of its own (`HASHING (see usage)`, `EVP (see usage)`, `JAVAX_CRYPTO (see usage)`, KEY_GENERATION,
+  PADDING, MODES): no algorithm, so `undefined`, never guessed. Lockfile findings are named `DEPENDENCY:<package>`.
+  No metadata block; its docs say CycloneDX 1.5, the output declares 1.6.

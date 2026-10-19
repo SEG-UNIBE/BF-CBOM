@@ -45,6 +45,15 @@ held-out corpora, versioned, and every change is recorded with its reason and pr
 (`python -m analysis.freeze`); the pilot corpus is the development set. A two-rater review of `vocab.csv` (Cohen's
 κ) is an option for the paper, not decided.
 
+### Observers
+
+Three tools (qelens, cryptarium, qScan) failed the pilot's inclusion bar and run as **observers** (`role: observer` in
+`common/tools.yaml`). Their CBOMs are normalised with specs of the same kind as everyone's, they have their own
+ladder and score rows, and the voters confirm their findings; but an observer's record never confirms another tool,
+never counts in k, exclusivity or Dawid-Skene, and an observer is never ranked. Every voter number is therefore the
+same with and without them (a test checks it), and `--observers-vote` turns them into voters for the sensitivity
+check. One predicate decides it everywhere (`common/tools_registry.py:votes`).
+
 ### What a record's name amounts to (`resolution`)
 
 | Value | Meaning | Example | Algorithm item? |

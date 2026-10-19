@@ -88,6 +88,12 @@ FETCH_OPT = typer.Option(
     "~/.cache/bf-cbom/snapshots; one shallow git fetch per repo) so file_exists and the traceability check work on "
     "a copied export; on the VM the git mirror is used anyway",
 )
+OBSERVERS_VOTE_OPT = typer.Option(
+    False,
+    "--observers-vote",
+    help="Let the observer tools (tools.yaml role: observer) vote: they confirm others, count in k and are ranked "
+    "(the sensitivity check of the observer role; by default they are confirmed by the voters but confirm nobody)",
+)
 INCLUDE_TAILORED_OPT = typer.Option(
     False,
     "--include-tailored",
@@ -114,8 +120,8 @@ def _expects(exp_dir: Path) -> dict[str, str | None]:
     return {r["full_name"]: r.get("expect_crypto") for r in _spec(exp_dir).get("repos") or []}
 
 
-def _voter_of(merge_llm: bool = False) -> dict[str, str]:
-    return voter_groups(merge_llm=merge_llm)
+def _voter_of(merge_llm: bool = False, observers_vote: bool = False) -> dict[str, str]:
+    return voter_groups(merge_llm=merge_llm, observers_vote=observers_vote)
 
 
 def _is_tailored(tailored: dict[str, frozenset[str]], tool: str, repo: str) -> bool:
@@ -348,6 +354,7 @@ def _levels_step(
     write: Writer,
     *,
     merge_llm: bool = False,
+    observers_vote: bool = False,
     include_tailored: bool = False,
     closure: bool = False,
 ) -> list[lv.LevelRow]:
@@ -366,7 +373,7 @@ def _levels_step(
             excluded.add((f"{snapshot}/{variant}", n.tool))
     if not ladder_in:
         _err(f"no ok results for run{run} in {exp_dir}")
-    voter_of = _voter_of(merge_llm)
+    voter_of = _voter_of(merge_llm, observers_vote)
     rows = lv.ladder(ladder_in, voter_of, exclude=set() if include_tailored else excluded, closure=closure)
     write(f"levels-run{run}.csv", [r.to_dict() for r in rows], lv.LEVEL_COLUMNS)
     algorithms = lv.algorithm_rows(
@@ -386,6 +393,7 @@ def _tables_step(
     level: str = "L3",
     closure: bool = False,
     merge_llm: bool = False,
+    observers_vote: bool = False,
     raqun: bool | None = None,
     all_assets: bool,
 ) -> None:
@@ -397,7 +405,7 @@ def _tables_step(
         tbl.run_rows(exp_dir, languages, tailored=tailored_map(), expects=_expects(exp_dir)),
         tbl.RUNS_COLUMNS,
     )
-    voter_of = _voter_of(merge_llm)
+    voter_of = _voter_of(merge_llm, observers_vote)
     norm_rows: list[dict] = []
     per_snapshot: dict[tuple[str, str], list] = defaultdict(list)
     commits: dict[str, str | None] = {}
@@ -530,12 +538,13 @@ def _score_step(
     *,
     level: str,
     merge_llm: bool,
+    observers_vote: bool,
     include_tailored: bool,
     samples: int,
     consensus: dict[tuple[str, str, str], set[str]] | None = None,
 ) -> None:
     """score-run<k>.csv and loo-run<k>.csv (analysis/score.py) from the exact matcher's groups."""
-    voter_of = _voter_of(merge_llm)
+    voter_of = _voter_of(merge_llm, observers_vote)
     tools_ran: dict[str, set[str]] = defaultdict(set)
     repo_of: dict[str, str] = {}
     for _, cbom_path, n in normalized:
@@ -566,6 +575,7 @@ def score_cmd(
     window: int = WINDOW_OPT,
     closure: bool = CLOSURE_OPT,
     merge_llm: bool = MERGE_LLM_OPT,
+    observers_vote: bool = OBSERVERS_VOTE_OPT,
     include_tailored: bool = INCLUDE_TAILORED_OPT,
     samples: int = SAMPLES_OPT,
     consensus: bool = CONSENSUS_OPT,
@@ -579,7 +589,7 @@ def score_cmd(
     normalized = [x for x in all_runs if x[1].name == f"run{run}.json"]
     if not normalized:
         _err(f"no ok results for run{run} in {exp_dir}")
-    matcher = ExactMatcher(level=level, window=window, closure=closure, voter_of=_voter_of(merge_llm))
+    matcher = ExactMatcher(level=level, window=window, closure=closure, voter_of=_voter_of(merge_llm, observers_vote))
     per_snapshot: dict[tuple[str, str], list] = defaultdict(list)
     for _, cbom_path, n in normalized:
         per_snapshot[(cbom_path.parents[2].name, cbom_path.parents[1].name)] += n.records
@@ -593,6 +603,7 @@ def score_cmd(
         write,
         level=level,
         merge_llm=merge_llm,
+        observers_vote=observers_vote,
         include_tailored=include_tailored,
         samples=samples,
         consensus=sets if consensus else None,
@@ -635,6 +646,7 @@ def levels(
     name: str = EXP_ARG,
     run: int = RUN_OPT,
     merge_llm: bool = MERGE_LLM_OPT,
+    observers_vote: bool = OBSERVERS_VOTE_OPT,
     include_tailored: bool = INCLUDE_TAILORED_OPT,
     closure: bool = CLOSURE_OPT,
 ):
@@ -649,6 +661,7 @@ def levels(
         list(_normalize_runs(exp_dir, run=run)),
         _writer(analysis_dir(exp_dir), counts),
         merge_llm=merge_llm,
+        observers_vote=observers_vote,
         include_tailored=include_tailored,
         closure=closure,
     )
@@ -667,6 +680,7 @@ def tables(
     level: str = LEVEL_OPT,
     closure: bool = CLOSURE_OPT,
     merge_llm: bool = MERGE_LLM_OPT,
+    observers_vote: bool = OBSERVERS_VOTE_OPT,
     raqun: bool | None = RAQUN_OPT,
     all_assets: bool = ALL_ASSETS_OPT,
 ):
@@ -687,6 +701,7 @@ def tables(
         level=level,
         closure=closure,
         merge_llm=merge_llm,
+        observers_vote=observers_vote,
         raqun=raqun,
         all_assets=all_assets,
     )
@@ -702,6 +717,7 @@ def run_report(
     level: str = "L3",
     all_assets: bool = False,
     merge_llm: bool = False,
+    observers_vote: bool = False,
     include_tailored: bool = False,
     closure: bool = False,
     fetch: bool = False,
@@ -721,7 +737,14 @@ def run_report(
     normalized = [x for x in done if x[1].name == f"run{run}.json"]
     _schema_step(exp_dir, run, normalized, write, store=store)
     _levels_step(
-        exp_dir, run, normalized, write, merge_llm=merge_llm, include_tailored=include_tailored, closure=closure
+        exp_dir,
+        run,
+        normalized,
+        write,
+        merge_llm=merge_llm,
+        observers_vote=observers_vote,
+        include_tailored=include_tailored,
+        closure=closure,
     )
     groups = _tables_step(
         exp_dir,
@@ -732,6 +755,7 @@ def run_report(
         level=level,
         closure=closure,
         merge_llm=merge_llm,
+        observers_vote=observers_vote,
         raqun=raqun,
         all_assets=all_assets,
     )
@@ -744,6 +768,7 @@ def run_report(
         write,
         level=level,
         merge_llm=merge_llm,
+        observers_vote=observers_vote,
         include_tailored=include_tailored,
         samples=samples,
         consensus=sets if consensus else None,
@@ -757,6 +782,7 @@ def run_report(
         "raqun": rq.available() if raqun is None else raqun,
         "all_assets": all_assets,
         "merge_llm": merge_llm,
+        "observers_vote": observers_vote,
         "include_tailored": include_tailored,
         "closure": closure,
         "fetch": fetch,
@@ -773,6 +799,7 @@ def report(
     level: str = LEVEL_OPT,
     all_assets: bool = ALL_ASSETS_OPT,
     merge_llm: bool = MERGE_LLM_OPT,
+    observers_vote: bool = OBSERVERS_VOTE_OPT,
     include_tailored: bool = INCLUDE_TAILORED_OPT,
     closure: bool = CLOSURE_OPT,
     fetch: bool = FETCH_OPT,
@@ -791,6 +818,7 @@ def report(
         level=level,
         all_assets=all_assets,
         merge_llm=merge_llm,
+        observers_vote=observers_vote,
         include_tailored=include_tailored,
         closure=closure,
         fetch=fetch,

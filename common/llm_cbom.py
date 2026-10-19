@@ -1,7 +1,7 @@
 """Code-reading LLM CBOM generation shared by all LLM provider workers (BF-CBOM 2.0, Phase 2).
 
 Pipeline: select source files that reference crypto APIs -> send them in line-numbered chunks ->
-require file and line per reported asset -> assemble a CycloneDX 1.6 CBOM. Provider workers
+require file and line per reported asset -> assemble a CycloneDX 1.7 CBOM. Provider workers
 (`workers/deepseek`, later `workers/chatgpt`, `workers/claude`) only supply an `LLMProvider`, so all
 of them use identical prompts and file selection and differ in the model alone.
 
@@ -19,8 +19,11 @@ fails aborts the job (`error`), since a CBOM built from a subset of the chunks w
 less. An unparsable answer is retried once as two halves. Chunks past the deadline raise a TimeoutError (`timeout`).
 
 The model answers in free text ("GCM", "PSS", assetType "key"); `assemble_cbom` maps every value onto the
-CycloneDX 1.6 enums so the CBOM is valid. A value without an enum equivalent becomes `other` and the model's
-original is kept in a `bf-cbom:<field>` property, so nothing is lost (ASSEMBLY_VERSION, recorded in the CBOM).
+CycloneDX 1.7 enums so the CBOM is valid. A value without an enum equivalent becomes `other` and the model's
+original is kept in a `bf-cbom:<field>` property, so nothing is lost (ASSEMBLY_VERSION, recorded in the CBOM). The two
+1.7 fields bound to the CycloneDX registry (`algorithmFamily`, `ellipticCurve`) have no `other`: a value outside the
+registry is left out of the field and kept in `bf-cbom:algorithm-family` / `bf-cbom:curve`. The prompt lists the
+registry's algorithm families, so the model can name them as a 1.7 generator should.
 """
 
 from __future__ import annotations
@@ -42,8 +45,26 @@ from .models import RepoInfo, Trace
 
 logger = logging.getLogger(__name__)
 
-PROMPT_VERSION = "2026-10-15.2"  # prompt + file-selection version (recorded in the CBOM metadata)
-ASSEMBLY_VERSION = "2026-10-18.1"  # how answers become CycloneDX: enum mapping, usage properties (in the CBOM metadata)
+PROMPT_VERSION = "2026-10-20.1"  # prompt + file-selection version (recorded in the CBOM metadata); .1: 1.7 families
+ASSEMBLY_VERSION = "2026-10-20.1"  # how answers become CycloneDX (in the CBOM metadata); .1: CycloneDX 1.7
+
+# The CycloneDX 1.7 registry of algorithm families and elliptic curves. Vendored once, for the analysis, in
+# analysis/data/cyclonedx/; the LLM worker images copy this one file to the same path.
+CDX_DEFS = Path(
+    os.getenv(
+        "CYCLONEDX_DEFS",
+        str(Path(__file__).resolve().parents[1] / "analysis" / "data" / "cyclonedx" / "cryptography-defs.schema.json"),
+    )
+)
+
+
+def _registry(path: Path = CDX_DEFS) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """(algorithm families, elliptic-curve identifiers `<category>/<name>`) of the CycloneDX 1.7 registry."""
+    defs = json.loads(path.read_text(encoding="utf-8"))["definitions"]
+    return tuple(defs["algorithmFamiliesEnum"]["enum"]), tuple(defs["ellipticCurvesEnum"]["enum"])
+
+
+CDX_FAMILIES, CDX_CURVES = _registry()
 
 LLM_MAX_FILES = int(os.getenv("LLM_MAX_FILES", "1000"))
 LLM_MAX_CHUNK_CHARS = int(os.getenv("LLM_MAX_CHUNK_CHARS", "40000"))  # ~10k tokens of code per request
@@ -114,7 +135,8 @@ CRYPTO_API_PATTERNS: dict[str, re.Pattern] = {
 # "other" languages: the union of both pattern sets
 _ANY_PATTERN = re.compile("|".join(p.pattern for p in CRYPTO_API_PATTERNS.values()))
 
-SYSTEM_PROMPT = """You are a cryptography auditor producing a Cryptography Bill of Materials (CBOM).
+SYSTEM_PROMPT = (
+    """You are a cryptography auditor producing a Cryptography Bill of Materials (CBOM).
 You receive source files of one software project, each line prefixed with its file path and line number.
 List every cryptographic asset that this code USES or CONFIGURES: algorithms (ciphers, hashes, MACs, signatures,
 key agreement, key derivation, random number generation), keys and key material, certificates, and protocols
@@ -125,8 +147,9 @@ Answer with ONE JSON object and nothing else:
 {"assets": [
   {"name": "<algorithm or asset name as used, e.g. AES, SHA-256, RSA, HMAC-SHA256, TLS, X.509>",
    "assetType": "algorithm|key|certificate|protocol|related-crypto-material",
-   "primitive": "<for algorithms: block-cipher|stream-cipher|hash|mac|signature|pke|kem|key-agree|kdf|drbg|ae|other,
-                 else null>",
+   "primitive": "<for algorithms: block-cipher|stream-cipher|hash|mac|signature|pke|kem|key-agree|kdf|drbg|ae|key-wrap|
+                 other, else null>",
+   "algorithmFamily": "<for algorithms: one of the CycloneDX algorithm families listed below, or null>",
    "keySize": <bits as integer or null>, "curve": "<e.g. P-256, secp256k1, Ed25519 or null>",
    "mode": "<e.g. GCM, CBC, CTR or null>", "padding": "<e.g. PKCS7, OAEP, PKCS1v15 or null>",
    "digest": "<hash used inside a MAC/signature/KDF, e.g. SHA-256, or null>",
@@ -135,7 +158,11 @@ Answer with ONE JSON object and nothing else:
    "confidence": "high|medium|low"}
 ]}
 One entry per call site. If a value is not visible in the code, use null. If there is nothing to report,
-answer {"assets": []}."""
+answer {"assets": []}.
+CycloneDX algorithm families: """
+    + ", ".join(CDX_FAMILIES)
+    + "."
+)
 
 
 @dataclass
@@ -439,9 +466,9 @@ def _str_or_none(v) -> str | None:
 
 _ASSET_TYPES = {"algorithm", "key", "certificate", "protocol", "related-crypto-material"}  # what the prompt allows
 
-# CycloneDX 1.6 enum values the model's free text is mapped to (`other`/`unknown` are valid too)
+# CycloneDX 1.7 enum values the model's free text is mapped to (`other`/`unknown` are valid too)
 CDX_PRIMITIVES = ("drbg", "mac", "block-cipher", "stream-cipher", "signature", "hash", "pke", "xof", "kdf",
-                  "key-agree", "kem", "ae", "combiner")  # fmt: skip
+                  "key-agree", "kem", "ae", "combiner", "key-wrap")  # fmt: skip
 CDX_MODES = ("cbc", "ecb", "ccm", "gcm", "cfb", "ofb", "ctr")
 CDX_PADDINGS = ("pkcs5", "pkcs7", "pkcs1v15", "oaep", "raw")
 _SYNONYMS = {
@@ -457,6 +484,8 @@ _SYNONYMS = {
         "prng": "drbg",
         "csprng": "drbg",
         "keyderivation": "kdf",
+        "keywrap": "key-wrap",
+        "keywrapping": "key-wrap",
     },  # fmt: skip
     "mode": {"cfb1": "cfb", "cfb8": "cfb", "cfb64": "cfb", "cfb128": "cfb"},
     "padding": {
@@ -483,7 +512,7 @@ def _fold(value: str) -> str:
 
 
 def to_cdx_enum(field_name: str, value: str | None, allowed: tuple[str, ...]) -> tuple[str | None, str | None]:
-    """(CycloneDX 1.6 value, the model's original when it had to become `other`) for a free-text value."""
+    """(CycloneDX 1.7 value, the model's original when it had to become `other`) for a free-text value."""
     if value is None:
         return None, None
     key = _fold(value)
@@ -497,6 +526,19 @@ def to_cdx_enum(field_name: str, value: str | None, allowed: tuple[str, ...]) ->
     if field_name == "padding" and key.startswith("oaepwith"):
         return "oaep", None
     return "other", value
+
+
+def to_registry(value: str | None, allowed: tuple[str, ...]) -> tuple[str | None, str | None]:
+    """(registry value, the model's original when it has none) for `algorithmFamily` or `ellipticCurve`: the same
+    spelling up to case and separators; for a curve also its name without the `<category>/` prefix (P-256 ->
+    nist/P-256, secp256r1 -> secg/secp256r1; the names are unique across categories). No synonyms, no guessing."""
+    if value is None:
+        return None, None
+    key = _fold(value)
+    for a in allowed:
+        if _fold(a) == key or ("/" in a and _fold(a.split("/", 1)[1]) == key):
+            return a, None
+    return None, value
 
 
 def material_type(name: str) -> str | None:
@@ -517,6 +559,7 @@ def _normalize_asset(a: dict) -> dict | None:
         "assetType": asset_type,
         "assetTypeRaw": raw_type,
         "primitive": _str_or_none(a.get("primitive")),
+        "algorithmFamily": _str_or_none(a.get("algorithmFamily")),
         "keySize": _int_or_none(a.get("keySize")),
         "curve": _str_or_none(a.get("curve")),
         "mode": _str_or_none(a.get("mode")),
@@ -567,7 +610,7 @@ class GenerationStats:
     chunks_split: int = 0  # chunks re-sent as two halves after an unparsable answer
     locations_verified: int = 0
     locations_unverified: int = 0
-    values_not_in_enum: int = 0  # model values kept in bf-cbom:<field> because CycloneDX 1.6 has no such value
+    values_not_in_enum: int = 0  # model values kept in bf-cbom:<field> because CycloneDX 1.7 has no such value
     notes: list[str] = field(default_factory=list)
 
     def add_usage(self, usage: dict) -> None:
@@ -603,7 +646,7 @@ def assemble_cbom(
     repo_path: Path | None,
     stats: GenerationStats,
 ) -> dict:
-    """CycloneDX 1.6 CBOM from normalised assets; duplicates (same asset at the same place) collapse."""
+    """CycloneDX 1.7 CBOM from normalised assets; duplicates (same asset at the same place) collapse."""
     components: list[dict] = []
     seen: set[tuple] = set()
     for raw in assets:
@@ -613,6 +656,7 @@ def assemble_cbom(
         key = (
             a["name"].lower(),
             a["assetType"],
+            a["algorithmFamily"],
             a["keySize"],
             a["curve"],
             a["mode"],
@@ -626,6 +670,8 @@ def assemble_cbom(
         primitive, primitive_raw = to_cdx_enum("primitive", a["primitive"], CDX_PRIMITIVES)
         mode, mode_raw = to_cdx_enum("mode", a["mode"], CDX_MODES)
         padding, padding_raw = to_cdx_enum("padding", a["padding"], CDX_PADDINGS)
+        family, family_raw = to_registry(a["algorithmFamily"], CDX_FAMILIES)
+        curve, curve_raw = to_registry(a["curve"], CDX_CURVES)
         digest = a["digest"]
         if not digest and a["padding"] and (m := _OAEP_DIGEST.search(a["padding"])):
             digest = m.group(1)  # "OAEPWithSHA-256AndMGF1Padding" -> SHA-256
@@ -638,9 +684,10 @@ def assemble_cbom(
         algo = {
             k: v
             for k, v in {
+                "algorithmFamily": family,
                 "primitive": primitive,
                 "parameterSetIdentifier": str(a["keySize"]) if a["keySize"] else None,
-                "curve": a["curve"],
+                "ellipticCurve": curve,
                 "mode": mode,
                 "padding": padding,
             }.items()
@@ -660,7 +707,15 @@ def assemble_cbom(
             props.append({"name": "bf-cbom:evidence", "value": a["evidence"]})
         originals = {"asset-type": a["assetTypeRaw"] if asset_type != a["assetTypeRaw"].lower() else None}
         if asset_type == "algorithm":  # the other fields are only written for algorithms
-            originals.update({"primitive": primitive_raw, "mode": mode_raw, "padding": padding_raw})
+            originals.update(
+                {
+                    "primitive": primitive_raw,
+                    "algorithm-family": family_raw,
+                    "curve": curve_raw,
+                    "mode": mode_raw,
+                    "padding": padding_raw,
+                }
+            )
         for name, value in originals.items():
             if value:
                 props.append({"name": f"bf-cbom:{name}", "value": value})
@@ -723,7 +778,7 @@ def assemble_cbom(
         }
     return {
         "bomFormat": "CycloneDX",
-        "specVersion": "1.6",
+        "specVersion": "1.7",
         "serialNumber": f"urn:uuid:{uuid.uuid4()}",
         "version": 1,
         "metadata": metadata,

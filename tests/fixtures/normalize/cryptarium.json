@@ -1,0 +1,181 @@
+{
+ "bomFormat": "CycloneDX",
+ "specVersion": "1.6",
+ "serialNumber": "urn:uuid:00000000-0000-0000-0000-000000000000",
+ "version": 1,
+ "metadata": {
+  "tools": {
+   "components": [
+    {
+     "type": "application",
+     "name": "cryptarium",
+     "version": "0.3.0"
+    }
+   ]
+  },
+  "component": {
+   "type": "application",
+   "name": "scanned-target"
+  },
+  "properties": [
+   {
+    "name": "bf-cbom:fixture-origin",
+    "value": "cryptarium 0.3.0 (-deterministic) on corpus/micro/c, 2026-10-19; complete CBOM"
+   }
+  ]
+ },
+ "components": [
+  {
+   "type": "cryptographic-asset",
+   "bom-ref": "crypto/algorithm/5fbf302e509525b0",
+   "name": "UNKNOWN",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {
+     "primitive": "other",
+     "cryptoFunctions": [
+      "encrypt"
+     ],
+     "nistQuantumSecurityLevel": 0
+    }
+   }
+  },
+  {
+   "type": "cryptographic-asset",
+   "bom-ref": "crypto/algorithm/a526371bd980b668",
+   "name": "AES-256",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {
+     "primitive": "ae",
+     "parameterSetIdentifier": "256",
+     "cryptoFunctions": [
+      "encrypt",
+      "decrypt"
+     ],
+     "nistQuantumSecurityLevel": 1
+    }
+   }
+  },
+  {
+   "type": "cryptographic-asset",
+   "bom-ref": "crypto/algorithm/ca482d6f95bdccc8",
+   "name": "UNKNOWN",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {
+     "primitive": "other",
+     "cryptoFunctions": [
+      "encrypt"
+     ],
+     "nistQuantumSecurityLevel": 0
+    }
+   }
+  },
+  {
+   "type": "cryptographic-asset",
+   "bom-ref": "crypto/algorithm/98b3f400b59ab4c3",
+   "name": "SHA-256",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {
+     "primitive": "hash",
+     "cryptoFunctions": [
+      "digest"
+     ],
+     "nistQuantumSecurityLevel": 0
+    }
+   }
+  },
+  {
+   "type": "cryptographic-asset",
+   "bom-ref": "crypto/algorithm/3c8da806739ec9a0",
+   "name": "MD5",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {
+     "primitive": "hash",
+     "cryptoFunctions": [
+      "digest"
+     ],
+     "nistQuantumSecurityLevel": 0
+    }
+   }
+  },
+  {
+   "type": "cryptographic-asset",
+   "bom-ref": "crypto/algorithm/471f89bb9f55de8e",
+   "name": "SHA-512",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {
+     "primitive": "hash",
+     "cryptoFunctions": [
+      "digest"
+     ],
+     "nistQuantumSecurityLevel": 1
+    }
+   }
+  },
+  {
+   "type": "cryptographic-asset",
+   "bom-ref": "crypto/algorithm/77c20c2c9dcd85a4",
+   "name": "UNKNOWN",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {
+     "primitive": "other",
+     "cryptoFunctions": [
+      "digest"
+     ],
+     "nistQuantumSecurityLevel": 0
+    }
+   }
+  },
+  {
+   "type": "cryptographic-asset",
+   "bom-ref": "crypto/algorithm/57d7697e63fa2677",
+   "name": "UNKNOWN",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {
+     "primitive": "other",
+     "cryptoFunctions": [
+      "sign"
+     ],
+     "nistQuantumSecurityLevel": 0
+    }
+   }
+  },
+  {
+   "type": "cryptographic-asset",
+   "bom-ref": "crypto/algorithm/e57cfd1f90e4a707",
+   "name": "UNKNOWN",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {
+     "primitive": "other",
+     "cryptoFunctions": [
+      "sign"
+     ],
+     "nistQuantumSecurityLevel": 0
+    }
+   }
+  },
+  {
+   "type": "cryptographic-asset",
+   "bom-ref": "crypto/algorithm/9c6d51f2e1eff8cf",
+   "name": "UNKNOWN",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {
+     "primitive": "other",
+     "cryptoFunctions": [
+      "encrypt"
+     ],
+     "nistQuantumSecurityLevel": 0
+    }
+   }
+  }
+ ]
+}
