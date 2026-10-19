@@ -12,8 +12,8 @@ FROM eclipse-temurin:25-jre@sha256:dbb43d81099eec91e0800226ed2296d03146ee7857165
 # ---- build stage: the release's own build (its Dockerfile does the same)
 # Maven 3.9 on Temurin 25 JDK (image index digest, 2026-10-17)
 FROM maven:3.9-eclipse-temurin-25@sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976 AS build
-ARG CIPHERSIFT_VERSION=1.1.1
-ARG CIPHERSIFT_SHA256=52225cfe0e16397f196ea58427949c044d89157199d2bc40fc1d865024bf3434
+ARG CIPHERSIFT_VERSION=1.2.0
+ARG CIPHERSIFT_SHA256=90b8ee28275f57bae4e1cdf3974fe858750bcdcc087e16c1ccf5d15c2bb4fd45
 RUN apt-get update \
  && apt-get install -y --no-install-recommends gcc libc6-dev \
  && rm -rf /var/lib/apt/lists/*
@@ -33,7 +33,7 @@ RUN --mount=type=cache,target=/home/builder/.m2,uid=10001 \
 
 # ---- runtime
 FROM ${BASE_IMAGE}:${BASE_TAG}
-ARG CIPHERSIFT_VERSION=1.1.1
+ARG CIPHERSIFT_VERSION=1.2.0
 COPY --from=jre /opt/java/openjdk /opt/java/openjdk
 COPY --from=build /opt/ciphersift /opt/ciphersift
 # natives are extracted to $XDG_CACHE_HOME/ciphersift/native/ on first use (must be private to the user)

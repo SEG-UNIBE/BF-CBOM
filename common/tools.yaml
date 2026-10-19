@@ -146,7 +146,7 @@ tools:
 
   ciphersift:
     micro_2026-10-17: {java: 11/11, python: 11/11, go: 11/11}   # tailored on these projects, see tailored_on
-    engine: ciphersift              # CipherSift v1.1.1 (SEG-UNIBE, Apache-2.0): clean-room reimplementation of the approach of Crypsy (Näther & Hirsch, arXiv 2608.04857) for Java, Python and Go
+    engine: ciphersift              # CipherSift v1.2.0 (SEG-UNIBE, Apache-2.0): clean-room reimplementation of the approach of Crypsy (Näther & Hirsch, arXiv 2608.04857) for Java, Python and Go
     memory_gb: 4
     approach: syntax tree (tree-sitter) + YAML rules (name and constant resolution, wrapper propagation)
     native_cyclonedx: true          # CycloneDX 1.7, family in algorithmProperties.algorithmFamily
