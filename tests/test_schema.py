@@ -52,14 +52,14 @@ def test_meaningful_counts_standard_fields_apart_from_any_source_per_asset_type(
     path.parent.mkdir(parents=True)
     path.write_text(json.dumps(bom), encoding="utf-8")
     n = normalize_cbom(bom, "t")
-    rows = {(r["asset_type"], r["dimension"]): r for r in schema.meaningful_rows([({}, path, n)], {"t": True})}
+    rows = {(r["asset_type"], r["dimension"]): r for r in schema.meaningful_rows([({}, path, n)], {"t": "tool"})}
     algo = {d: rows[("algorithm", d)] for d in ("primitive", "parameter", "key_size", "mode", "security_level")}
     assert all(r["assets"] == 2 for r in algo.values()) and "asset_type" not in {d for _, d in rows}
     assert (algo["key_size"]["standard"], algo["key_size"]["any"]) == (1, 2)
     assert (algo["mode"]["standard"], algo["mode"]["any"]) == (0, 1)
     assert (algo["primitive"]["standard"], algo["primitive"]["any"]) == (1, 2)  # AES's primitive is derived
     assert algo["security_level"]["any"] is None and algo["security_level"]["any_share"] is None  # not normalised
-    assert algo["key_size"]["native_cyclonedx"] is True and algo["mode"]["any_share"] == 0.5
+    assert algo["key_size"]["cbom_by"] == "tool" and algo["mode"]["any_share"] == 0.5
     key = rows[("related-crypto-material", "type")]
     assert (key["assets"], key["standard"], key["any"]) == (1, 1, 1)
     assert rows[("related-crypto-material", "size")]["standard"] == 1 and rows[("protocol", "type")]["standard"] == 0

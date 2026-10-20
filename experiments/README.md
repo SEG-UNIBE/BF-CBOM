@@ -68,11 +68,13 @@ Rerunning a spec is resumable: runs whose `run<k>.meta.json` exists are skipped,
 experiment's `_experiment.yaml` (below), and jobs still pending from an interrupted run are collected (`--requeue-pending` to reissue).
 `ARGS=--retry-failed` redoes stored runs whose status is not `ok`; `--rerun <tool>[,<tool>]` redoes every stored run
 of those tools, whatever its status (after a worker change, e.g. `--rerun deepseek,cryptobomforge`).
-`ARGS=--overwrite-old` runs the whole spec afresh: it first removes every stored run (CBOMs, meta files, unsupported
-marks, normalised CBOMs, also of tools and repos the spec no longer names, which nothing reads any more) and the
-old `_ANALYSIS/`, and cancels jobs an earlier run left pending. `_experiment.yaml` keeps its commits, so the
-same snapshots are scanned, and `_run-log.json` keeps the earlier sessions (the new one records `runs_overwritten`). Nothing is
-removed when the spec or a snapshot fails to resolve. For fresh pins, `make experiment-delete NAME=<exp>` first.
+`ARGS=--overwrite-old` runs the whole spec as if it had never run: it first cancels the jobs an earlier run left and
+removes the experiment folder with everything in it (stored runs, the record, `_run-log.json`, `mutants.json`,
+`_ANALYSIS/`, files of older layouts), then resolves the spec afresh (the new session records `runs_overwritten`).
+`make experiment-delete NAME=<exp>` removes the same folder and cancels the experiment's jobs. Results are never kept
+for their own sake: the spec pins every repo's commit (the corpus files and the corpus builder pin them; a spec
+without a commit gets the branch head of the day) and the mutants are deterministic, so a rerun scans the same
+snapshots and repeats the results.
 
 **Mutants (`mutation:`, Phase 4).** For every repo of a spec with a `mutation:` block the runner makes `per_repo`
 insertion mutants before anything is enqueued (`mutation/mutants.py`): one catalog snippet (`mutation/catalog/
@@ -80,18 +82,18 @@ insertion mutants before anything is enqueued (`mutation/mutants.py`): one catal
 has a caller (or a `main`), committed on the pinned commit as the branch `bfcbom/ins-<snippet>-<style>-<hash>` of the
 base mirror and scanned like any variant. A snippet only goes where its library is already declared (pyca
 `cryptography` for Python's asymmetric and AES snippets, Go 1.24 or `golang.org/x/crypto` for Go's PBKDF2); dependency
-files are never edited. `mutants.json` pins the mutants like `_experiment.yaml` pins the commits: a resumed or
-`--overwrite-old` run keeps them (a changed `mutation:` block is ignored with a note) and rebuilds missing branches
-with the same SHA from the recorded inserts. Per mutant it records the snippet, style, catalog version, file, host
+files are never edited. `mutants.json` pins the mutants like `_experiment.yaml` pins the commits: a resumed run
+keeps them (a changed `mutation:` block is ignored with a note) and rebuilds missing branches with the same SHA from
+the recorded inserts; `--overwrite-old` makes them again, the same ones. Per mutant it records the snippet, style, catalog version, file, host
 (name, line, number of callers by name), the line naming the algorithm (`call_line`), the related lines, the inserted
 spans, the line shifts, the inserts, the expected record and the patch. Repos without a catalog language or a host get
 none, with a note.
 
 **Which repos an experiment used** is answered by one file, its record `_experiment.yaml`: the spec as run, every
 repo with the branch and commit it was resolved to (a fixture with its `path` and published commit), the tools, the
-repetitions and the `mutation:` block. `experiment run` writes it once the snapshots resolve (a failing resolve leaves
-the old record), and the next run keeps its commits for every repo the spec still names, so a resumed experiment never
-moves to a newer upstream commit; a repo the spec dropped leaves the record, and `mutants.json` holds the mutants of
+repetitions and the `mutation:` block. `experiment run` writes it once the snapshots resolve, and a resumed run
+(without `--overwrite-old`) keeps its commits for every repo the spec still names, so it never moves to a newer
+upstream commit halfway; a repo the spec dropped leaves the record, and `mutants.json` holds the mutants of
 exactly the record's repos. The runner's overview and the analysis read only the stored runs of the repos, tools and
 repetitions the record names (`common/experiment.py:iter_results`), so a run stored under an earlier version of the
 spec never reaches a table; the `_SUMMARY.md` header repeats the counts. The record is itself a fully pinned spec:
@@ -279,7 +281,7 @@ spec, as described in [Normalisation](#normalisation). It writes:
 **`schema <exp>`** answers RQ1 (`analysis/schema.py`): every CBOM that declares a CycloneDX version with a vendored
 schema (1.6, 1.7) is validated as a whole document with `jsonschema` (offline, `referencing` registry), reported per
 CBOM in `schema-run<k>.csv` (valid, error count, error kinds `<keyword>:<path>`); tools whose CBOM our worker assembles
-(`native_cyclonedx: false` in `common/tools.yaml`) are reported apart. `meaningful-run<k>.csv` gives, per tool,
+(`cbom_by: bf-cbom` in `common/tools.yaml`, the LLM workers) are reported apart. `meaningful-run<k>.csv` gives, per tool,
 CycloneDX asset type and that type's own fields (`analysis/schema.py:MEANINGFUL_FIELDS`: an algorithm's primitive,
 parameter = parameter set or curve, key size, mode, padding, functions, OID, security levels; a key's type, size,
 algorithm, format; a certificate's subject, issuer, validity, signature algorithm, public key, format; a protocol's
@@ -418,7 +420,7 @@ files and never change these:
 |---|---|---|---|
 | `runs.csv` | runs | stored run, every repetition, incl. failed, timed-out and `unsupported` | repo, snapshot, commit, variant, tool, run, tailored (the tool was tuned on this repo), status, duration_sec, size_bytes, error (the most telling line), peak_memory_mb, memory_limit_mb, oom_kills, enqueued_at, started_at, finished_at, queue_sec, tool_version, image_ref, bfcbom_commit, bom_format, spec_version (as the CBOM declares), components, crypto_assets and, by the declared `assetType`, algorithm_assets, certificate_assets, protocol_assets, material_assets, other_assets, plus located_file_assets and located_line_assets (crypto assets with a file, and with a file and a line, in the CBOM), expect_crypto (from the spec), workaround (recorded setup workarounds: CryptoScan `--exclude`, CipherRadar `.cradarignore`); for LLM workers requests, requests_failed, chunks_total, chunks_sent, chunks_skipped (over `LLM_MAX_CHUNKS`, never sent), input_tokens, cached_input_tokens, cache_write_tokens, output_tokens, reasoning_tokens, models_answered |
 | `records-run<k>.csv` | records | normalised record: one (component, occurrence) of one tool | snapshot, variant, tool, run, location_kind (`line`, `window`, `import`, `file`, `none`, `unread`), record_id (`<tool>:<component>:<occurrence>`), site_id (`<tool>:<file>:<line>` when located), every record dimension, resolution (`mapped`, `ambiguous`, `api`, `non-crypto`, `undefined`; only `mapped` records become items), `raw_*`, `src_*`, unmapped, conflicts, spec_issues |
-| `groups-exact-run<k>.csv` | matches | group of the exact matcher: `repo` scope = one cluster per key at the level (its members plus attached records), `site` scope = its located records at one call site | matcher, repo, snapshot, commit, variant, run, group_id (`E00001`, clusters sorted by key; sites `E00001.001`), k (tools, observers included), tools, language, level, scope, key (the level's key: a raw name at L0, an identity at L4), voters, voter_groups (observers are none), n_records, n_sites, units (L4 identities of the voting members; of all members when only observers are in), n_units, n_attached, located_voters, colocated_voters (repo scope; voters only), file, line_min, line_max, parent (site scope) |
+| `groups-exact-run<k>.csv` | matches | group of the exact matcher: `repo` scope = one cluster per key at the level (its members plus attached records), `site` scope = its located records at one call site | matcher, repo, snapshot, commit, variant, run, group_id (`E00001`, clusters sorted by key; sites `E00001.001`), n_tools (tools, observers included; k counts voter groups: `voter_groups`), tools, language, level, scope, key (the level's key: a raw name at L0, an identity at L4), voters, voter_groups (observers are none), n_records, n_sites, units (L4 identities of the voting members; of all members when only observers are in), n_units, n_attached, located_voters, colocated_voters (repo scope; voters only), file, line_min, line_max, parent (site scope) |
 | `members-exact-run<k>.csv` | matches | (group, record) pair | matcher, snapshot, variant, run, group_id, record_id, tool, unit (the record's L4 identity), implied (attached through `--closure`), matched (its own identity differs from the group's key: joined through a lower level), attached (a generic or implying record, no key of its own in the group) |
 | `groups-raqun-run<k>.csv`, `members-raqun-run<k>.csv`, `agreement-raqun-run<k>.csv` | matches | RaQuN's groups (repo scope only; `n_elements`, `similarity` = Jaccard of the attribute sets) | as the exact tables |
 | `matchers-run<k>.csv` | matches | (repository, level): exact vs RaQuN | repo, snapshot, variant, run, level, matcher_a, matcher_b, records_common, groups_a, groups_b, pairs_a, pairs_b, pairs_both, pair_jaccard, a_in_one_b, b_in_one_a |

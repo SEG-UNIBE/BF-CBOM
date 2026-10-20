@@ -5,8 +5,10 @@
 # groups"). `merge_group` names a coarser voter the sensitivity analysis can merge them into (`--merge-llm`: the LLM
 # workers, which share prompts and file selection, decided 2026-10-18); `engine_family` marks tools that share only a
 # pattern engine but run independently written rules (decided 2026-10-20 after the rule-overlap check): separate
-# voters, merged for the `engine-merged` ranking of grouping-run<k>.csv. `native_cyclonedx` tells whether the tool itself emits CycloneDX (RQ1 validity is measured
-# only for those; for the others our adapter produces the CBOM). `languages` is the tool's declared
+# voters, merged for the `engine-merged` ranking of grouping-run<k>.csv. `cbom_by` says who writes the CBOM document:
+# `tool` (the tool itself; our worker adapter at most moves a tool's own values into standard fields) or `bf-cbom` (our
+# worker assembles it, the LLM workers), whose validity measures us, not the tool (refinement 3); the format is read
+# from each document (bomFormat, specVersion). `languages` is the tool's declared
 # scope: a repo in another language is "not supported", never "failed" (pilot recommendation).
 # `status`: integrated (worker exists) | candidate (passed the pilot's inclusion bar, worker pending)
 #          | blocked (needs access, see CLAUDE.md) | excluded (failed the bar; kept for RQ1/RQ2 only)
@@ -25,7 +27,7 @@ tools:
     engine: sonar-cryptography      # IBM/PQCA sonar-cryptography plugin; the action jar and the server image share it
     memory_gb: 8
     approach: syntax tree + resolution of provider strings (JCA, BouncyCastle, pyca/cryptography, Go std)
-    native_cyclonedx: true
+    cbom_by: tool
     languages: [java, python, go]   # 2.1.10 had no Go analyser (0/11 on micro-go); 2.3.0 has the action jar's engine
     voter_group: cbomkit            # one voter together with cbomkit-jar (same sonar-cryptography engine)
     status: integrated              # server image ghcr.io/cbomkit/cbomkit 2.3.0 (sonar-cryptography 1.7.0, same engine as cbomkit-jar)
@@ -40,7 +42,7 @@ tools:
     engine: sonar-cryptography      # cbomkit-action v2.3.0 jar (cbomkit-lib 1.3.0, sonar-cryptography 1.7.0): the packaging the pilot graded
     memory_gb: 8
     approach: syntax tree + resolution of provider strings (JCA, BouncyCastle, pyca/cryptography, Go std)
-    native_cyclonedx: true
+    cbom_by: tool
     languages: [java, python, go]
     voter_group: cbomkit            # one voter together with cbomkit; a separate tool in every other table
     status: integrated              # workers/cbomkit-jar; source-only scan (CBOMKIT_JAVA_REQUIRE_BUILD=false), CBOMKIT_LANGUAGES from the repo language
@@ -50,7 +52,7 @@ tools:
     engine: cdxgen
     memory_gb: 16                   # 4 OOM-killed Gradle on bisq/bisq2 (2026-10-18); 8 still OOM-killed on Chat2DB, bisq, bisq2, kafka (2026-10-19)
     approach: dependency manifests + evidence (atom); crypto output is mostly libraries and certificates
-    native_cyclonedx: true
+    cbom_by: tool
     languages: [java, python, javascript, go]   # source-level crypto with locations: JS/TS only (12.8.x, run without -t)
     status: integrated              # image 12.8.5 (11.7.0 found nothing on any micro project)
     notes: >
@@ -66,7 +68,7 @@ tools:
     engine: codeql                  # Santander cryptobom-forge on CodeQL crypto queries
     memory_gb: 6
     approach: data flow (CodeQL)
-    native_cyclonedx: false         # emits IBM's pre-standard draft `1.4-cbom-1.0` (bomFormat CBOM, type crypto-asset), not CycloneDX
+    cbom_by: tool                   # its own IBM pre-standard draft `1.4-cbom-1.0` (bomFormat CBOM, type crypto-asset), not CycloneDX
     languages: [python, c]          # upstream CodeQL crypto queries exist for Python and C/C++ only (no Java query)
     status: integrated              # runs experimental/cryptography/inventory/new_models (before 2026-10-17: CodeQL's default security suite by mistake)
     pilot: {java: fail, python: fail}   # exact line lost, algorithms relabelled; RQ1 (non-conformance example) and RQ2 only
@@ -75,7 +77,7 @@ tools:
     engine: llm                     # provider adapters share prompts and file selection (common/llm_cbom.py, Phase 2)
     memory_gb: 1
     approach: LLM reading pre-filtered source files
-    native_cyclonedx: true          # assembled by the worker from the model's structured answer
+    cbom_by: bf-cbom                # assembled by the worker from the model's structured answer
     languages: [java, python, go, javascript, c]
     voter_group: deepseek           # each LLM is its own voter; `--merge-llm` merges them into `merge_group`
     merge_group: llm
@@ -85,7 +87,7 @@ tools:
     engine: llm
     memory_gb: 1
     approach: LLM reading pre-filtered source files (same prompts and file selection as deepseek)
-    native_cyclonedx: true
+    cbom_by: bf-cbom                # assembled by the worker from the model's structured answer
     languages: [java, python, go, javascript, c]
     voter_group: chatgpt
     merge_group: llm
@@ -94,7 +96,7 @@ tools:
     engine: llm
     memory_gb: 1
     approach: LLM reading pre-filtered source files (same prompts and file selection as deepseek)
-    native_cyclonedx: true
+    cbom_by: bf-cbom                # assembled by the worker from the model's structured answer
     languages: [java, python, go, javascript, c]
     voter_group: claude
     merge_group: llm
@@ -103,7 +105,7 @@ tools:
     engine: cryptoscan               # CSNP CryptoScan 1.4.0, regex pattern catalogue (90+ patterns)
     memory_gb: 2
     approach: patterns
-    native_cyclonedx: true          # `--format cbom` emits CycloneDX 1.6 with evidence.occurrences
+    cbom_by: tool                   # `--format cbom` emits CycloneDX 1.6 with evidence.occurrences
     languages: [java, python, go, javascript, typescript, c, cpp, rust, csharp, ruby, php]
     status: integrated
     micro_2026-10-17: {java: 9/11, python: 10/11, go: 10/11, javascript: 9/11, c: 1/11}   # record-based scoring (2026-10-18), strict the same; 2026-10-15 (0/0/5/6/0) was our setup error (no --include-quantum-safe, demo/ folder)
@@ -114,7 +116,7 @@ tools:
     engine: pqcheck                 # github.com/Rafael-Ryu/pqcheck 0.1.0 (Apache-2.0), tree-sitter + go/types
     memory_gb: 4
     approach: syntax tree (tree-sitter), Go via go/types when a Go toolchain is present
-    native_cyclonedx: true
+    cbom_by: tool
     languages: [python, go]
     status: integrated             # workers/pqcheck
     pilot: {python: pass, go: pass}
@@ -123,7 +125,7 @@ tools:
     engine: q-darpan                # github.com/RohanExploit/q-darpan 72a4edd (Apache-2.0), tree-sitter
     memory_gb: 4
     approach: syntax tree (tree-sitter)
-    native_cyclonedx: true          # CycloneDX 1.7, but locations only in custom properties qdarpan:location.N (adapter moves them to evidence.occurrences)
+    cbom_by: tool                   # CycloneDX 1.7, but locations only in custom properties qdarpan:location.N (adapter moves them to evidence.occurrences)
     languages: [java, go, c]
     status: integrated             # workers/qdarpan
     pilot: {java: pass, go: pass, c: pass}
@@ -132,7 +134,7 @@ tools:
     engine: semgrep-rules           # github.com/securin-public/securin-xbom a270c5f (Apache-2.0), ~13 semgrep rule files
     memory_gb: 4
     approach: patterns (semgrep)
-    native_cyclonedx: true
+    cbom_by: tool
     languages: [java, python]
     voter_group: securin-xbom       # own voter: its semgrep-registry rules share no rule with CipherRadar's (analysis/README.md "Voter groups")
     engine_family: semgrep          # semgrep engine; CipherRadar and SCANOSS run opengrep, its fork
@@ -144,7 +146,7 @@ tools:
     engine: opengrep-rules          # github.com/nk-sentinel/cipherradar efa5d9d, opengrep rules + tree-sitter + YARA
     memory_gb: 4
     approach: patterns (opengrep) + syntax tree
-    native_cyclonedx: true          # CycloneDX 1.7
+    cbom_by: tool                   # CycloneDX 1.7
     languages: [java, python, go, javascript]   # Java: nil-pointer crash on `new ECGenParameterSpec(<identifier>)` (jjwt, Keycloak) is worked around in the worker (files with the trigger pre-excluded via .cradarignore, recorded in the notes; the tool itself is not patched)
     voter_group: cipherradar        # own voter: its rules share no rule with securin-xbom's or SCANOSS's (3 bare API names in Go)
     engine_family: semgrep          # opengrep (a semgrep fork) for its rule pass, plus tree-sitter and YARA-X passes
@@ -157,7 +159,7 @@ tools:
     engine: ciphersift              # CipherSift v1.2.0 (SEG-UNIBE, Apache-2.0): clean-room reimplementation of the approach of Crypsy (Näther & Hirsch, arXiv 2608.04857) for Java, Python and Go
     memory_gb: 4
     approach: syntax tree (tree-sitter) + YAML rules (name and constant resolution, wrapper propagation)
-    native_cyclonedx: true          # CycloneDX 1.7, family in algorithmProperties.algorithmFamily
+    cbom_by: tool                   # CycloneDX 1.7, family in algorithmProperties.algorithmFamily
     languages: [java, python, go]
     voter_group: ciphersift
     status: integrated              # workers/ciphersift; release pinned in docker/Dockerfile.worker-ciphersift
@@ -174,7 +176,7 @@ tools:
     engine: opengrep-rules          # SCANOSS crypto-finder 0.37.1 on opengrep 1.22.0, rules scanoss/open-crypto-rules@c5f32b7b
     memory_gb: 4
     approach: patterns (opengrep) + call graph
-    native_cyclonedx: true          # `--format cyclonedx`; declares CycloneDX 1.7 (its docs still say 1.6)
+    cbom_by: tool                   # `--format cyclonedx`; declares CycloneDX 1.7 (its docs still say 1.6)
     languages: [go, c, javascript, rust]   # what the open rules cover; Java/Python rules only through the API with a key
     voter_group: scanoss            # own voter: scanoss/open-crypto-rules share no rule with CipherRadar's (3 bare API names in Go)
     engine_family: semgrep          # opengrep (a semgrep fork)
@@ -190,7 +192,7 @@ tools:
     engine: mondoo-xgrep            # proprietary binary (free of charge) from the public npm package, pinned 0.86.0
     memory_gb: 4
     approach: syntax tree + data flow
-    native_cyclonedx: true
+    cbom_by: tool
     languages: [java, python, go, javascript]
     status: integrated              # workers/xgrep
     pilot: {java: pass, python: pass, go: pass, javascript: pass}
@@ -198,7 +200,7 @@ tools:
   cryptoscope:
     engine: ibm-cryptoscope
     approach: data flow
-    native_cyclonedx: unknown
+    cbom_by: unknown
     languages: [java]
     status: blocked
 
@@ -208,7 +210,7 @@ tools:
     engine: qelens                  # qelens/cbom (ex keylens, MPL-2.0), crate `cbom` 0.1.2
     memory_gb: 4
     approach: syntax tree (tree-sitter), dependency lockfiles
-    native_cyclonedx: true          # `--format cyclonedx` (specVersion 1.6; its docs say 1.5)
+    cbom_by: tool                   # `--format cyclonedx` (specVersion 1.6; its docs say 1.5)
     languages: [python, javascript] # its SUPPORTED_LANGUAGES.md; Rust only through Cargo.lock
     status: integrated              # workers/qelens; release pinned in docker/Dockerfile.worker-qelens
     role: observer
@@ -217,7 +219,7 @@ tools:
     engine: cryptarium              # sgoveia/cryptarium v0.3.0 (Apache-2.0)
     memory_gb: 4
     approach: syntax tree (tree-sitter) + YAML rule packs (embedded); also certificates, keys, nginx/SSH/JWT configs
-    native_cyclonedx: true
+    cbom_by: tool
     languages: [java, python, go, javascript, c]
     status: integrated              # workers/cryptarium; release tag pinned in docker/Dockerfile.worker-cryptarium
     role: observer
@@ -226,7 +228,7 @@ tools:
     engine: qscan                   # quantakrypto/pqc-tools, npm @quantakrypto/qscan 0.12.0 (Apache-2.0)
     memory_gb: 4
     approach: patterns (own TypeScript detectors); dependency manifests, keys, TLS and IaC configs
-    native_cyclonedx: true          # `--format cbom` (CycloneDX 1.6)
+    cbom_by: tool                   # `--format cbom` (CycloneDX 1.6)
     languages: [java, python, go, javascript, c, rust, csharp, ruby, php]   # of its 14 claimed languages, those in our list
     status: integrated              # workers/qscan; npm release pinned in docker/Dockerfile.worker-qscan
     role: observer

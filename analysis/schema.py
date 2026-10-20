@@ -3,8 +3,8 @@
 - **Conformance:** every CBOM that declares a CycloneDX version with a vendored schema (1.6, 1.7) is validated as a
   whole document with `jsonschema` against the official schema (`analysis/data/cyclonedx/`, offline through a
   `referencing` registry). Reported per CBOM: valid, number of errors, error kinds (`<keyword>:<path without
-  indices>`). Tools whose CBOM our own adapter writes (`native_cyclonedx: false` in common/tools.yaml) are reported
-  apart (refinement 3): their validity would measure us.
+  indices>`). Tools whose CBOM our own worker assembles (`cbom_by: bf-cbom` in common/tools.yaml, the LLM workers) are
+  reported apart (refinement 3): their validity would measure us.
 - **Meaningful:** per CycloneDX asset type (`assetType`: algorithm, certificate, protocol, related-crypto-material),
   the share of crypto assets (components, not occurrences) carrying the standard's own fields for that type
   (`MEANINGFUL_FIELDS`: an algorithm's primitive, parameter set or curve, mode, padding, functions, OID, ...; a
@@ -34,7 +34,7 @@ from .tables import LIST_SEP, full_name
 
 VALIDATED_VERSIONS = ("1.6", "1.7")
 SCHEMA_COLUMNS = [
-    "repo", "snapshot", "variant", "language", "tool", "run", "native_cyclonedx", "bom_format", "spec_version",
+    "repo", "snapshot", "variant", "language", "tool", "run", "cbom_by", "bom_format", "spec_version",
     "schema", "valid", "errors", "error_kinds",
 ]  # fmt: skip
 # Per CycloneDX asset type: (dimension label, standard JSON paths relative to `cryptoProperties`, record dimension the
@@ -75,7 +75,7 @@ MEANINGFUL_FIELDS: dict[str, tuple[tuple[str, tuple[str, ...], str | None], ...]
     ),
 }  # fmt: skip
 MEANINGFUL_COLUMNS = [
-    "tool", "native_cyclonedx", "asset_type", "assets", "dimension", "standard", "any", "standard_share", "any_share",
+    "tool", "cbom_by", "asset_type", "assets", "dimension", "standard", "any", "standard_share", "any_share",
 ]  # fmt: skip
 TRACE_COLUMNS = [
     "repo", "snapshot", "variant", "language", "tool", "run", "asset_type", "source", "records", "located_file",
@@ -126,7 +126,7 @@ def validate_document(cbom: dict) -> dict:
     return {"schema": version, "valid": not kinds, "errors": sum(kinds.values()), "error_kinds": dict(kinds)}
 
 
-def schema_row(meta: dict, cbom_path: Path, cbom: dict, *, language: str | None, native: bool | None) -> dict:
+def schema_row(meta: dict, cbom_path: Path, cbom: dict, *, language: str | None, cbom_by: str | None) -> dict:
     snapshot, variant = cbom_path.parents[2].name, cbom_path.parents[1].name
     result = validate_document(cbom)
     kinds = sorted(result["error_kinds"].items(), key=lambda kv: (-kv[1], kv[0]))[:_MAX_KINDS]
@@ -137,7 +137,7 @@ def schema_row(meta: dict, cbom_path: Path, cbom: dict, *, language: str | None,
         "language": language,
         "tool": meta.get("worker") or cbom_path.parent.name,
         "run": meta.get("run_index"),
-        "native_cyclonedx": native,
+        "cbom_by": cbom_by,
         "bom_format": cbom.get("bomFormat"),
         "spec_version": cbom.get("specVersion"),
         "schema": result["schema"],
@@ -170,7 +170,7 @@ def _record_has(values: dict, dim: str | None) -> bool:
     return any(values.get(d) not in (None, "", (), []) for d in dims)
 
 
-def meaningful_rows(normalized, native_of: dict[str, bool | None]) -> list[dict]:
+def meaningful_rows(normalized, cbom_by: dict[str, str | None]) -> list[dict]:
     """One row per (tool, asset type, dimension) over all CBOMs of `normalized` ((meta, path, NormalizedCbom)
     triples): `standard` counts assets whose raw component carries the field (the CBOM next to the normalised
     one), `any` counts assets with a value from any source in the records (None for fields the normaliser does
@@ -203,7 +203,7 @@ def meaningful_rows(normalized, native_of: dict[str, bool | None]) -> list[dict]
             rows.append(
                 {
                     "tool": tool,
-                    "native_cyclonedx": native_of.get(tool),
+                    "cbom_by": cbom_by.get(tool),
                     "asset_type": at,
                     "assets": total,
                     "dimension": label,

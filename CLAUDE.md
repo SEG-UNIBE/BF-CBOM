@@ -57,12 +57,13 @@ Shared context for coworkers and for Claude Code (which loads this file automati
   stores the results on `results-data`. A spec's `mutation:` block makes every repo's variants the original plus
   generated insertion mutants (`mutation/mutants.py`, Phase 4), pinned in `mutants.json` like the commits in
   `_experiment.yaml`. Resumable: a run with a stored meta file is skipped, `--retry-failed` redoes the runs that are not ok,
-  `--rerun <tools>` every run of those tools, `--overwrite-old` the whole spec (every stored run and the old
-  `_ANALYSIS/` removed first, pending jobs cancelled; `_experiment.yaml` and `mutants.json` keep the commits and
-  mutants pinned, the run log is kept; `common/experiment.py:clear_stored_runs`). A spec entry with `path:` publishes a
+  `--rerun <tools>` every run of those tools, `--overwrite-old` the whole spec as if it had never run (the
+  experiment folder goes with everything in it, record, run log and `mutants.json` included, and its jobs are
+  cancelled, like `experiment delete`; `common/experiment.py:remove_experiment`). Results are regenerated, never kept:
+  the spec pins the commits and the mutants are deterministic, so a rerun repeats them (decided 2026-10-20). A spec entry with `path:` publishes a
   directory as a deterministic commit (`publish_fixture`). Spec format and the list of specs: `experiments/README.md`.
 - **Experiment folder:** `_experiment.yaml` (the record: the spec as run, every repo with its resolved branch and
-  commit, written once the snapshots resolve; the next run keeps those commits, so it replaces a lock file; the one
+  commit, written once the snapshots resolve; a resumed run keeps those commits, so it replaces a lock file; the one
   answer to which repos, tools and repetitions an experiment covers, and the overview and the analysis read only the
   stored runs it names, `iter_results`), `_run-log.json` (runner sessions: times, VM RAM and CPUs, budget, waves,
   peak VM RAM, worker image IDs), `_ANALYSIS/` (with `_SUMMARY.md`; emptied and rebuilt by every `report`),
@@ -80,7 +81,7 @@ Shared context for coworkers and for Claude Code (which loads this file automati
   their detection logic, an engine or a rule set, count as one voter in RQ4; default the tool itself; evidence in
   `analysis/README.md` "Voter groups"), `merge_group`, `engine_family` (a shared pattern engine only, merged in the
   `engine-merged` sensitivity ranking), `languages`,
-  `native_cyclonedx`, status, the pilot verdicts, `tailored_on` and `memory_gb` (= the worker's compose memory limit;
+  `cbom_by` (who writes the CBOM document: the tool, or BF-CBOM for the LLM workers), status, the pilot verdicts, `tailored_on` and `memory_gb` (= the worker's compose memory limit;
   a test keeps them equal).
 - **Memory budget (waves):** `EXPERIMENT_MEMORY_BUDGET_GB` (laptop default 14, 0 = unlimited) caps the summed
   `memory_gb` of the tools fed at once; the rest run in later waves. Runner and UI plan waves with
@@ -159,11 +160,11 @@ appear in the paper's figures is decided later.
 | Worker | Voter group | Languages | Invocation and caveats |
 |---|---|---|---|
 | `cbomkit` | cbomkit | Java, Python, Go | CBOMkit server image, cloned through the git server over TLS; Python covers pyca only; modules need a build file and `src/`; large repos need ~45 min and a 16 GB heap |
-| `cbomkit-jar` | cbomkit | Java, Python, Go | cbomkit-action, source only, the same engine (packaging differences are measured); `CBOMKIT_ENSURE_SRC=1` opt-in |
+| `cbomkit-jar` | cbomkit | Java, Python, Go | cbomkit-action, source only, the same engine (packaging differences are measured); the indexing risk (build file without `src/`) is noted, `CBOMKIT_ENSURE_SRC=1` stays off |
 | `cdxgen` | cdxgen | Java, Python, JS, Go | `--include-crypto --evidence`, `-t python` / `-t go` for those repos; algorithms carry locations only for JS/TS (occurrences) and Go (property `cdx:golem:crypto:sourceLocation`); Java code yields none (atom has no crypto sinks); 16 GiB (OOM-killed at 8 on Chat2DB, bisq, bisq2, kafka) |
 | `cryptobomforge` | cryptobomforge | Python, C | CodeQL's crypto inventory queries, C with `--build-mode none`; writes IBM's draft `1.4-cbom-1.0`, not CycloneDX, also when CodeQL finds nothing (every stored CBOM is the tool's; the worker's placeholder for that case went 2026-10-20) |
 | `deepseek`, `chatgpt`, `claude` | one each, `merge_group: llm` | all five | `common/llm_cbom.py` (below), CycloneDX 1.7 assembled by us; `chatgpt` / `claude` need `make up-prod EXTRA_PROFILES=llm` and a key in `docker/env/worker-<provider>.env`; a request that fails after the provider's retries fails the job (no partial CBOMs), `LLM_MAX_CHUNKS` 1000, `LLM_CONCURRENCY` 4 |
-| `cryptoscan` | cryptoscan | eleven | always `--include-quantum-safe`; skips folders named demo, example, sample; on a Go panic (1.4.0, specific files) the worker bisects and reruns with `--exclude` of those files, recorded as a workaround |
+| `cryptoscan` | cryptoscan | eleven | always `--include-quantum-safe`; skips folders named demo, example, sample; 1.4.0 panics on specific files and the run fails (its `--exclude` cannot name one exact file, so no workaround; `docs/findings.md` "Interventions") |
 | `pqcheck` | pqcheck | Python, Go | |
 | `qdarpan` | qdarpan | Java, Go, C | the worker adapter moves `qdarpan:location.N` into `evidence.occurrences` |
 | `securin-xbom` | securin-xbom | Java, Python | the registry rule sets it fetches online, frozen unfiltered at a semgrep-rules commit |
@@ -206,7 +207,8 @@ where they declare support, but no analysis, figure or tuning effort goes into t
   repos while stored `ok` (16 GiB; an ok run with OOM kills counts as `oom` and is redone by `--retry-failed`);
   DeepSeek runs with failed requests (the account ran out of credit) were stored `ok` and the 100-chunk cap truncated
   four repos (requests now fail the job, chunks 1000, 4 in flight, deadline = `timeout`); CryptoScan 1.4.0 panics on
-  specific files (the worker bisects, excludes exactly those files and records the workaround). Analysis: the exact
+  specific files (its runs there fail; the bisection workaround went 2026-10-20, `docs/findings.md`
+  "Interventions"). Analysis: the exact
   matcher's clusters are per key and never merge through a bridging record (one bridging name had merged SHA-256
   with SHA-512); scores use units (L4 identities) and the mean of per-repository rates with a support threshold for
   ranks; names nobody understands are `undefined`, API names `api`, non-crypto rules `non-crypto` (never items);
@@ -229,6 +231,15 @@ where they declare support, but no analysis, figure or tuning effort goes into t
   rule-overlap check, and every report ranks again under `per-tool`, `llm-merged` and `engine-merged`
   (`grouping-run<k>.csv`). `_experiment.yaml` is the experiment's record (lock.json is gone) and the only list of
   what the analysis reads.
+- **e1-pilot export review (2026-10-20):** DeepSeek failed on all 12 repos (402, no credit); cdxgen timed out on
+  keycloak again (30 min at 2.1 GiB, not memory); CryptoScan's crash bisection cannot work with 1.4.0's `--exclude`
+  (removed: the run fails; CipherRadar's `.cradarignore` stays, CBOMkit's `src/` stays off; effects in
+  `docs/findings.md` "Interventions"). Fixed in the
+  analysis: the matcher (RQ3 tables, k) now leaves out tailored pairs like the ladder and the scores (CipherSift
+  had voted in 254 of 300 L3 groups of the pilot); `cbom_by` (tool / bf-cbom) replaces `native_cyclonedx`
+  (CryptobomForge writes its draft itself, the LLM CBOMs are ours); `groups-*.csv` call the tool count `n_tools`.
+  `--overwrite-old` and `experiment delete` now leave nothing of a former run (the folder with its record, run log
+  and `mutants.json`, and the experiment's Redis entries); the spec pins the commits.
 - **Phase 4 built (2026-10-20):** insertion mutants for Java, Python and Go (`mutation/`, below); the smoke spec
   `experiments/e4-mutation-smoke.yaml` waits for the VM. Removal mutants come after E1 (they need its voters).
 - **Waiting for the VM:** `make up-prod`, then each experiment as a whole (the user's preference, 2026-10-20):
@@ -301,7 +312,7 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
     `relatedCryptoMaterialProperties.type`, `primitive`; a test keeps `cbom-norm.schema.json` equal to them).
   - `record_id` = `<tool>:<component>:<occurrence>`, `site_id` = `<tool>:<file>:<line>`.
 - **RQ1** (`schema.py`): whole-document validation against the vendored schemas (`jsonschema` with an offline
-  `referencing` registry), split by `native_cyclonedx` (refinement 3); "meaningful" shares per CycloneDX asset type
+  `referencing` registry), split by `cbom_by` (refinement 3); "meaningful" shares per CycloneDX asset type
   with the standard's own fields for that type (standard fields vs any source; no tautological assetType column);
   traceability per asset type, with `located_file` (names a file) and `located_line` (file and line) apart, weak and
   strong on the records with a line (refinement 4); key material gets its own rows so secrets in configuration files
@@ -426,7 +437,8 @@ Implementation notes and gotchas: `notes.md` "Phase 4: mutation harness".
    table; protocols imply no cipher suites unless named) is applied as an optional closure (`--closure`), reported
    next to the plain sets.
 3. **RQ1 only for native CycloneDX output.** When our worker adapter writes the CBOM, validity would measure us;
-   `native_cyclonedx` in `tools.yaml` splits the RQ1 tables.
+   `cbom_by: bf-cbom` in `tools.yaml` (the LLM workers) splits the RQ1 tables; the format is read from each document
+   (CryptobomForge writes IBM's draft itself: `tool`, no schema).
 4. **Traceability, weak and strong.** Weak: the file exists at the commit and the line is in range. Strong: lines
    line±k also contain a token from the alias table (algorithm name, provider string, crypto API identifier).
 5. **Third insertion style** (Phase 4): indirection through a variable or constant separates pattern tools from
@@ -478,10 +490,12 @@ Implementation notes and gotchas: `notes.md` "Phase 4: mutation harness".
       current pinned releases, robust workers (cwd outside the clone, timeouts, failure reporting), and everything
       that changes results in `tool_version` or the run notes.
     - *No repairs:* no source patches, no rewriting of a tool's input or output, no rule filtering, no files added to
-      scanned repos. A crash is a result about the tool; a minimal workaround that lets it produce output is allowed
-      and recorded in the run notes (`workaround:` lines, the `workaround` column of runs.csv): CipherRadar's
-      `.cradarignore`, CryptoScan's `--exclude` of exactly the files its 1.4.0 release panics on (the worker finds
-      them by bisection; 4 of 39 repos, deterministic, no upstream fix).
+      scanned repos. A crash is a result about the tool. The one intervention (sharpened 2026-10-20): when a crash
+      on a specific file ends the whole scan, that file is left out through the tool's *own* exclusion mechanism, by
+      its exact path, and recorded in the run notes (`workaround:` lines, the `workaround` column of runs.csv):
+      CipherRadar's `.cradarignore`. Without such a mechanism the run fails (CryptoScan 1.4.0: its `--exclude`
+      matches basenames only). A tool that runs but finds less is never steered (CBOMkit's `src/` indexing stays
+      off). Effects of each, for the paper: `docs/findings.md` "Interventions".
     - *Analysis:* our analysis reads every location format a tool uses.
     - *Check a 0 before accepting it:* rerun the tool in a throwaway container with its debug output and find the
       cause; distinguish *by design* (cdxgen gives no Java locations) from *our setup* (cdxgen without `-t` never

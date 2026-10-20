@@ -326,7 +326,7 @@ def _schema_step(exp_dir: Path, run: int, normalized: list[Normalized], write: W
     """RQ1 (analysis/schema.py): schema-run<k>.csv (whole-document validation), meaningful-run<k>.csv and
     traceability-run<k>.csv (needs the snapshot files: the mirror on the VM or `--fetch`)."""
     languages = _languages(exp_dir)
-    native = {t: info.get("native_cyclonedx") for t, info in load_tools().items()}
+    cbom_by = {t: info.get("cbom_by") for t, info in load_tools().items()}
     schema_rows = []
     for meta, cbom_path, _ in normalized:
         try:
@@ -335,9 +335,9 @@ def _schema_step(exp_dir: Path, run: int, normalized: list[Normalized], write: W
             continue
         language = languages.get(tbl.full_name(cbom_path.parents[2].name))
         tool = meta.get("worker") or cbom_path.parent.name
-        schema_rows.append(sch.schema_row(meta, cbom_path, cbom, language=language, native=native.get(tool)))
+        schema_rows.append(sch.schema_row(meta, cbom_path, cbom, language=language, cbom_by=cbom_by.get(tool)))
     write(f"schema-run{run}.csv", schema_rows, sch.SCHEMA_COLUMNS)
-    write(f"meaningful-run{run}.csv", sch.meaningful_rows(normalized, native), sch.MEANINGFUL_COLUMNS)
+    write(f"meaningful-run{run}.csv", sch.meaningful_rows(normalized, cbom_by), sch.MEANINGFUL_COLUMNS)
     trace = sch.traceability_rows(normalized, store, languages=languages)
     write(f"traceability-run{run}.csv", trace, sch.TRACE_COLUMNS)
     if trace and not any(r.get("source") for r in trace):
@@ -360,6 +360,19 @@ def schema_cmd(name: str = EXP_ARG, run: int = RUN_OPT, fetch: bool = FETCH_OPT)
     if not normalized:
         _err(f"no ok results for run{run} in {exp_dir}")
     _schema_step(exp_dir, run, normalized, _writer(analysis_dir(exp_dir), counts), store=store)
+
+
+def _match_input(normalized: list[Normalized], include_tailored: bool) -> dict[tuple[str, str], list]:
+    """The matcher's input per (snapshot, variant): the run's records, without the (tool, repo) pairs the tool was
+    tuned on (refinement 13) unless `include_tailored`, so the matcher's groups, their k and agreement and the scores
+    leave them out as the ladder does."""
+    tailored = {} if include_tailored else tailored_map()
+    out: dict[tuple[str, str], list] = defaultdict(list)
+    for _, cbom_path, n in normalized:
+        snapshot, variant = cbom_path.parents[2].name, cbom_path.parents[1].name
+        if not _is_tailored(tailored, n.tool, tbl.full_name(snapshot)):
+            out[(snapshot, variant)] += n.records
+    return dict(sorted(out.items()))
 
 
 def _levels_step(
@@ -411,12 +424,13 @@ def _tables_step(
     observers_vote: bool = False,
     raqun: bool | None = None,
     all_assets: bool,
+    include_tailored: bool = False,
     store: SnapshotStore | None = None,
 ) -> None:
     """runs.csv, the normalised records (with each record's location kind, read from the snapshot files in `store`),
-    the units, coverage and conformance of this run, the exact matcher's groups/members/agreement, RaQuN's groups and
-    the matcher comparison when available, and the micro tables (if any). Returns the exact groups per (snapshot,
-    variant)."""
+    the units, coverage and conformance of this run, the exact matcher's groups/members/agreement (without tailored
+    pairs, `_match_input`), RaQuN's groups and the matcher comparison when available, and the micro tables (if any).
+    Returns the exact groups per (snapshot, variant)."""
     store = store or SnapshotStore()
     languages = _languages(exp_dir)
     write(
@@ -426,13 +440,11 @@ def _tables_step(
     )
     voter_of = _voter_of(merge_llm, observers_vote)
     norm_rows: list[dict] = []
-    per_snapshot: dict[tuple[str, str], list] = defaultdict(list)
     commits: dict[str, str | None] = {}
     location_kinds: list[dict[str, str]] = []
     for meta, cbom_path, n in normalized:
         snapshot, variant = cbom_path.parents[2].name, cbom_path.parents[1].name
         commits.setdefault(snapshot, meta.get("base_commit"))
-        per_snapshot[(snapshot, variant)] += n.records
         repo, commit = tbl.full_name(snapshot), meta.get("variant_commit") or meta.get("base_commit")
         kinds = {r.record_id: sch.location_kind(r, store, repo, commit) for r in n.records}
         location_kinds.append(kinds)
@@ -457,11 +469,11 @@ def _tables_step(
     # the exact matcher at every level feeds matchlevels-run<k>.csv (RQ3, matcher x level); the full group, member
     # and agreement tables are written at the scoring level only
     matchlevel_rows: list[dict] = []
-    groups_by_snapshot: dict[tuple[str, str], list] = {}
+    per_snapshot = _match_input(normalized, include_tailored)
     exact_by_level: dict[str, dict[tuple[str, str], list]] = {}
     for lv_name in lv.LEVELS:
         matcher = ExactMatcher(level=lv_name, window=window, closure=closure, voter_of=voter_of)
-        at_level = {key: matcher.match(records) for key, records in sorted(per_snapshot.items())}
+        at_level = {key: matcher.match(records) for key, records in per_snapshot.items()}
         exact_by_level[lv_name] = at_level
         matchlevel_rows.append(tbl.matchlevel_row(matcher.name, lv_name, run, at_level, voter_of))
     groups_by_snapshot = exact_by_level[level]
@@ -669,10 +681,7 @@ def score_cmd(
     if not normalized:
         _err(f"no ok results for run{run} in {exp_dir}")
     matcher = ExactMatcher(level=level, window=window, closure=closure, voter_of=_voter_of(merge_llm, observers_vote))
-    per_snapshot: dict[tuple[str, str], list] = defaultdict(list)
-    for _, cbom_path, n in normalized:
-        per_snapshot[(cbom_path.parents[2].name, cbom_path.parents[1].name)] += n.records
-    groups = {key: matcher.match(records) for key, records in sorted(per_snapshot.items())}
+    groups = {key: matcher.match(records) for key, records in _match_input(normalized, include_tailored).items()}
     sets = _stability_step(all_runs, write, level=level)
     _score_step(
         exp_dir,
@@ -771,6 +780,7 @@ def tables(
     observers_vote: bool = OBSERVERS_VOTE_OPT,
     raqun: bool | None = RAQUN_OPT,
     all_assets: bool = ALL_ASSETS_OPT,
+    include_tailored: bool = INCLUDE_TAILORED_OPT,
 ):
     """Flat CSV tables for pandas/R: runs, normalised records, the exact matcher's groups, members and agreement
     (and RaQuN's, with the comparison), micro."""
@@ -778,7 +788,8 @@ def tables(
     out_dir = analysis_dir(exp_dir)
     counts: dict[str, int] = {}
     normalized = list(_normalize_runs(exp_dir, run=run))
-    settings = {"run": run, "window": window, "level": level, "closure": closure, "all_assets": all_assets}
+    settings = {"run": run, "window": window, "level": level, "closure": closure, "all_assets": all_assets,
+                "include_tailored": include_tailored}  # fmt: skip
     write = _writer(out_dir, counts)
     _tables_step(
         exp_dir,
@@ -792,6 +803,7 @@ def tables(
         observers_vote=observers_vote,
         raqun=raqun,
         all_assets=all_assets,
+        include_tailored=include_tailored,
     )
     _write_info(out_dir, run, settings, counts, normalized, _voter_of(merge_llm, observers_vote))
     typer.echo(f"written to {out_dir}")
@@ -847,6 +859,7 @@ def run_report(
         observers_vote=observers_vote,
         raqun=raqun,
         all_assets=all_assets,
+        include_tailored=include_tailored,
         store=store,
     )
     sets = _stability_step(originals, write, level=level)

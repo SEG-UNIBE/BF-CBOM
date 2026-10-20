@@ -52,7 +52,7 @@ USAGE_COLUMNS = (
     "cached_input_tokens", "cache_write_tokens", "output_tokens", "reasoning_tokens",
 )  # fmt: skip
 RECORDS_COLUMNS = ["repo", "snapshot", "commit", "variant", "language", "tool", "run", "location_kind"] + RECORD_COLUMNS
-GROUP_KEY_COLUMNS = ["matcher", "repo", "snapshot", "commit", "variant", "run", "group_id", "k", "tools"]
+GROUP_KEY_COLUMNS = ["matcher", "repo", "snapshot", "commit", "variant", "run", "group_id", "n_tools", "tools"]
 GROUP_COLUMNS = GROUP_KEY_COLUMNS + [
     "language",
     "level",
@@ -116,8 +116,8 @@ WORKAROUND_PREFIX = "workaround: "
 
 
 def workaround_line(notes: str | None) -> str | None:
-    """The recorded setup workarounds of a run (worker note lines starting with `workaround: `, e.g. CryptoScan's
-    `--exclude` of files it panics on, CipherRadar's `.cradarignore`), joined; None when there is none."""
+    """The recorded setup workarounds of a run (worker note lines starting with `workaround: `: CipherRadar's
+    `.cradarignore` of the files it crashes on), joined; None when there is none."""
     found = [
         ln.strip()[len(WORKAROUND_PREFIX) :]
         for ln in (notes or "").splitlines()
@@ -354,7 +354,7 @@ def group_rows(
                 "commit": commit,
                 "language": language,
                 "group_id": g.group_id,
-                "k": g.k,
+                "n_tools": g.k,
                 "tools": g.tools,
                 "scope": g.scope,
                 "key": g.key,

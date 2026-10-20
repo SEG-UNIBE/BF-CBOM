@@ -632,7 +632,7 @@ def _rq1(schema: list[dict], meaningful: list[dict], trace: list[dict]) -> list[
         table = []
         for tool in sorted(by_tool):
             rs = by_tool[tool]
-            native = rs[0].get("native_cyclonedx")
+            by = rs[0].get("cbom_by")
             checked = [r for r in rs if r.get("schema")]
             valid = sum(_true(r["valid"]) for r in checked)
             kinds: Counter = Counter()
@@ -646,7 +646,7 @@ def _rq1(schema: list[dict], meaningful: list[dict], trace: list[dict]) -> list[
             table.append(
                 [
                     tool,
-                    "adapter" if _false(native) else ("native" if _true(native) else "?"),
+                    {"tool": "tool", "bf-cbom": "BF-CBOM"}.get(by or "", "?"),
                     len(rs),
                     versions,
                     len(checked) or "",
@@ -658,8 +658,9 @@ def _rq1(schema: list[dict], meaningful: list[dict], trace: list[dict]) -> list[
             )
         lines += [
             "**Conformance:** every CBOM validated as a whole document against the official CycloneDX JSON schema of "
-            "the version it declares (vendored 1.6 and 1.7). `adapter` = our worker assembles the CBOM, so validity "
-            "there measures BF-CBOM, not the tool (refinement 3). `no schema` = another dialect or version "
+            "the version it declares (vendored 1.6 and 1.7). `CBOM by`: `tool` = the tool writes the document, "
+            "`BF-CBOM` = our worker assembles it (the LLM workers), so validity there measures BF-CBOM, not the tool "
+            "(refinement 3). `no schema` = another dialect or version "
             "(IBM's draft, 1.5 and older).",
             "",
         ]
@@ -794,7 +795,7 @@ def _matching(levels: list[dict], groups: list[dict], matchers: list[dict]) -> l
             "dimension, the share of the groups with at least two voters reporting a value admitted at that level in "
             "which every reporting voter carries the majority value (the number of such groups in brackets); "
             "`location`: of the groups with two located voters, the share with two voters at one call site. "
-            "Parameters exist from L2 on.",
+            "Parameters exist from L2 on. Pairs a tool was tuned on are left out, as in the ladder and the scores.",
             "",
         ]
         header = ["matcher", "level", "items", "k=1", "k=2", "k=3", "k≥4", "key size", "mode", "padding", "curve",

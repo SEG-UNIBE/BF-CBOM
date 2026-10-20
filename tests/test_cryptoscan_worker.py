@@ -1,13 +1,12 @@
-"""CryptoScan worker: panic bisection with `--exclude` and the recorded workaround (refinement 15).
+"""CryptoScan worker: one run as released; a crash fails the run with the panic head in the error.
 
 The tool is not installed in the test environment; a fake executable panics (rc 2, Go stack trace, no output) when a
-scanned file contains the marker PANIC and otherwise writes a CBOM naming the files it scanned, honouring --exclude.
+scanned file contains the marker PANIC and otherwise writes a CBOM naming the files it scanned.
 """
 
 import importlib.util
 import json
 import sys
-import time
 from pathlib import Path
 
 import pytest
@@ -39,18 +38,11 @@ def fake_cryptoscan(tmp_path, monkeypatch):
         "args = sys.argv[1:]\n"
         "root = args[1]\n"
         "out = args[args.index('--output') + 1]\n"
-        "patterns = args[args.index('--exclude') + 1].split(',') if '--exclude' in args else []\n"
-        "def excluded(rel):\n"
-        "    for p in patterns:\n"
-        "        if p.endswith('/**') and (rel + '/').startswith(p[:-2]): return True\n"
-        "        if '/' in p and rel == p: return True\n"
-        "        if '/' not in p and os.path.basename(rel) == p: return True\n"
-        "    return False\n"
         "kept = []\n"
         "for d, _, files in os.walk(root):\n"
         "    for f in files:\n"
         "        rel = os.path.relpath(os.path.join(d, f), root).replace(os.sep, '/')\n"
-        "        if rel.startswith('.git/') or excluded(rel): continue\n"
+        "        if rel.startswith('.git/'): continue\n"
         "        kept.append(rel)\n"
         "with open(os.path.join(root, '..', 'scans.log'), 'a') as fh: fh.write(' '.join(sorted(kept)) + '\\n')\n"
         "for rel in kept:\n"
@@ -72,38 +64,20 @@ def _repo(tmp_path: Path, files: dict[str, str]) -> Path:
     return repo
 
 
-def test_panic_is_bisected_to_the_file_and_excluded_in_the_rerun(tmp_path: Path, fake_cryptoscan):
-    repo = _repo(
-        tmp_path,
-        {
-            "README.md": "docs",
-            "a/x.go": "clean",
-            "a/b/bad.go": "x := \u00e9 PANIC",
-            "a/b/ok.go": "clean",
-            "c/ok.go": "clean",
-            "c/d/e.go": "clean",
-        },
-    )
+def test_a_clean_scan_writes_the_tools_cbom(tmp_path: Path, fake_cryptoscan):
+    repo = _repo(tmp_path, {"README.md": "docs", "a/x.go": "clean"})
     out, trace = tmp_path / "cbom.json", Trace()
-    excluded = cs.run_cryptoscan(repo, out, trace, timeout=60)
-    assert excluded == ["a/b/bad.go"]
-    cbom = json.loads(out.read_text())
-    assert [c["name"] for c in cbom["components"]] == ["README.md", "a/b/ok.go", "a/x.go", "c/d/e.go", "c/ok.go"]
-    notes = trace.text()
-    assert "workaround: cryptoscan --exclude a/b/bad.go (Go panic in patterns.MatchWithContext" in notes
-    assert "cryptoscan panicked: panic: runtime error: slice bounds out of range" in notes
-    scans = (tmp_path / "scans.log").read_text().splitlines()
-    assert len(scans) < 12  # bisection, not a scan per file
+    cs.run_cryptoscan(repo, out, trace, timeout=60)
+    assert [c["name"] for c in json.loads(out.read_text())["components"]] == ["README.md", "a/x.go"]
+    assert "--include-quantum-safe" in trace.text() and "--exclude" not in trace.text()
 
 
-def test_several_culprits_including_a_top_level_file(tmp_path: Path, fake_cryptoscan):
-    repo = _repo(
-        tmp_path,
-        {"BAD.md": "PANIC", "a/x.go": "clean", "a/bad.go": "PANIC", "z/ok.go": "clean", "z/y/bad2.go": "PANIC"},
-    )
-    out, trace = tmp_path / "cbom.json", Trace()
-    assert cs.run_cryptoscan(repo, out, trace, timeout=60) == ["BAD.md", "a/bad.go", "z/y/bad2.go"]
-    assert [c["name"] for c in json.loads(out.read_text())["components"]] == ["a/x.go", "z/ok.go"]
+def test_a_panic_fails_the_run_after_one_scan(tmp_path: Path, fake_cryptoscan):
+    # the tool's crash is the result: no retry, no file excluded
+    repo = _repo(tmp_path, {"a/x.go": "clean", "a/b/bad.go": "x := \u00e9 PANIC"})
+    with pytest.raises(RuntimeError, match="cryptoscan_panic rc=2: panic: runtime error: slice bounds out of range"):
+        cs.run_cryptoscan(repo, tmp_path / "cbom.json", Trace(), timeout=60)
+    assert len((tmp_path / "scans.log").read_text().splitlines()) == 1
 
 
 def test_a_failure_without_panic_is_the_tools_error(tmp_path: Path, monkeypatch):
@@ -124,9 +98,3 @@ def test_error_excerpt_keeps_the_panic_head_and_the_tail():
     assert lines[0].startswith("panic: runtime error") and lines[1] == "goroutine 42 [running]:"
     assert lines[-3:] == ["frame 17", "frame 18", "frame 19"]
     assert cs.panicked(PANIC) and not cs.panicked("Error: no patterns\n")
-
-
-def test_bisection_respects_the_deadline(tmp_path: Path, fake_cryptoscan):
-    repo = _repo(tmp_path, {"a/bad.go": "PANIC", "b/ok.go": "clean"})
-    with pytest.raises(TimeoutError, match="cryptoscan_timeout"):
-        cs.find_crashing_files(repo, tmp_path / "cbom.json", Trace(), deadline=time.monotonic() + 1)

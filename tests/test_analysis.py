@@ -170,7 +170,7 @@ def test_tables_command_writes_joinable_tables(tmp_path, monkeypatch):
     for g in groups:
         assert int(g["n_records"]) == sum(m["group_id"] == g["group_id"] for m in members)
     # CBOMkit and CipherRadar agree on micro-java: most repo groups have both voters, most sites too
-    assert sum(g["k"] == "2" for g in repo) >= 8 and sum(g["k"] == "2" for g in sites) >= 10
+    assert sum(g["n_tools"] == "2" for g in repo) >= 8 and sum(g["n_tools"] == "2" for g in sites) >= 10
     dims = {a["dimension"] for a in agreement}
     assert dims == {"key_size", "mode", "padding", "curve", "digest", "location"}
     info = json.loads((out / "tables-run1.json").read_text())
@@ -418,14 +418,12 @@ def test_workaround_line_collects_the_recorded_setup_workarounds():
     from analysis.tables import workaround_line
 
     notes = (
-        "cryptoscan cmd: cryptoscan scan /tmp/r\n"
-        "cryptoscan panics on a/b/bad.go\n"
-        "workaround: cryptoscan --exclude a/b/bad.go (Go panic in patterns.MatchWithContext on these files)\n"
+        "cradar: 1 Java files with the known crash trigger added to .cradarignore\n"
+        "cradar cmd: cradar --verbose scan /tmp/r\n"
+        "workaround: .cradarignore a/B.java (known nil-pointer crash trigger / crashes; the tool is unchanged)\n"
     )
-    assert (
-        workaround_line(notes)
-        == "cryptoscan --exclude a/b/bad.go (Go panic in patterns.MatchWithContext on these files)"
-    )
+    expected = ".cradarignore a/B.java (known nil-pointer crash trigger / crashes; the tool is unchanged)"
+    assert workaround_line(notes) == expected
     assert workaround_line("cradar cmd: cradar scan\n") is None and workaround_line(None) is None
 
 

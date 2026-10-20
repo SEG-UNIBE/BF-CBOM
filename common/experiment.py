@@ -308,21 +308,16 @@ def repo_full_name(dir_name: str) -> str:
 _SNAPSHOT_DIR = re.compile(r".+__.+@[0-9a-f]+")  # repo_dir_name's shape
 
 
-def clear_stored_runs(exp_dir: Path) -> int:
-    """Remove every stored run of an experiment (`experiment run --overwrite-old`): all snapshot folders, with every
-    CBOM, meta file, unsupported mark and normalised CBOM in them, also of tools, repos and repetitions the spec no
-    longer names (which `iter_results` already skips), and `_ANALYSIS/`, which described them.
-    Kept: `_experiment.yaml` (with the pinned commits, so the rerun scans the same snapshots), the run log (the
-    history of sessions) and `mutants.json` (the pinned mutants). Returns the number of stored runs removed."""
-    removed = 0
-    for d in sorted(exp_dir.iterdir()) if exp_dir.is_dir() else []:
-        if not d.is_dir():
-            continue
-        if _SNAPSHOT_DIR.fullmatch(d.name):
-            removed += sum(1 for _ in d.glob("*/*/run*.meta.json"))
-            shutil.rmtree(d)
-        elif d.name == ANALYSIS_DIR:
-            shutil.rmtree(d)
+def remove_experiment(exp_dir: Path) -> int:
+    """Remove an experiment folder with everything in it (`experiment delete`, `experiment run --overwrite-old`): the
+    stored runs, the record `_experiment.yaml`, the run log, `mutants.json`, `_ANALYSIS/` and anything else, so a
+    rerun starts as if the experiment had never run. Results are regenerated, never kept: the spec pins the commits
+    and the mutants are deterministic (mutation/mutants.py), so a rerun scans the same snapshots. Returns the number
+    of stored runs removed."""
+    if not exp_dir.is_dir():
+        return 0
+    removed = sum(1 for _ in exp_dir.glob("*/*/*/run*.meta.json"))
+    shutil.rmtree(exp_dir)
     return removed
 
 
@@ -573,7 +568,8 @@ def resolve_snapshots(
 
     Then the spec is written as the experiment's record, `_experiment.yaml`: the spec as run, every repo with the
     branch and commit it was resolved to. Commits already in the record win over the spec, so a resumed experiment
-    never silently moves to a newer upstream commit; a repo the spec no longer names leaves the record. Nothing is
+    never silently moves to a newer upstream commit (`--overwrite-old` removes the record first, so the spec
+    decides); a repo the spec no longer names leaves the record. Nothing is
     written when a repo fails to resolve. With a `mutation:` block the variants are the original plus the repo's
     mutants, which mutants.json pins the same way (mutation/mutants.py), for exactly the record's repos.
     """
@@ -783,7 +779,7 @@ def iter_results(exp_dir: Path, spec: ExperimentSpec | None = None):
     """Yield (meta dict, cbom path) for every stored run of the repos, tools and repetitions the experiment's spec
     copy names. `_experiment.yaml` is the one record of what an experiment covers: a run stored under an earlier
     version of the spec (a repo or tool dropped since, fewer repetitions) is never read; `--overwrite-old` removes
-    such runs (clear_stored_runs). `spec`: the spec copy, when the caller has it loaded already."""
+    them with the whole folder (remove_experiment). `spec`: the spec copy, when the caller has it loaded already."""
     spec = spec or load_spec(spec_path(exp_dir))
     repos, tools = {r.full_name for r in spec.repos}, set(spec.tools)
     for meta_path in sorted(exp_dir.glob("*/*/*/run*.meta.json")):

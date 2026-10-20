@@ -1,12 +1,14 @@
 """The mutants of an experiment: selected deterministically, committed as branches in the bare mirror, recorded in
-mutants.json next to lock.json.
+mutants.json next to the record `_experiment.yaml`.
 
 `ensure_mutants` is called by the runner (common/experiment.py:resolve_snapshots) for every repo of a spec with a
-`mutation:` block. A repo already in mutants.json keeps its mutants: their branches are checked and, where missing
-(e.g. a fresh VM), rebuilt from the recorded inserts with the same SHA. A new repo gets `per_repo` insertion mutants:
-(snippet, style) pairs drawn round-robin over the styles from a seeded shuffle, each into a host from a file not used
-yet where possible, among the snippets whose library the project already declares (dependency files are never
-edited, decided 2026-10-20). Every mutant is one commit on the pinned commit: one file changed, whole lines inserted.
+`mutation:` block. A repo already in mutants.json (a resumed run) keeps its mutants: their branches are checked and,
+where missing (e.g. a fresh VM), rebuilt from the recorded inserts with the same SHA; `--overwrite-old` removes the
+file with the experiment folder, and the regenerated mutants are the same ones (same seed, commit and catalog
+version). A new repo gets `per_repo` insertion mutants: (snippet, style) pairs drawn round-robin over the styles from
+a seeded shuffle, each into a host from a file not used yet where possible, among the snippets whose library the
+project already declares (dependency files are never edited, decided 2026-10-20). Every mutant is one commit on the
+pinned commit: one file changed, whole lines inserted.
 """
 
 from __future__ import annotations

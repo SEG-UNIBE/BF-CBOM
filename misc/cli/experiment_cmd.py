@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import time
 import uuid
 import zipfile
@@ -22,7 +21,6 @@ import yaml
 
 from common import corpus as corpus_mod
 from common.experiment import (
-    ANALYSIS_DIR,
     GIT_MIRROR_DIR,
     GITSERVER_URL,
     RESULTS_DIR,
@@ -30,7 +28,6 @@ from common.experiment import (
     ExperimentError,
     PlannedJob,
     Snapshot,
-    clear_stored_runs,
     expected_jobs,
     experiment_dir,
     is_experiment,
@@ -38,6 +35,7 @@ from common.experiment import (
     mark_unsupported,
     plan_jobs,
     plan_waves,
+    remove_experiment,
     resolve_snapshots,
     save_run_log_entry,
     write_result,
@@ -218,9 +216,8 @@ def run(
     overwrite_old: bool = typer.Option(
         False,
         "--overwrite-old",
-        help="Run the whole spec afresh: remove every stored run first (also of tools and repos the spec no longer "
-        "names) and the old _ANALYSIS/, cancel jobs an earlier run left pending; the pinned commits (_experiment.yaml) "
-        "and the run log are kept",
+        help="Run the whole spec afresh, as if it had never run: the experiment folder (every stored run, the record, "
+        "the run log, mutants.json, _ANALYSIS/) is removed and the jobs an earlier run left are cancelled first",
     ),
     skip_unsupported: bool = typer.Option(
         True,
@@ -253,6 +250,17 @@ def run(
         fg=typer.colors.BLUE,
         err=True,
     )
+    r = _redis(redis_host, redis_port)
+    overwritten = 0
+    if overwrite_old:  # nothing of a former run is left: the spec alone decides what runs (its pinned commits)
+        cancelled = _forget(r, spec.name)
+        overwritten = remove_experiment(exp_dir)
+        typer.secho(
+            f"--overwrite-old: removed the experiment folder ({overwritten} stored run(s)) and cancelled {cancelled} "
+            "pending job(s)",
+            fg=typer.colors.BLUE,
+            err=True,
+        )
 
     typer.secho("resolving snapshots and mirroring to the git server...", fg=typer.colors.BLUE, err=True)
     try:
@@ -260,20 +268,8 @@ def run(
     except ExperimentError as e:
         _err(str(e), 2)
 
-    r = _redis(redis_host, redis_port)
     pending_raw = r.hgetall(_pending_key(spec.name))
     pending = {jid: _job_from_descriptor(jid, json.loads(d)) for jid, d in pending_raw.items()}
-    overwritten = 0
-    if overwrite_old:  # only now: a spec or snapshot that fails to resolve leaves the stored runs untouched
-        _cancel_pending(r, spec.name, pending)  # a late result of a cancelled job is ignored (`_collect`)
-        overwritten = clear_stored_runs(exp_dir)
-        typer.secho(
-            f"--overwrite-old: removed {overwritten} stored run(s) and the old {ANALYSIS_DIR}/, cancelled "
-            f"{len(pending)} pending job(s); commits stay pinned (_experiment.yaml)",
-            fg=typer.colors.BLUE,
-            err=True,
-        )
-        pending = {}
     # Drop descriptors whose result arrived in the meantime.
     for jid, job in list(pending.items()):
         if job.paths(exp_dir)[1].exists():
@@ -558,6 +554,16 @@ def _cancel_pending(r: redis.Redis, name: str, pending: dict[str, PlannedJob]) -
     return removed
 
 
+def _forget(r: redis.Redis, name: str) -> int:
+    """Everything Redis holds for an experiment goes: its queued jobs leave the worker queues (a job a worker already
+    took finishes, and its result, no longer routed to the experiment, is dropped), the pending, running and status
+    entries and any result not collected yet. Returns the number of pending jobs."""
+    pending = {jid: _job_from_descriptor(jid, json.loads(d)) for jid, d in r.hgetall(_pending_key(name)).items()}
+    _cancel_pending(r, name, pending)
+    r.delete(_status_key(name), _pending_key(name), _running_key(name), f"results:{_route_key(name)}")
+    return len(pending)
+
+
 @experiment_app.command("collect")
 def collect(
     name: str = typer.Argument(..., help="Experiment name"),
@@ -683,15 +689,21 @@ def export(
 
 
 @experiment_app.command("delete")
-def delete(name: str = typer.Argument(...), yes: bool = typer.Option(False, "--yes", help="Do not ask")):
-    """Delete an experiment's results from the volume."""
+def delete(
+    name: str = typer.Argument(...),
+    yes: bool = typer.Option(False, "--yes", help="Do not ask"),
+    redis_host: str = REDIS_HOST_OPT,
+    redis_port: int = REDIS_PORT_OPT,
+):
+    """Delete an experiment: its folder on the volume and everything Redis holds for it (pending jobs cancelled)."""
     exp_dir = experiment_dir(name)
     if not exp_dir.exists():
         _err(f"no experiment '{name}' under {RESULTS_DIR}")
     if not yes and not typer.confirm(f"delete {exp_dir} with all stored CBOMs?"):
         raise typer.Exit(0)
-    shutil.rmtree(exp_dir)
-    typer.echo(f"deleted {exp_dir}")
+    cancelled = _forget(_redis(redis_host, redis_port), name)
+    remove_experiment(exp_dir)
+    typer.echo(f"deleted {exp_dir}" + (f", cancelled {cancelled} pending job(s)" if cancelled else ""))
 
 
 @experiment_app.command("env")

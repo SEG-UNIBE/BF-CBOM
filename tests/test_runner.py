@@ -149,7 +149,7 @@ def test_run_stores_results_resumes_retries_and_exports(world, tmp_path):
     assert sum(n.endswith("run1.json") for n in names) == 4
 
 
-def test_overwrite_old_reruns_the_whole_spec_on_the_pinned_commits(world):
+def test_overwrite_old_leaves_nothing_of_the_former_run(world):
     spec, results, r = world["spec"], world["results"], world["redis"]
     assert _run(["run", str(spec), "--idle-timeout", "20"]).exit_code == 0
     exp = results / "e-fake"
@@ -162,6 +162,7 @@ def test_overwrite_old_reruns_the_whole_spec_on_the_pinned_commits(world):
     norm.write_text("{}")
     (exp / ex.ANALYSIS_DIR).mkdir(exist_ok=True)
     (exp / ex.ANALYSIS_DIR / "_SUMMARY.md").write_text("old")
+    (exp / "lock.json").write_text("{}")  # a file of an older layout
     # a job an earlier run left pending whose result never comes: without the flag the run would wait for it
     snap = experiment_cmd.resolve_snapshots(ex.load_spec(spec), exp)[0]
     stale_job = ex.PlannedJob(job_id="stale-job", snapshot=snap, tool="t1", run_index=1)
@@ -169,19 +170,30 @@ def test_overwrite_old_reruns_the_whole_spec_on_the_pinned_commits(world):
 
     out = _run(["run", str(spec), "--idle-timeout", "20", "--overwrite-old"])
     assert out.exit_code == 0, out.output
-    assert "removed 5 stored run(s)" in out.output and "cancelled 1 pending job(s)" in out.output
+    assert "removed the experiment folder (5 stored run(s)) and cancelled 1 pending job(s)" in out.output
     assert "0 run(s) already on disk, 0 still pending from an earlier run, 4 to enqueue" in out.output
     assert len(world["workers"].seen) == 8  # every run of the spec again
     assert len(list(exp.glob("*/*/*/run1.meta.json"))) == 4 and not stale_tool.exists() and not norm.exists()
-    assert not (exp / ex.ANALYSIS_DIR / "_SUMMARY.md").exists()
-    assert {n: r.commit for n, r in ex.pinned_repos(exp).items()} == pins
+    assert not (exp / ex.ANALYSIS_DIR / "_SUMMARY.md").exists() and not (exp / "lock.json").exists()
+    assert {n: r.commit for n, r in ex.pinned_repos(exp).items()} == pins  # the same snapshots, from the spec
     assert not r.hexists(experiment_cmd._pending_key("e-fake"), "stale-job")
-    first_session, second = ex.load_run_log(exp)
-    assert (first_session["runs_overwritten"], second["runs_overwritten"]) == (0, 5)
-    assert second["results_stored"] == 4
+    (session,) = ex.load_run_log(exp)  # the former sessions went with their runs
+    assert session["runs_overwritten"] == 5 and session["results_stored"] == 4
 
 
-def test_mutation_block_runs_originals_and_mutants_and_keeps_them_pinned(world, tmp_path):
+def test_delete_removes_the_folder_and_what_redis_holds_for_the_experiment(world):
+    spec, results, r = world["spec"], world["results"], world["redis"]
+    assert _run(["run", str(spec), "--idle-timeout", "20"]).exit_code == 0
+    snap = experiment_cmd.resolve_snapshots(ex.load_spec(spec), results / "e-fake")[0]
+    stale_job = ex.PlannedJob(job_id="stale-job", snapshot=snap, tool="t1", run_index=1)
+    r.hset(experiment_cmd._pending_key("e-fake"), "stale-job", experiment_cmd._descriptor(stale_job))
+    out = _run(["delete", "e-fake", "--yes"])
+    assert out.exit_code == 0 and "cancelled 1 pending job(s)" in out.output, out.output
+    assert not (results / "e-fake").exists()
+    assert not r.exists(experiment_cmd._status_key("e-fake"), experiment_cmd._pending_key("e-fake"))
+
+
+def test_mutation_block_runs_originals_and_mutants_and_regenerates_them_identically(world, tmp_path):
     src = tmp_path / "upstream" / "mutable"
     (src / "pkg").mkdir(parents=True)
     (src / "pkg" / "core.py").write_text(
@@ -217,7 +229,7 @@ def test_mutation_block_runs_originals_and_mutants_and_keeps_them_pinned(world, 
 
     again = _run(["run", str(spec), "--idle-timeout", "20", "--overwrite-old"])
     assert again.exit_code == 0, again.output
-    assert ex.load_mutants(exp)["repos"] == manifest["repos"]  # the mutants stay pinned like the commits
+    assert ex.load_mutants(exp)["repos"] == manifest["repos"]  # regenerated from scratch: deterministic
     assert len(world["workers"].seen) == 12
 
 

@@ -261,3 +261,40 @@ code of 2026-10-19 (per-key clusters, `resolution`, macro rates); the runs thems
   records (14,469 on bisq2, i18n keys): key material has its own rows now.
 - **Micro:** CryptoScan finds only EC and RSA of the 11 micro-c assets although C is in its languages (OpenSSL EVP
   API): a refinement-15 check of its patterns is open.
+
+## Interventions in how the tools run, and their effects (e1-pilot-corpus, 2026-10-20)
+BF-CBOM runs every tool as shipped, with its documented best invocation (refinement 15). One intervention is allowed:
+when a tool crashes on a specific file and the crash ends the whole scan, that file is left out through the tool's
+*own* exclusion mechanism, by its exact path, and the run records it (`workaround` column of `runs.csv`; the paper
+reports the crash). A tool that runs but finds less is never steered (that is a finding about the tool), and nothing
+else in its input changes (decided 2026-10-20). Numbers: the VM run of 2026-10-20 (12 repos, run 1; items are voters'
+L4 identities per repository, CipherSift and observers left out).
+- **CipherRadar `.cradarignore` (kept).** The Java pass dies with a nil pointer on `new ECGenParameterSpec(
+  <identifier>)` and writes no CBOM. The worker lists the Java files with that trigger in `.cradarignore`,
+  CipherRadar's own ignore file: 1 file in jjwt (`EcSignatureAlgorithm.java`), 9 in keycloak (6 of them tests).
+  Without it CipherRadar fails on 2 of the 4 Java repos and loses all 23 of its items there (8 + 15, of its 127).
+  With it, it misses what those files hold: other voters report 20 (jjwt) and 56 (keycloak) mapped records there,
+  but every algorithm among them except MGF1 (keycloak) also occurs elsewhere in the repo, so at repository level
+  the exclusion costs CipherRadar at most one item; at call-site level it cannot report those files' sites.
+- **CryptoScan crash bisection (removed).** 1.4.0 panics in `patterns.MatchWithContext` (index out of range) on
+  some files, and one such file ends the whole scan without a CBOM. The worker used to bisect with `--exclude`, but
+  1.4.0's `--exclude` matches a file by its basename only and a directory by its relative path, where `dir/**` skips
+  the subdirectories and still scans the files directly in `dir` (`pkg/scanner/scanner.go`): a nested file cannot
+  be excluded by its path. On keycloak the true culprit stayed in every scan, 86 files "panicked" alone and the
+  200-scan limit failed the run. The tool offers no exact-path exclusion, so the run now fails with the panic head
+  in the error. Effect: keycloak on the pilot (1 of 12 repos; other voters report 27 algorithms there); on the
+  first ICPC run (2026-10-19) allure2, bisq, docling and keycloak (4 of 39 repos). The alternatives were rejected:
+  excluding by basename also hides every other file of that name, and deleting files from our clone changes the
+  tool's input.
+- **CBOMkit module indexing (left as the tool does it).** Not a crash: CBOMkit indexes a directory as a module only
+  when it has a build file and a `src/` directory, so on Kafka-like layouts it scans a handful of files (the pilot:
+  7 of 2,900 on Kafka). The pilot added an empty `src/` at the repo root; cbomkit-jar keeps that as the opt-in
+  `CBOMKIT_ENSURE_SRC=1`, off in every run. Effect: CBOMkit and cbomkit-jar report nothing on kafka, where the
+  other voters report 15 algorithms; keycloak carries the same risk note but is partly indexed (65 assets). Kept
+  off: the empty directory is a file added to the scanned repo, it repairs the tool's indexing rather than letting
+  it run, and the jar would differ from the server image by our hand.
+- **Invocation choices that change results** (the tools' documented options, not interventions): CryptoScan always
+  gets `--include-quantum-safe` (without it its CBOM leaves out AES, SHA-2, HMAC and PBKDF2); cdxgen gets `-t
+  python` / `-t go` (without it, it never analysed Python or Go: our setup error of 2026-10-15); CipherRadar runs
+  from a working directory outside the clone, so a `.cradar.yml` committed in a scanned repo cannot change the
+  scan.
