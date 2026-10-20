@@ -17,7 +17,8 @@ guessed: a name nobody can read stays `undefined` and never becomes an item that
 
 ## Units: asset, record, item
 
-Every table counts one of three units. They differ by orders of magnitude for the same output, so a number is only
+A tool's *findings* are the cryptographic uses its CBOM reports (the word of RQ2 and RQ3). Every table counts
+them in one of three units. They differ by orders of magnitude for the same output, so a number is only
 readable with its unit (the normalisation table counted records until 2026-10-20 and showed CryptoScan's 199 assets
 as 13,996).
 

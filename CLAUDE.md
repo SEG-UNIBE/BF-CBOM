@@ -186,8 +186,10 @@ which generator can be trusted on real code that has no reference CBOM. It frame
 matching** (normalise -> match -> score) and validates the scores by **inserting and removing known crypto calls** in
 real projects.
 - **RQ1:** do outputs conform to CycloneDX?
-- **RQ2:** what do tools report?
-- **RQ3:** how well can assets be matched, per kind of information (algorithm, parameters, location)?
+- **RQ2:** what findings do tools report?
+- **RQ3:** how well can findings be matched, per kind of information (algorithm, parameters, location)? (A
+  *finding* is a cryptographic use a CBOM reports; it is counted as records and items, never as assets, which
+  depend on each tool's packaging: `analysis/README.md` "Units".)
 - **RQ4:** can tools be scored and ranked without ground truth?
 
 Decisions: mutants are hosted on the local git server; the LLM generator reads the code; the corpus is ~100 repos per
