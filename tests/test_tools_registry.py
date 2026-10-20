@@ -29,6 +29,14 @@ def test_registry_llm_workers_are_separate_voters_with_a_merge_group():
     assert llms and all(tools[t]["voter_group"] == t and tools[t]["merge_group"] == "llm" for t in llms)
 
 
+def test_rule_tools_are_separate_voters_merged_only_by_engine_family():
+    # their rule sets share no rule (analysis/README.md "Voter groups"); the shared engine is a sensitivity check
+    rule_tools = ("securin-xbom", "cipherradar", "scanoss")
+    declared, merged = reg.voter_groups(), reg.voter_groups(engine_family=True)
+    assert [declared[t] for t in rule_tools] == list(rule_tools)
+    assert {merged[t] for t in rule_tools} == {"semgrep"} and merged["cbomkit"] == declared["cbomkit"] == "cbomkit"
+
+
 def test_tailored_repos_from_a_corpus_yaml_and_a_fixture_directory(tmp_path):
     (tmp_path / "corpus").mkdir()
     (tmp_path / "corpus" / "pilot.yaml").write_text(

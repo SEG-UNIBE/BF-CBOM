@@ -51,7 +51,7 @@ USAGE_COLUMNS = (
     "requests", "requests_failed", "chunks_total", "chunks_sent", "chunks_skipped", "input_tokens",
     "cached_input_tokens", "cache_write_tokens", "output_tokens", "reasoning_tokens",
 )  # fmt: skip
-RECORDS_COLUMNS = ["repo", "snapshot", "commit", "variant", "language", "tool", "run"] + RECORD_COLUMNS
+RECORDS_COLUMNS = ["repo", "snapshot", "commit", "variant", "language", "tool", "run", "location_kind"] + RECORD_COLUMNS
 GROUP_KEY_COLUMNS = ["matcher", "repo", "snapshot", "commit", "variant", "run", "group_id", "k", "tools"]
 GROUP_COLUMNS = GROUP_KEY_COLUMNS + [
     "language",
@@ -87,9 +87,10 @@ AGREEMENT_COLUMNS = [
     "matcher", "repo", "snapshot", "variant", "run", "group_id", "scope", "key", "dimension", "reporting",
     "agreeing", "majority", "values",
 ]  # fmt: skip
+LOCATION_KINDS = ("line", "window", "import", "file", "none", "unread")  # analysis/schema.py:location_kind
 UNIT_COLUMNS = [
     "tool", "role", "cboms", "assets", "records", "items", "records_per_asset_median", "records_per_asset_max",
-    "multi_occurrence_share", "assets_per_item", "unlocated_share",
+    "multi_occurrence_share", "assets_per_item", "unlocated_share", *[f"loc_{k}" for k in LOCATION_KINDS],
 ]  # fmt: skip
 MICRO_COLUMNS = [
     "project", "language", "tool", "run", "tailored", "status", "verdict", "n_items",
@@ -304,9 +305,18 @@ def run_rows(
 
 
 def record_rows(
-    records: list[NormRecord], *, snapshot: str, variant: str, run: int, commit: str | None, language: str | None
+    records: list[NormRecord],
+    *,
+    snapshot: str,
+    variant: str,
+    run: int,
+    commit: str | None,
+    language: str | None,
+    location_kinds: dict[str, str] | None = None,
 ) -> list[dict]:
-    """Normalised records (analysis/normalize/) of one CBOM."""
+    """Normalised records (analysis/normalize/) of one CBOM; `location_kinds`: record id -> analysis/schema.py
+    location_kind."""
+    kinds = location_kinds or {}
     base = {
         "repo": full_name(snapshot),
         "snapshot": snapshot,
@@ -315,7 +325,7 @@ def record_rows(
         "language": language,
         "run": run,
     }
-    return [{**base, "tool": r.tool, **r.csv_row()} for r in records]
+    return [{**base, "tool": r.tool, "location_kind": kinds.get(r.record_id), **r.csv_row()} for r in records]
 
 
 # ----- matches (generic over matchers) -----
@@ -433,17 +443,24 @@ class MicroEntry:
     tailored: bool = False  # the tool was tuned on this project (tools.yaml tailored_on, refinement 13)
 
 
-def unit_rows(cboms: list[NormalizedCbom], voter_of: dict[str, str] | None = None) -> list[dict]:
+def unit_rows(
+    cboms: list[NormalizedCbom],
+    voter_of: dict[str, str] | None = None,
+    location_kinds: list[dict[str, str]] | None = None,
+) -> list[dict]:
     """How each tool packages its findings (analysis/README.md "Units"), over the algorithm assets of `cboms` (one
     run's CBOMs of the original variants): per tool its assets (CBOM components), their records (occurrences) and its
     items (distinct L4 identities of its `mapped` records per CBOM, i.e. per repository, as the ladder counts them,
     tailored repositories included), with the records per asset, the share of assets listed at more than one place,
-    the assets per item (above 1: one component per finding) and the share of assets without a file."""
+    the assets per item (above 1: one component per finding), the share of assets without a file, and the
+    algorithm records per location kind (`loc_<kind>`; `location_kinds`: one {record id: kind} per CBOM)."""
     acc: dict[str, dict] = {}
-    for n in cboms:
-        t = acc.setdefault(n.tool, {"cboms": 0, "per_asset": [], "items": 0, "unlocated": 0})
+    for i, n in enumerate(cboms):
+        t = acc.setdefault(n.tool, {"cboms": 0, "per_asset": [], "items": 0, "unlocated": 0, "kinds": Counter()})
         t["cboms"] += 1
         assets = [rs for rs in assets_of(n) if rs[0].values.get("asset_type") == "algorithm"]
+        kinds = location_kinds[i] if location_kinds else {}
+        t["kinds"].update(kinds.get(r.record_id) or "unread" for rs in assets for r in rs)
         t["per_asset"] += [len(rs) for rs in assets]
         t["unlocated"] += sum(not any(r.file for r in rs) for rs in assets)
         units = {identity(r, UNIT_LEVEL) for rs in assets for r in rs if r.resolution in (None, "mapped")}
@@ -464,6 +481,7 @@ def unit_rows(cboms: list[NormalizedCbom], voter_of: dict[str, str] | None = Non
                 "multi_occurrence_share": round(sum(k > 1 for k in per) / n_assets, 3) if n_assets else None,
                 "assets_per_item": round(n_assets / t["items"], 2) if t["items"] else None,
                 "unlocated_share": round(t["unlocated"] / n_assets, 3) if n_assets else None,
+                **{f"loc_{k}": t["kinds"][k] for k in LOCATION_KINDS},
             }
         )
     return rows

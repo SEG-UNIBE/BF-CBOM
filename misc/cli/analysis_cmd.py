@@ -297,8 +297,10 @@ def _normalize_step(
     exp_dir: Path, write: Writer, *, store: SnapshotStore | None = None
 ) -> tuple[Report, list[Normalized]]:
     """Normalise every stored ok CBOM (all repetitions, mutants included): run<k>.norm.json next to each, and over
-    the original variants normalize.json, vocab.csv, coverage.csv and conformance.csv (a mutated repository would
-    count once per mutant). Returns the report and the normalised CBOMs."""
+    the original variants of every repetition normalize.json (the normaliser's diagnostics) and vocab.csv (the
+    mapping table: every spelling any run used; a mutated repository would count once per mutant). The per-run
+    tables of what the tools' assets hold (coverage-run<k>.csv, conformance-run<k>.csv) are `_tables_step`'s.
+    Returns the report and the normalised CBOMs."""
     report = Report()
     done: list[Normalized] = []
     fallback: set[str] = set()
@@ -315,8 +317,6 @@ def _normalize_step(
     out_dir.mkdir(exist_ok=True)
     _write_json(out_dir / "normalize.json", report.to_dict())
     write("vocab.csv", report.vocab_rows(), VOCAB_COLUMNS)
-    write("coverage.csv", report.coverage_rows(), COVERAGE_COLUMNS)
-    write("conformance.csv", report.conformance_rows(), CONFORMANCE_COLUMNS)
     if fallback:
         typer.secho(f"no adapter spec, generic CycloneDX reader used: {sorted(fallback)}", fg=typer.colors.YELLOW)
     return report, done
@@ -411,9 +411,13 @@ def _tables_step(
     observers_vote: bool = False,
     raqun: bool | None = None,
     all_assets: bool,
+    store: SnapshotStore | None = None,
 ) -> None:
-    """runs.csv, the normalised records, the exact matcher's groups/members/agreement, RaQuN's groups and the matcher
-    comparison when available, and the micro tables (if any). Returns the exact groups per (snapshot, variant)."""
+    """runs.csv, the normalised records (with each record's location kind, read from the snapshot files in `store`),
+    the units, coverage and conformance of this run, the exact matcher's groups/members/agreement, RaQuN's groups and
+    the matcher comparison when available, and the micro tables (if any). Returns the exact groups per (snapshot,
+    variant)."""
+    store = store or SnapshotStore()
     languages = _languages(exp_dir)
     write(
         "runs.csv",
@@ -424,20 +428,32 @@ def _tables_step(
     norm_rows: list[dict] = []
     per_snapshot: dict[tuple[str, str], list] = defaultdict(list)
     commits: dict[str, str | None] = {}
+    location_kinds: list[dict[str, str]] = []
     for meta, cbom_path, n in normalized:
         snapshot, variant = cbom_path.parents[2].name, cbom_path.parents[1].name
         commits.setdefault(snapshot, meta.get("base_commit"))
         per_snapshot[(snapshot, variant)] += n.records
+        repo, commit = tbl.full_name(snapshot), meta.get("variant_commit") or meta.get("base_commit")
+        kinds = {r.record_id: sch.location_kind(r, store, repo, commit) for r in n.records}
+        location_kinds.append(kinds)
         norm_rows += tbl.record_rows(
             n.records,
             snapshot=snapshot,
             variant=variant,
             run=run,
             commit=meta.get("base_commit"),
-            language=languages.get(tbl.full_name(snapshot)),
+            language=languages.get(repo),
+            location_kinds=kinds,
         )
     write(f"records-run{run}.csv", norm_rows, tbl.RECORDS_COLUMNS)
-    write(f"units-run{run}.csv", tbl.unit_rows([n for _, _, n in normalized], voter_of), tbl.UNIT_COLUMNS)
+    # one run of the original variants, like every table the summary's normalisation section shows
+    cboms = [n for _, _, n in normalized]
+    write(f"units-run{run}.csv", tbl.unit_rows(cboms, voter_of, location_kinds), tbl.UNIT_COLUMNS)
+    per_run = Report()
+    for n in cboms:
+        per_run.add(n)
+    write(f"coverage-run{run}.csv", per_run.coverage_rows(), COVERAGE_COLUMNS)
+    write(f"conformance-run{run}.csv", per_run.conformance_rows(), CONFORMANCE_COLUMNS)
     # the exact matcher at every level feeds matchlevels-run<k>.csv (RQ3, matcher x level); the full group, member
     # and agreement tables are written at the scoring level only
     matchlevel_rows: list[dict] = []
@@ -591,7 +607,10 @@ def _score_step(
     samples: int,
     consensus: dict[tuple[str, str, str], set[str]] | None = None,
 ) -> None:
-    """score-run<k>.csv and loo-run<k>.csv (analysis/score.py) from the exact matcher's groups."""
+    """score-run<k>.csv, loo-run<k>.csv and grouping-run<k>.csv (analysis/score.py) from the exact matcher's groups.
+    grouping-run<k>.csv ranks the tools again with every tool its own voter group, with the LLM workers merged and
+    with the tools of one pattern engine family merged (the sensitivity checks of the declared voter groups;
+    observers stay observers)."""
     voter_of = _voter_of(merge_llm, observers_vote)
     tools_ran: dict[str, set[str]] = defaultdict(set)
     repo_of: dict[str, str] = {}
@@ -600,19 +619,31 @@ def _score_step(
         tools_ran[f"{snapshot}/{variant}"].add(n.tool)
         repo_of[f"{snapshot}/{variant}"] = tbl.full_name(snapshot)
     groups = {f"{s}/{v}": g for (s, v), g in groups_by_snapshot.items()}
-    obs = sc.observe(
-        groups,
-        level=level,
-        voter_of=voter_of,
-        tools_ran=tools_ran,
-        tailored=None if include_tailored else tailored_map(),
-        repo_of=repo_of,
-    )
-    for (snapshot, variant, tool), keys in (consensus or {}).items():
-        obs.restrict(f"{snapshot}/{variant}", tool, set(keys))  # keep the items in the tool's consensus set
+
+    def observe(voters: VoterMap) -> sc.Observations:
+        obs = sc.observe(
+            groups,
+            level=level,
+            voter_of=voters,
+            tools_ran=tools_ran,
+            tailored=None if include_tailored else tailored_map(),
+            repo_of=repo_of,
+        )
+        for (snapshot, variant, tool), keys in (consensus or {}).items():
+            obs.restrict(f"{snapshot}/{variant}", tool, set(keys))  # keep the items in the tool's consensus set
+        return obs
+
+    obs = observe(voter_of)
     rows, loo = sc.score_rows(obs, samples=samples)
     write(f"score-run{run}.csv", rows, sc.SCORE_COLUMNS)
     write(f"loo-run{run}.csv", loo, sc.LOO_COLUMNS)
+    groupings = {"declared": obs, "per-tool": observe(VoterMap({t: t for t in voter_of}, voter_of.observers))}
+    if not merge_llm:
+        groupings["llm-merged"] = observe(_voter_of(True, observers_vote))
+    groupings["engine-merged"] = observe(
+        voter_groups(merge_llm=merge_llm, observers_vote=observers_vote, engine_family=True)
+    )
+    write(f"grouping-run{run}.csv", sc.grouping_rows(groupings), sc.GROUPING_COLUMNS)
 
 
 @analysis_app.command("score")
@@ -685,14 +716,14 @@ def _write_info(
 def normalize(name: str = EXP_ARG):
     """Normalise every stored CBOM with its tool's adapter spec (analysis/adapters/<tool>.yaml).
 
-    Writes run<k>.norm.json next to each run<k>.json, analysis/normalize.json (coverage per tool: fill rates,
-    sources, spec issues, conflicts, unmapped values), analysis/vocab.csv (what every raw value mapped to),
-    analysis/coverage.csv (fill rates, long format) and analysis/conformance.csv (spec issues per kind).
+    Writes run<k>.norm.json next to each run<k>.json, _ANALYSIS/normalize.json (per tool over every run: what was
+    read, value sources, spec issues, conflicts, unmapped values) and _ANALYSIS/vocab.csv (what every raw value
+    mapped to). The per-run fill and conformance tables come with `tables` and `report`.
     """
     exp_dir = _experiment(name)
     counts: dict[str, int] = {}
     report, done = _normalize_step(exp_dir, _writer(analysis_dir(exp_dir), counts))
-    typer.echo("algorithm assets of the original variants: mapped to an algorithm, with a value the tool reported:")
+    typer.echo("algorithm assets (original variants, every run): mapped to an algorithm, with a value the tool gave:")
     for line in report.summary_lines():
         typer.echo("  " + line)
     typer.echo(f"{len(done)} CBOMs normalised (run<k>.norm.json next to each), in {analysis_dir(exp_dir)}")
@@ -816,6 +847,7 @@ def run_report(
         observers_vote=observers_vote,
         raqun=raqun,
         all_assets=all_assets,
+        store=store,
     )
     sets = _stability_step(originals, write, level=level)
     _score_step(

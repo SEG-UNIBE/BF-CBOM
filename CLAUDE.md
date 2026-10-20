@@ -77,7 +77,9 @@ Shared context for coworkers and for Claude Code (which loads this file automati
   (requests, input / cached / cache-write / output / reasoning tokens, the model ids answered with; kept on failed
   runs).
 - **Tool registry:** `common/tools.yaml` (loader `common/tools_registry.py`): engine family, `voter_group` (tools sharing
-  an engine or rule set count as one voter in RQ4; default the tool itself), `merge_group`, `languages`,
+  their detection logic, an engine or a rule set, count as one voter in RQ4; default the tool itself; evidence in
+  `analysis/README.md` "Voter groups"), `merge_group`, `engine_family` (a shared pattern engine only, merged in the
+  `engine-merged` sensitivity ranking), `languages`,
   `native_cyclonedx`, status, the pilot verdicts, `tailored_on` and `memory_gb` (= the worker's compose memory limit;
   a test keeps them equal).
 - **Memory budget (waves):** `EXPERIMENT_MEMORY_BUDGET_GB` (laptop default 14, 0 = unlimited) caps the summed
@@ -164,9 +166,9 @@ appear in the paper's figures is decided later.
 | `cryptoscan` | cryptoscan | eleven | always `--include-quantum-safe`; skips folders named demo, example, sample; on a Go panic (1.4.0, specific files) the worker bisects and reruns with `--exclude` of those files, recorded as a workaround |
 | `pqcheck` | pqcheck | Python, Go | |
 | `qdarpan` | qdarpan | Java, Go, C | the worker adapter moves `qdarpan:location.N` into `evidence.occurrences` |
-| `securin-xbom` | grep-rules | Java, Python | the registry rule sets it fetches online, frozen unfiltered at a semgrep-rules commit |
-| `cipherradar` | grep-rules | Java, Python, Go, JS | runs outside the clone; Java files with its crash trigger pre-excluded via `.cradarignore` (recorded) |
-| `scanoss` | grep-rules | Go, C, JS, Rust | crypto-finder with the public open rules; Java/Python rules need an API key (research key requested) |
+| `securin-xbom` | securin-xbom | Java, Python | the registry rule sets it fetches online, frozen unfiltered at a semgrep-rules commit |
+| `cipherradar` | cipherradar | Java, Python, Go, JS | runs outside the clone; Java files with its crash trigger pre-excluded via `.cradarignore` (recorded) |
+| `scanoss` | scanoss | Go, C, JS, Rust | crypto-finder with the public open rules; Java/Python rules need an API key (research key requested) |
 | `ciphersift` | ciphersift | Java, Python, Go | benchmark-informed: `tailored_on` the micro projects and the pilot corpus (refinement 13) |
 | `xgrep` | xgrep | Java, Python, Go, JS | |
 | `qelens` | observer | Python, JS | crate `cbom` 0.1.2, CycloneDX on stdout; many findings on import lines; category names such as `HASHING (see usage)` stay `undefined` |
@@ -217,6 +219,14 @@ where they declare support, but no analysis, figure or tuning effort goes into t
   ignored). Vocabulary 2026-10-20.2. The DeepSeek rerun below picks up the new assembly.
 - **Observers added (2026-10-19):** qelens, cryptarium and qScan are workers with `role: observer` and are in the
   three experiment specs; the reruns below pick them up. Vocabulary 2026-10-19.2 (their specs only).
+- **Analysis units and voters (2026-10-20):** tables count *assets*, *records* or *items* and say which
+  (`analysis/README.md` "Units"; cross-tool comparisons count items); packaging per tool is declared in
+  `analysis/README.md` and measured in `units-run<k>.csv`, the kind of place every record names (`line`, `window`,
+  `import`, `file`, `none`) in `records-run<k>.csv`; the normalisation section is one run throughout. Voter groups
+  follow shared detection logic: the former `grep-rules` (securin-xbom, CipherRadar, SCANOSS) is split after a
+  rule-overlap check, and every report ranks again under `per-tool`, `llm-merged` and `engine-merged`
+  (`grouping-run<k>.csv`). `_experiment.yaml` is the experiment's record (lock.json is gone) and the only list of
+  what the analysis reads.
 - **Phase 4 built (2026-10-20):** insertion mutants for Java, Python and Go (`mutation/`, below); the smoke spec
   `experiments/e4-mutation-smoke.yaml` waits for the VM. Removal mutants come after E1 (they need its voters).
 - **Waiting for the VM:** `make up-prod`, then each experiment as a whole (the user's preference, 2026-10-20):
@@ -258,9 +268,12 @@ exclusion is recorded with its reason (refinement 11); `make corpus-prune` drops
 - **Costs are computed offline, never in the worker:** prices change and differ per model, cache hit and time of day.
   `analysis/data/llm_prices.yaml` is dated and sourced; `analysis/costs.py` prices the stored usage, so costs can be
   recomputed for any price date and the paper states the table version.
-- **Engine independence:** tools sharing an engine or rule set are one voter (`voter_group`). The LLM workers are
-  separate voters by default; merging them into one "LLM" voter (`--merge-llm`) is the sensitivity analysis, since
-  they share prompts and file selection.
+- **Engine independence:** tools sharing their detection logic (an engine, a rule set) are one voter
+  (`voter_group`). The LLM workers are separate voters by default; merging them into one "LLM" voter (`--merge-llm`)
+  is the sensitivity analysis, since they share prompts and file selection. The pattern-rule tools (securin-xbom,
+  CipherRadar, SCANOSS) were one voter `grep-rules` until 2026-10-20; their rule sets share no rule
+  (`misc/rule_overlap.py`), so they count apart, and the `engine-merged` ranking of `grouping-run<k>.csv` shows the
+  former grouping next to `per-tool` and `llm-merged`.
 - **Blocked on access:** SCANOSS's Java/Python rules (API key) and IBM Cryptoscope (artifact), see the table above.
 
 ### Phase 3: analysis library (`analysis/`)
@@ -326,8 +339,8 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
 - **Tables** (`tables.py`), flat long-format CSVs in three layers, so new matchers only add files: **runs**
   (`runs.csv`, one row per stored run with status, timing, memory, provenance, LLM usage and `cost_usd`), **records**
   (`records-run<k>.csv`), **matches** (`groups-`, `members-`, `agreement-<matcher>-run<k>.csv`, `matchers-run<k>.csv`).
-  Plus `micro-run<k>.csv`, `micro-items-run<k>.csv`, `items-run<k>.csv`, `units-run<k>.csv`, `levels-run<k>.csv`, `coverage.csv`,
-  `conformance.csv`, the RQ1, score and stability tables. Join keys: (snapshot, variant, run, record_id) and
+  Plus `micro-run<k>.csv`, `micro-items-run<k>.csv`, `items-run<k>.csv`, `units-run<k>.csv`, `levels-run<k>.csv`, `coverage-run<k>.csv`,
+  `conformance-run<k>.csv`, the RQ1, score and stability tables. Join keys: (snapshot, variant, run, record_id) and
   (snapshot, variant, run, group_id); group ids restart per snapshot and variant. Full list: `experiments/README.md`.
 - **Report** (`analysis/report/README.md`): plot recipes on the CSVs (UpSet of tools per asset, fill-rate heatmaps,
   ladder, ranking with CIs, cost per confirmed asset). The figures are built by the user later, following the
@@ -379,7 +392,9 @@ Implementation notes and gotchas: `notes.md` "Phase 4: mutation harness".
 - **E3 (RQ4, ranking without ground truth):** the agreement-based scores and rankings per dimension.
 - **E4 (RQ4, validation):** mutation runs give per-tool detection rates as partial ground truth. Compare the rankings
   of E3 and E4 (Kendall τ with bootstrap CIs over repos; refinement 9). Inspect "right alone" cases: sample exclusive
-  findings and validate them manually, to quantify the penalty for being right alone.
+  findings and validate them manually, to quantify the penalty for being right alone. Check the voter groups'
+  independence on the known items: tools that miss the same mutants more often than chance share a blind spot
+  (`analysis/README.md` "Voter groups").
 - **Threats addressed explicitly:** shared blind spots (engine grouping), inserted calls being easier than real ones
   (three insertion styles plus a manual sample), moving targets (pinned digests and a replication package),
   benchmark-informed tools (refinement 13), normalisation creating agreement (refinement 14).

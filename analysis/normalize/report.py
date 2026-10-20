@@ -1,9 +1,10 @@
 """Coverage per tool and the per-field mapping table over many normalised CBOMs.
 
-`normalize.json`: per tool what was read (formats declared, records, asset types), how complete the algorithm
-assets are per dimension (reported by the tool vs derived by us), what their names resolve to, where the values came
+`normalize.json` (every run): per tool what was read (formats declared, records, asset types), where the values came
 from (standard field, tool property, occurrence, name, API context, ...), spec issues by kind, conflicts and the top
-unmapped values.
+unmapped values. `coverage_rows` and `conformance_rows` (one run, `coverage-run<k>.csv`, `conformance-run<k>.csv`):
+how complete the algorithm assets are per dimension (reported by the tool vs derived by us), what their names
+resolve to, and the spec issues.
 
 Fill rates, resolutions, sources and spec issues count **assets** (CBOM components), the unit of the RQ1 and RQ2
 tables: a record is one occurrence of an asset, and counted per record a tool's few assets with hundreds of
@@ -158,7 +159,6 @@ class Report:
     def to_dict(self) -> dict:
         out = {}
         for tool, t in sorted(self.tools.items()):
-            assets = t["counts"]["algorithm_assets"]
             out[tool] = {
                 "cboms": t["cboms"],
                 "adapter": dict(t["adapters"]),
@@ -167,19 +167,11 @@ class Report:
                 "counts": dict(t["counts"]),
                 "skipped": dict(t["skipped"]),
                 "asset_types": dict(t["asset_types"]),  # assets per normalised asset type
-                "algorithm_fill": {  # shares of the algorithm assets
-                    d: {
-                        "reported": round(t["fill"][d] / assets, 3) if assets else 0.0,
-                        "derived": round(t["fill_derived"][d] / assets, 3) if assets else 0.0,
-                    }
-                    for d in COVERAGE_DIMS
-                },
-                "sources": {d: dict(c) for d, c in t["sources"].items()},
+                "sources": {d: dict(c) for d, c in t["sources"].items()},  # algorithm assets per value source
                 "spec_issues": dict(t["spec_issue_kinds"]),
                 "spec_issues_top": dict(t["spec_issues"].most_common(15)),
                 "conflicts": dict(t["conflicts"]),
                 "unmapped_top": dict(t["unmapped"].most_common(25)),
-                "resolution": dict(t["resolution"]),  # algorithm assets: mapped | ambiguous | api | ...
             }
         return out
 

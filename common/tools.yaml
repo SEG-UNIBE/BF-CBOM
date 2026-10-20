@@ -1,8 +1,11 @@
 # Engine / rule-set families of the CBOM generators (BF-CBOM 2.0, Phase 2 "engine independence").
 #
-# Tools sharing an engine (or a `voter_group`) count as one voter in the agreement-based scoring
-# (RQ4); `merge_group` names a coarser voter the sensitivity analysis can merge them into (`--merge-llm`:
-# the LLM workers, which share prompts and file selection, decided 2026-10-18). `native_cyclonedx` tells whether the tool itself emits CycloneDX (RQ1 validity is measured
+# Tools sharing their detection logic (an engine, or a rule set) have one `voter_group` and count as one voter in
+# the agreement-based scoring (RQ4; default: the tool itself; evidence per group in analysis/README.md "Voter
+# groups"). `merge_group` names a coarser voter the sensitivity analysis can merge them into (`--merge-llm`: the LLM
+# workers, which share prompts and file selection, decided 2026-10-18); `engine_family` marks tools that share only a
+# pattern engine but run independently written rules (decided 2026-10-20 after the rule-overlap check): separate
+# voters, merged for the `engine-merged` ranking of grouping-run<k>.csv. `native_cyclonedx` tells whether the tool itself emits CycloneDX (RQ1 validity is measured
 # only for those; for the others our adapter produces the CBOM). `languages` is the tool's declared
 # scope: a repo in another language is "not supported", never "failed" (pilot recommendation).
 # `status`: integrated (worker exists) | candidate (passed the pilot's inclusion bar, worker pending)
@@ -131,7 +134,8 @@ tools:
     approach: patterns (semgrep)
     native_cyclonedx: true
     languages: [java, python]
-    voter_group: grep-rules         # semgrep/opengrep rule tools share the matching engine; rules differ (sensitivity analysis)
+    voter_group: securin-xbom       # own voter: its semgrep-registry rules share no rule with CipherRadar's (analysis/README.md "Voter groups")
+    engine_family: semgrep          # semgrep engine; CipherRadar and SCANOSS run opengrep, its fork
     status: integrated             # workers/securin-xbom
     pilot: {java: pass, python: pass, go: fail, c: fail, javascript: fail}
     notes: runs offline with the semgrep.dev rule sets it fetches online (r/java.lang.security, r/python.cryptography) frozen at a pinned semgrep-rules commit, unfiltered; before 2026-10-17 offline mode silently dropped them. Its cdxgen layer is broken with cdxgen 12
@@ -142,7 +146,8 @@ tools:
     approach: patterns (opengrep) + syntax tree
     native_cyclonedx: true          # CycloneDX 1.7
     languages: [java, python, go, javascript]   # Java: nil-pointer crash on `new ECGenParameterSpec(<identifier>)` (jjwt, Keycloak) is worked around in the worker (files with the trigger pre-excluded via .cradarignore, recorded in the notes; the tool itself is not patched)
-    voter_group: grep-rules
+    voter_group: cipherradar        # own voter: its rules share no rule with securin-xbom's or SCANOSS's (3 bare API names in Go)
+    engine_family: semgrep          # opengrep (a semgrep fork) for its rule pass, plus tree-sitter and YARA-X passes
     status: integrated             # workers/cipherradar
     pilot: {java: borderline, python: pass, go: pass, javascript: pass, c: fail}
     notes: very noisy solo findings (17-31 % precise when alone in the pilot); needs writable XDG_* dirs or opengrep dies silently
@@ -171,7 +176,8 @@ tools:
     approach: patterns (opengrep) + call graph
     native_cyclonedx: true          # `--format cyclonedx`; declares CycloneDX 1.7 (its docs still say 1.6)
     languages: [go, c, javascript, rust]   # what the open rules cover; Java/Python rules only through the API with a key
-    voter_group: grep-rules
+    voter_group: scanoss            # own voter: scanoss/open-crypto-rules share no rule with CipherRadar's (3 bare API names in Go)
+    engine_family: semgrep          # opengrep (a semgrep fork)
     status: integrated              # workers/scanoss; binary, opengrep and rules commit pinned in docker/Dockerfile.worker-scanoss
     pilot: {go: pass, c: pass, javascript: fail, java: "?", python: "?"}   # open rules only; Java/Python rules not available
     notes: >

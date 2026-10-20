@@ -14,7 +14,7 @@ location-aware cross-matching with hand-checked samples. Reports and the landsca
   exclusive findings (E4) are essential. Only about 18 % of the clusters had two or more tools.
 - **Matcher rules** (the call-site matcher, retired 2026-10-18; its line window lives on in the exact matcher): same
   file, |Δline| ≤ 2, family sets intersect, nearest-neighbour linking; an unknown family never matches (as a wildcard
-  it inflated weak tools). Opengrep/semgrep rule tools share the voter group `grep-rules`.
+  it inflated weak tools). Opengrep/semgrep rule tools shared the voter group `grep-rules` (split 2026-10-20: their rule sets share no rule, `analysis/README.md` "Voter groups").
 - **Formats:** CryptobomForge emits IBM's draft `1.4-cbom-1.0`, not CycloneDX (the ICPC paper's claim needs a
   correction). cdxgen reports no file or line for crypto findings outside JS/TS.
 - **Shared blind spot of all tools:** algorithm names passed through variables or constants (the third insertion style

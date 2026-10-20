@@ -51,6 +51,7 @@ SCORE_COLUMNS = [
     "ci_high", "exclusive", "exclusivity", "rank", "ds_support", "ds_sensitivity", "ds_specificity",
 ]  # fmt: skip
 LOO_COLUMNS = ["dimension", "level", "left_out", "kendall_tau", "ranking"]
+GROUPING_COLUMNS = ["dimension", "level", "grouping", "voter_groups", "ranked", "kendall_tau", "ranking"]
 
 AgreeSet = dict[str, set]  # tool -> the items it reports inside one group (a cluster, or a call-site group)
 
@@ -297,6 +298,42 @@ def leave_one_out(obs: Observations, dim: str, *, min_repos: int = MIN_REPOS, mi
                 "ranking": order,
             }
         )
+    return rows
+
+
+def grouping_rows(
+    by_grouping: dict[str, Observations], *, min_repos: int = MIN_REPOS, min_items: int = MIN_ITEMS
+) -> list[dict]:
+    """The ranking per dimension under each voter grouping (the sensitivity check of the voter groups) and its
+    Kendall tau against the first grouping's (the declared one). The matcher's groups are the same under every
+    grouping; only who may confirm whom changes, so a different ranking is the grouping's effect alone."""
+    names = list(by_grouping)
+    rows = []
+    for dim in DIMS:
+        orders = {}
+        for name, obs in by_grouping.items():
+            pooled = confirmation(obs, dim)
+            if any(n for n, _, _ in pooled.values()):
+                orders[name] = ranking(
+                    _voting(obs, repo_rates(obs, dim)), pooled, min_repos=min_repos, min_items=min_items
+                )
+        if names[0] not in orders:
+            continue
+        for name in names:
+            if name not in orders:
+                continue
+            obs = by_grouping[name]
+            rows.append(
+                {
+                    "dimension": dim,
+                    "level": obs.level,
+                    "grouping": name,
+                    "voter_groups": len({obs.voter(t) for t in obs.tools if obs.votes(t)}),
+                    "ranked": len(orders[name]),
+                    "kendall_tau": kendall_tau(orders[names[0]], orders[name]),
+                    "ranking": orders[name],
+                }
+            )
     return rows
 
 

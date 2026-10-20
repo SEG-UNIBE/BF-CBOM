@@ -30,7 +30,7 @@ memberships = pd.crosstab(sets["group_id"], sets["voter"]).astype(bool)   # the 
 
 **Fill-rate heatmap (RQ2).** Share of algorithm assets per tool and dimension with a reported value.
 ```python
-cov = pd.read_csv(f"{A}/coverage.csv")
+cov = pd.read_csv(f"{A}/coverage-run1.csv")
 heat = cov.pivot(index="tool", columns="dimension", values="reported_share")
 ```
 

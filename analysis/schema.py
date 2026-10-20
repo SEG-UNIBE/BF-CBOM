@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter, defaultdict
 from functools import lru_cache
 from pathlib import Path
@@ -239,6 +240,41 @@ def alias_tokens(vocab: Vocabulary | None = None) -> frozenset[str]:
     keys = set(vocab.algorithm_alias) | set(vocab.family_alias) | set(vocab.curve_alias) | set(vocab.names)
     keys |= {fold(k) for k, _ in vocab.apis}
     return frozenset(k for k in keys if len(k) >= 3 and k not in vocab.noise)
+
+
+LOCATION_KINDS = ("line", "window", "import", "file", "none", "unread")
+# An import statement, by file extension (a line inside Go's `import ( ... )` block is a quoted path on its own)
+_IMPORT_LINE = {
+    ".java": re.compile(r"^\s*import\s+(static\s+)?[\w.]+(\.\*)?\s*;"),
+    ".py": re.compile(r"^\s*(import\s+[\w.]|from\s+[.\w]+\s+import\s)"),
+    ".go": re.compile(r'^\s*(import\s*(\(|"|[\w.]+\s+")|([\w.]+\s+)?"[\w./-]+"\s*(//.*)?$)'),
+    ".js": re.compile(r"^\s*(import\s|export\s.*\sfrom\s|(const|let|var)\s.*=\s*require\s*\()"),
+    ".c": re.compile(r"^\s*#\s*include\b"),
+    ".rs": re.compile(r"^\s*(pub\s+)?(use\s|extern\s+crate\b)"),
+}
+for _ext, _same in ((".ts", ".js"), (".mjs", ".js"), (".cjs", ".js"), (".jsx", ".js"), (".tsx", ".js"),
+                    (".h", ".c"), (".cc", ".c"), (".cpp", ".c"), (".hpp", ".c")):  # fmt: skip
+    _IMPORT_LINE[_ext] = _IMPORT_LINE[_same]
+
+
+def location_kind(rec, store: SnapshotStore, repo: str, commit: str | None) -> str:
+    """What kind of place a record names (LOCATION_KINDS): `none` no file, `file` a file without a line, `window` a
+    span of several lines, `import` a single line holding an import statement, `line` any other single line (in
+    practice the call or the declaration), `unread` a single line whose file the snapshot does not have here (no
+    mirror and no `--fetch`, or a file missing at the commit)."""
+    if not rec.file:
+        return "none"
+    if not rec.line:
+        return "file"
+    if rec.line_end and int(rec.line_end) > int(rec.line):
+        return "window"
+    files = store.files(repo, commit)
+    text = store.read(repo, commit, rec.file) if files is not None and rec.file in files else None
+    lines = text.splitlines() if text is not None else []
+    if not 1 <= int(rec.line) <= len(lines):
+        return "unread"
+    pattern = _IMPORT_LINE.get(Path(rec.file).suffix.lower())
+    return "import" if pattern and pattern.match(lines[int(rec.line) - 1]) else "line"
 
 
 def trace_record(rec, store: SnapshotStore, repo: str, commit: str | None, tokens: frozenset[str], *, window: int):

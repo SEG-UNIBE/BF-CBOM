@@ -198,8 +198,13 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert int(scores[("algorithm", "cbomkit")]["items"]) >= 11 and scores[("algorithm", "cipherradar")]["items"]
     assert float(scores[("algorithm", "cbomkit")]["rate_pooled"]) >= 0.8  # CBOMkit and CipherRadar agree on micro-java
     assert scores[("algorithm", "cbomkit")]["ds_support"] and scores[("location", "cbomkit")]["items"]
-    assert list(_read_csv(out / "coverage.csv")[0]) == COVERAGE_COLUMNS
-    assert (out / "conformance.csv").read_text(encoding="utf-8").startswith(",".join(CONFORMANCE_COLUMNS))
+    grouping = {(r["dimension"], r["grouping"]): r for r in _read_csv(out / "grouping-run1.csv")}
+    assert grouping[("algorithm", "declared")]["kendall_tau"] in ("", "1.0")  # one ranked tool or the same order
+    assert {g for _, g in grouping} == {"declared", "per-tool", "llm-merged", "engine-merged"}
+    assert list(_read_csv(out / "coverage-run1.csv")[0]) == COVERAGE_COLUMNS
+    assert (out / "conformance-run1.csv").read_text(encoding="utf-8").startswith(",".join(CONFORMANCE_COLUMNS))
+    units = {u["tool"]: u for u in _read_csv(out / "units-run1.csv")}
+    assert units["cbomkit"]["assets"] == _read_csv(out / "coverage-run1.csv")[0]["assets"]  # the same CBOMs
     algos = _read_csv(out / "items-run1.csv")
     assert list(algos[0]) == lv.ITEM_COLUMNS and all(int(a["k_L0"]) <= int(a["k_L4"]) for a in algos)
     levels = _read_csv(out / "matchlevels-run1.csv")
@@ -212,7 +217,7 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert info["rows"]["items-run1.csv"] == len(algos) and info["vocabulary"]["algorithms"]
     summary = (out / "_SUMMARY.md").read_text(encoding="utf-8")
     assert summary.startswith("# exp-tables: analysis summary (run 1)")
-    assert info["voters"]["cipherradar"] == {"voter_group": "grep-rules", "role": "voter", "engine": "opengrep-rules"}
+    assert info["voters"]["cipherradar"] == {"voter_group": "cipherradar", "role": "voter", "engine": "opengrep-rules"}
     sections = ("## Runs", "## What the tools report", "## Micro projects", "## RQ1", "## Voter groups",
                 "## Agreement ladder", "## Matching (RQ3)", "## Scores")  # fmt: skip
     for section in (*sections, "## Files"):

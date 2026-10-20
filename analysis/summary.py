@@ -36,9 +36,9 @@ FILES = {
     "locations",
     "levels-run{k}.csv": "share of each tool's items another voter group confirms, per level L0-L4",
     "units-run{k}.csv": "per tool: assets, records, items and how they relate (records per asset, assets per item)",
-    "coverage.csv": "per tool and dimension: algorithm assets with a value (reported vs derived), and what their "
-    "names are (resolution)",
-    "conformance.csv": "spec issues per tool and kind (assets: field, enum, type, deprecated; documents)",
+    "coverage-run{k}.csv": "per tool and dimension: algorithm assets with a value (reported vs derived), and what "
+    "their names are (resolution)",
+    "conformance-run{k}.csv": "spec issues per tool and kind (assets: field, enum, type, deprecated; documents)",
     "schema-run{k}.csv": "RQ1: one row per CBOM: declared format and version, schema validity, error count and kinds",
     "meaningful-run{k}.csv": "RQ1: per tool, asset type and dimension, assets with a value from standard fields / any",
     "traceability-run{k}.csv": "RQ1: per (snapshot, tool, asset type), records with a file, with a file and line, "
@@ -56,6 +56,8 @@ FILES = {
     "matchers-run{k}.csv": "RQ3: per repository, exact vs RaQuN: common records, groups, co-membership pair Jaccard",
     "score-run{k}.csv": "RQ4: per tool, dimension and level: items, confirmation (CI), exclusivity, rank, Dawid-Skene",
     "loo-run{k}.csv": "RQ4: ranking without each voter group and its Kendall tau against the full ranking",
+    "grouping-run{k}.csv": "RQ4: ranking with every tool its own voter group and with the LLM workers merged, and "
+    "its Kendall tau against the declared voter groups",
     "stability.csv": "per (tool, snapshot) with repeated runs: Jaccard across runs, record-count CV, consensus set",
 }
 
@@ -512,9 +514,39 @@ def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
     return lines + [""]
 
 
+LOCATION_KINDS = ("line", "window", "import", "file", "none", "unread")  # analysis/schema.py:location_kind
+
+
+def _places(units: list[dict]) -> list[str]:
+    """What kind of place each tool's algorithm records name (units-run<k>.csv `loc_<kind>`)."""
+    if not units or f"loc_{LOCATION_KINDS[0]}" not in units[0]:
+        return []
+    table = []
+    for u in units:
+        total = sum(_int(u.get(f"loc_{k}")) for k in LOCATION_KINDS)
+        shares = [_pct(_int(u.get(f"loc_{k}")) / total if total else None) for k in LOCATION_KINDS]
+        table.append([_tool(u), total, *shares])
+    unread = sum(_int(u.get("loc_unread")) for u in units)
+    lines = [
+        "**Places per tool**: the algorithm records by the kind of place they name. `line` = a single line of code "
+        "that is not an import (in practice the call or the declaration), `window` = a span of several lines "
+        "(CryptobomForge's 5-9-line windows), `import` = a single line holding an import statement, `file` = a file "
+        "without a line, `none` = no location, `unread` = a single line whose file the snapshot does not have here. "
+        "Tools that report import lines or windows place the same use elsewhere than tools that report the call: "
+        "the call-site matching window (±2 lines) absorbs only part of that.",
+    ]
+    if unread:
+        lines[0] += (
+            f" {unread} records are `unread`: the snapshot files are on the VM's git mirror (`analysis report` there, "
+            "or `--fetch` for a copied export)."
+        )
+    lines += [""] + md_table(["tool", "records", *LOCATION_KINDS], table) + [""]
+    return lines
+
+
 def _normalisation(units: list[dict], cov: list[dict], conf: list[dict]) -> list[str]:
     """How each tool packages its findings (units-run<k>.csv), then what its assets' names are and which values they
-    carry (coverage.csv, conformance.csv)."""
+    carry (coverage-run<k>.csv, conformance-run<k>.csv); one run of the original variants throughout."""
     if not units and not cov:
         return []
     lines = ["## Normalisation", ""]
@@ -547,6 +579,7 @@ def _normalisation(units: list[dict], cov: list[dict], conf: list[dict]) -> list
         header = ["tool", "CBOMs", "assets", "records", "items", "records per asset (median / max)", "several places",
                   "assets per item", "no location"]  # fmt: skip
         lines += md_table(header, table) + [""]
+        lines += _places(units)
     if cov:
         by_tool: dict[str, dict[str, dict]] = defaultdict(dict)
         for r in cov:
@@ -568,13 +601,16 @@ def _normalisation(units: list[dict], cov: list[dict], conf: list[dict]) -> list
                 + [", ".join(issues.get(tool, [])) or "none"]
             )
         lines += [
-            "**Names and values** (original variants, all repetitions; `coverage.csv`, `conformance.csv`), as "
-            "shares of the algorithm assets. What an asset's name is: `mapped` an algorithm identity (only these "
-            "become items), `ambiguous` a list of candidates, `api` a code identifier, `non-crypto` a rule outside "
-            "cryptography, `undefined` a name nobody understands. Then the share of assets with a value the tool "
-            "gave, from any field, property, name or API context (derived values not counted), and the spec issues: "
-            "assets with a standard-field value the declared version does not allow, by kind; `dialect` and "
-            "`version` count CBOMs.",
+            "**Names and values** (this run, original variants; `coverage-run<k>.csv`, `conformance-run<k>.csv`), as "
+            "shares of the tool's algorithm assets, i.e. of its CBOM's components as a reader of that CBOM finds "
+            "them: a document view, so the shares follow the tool's packaging (a tool that writes one component per "
+            "finding weighs an often-found algorithm more). The packaging-free comparison of parameters across "
+            "tools is per item: the ladder's parameter rows and the scores. What an asset's name is: `mapped` an "
+            "algorithm identity (only these become items), `ambiguous` a list of candidates, `api` a code "
+            "identifier, `non-crypto` a rule outside cryptography, `undefined` a name nobody understands. Then the "
+            "share of assets with a value the tool gave, from any field, property, name or API context (derived "
+            "values not counted), and the spec issues: assets with a standard-field value the declared version does "
+            "not allow, by kind; `dialect` and `version` count CBOMs.",
             "",
         ]
         header = ["tool", "assets", *RESOLUTION_SHOWN, *[d.replace("_", " ") for d in COVERAGE_SHOWN], "spec issues"]
@@ -778,7 +814,7 @@ def _matching(levels: list[dict], groups: list[dict], matchers: list[dict]) -> l
     return lines
 
 
-def _scores(rows: list[dict], loo: list[dict]) -> list[str]:
+def _scores(rows: list[dict], loo: list[dict], grouping: list[dict] | None = None) -> list[str]:
     """RQ4: the ranking per dimension (analysis/score.py)."""
     if not rows:
         return []
@@ -844,6 +880,36 @@ def _scores(rows: list[dict], loo: list[dict]) -> list[str]:
                 "",
             ]
             lines += md_table(["dimension", "lowest tau", "mean tau"], table, "lll") + [""]
+    return lines + _groupings(grouping or [])
+
+
+def _groupings(rows: list[dict]) -> list[str]:
+    """The ranking under other voter groupings (grouping-run<k>.csv): the sensitivity check of the voter groups."""
+    others = [r for r in rows if r["grouping"] != "declared"]
+    if not others:
+        return []
+    names = list(dict.fromkeys(r["grouping"] for r in others))
+    by = {(r["dimension"], r["grouping"]): r for r in rows}
+    table = []
+    for dim in dict.fromkeys(r["dimension"] for r in rows):
+        cells = [dim]
+        for g in names:
+            r = by.get((dim, g))
+            tau = _float(r.get("kendall_tau")) if r else None
+            cells.append(f"{tau:.2f} ({r['voter_groups']} voters)" if tau is not None else "")
+        table.append(cells)
+    algo = by.get(("algorithm", "per-tool"))
+    lines = [
+        "**Other voter groupings:** Kendall's tau between the ranking under the declared voter groups and the ranking "
+        "with every tool its own voter group (`per-tool`: tools sharing their detection logic then confirm each "
+        "other), with the LLM workers as one voter (`llm-merged`) and with the tools of one pattern engine family "
+        "as one voter (`engine-merged`: semgrep and its fork opengrep, whatever their rules); the matcher's groups "
+        "are the same, so a change is the grouping's effect alone (1 = unchanged order; `grouping-run<k>.csv`).",
+        "",
+    ]
+    lines += md_table(["dimension", *names], table, "l" + "l" * len(names)) + [""]
+    if algo and algo.get("ranking"):
+        lines += [f"Algorithm ranking with every tool its own voter: {algo['ranking'].replace(';', ', ')}.", ""]
     return lines
 
 
@@ -948,11 +1014,12 @@ def _voters(info: dict) -> list[str]:
     lines = ["## Voter groups", ""]
     lines += [
         "A tool's finding counts as confirmed only when a tool of *another* voter group reports it too (the ladder, "
-        "the matchers' k and the scores). Tools that run the same engine form one group, so that one engine never "
-        "confirms itself: the same engine packaged twice, or one rule-matching engine (semgrep, and opengrep, its "
-        "fork) running different rule sets. Every other tool is a voter group of its own. The groups are set in "
-        "`common/tools.yaml` (`voter_group`, "
-        "by `engine`); they are BF-CBOM's decision, made when the tools were integrated.",
+        "the matchers' k and the scores). Tools that share their detection logic (the same engine packaged twice, "
+        "or the same rules) form one group, so that the same logic never confirms itself; every other tool is a "
+        "voter group of its own. Tools that share only a pattern engine but run independently written rules count "
+        "apart: their rule sets were checked and share no rule. The groups are BF-CBOM's decision, set in "
+        '`common/tools.yaml` (`voter_group`) with the evidence in `analysis/README.md` ("Voter groups"); the '
+        "scores also rank the tools under other groupings.",
         "",
     ]
     if shared:
@@ -1202,12 +1269,12 @@ def render(analysis_dir: Path, *, run: int = 1) -> str:
     lines += _reported(rows("runs.csv"), run)
     lines += _negatives(rows("runs.csv"), run)
     lines += _micro(rows("micro-run{k}.csv"), rows("micro-items-run{k}.csv"))
-    lines += _normalisation(rows("units-run{k}.csv"), rows("coverage.csv"), rows("conformance.csv"))
+    lines += _normalisation(rows("units-run{k}.csv"), rows("coverage-run{k}.csv"), rows("conformance-run{k}.csv"))
     lines += _rq1(rows("schema-run{k}.csv"), rows("meaningful-run{k}.csv"), rows("traceability-run{k}.csv"))
     lines += _voters(info)
     lines += _ladder(rows("levels-run{k}.csv"))
     lines += _matching(rows("matchlevels-run{k}.csv"), rows("groups-exact-run{k}.csv"), rows("matchers-run{k}.csv"))
-    lines += _scores(rows("score-run{k}.csv"), rows("loo-run{k}.csv"))
+    lines += _scores(rows("score-run{k}.csv"), rows("loo-run{k}.csv"), rows("grouping-run{k}.csv"))
     lines += _stability(rows("stability.csv"))
     lines += _mutation(rows("mutants.csv"), rows("mutation.csv"), rows("mutation-rates.csv"))
     lines += _llm(rows("runs.csv"), rows("score-run{k}.csv"))

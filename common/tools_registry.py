@@ -59,11 +59,16 @@ def role(voter_of: dict[str, str] | None, tool: str) -> str:
 
 
 def voter_groups(
-    tools: dict[str, dict] | None = None, *, merge_llm: bool = False, observers_vote: bool = False
+    tools: dict[str, dict] | None = None,
+    *,
+    merge_llm: bool = False,
+    observers_vote: bool = False,
+    engine_family: bool = False,
 ) -> VoterMap:
     """tool -> voter group (`voter_group`, else the tool itself). Tools of one group share an engine or rule set and
     count as one voter (RQ4). With `merge_llm`, tools that declare a `merge_group` (the LLM workers: shared prompts
-    and file selection) are merged into it, the sensitivity analysis of CLAUDE.md Phase 2. The observers ride along
+    and file selection) are merged into it, the sensitivity analysis of CLAUDE.md Phase 2; with `engine_family`, tools
+    sharing a pattern engine family are merged (the `engine-merged` ranking). The observers ride along
     (`VoterMap.observers`); `observers_vote` makes them voters (the sensitivity check of the observer role)."""
     tools = tools if tools is not None else load_tools()
     out = {}
@@ -71,6 +76,8 @@ def voter_groups(
         group = str(info.get("voter_group") or tool)
         if merge_llm and info.get("merge_group"):
             group = str(info["merge_group"])
+        if engine_family and info.get("engine_family"):
+            group = str(info["engine_family"])
         out[tool] = group
     return VoterMap(out, frozenset() if observers_vote else observers(tools))
 

@@ -174,3 +174,39 @@ def test_traceability_weak_and_strong(tmp_path):
         [(meta, Path("o__r@x/original/t/run1.json"), n)], SnapshotStore(tmp_path / "a", tmp_path / "b"), languages={}
     )[0]
     assert none["source"] is None and none["file_exists"] is None and none["share_weak"] is None
+
+
+class _FakeStore:
+    """A snapshot with a few files in memory (SnapshotStore's files/read)."""
+
+    def __init__(self, files: dict[str, str]):
+        self._files = files
+
+    def files(self, repo, commit):
+        return frozenset(self._files)
+
+    def read(self, repo, commit, path):
+        return self._files.get(path)
+
+
+def test_location_kind_tells_calls_from_imports_windows_and_missing_places():
+    from types import SimpleNamespace
+
+    java = ["package p;", "import java.security.MessageDigest;", 'class A { void f() { md("SHA"); } }']
+    python = ["from cryptography.hazmat.primitives import hashes", "import hashlib", "hashlib.sha256(b'x')"]
+    go = ["package a", "", "import (", '\tcrand "crypto/rand"', '\t"crypto/sha256"', ")", "", "var names = []string{"]
+    go += ['\t"x",', "}", "", "func f() { sha256.Sum256(nil) }"]
+    store = _FakeStore({"A.java": "\n".join(java), "a.py": "\n".join(python), "a.go": "\n".join(go)})
+
+    def kind(file=None, line=None, line_end=None):
+        return schema.location_kind(SimpleNamespace(file=file, line=line, line_end=line_end), store, "o/r", "c")
+
+    assert kind() == "none" and kind("a.py") == "file" and kind("a.py", 1, 3) == "window"
+    assert [kind("A.java", n) for n in (2, 3)] == ["import", "line"]
+    assert [kind("a.py", n) for n in (1, 2, 3)] == ["import", "import", "line"]
+    assert [kind("a.go", n) for n in (3, 4, 5, 9, 12)] == ["import", "import", "import", "line", "line"]
+    assert kind("missing.py", 1) == "unread" and kind("a.py", 99) == "unread"
+    assert (
+        schema.location_kind(SimpleNamespace(file="a.py", line=1, line_end=None), SnapshotStore(), "o/r", None)
+        == "unread"
+    )

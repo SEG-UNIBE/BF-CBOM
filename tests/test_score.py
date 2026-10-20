@@ -200,3 +200,20 @@ def test_observers_are_confirmed_but_confirm_nobody_and_change_no_voter_number()
     voting, _ = scored(VoterMap(VOTERS), True)  # --observers-vote: o is a voter like any other
     assert (voting[("algorithm", "a")]["confirmed"], voting[("algorithm", "c")]["confirmed"]) == (2, 1)
     assert voting[("algorithm", "o")]["role"] == "voter" and voting[("algorithm", "o")]["rank"] is not None
+
+
+def test_grouping_rows_rank_again_with_every_tool_its_own_voter():
+    # a and a2 share a voter group: a2's RSA is confirmed only once they count apart
+    recs = [_rec(0, "a", "RSA"), _rec(1, "a2", "RSA"), _rec(2, "b", "AES"), _rec(3, "c", "AES")]
+    ran = {"s1": {"a", "a2", "b", "c"}}
+
+    def obs(voters):
+        groups = {"s1": ExactMatcher(level="L3", voter_of=voters).match(recs)}
+        return sc.observe(groups, level="L3", voter_of=voters, tools_ran=ran, repo_of={"s1": "o/s1"})
+
+    declared, per_tool = obs(VOTERS), obs({t: t for t in VOTERS})
+    assert sc.confirmation(declared, "algorithm")["a2"] == (1, 0, 1)
+    assert sc.confirmation(per_tool, "algorithm")["a2"] == (1, 1, 0)
+    rows = {r["grouping"]: r for r in sc.grouping_rows({"declared": declared, "per-tool": per_tool}, **LOW)}
+    assert (rows["declared"]["voter_groups"], rows["per-tool"]["voter_groups"]) == (3, 4)
+    assert rows["declared"]["kendall_tau"] == 1.0 and rows["per-tool"]["ranking"][:2] == ["a", "a2"]

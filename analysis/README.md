@@ -23,7 +23,7 @@ as 13,996).
 
 | Unit | What it is | Identified by | Counted in |
 |---|---|---|---|
-| **asset** | one crypto asset component of a CBOM, as the tool wrote it | `component_index` in the CBOM | RQ2 (what the tools report), RQ1 meaningful, the normalisation section (`units-run<k>.csv`, `coverage.csv`, `conformance.csv`, `normalize.json`) |
+| **asset** | one crypto asset component of a CBOM, as the tool wrote it | `component_index` in the CBOM | RQ2 (what the tools report), RQ1 meaningful, the normalisation section (`units-run<k>.csv`, `coverage-run<k>.csv`, `conformance-run<k>.csv`), `normalize.json` |
 | **record** | one occurrence of an asset: an asset found at five lines gives five records, an asset without occurrences one record without a location | `record_id` = `<tool>:<component>:<occurrence>`, its location `site_id` = `<tool>:<file>:<line>` | `records-run<k>.csv`, `units-run<k>.csv`, RQ1 traceability, the matchers' clusters and call-site groups (`members-*.csv`) |
 | **item** | one algorithm in one repository (snapshot and variant): one distinct L4 identity, however many assets and records of a tool carry it; a tool reports the item when one of its `mapped` records has that identity | algorithm: (snapshot, unit); parameter: (snapshot, unit, value); location: (snapshot, unit, file:line) | the ladder (`levels-`, `items-run<k>.csv`), the scores, stability, the tools-per-item distribution, E4 |
 
@@ -37,6 +37,21 @@ as 13,996).
   CBOMkit lists an algorithm once with its occurrences, CipherRadar writes one component per finding. Asset and
   record counts therefore describe a tool's output, item counts what it reports. Every tool's format: "Packaging per
   tool" below; an experiment's numbers: its `units-run<k>.csv`.
+- **Harmonised packaging.** Nothing that compares tools sees their packaging: every comparison first collapses a
+  tool's records into one canonical unit, so 800 occurrences or 800 components of one algorithm count once. The
+  ladder, the exact matcher's repo-level groups and the scores count items, (item, value) pairs and (item, site)
+  pairs (a site = file and line; the call-site groups chain located records within the window); RaQuN's elements are
+  a tool's distinct attribute sets per repository (`matchers/raqun.py`: records with the same canonical values are
+  one element, so AES-128 and AES-256 are two). Packaging shows only where a table describes the tool's own document:
+  RQ2's asset counts as written, RQ1's meaningful shares, the normalisation section's names and values (shares of
+  components, as a reader of the CBOM finds them), and, by design, `units-run<k>.csv`, which measures it.
+- **Kinds of place.** Tools also differ in what a place is, and every record says which kind it names
+  (`location_kind` in `records-run<k>.csv`, per tool in `units-run<k>.csv` and the summary's "Places per tool";
+  `schema.py:location_kind`): `line` a single line of code that is not an import (in practice the call or the
+  declaration), `window` a span of several lines, `import` a single line holding an import statement, `file` a file
+  without a line, `none` no location, `unread` a single line whose file the snapshot files available to the
+  analysis do not hold (the VM's mirror has them; `--fetch` for a copied export). A tool that reports the import
+  line places the same use elsewhere than one that reports the call, which the ±2-line window absorbs only in part.
 - **Two more words.** A *unit* is an L4 identity: the identity of an item (the `unit` column of
   `items-run<k>.csv`) and the expected value of an E4 mutant (`expected.unit`). A *site* is a record's file and line
   (call-site level, refinement 1). The micro ground truth's entries are *expected items* at site level, a known
@@ -118,6 +133,49 @@ never counts in k, exclusivity or Dawid-Skene, and an observer is never ranked. 
 same with and without them (a test checks it), and `--observers-vote` turns them into voters for the sensitivity
 check. One predicate decides it everywhere (`common/tools_registry.py:votes`).
 
+### Voter groups
+
+A tool's finding counts as confirmed only when a tool of another voter group reports it too (the ladder, the
+matchers' k, the scores). What makes two tools' votes dependent is shared detection logic: the same engine packaged
+twice, the same rules, the same prompts and file selection. A shared pattern engine running rules written
+independently is not: the rules decide what is found, the engine only runs them. The groups (`voter_group` in
+`common/tools.yaml`, one per tool by default):
+
+| Voter group | Tools | Shared detection logic | Evidence |
+|---|---|---|---|
+| cbomkit | CBOMkit, cbomkit-jar | the same sonar-cryptography engine, as a server image and as the action jar | the engine versions recorded in `tools.yaml` and the runs |
+| one each | securin-xbom, CipherRadar, SCANOSS | only a pattern engine (semgrep; opengrep, its fork); the rules are their own | the rule-overlap check below |
+| one each | DeepSeek, ChatGPT, Claude | our prompts and file selection, not the model | `--merge-llm` merges them (sensitivity) |
+| one each | every other tool | none | its own engine |
+
+Observers have groups of their own but confirm nobody (above).
+
+**Rule-overlap check** (2026-10-20, `misc/rule_overlap.py`, the rules at the commits the workers pin), per language
+both tools of a pair scan:
+
+| Pair | Language | Rules | Identical patterns | Rules sharing a pattern | Near-identical rules | Shared ids, messages |
+|---|---|---:|---:|---:|---:|---:|
+| securin-xbom, CipherRadar | Java | 82, 75 | 0 | 0, 0 | 0 | 0, 0 |
+| securin-xbom, CipherRadar | Python | 11, 34 | 0 | 0, 0 | 0 | 0, 0 |
+| CipherRadar, SCANOSS | Go | 19, 187 | 3 | 3, 3 | 0 | 0, 0 |
+| CipherRadar, SCANOSS | JavaScript | 18, 20 | 0 | 0, 0 | 0 | 0, 0 |
+
+The three identical Go patterns are bare API names any rule author writes (`bcrypt.GenerateFromPassword($V, $V)`,
+`tls.VersionTLS10`, `tls.VersionTLS11`); "near-identical" means a token Jaccard of at least 0.8 between two rules'
+patterns. securin-xbom (Java, Python) and SCANOSS (Go, C, JavaScript, Rust with its open rules) scan no common
+language, so they never meet. No rule set names another as its source, and CipherRadar runs a tree-sitter and a
+YARA-X pass besides its rules. Until 2026-10-20 the three were one voter group `grep-rules`, a conservative choice by
+the shared engine; the check showed that it rested on the engine alone, so they count apart since.
+
+**Sensitivity.** Every report ranks the tools again under other groupings (`grouping-run<k>.csv`, the summary's
+"Other voter groupings", Kendall's tau against the declared ranking): `per-tool` (every tool its own voter, so
+CBOMkit and cbomkit-jar confirm each other), `llm-merged` (the LLM workers as one voter) and `engine-merged` (the
+tools of one pattern engine family as one voter: `engine_family` in `tools.yaml`, the former `grep-rules`); next to
+it leave-one-voter-out. **Planned with E4:** whether two tools miss the same inserted items more often than chance
+(conditional dependence given the truth, the assumption behind independent voters and Dawid-Skene); tools with
+strongly correlated misses share a blind spot and would be one voter. Agreement on unlabelled data cannot decide
+this, since two tools also agree when both are right.
+
 ### What a record's name amounts to (`resolution`)
 
 | Value | Meaning | Example | Algorithm item? |
@@ -128,8 +186,8 @@ check. One predicate decides it everywhere (`common/tools_registry.py:votes`).
 | `non-crypto` | a finding outside cryptography reported as an asset | securin-xbom's `...sqli.jpa-sqli` | no |
 | `undefined` | a name nobody can read | `0`, `UNKNOWN`, `Sig` | no |
 
-The shares of each tool's algorithm assets are RQ2 results (the summary's normalisation table, `coverage.csv`,
-`normalize.json`; per record in `records-run<k>.csv`). Only `mapped` records enter the ladder and the scores.
+The shares of each tool's algorithm assets are RQ2 results (the summary's normalisation section,
+`coverage-run<k>.csv`; per record in `records-run<k>.csv`). Only `mapped` records enter the ladder and the scores.
 
 ## The ladder, by example
 
