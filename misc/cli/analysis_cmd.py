@@ -41,8 +41,8 @@ from common.experiment import (
     experiment_dir,
     is_experiment,
     iter_results,
-    load_lock,
     load_mutants,
+    pinned_repos,
     spec_path,
 )
 from common.tools_registry import load_tools, tailored_map, voter_groups
@@ -220,12 +220,12 @@ def norm_path(cbom_path: Path) -> Path:
 
 def _store(exp_dir: Path, *, fetch: bool = False) -> SnapshotStore:
     """The snapshot files behind the experiment: the git mirror on the VM, or the local cache (`--fetch` fills it
-    from lock.json's source URLs)."""
+    with the pinned commits of `_experiment.yaml` from their source URLs; fixtures are published, not fetched)."""
     store = SnapshotStore()
     if fetch:
-        for name, entry in sorted(load_lock(exp_dir).items()):
-            if entry.get("commit") and entry.get("source_url"):
-                store.fetch(name, entry["source_url"], entry["commit"], log=lambda m: typer.echo(m, err=True))
+        for name, repo in sorted(pinned_repos(exp_dir).items()):
+            if repo.commit and not repo.is_fixture:
+                store.fetch(name, repo.source_url, repo.commit, log=lambda m: typer.echo(m, err=True))
     return store
 
 
@@ -296,15 +296,17 @@ def _writer(out_dir: Path, counts: dict[str, int]) -> Writer:
 def _normalize_step(
     exp_dir: Path, write: Writer, *, store: SnapshotStore | None = None
 ) -> tuple[Report, list[Normalized]]:
-    """Normalise every stored ok CBOM (all repetitions): run<k>.norm.json next to each, normalize.json, vocab.csv,
-    coverage.csv and conformance.csv. Returns the report and the normalised CBOMs."""
+    """Normalise every stored ok CBOM (all repetitions, mutants included): run<k>.norm.json next to each, and over
+    the original variants normalize.json, vocab.csv, coverage.csv and conformance.csv (a mutated repository would
+    count once per mutant). Returns the report and the normalised CBOMs."""
     report = Report()
     done: list[Normalized] = []
     fallback: set[str] = set()
     for meta, cbom_path, n in _normalize_runs(exp_dir, store=store, mutants=True):
         _write_json(norm_path(cbom_path), n.to_dict())
-        report.add(n)
         done.append((meta, cbom_path, n))
+        if _original(done[-1]):
+            report.add(n)
         if n.adapter.get("fallback"):
             fallback.add(n.tool)
     if not done:
@@ -680,10 +682,10 @@ def normalize(name: str = EXP_ARG):
     exp_dir = _experiment(name)
     counts: dict[str, int] = {}
     report, done = _normalize_step(exp_dir, _writer(analysis_dir(exp_dir), counts))
-    typer.echo("algorithm records with a value reported by the tool (not derived):")
+    typer.echo("algorithm assets of the original variants: mapped to an algorithm, with a value the tool reported:")
     for line in report.summary_lines():
         typer.echo("  " + line)
-    typer.echo(f"{len(done)} CBOMs normalised (run<k>.norm.json next to each), in {exp_dir / 'analysis'}")
+    typer.echo(f"{len(done)} CBOMs normalised (run<k>.norm.json next to each), in {analysis_dir(exp_dir)}")
 
 
 @analysis_app.command("levels")

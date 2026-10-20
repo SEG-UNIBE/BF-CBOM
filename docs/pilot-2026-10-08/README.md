@@ -8,7 +8,7 @@ builds on. The raw tool outputs, logs and the private session transcripts were n
 | kept where | what |
 |---|---|
 | `corpus/micro/<language>/` + `corpus/micro/ground_truth.yaml` | the five hand-written micro projects (Java, Python, Go, JavaScript, C; 11 assets each) and their ground truth, machine-readable |
-| `corpus/pilot-2026-10-08.yaml` | the 16 real projects at the commits scanned then (full SHAs) |
+| `corpus/pilot-2026-10-08.yaml` | 12 of the 16 real projects (those in Java, Python and Go; the other four removed 2026-10-20) at the commits scanned then (full SHAs) |
 | `analysis/data/families.yaml`, `analysis/sites.py`, `analysis/match.py`, `analysis/groundtruth.py` | the family table, the location-aware matcher (same file, line ±2, compatible family, unknown matches nothing) and the micro scoring, ported to BF-CBOM's result layout |
 | `tests/fixtures/pilot/` | CBOMkit, pqcheck and CipherRadar outputs on the micro projects (open tools only), used as regression fixtures |
 | `common/tools.yaml` | engine families, per-language scope, pilot verdicts and the candidate tools |

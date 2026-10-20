@@ -27,7 +27,7 @@ experiment.
 | `e0-llm-smoke.yaml` | deepseek | 1 | the code-reading LLM worker on its own (needs `DEEPSEEK_API_KEY`) |
 | `e0-phase2-smoke.yaml` | deepseek, cryptoscan | 2 | the Phase 2 workers together |
 | `e0-micro.yaml` | all thirteen generators | 5 micro projects (`corpus/micro`) | inclusion check against the hand-written ground truth; analyse with `make analysis ARGS="report e0-micro"` (or only `"micro e0-micro"`) |
-| `e1-pilot-corpus.yaml` | all thirteen generators | 16 real projects (`corpus/pilot-2026-10-08.yaml`) | first real workload: location-aware agreement on the pilot's pinned projects; large repos (Kafka, Keycloak) push CBOMkit towards its timeout |
+| `e1-pilot-corpus.yaml` | all thirteen generators | the 12 pilot projects in Java, Python and Go (`corpus/pilot-2026-10-08.yaml`) | first real workload: location-aware agreement on the pilot's pinned projects; large repos (Kafka, Keycloak) push CBOMkit towards its timeout |
 | `e1-icpc-corpus.yaml` | all thirteen generators | 23 projects of the ICPC 2026 paper (`corpus/icpc-2026.yaml`, HEAD of 2026-10-18) | held-out counterpart of the pilot corpus: none of these repos was used to tune the vocabulary, the specs or CipherSift; six are marked `expect_crypto: low` (negative cases) |
 | `e0-stability.yaml` | all thirteen generators, 3 repetitions | 5 micro projects + the 10 fastest pilot repos | E0: run-to-run variance (`stability.csv`), consensus sets for the scores; 585 jobs |
 | `e4-mutation-smoke.yaml` | every non-LLM generator | pyjwt, jjwt, golang-jwt (pilot), 3 mutants each | the mutation harness end to end: the RSA-2048 keygen inserted in each style; CBOMkit and CryptoScan should find the direct one at its line (`mutation.csv`) |
@@ -49,7 +49,7 @@ corpus: corpus.yaml        # optional: repos from a corpus file (relative to thi
 repos:                     # and/or explicit repos
   - full_name: authlib/authlib
     git_url: https://github.com/authlib/authlib.git   # default: GitHub
-    branch: main           # default: main (resolved once, then frozen in lock.json)
+    branch: main           # default: main (resolved once, then frozen in the experiment's _experiment.yaml)
     commit: <40-hex sha>   # optional pin; otherwise resolved with git ls-remote on first run
     language: Python       # helps language-specific tools
     expect_crypto: low     # optional corpus metadata for the analysis (a negative case: little crypto expected)
@@ -64,14 +64,14 @@ mutation:                  # optional: every repo also gets insertion mutants as
   seed: 1
 ```
 
-Rerunning a spec is resumable: runs whose `run<k>.meta.json` exists are skipped, commits come from
-`lock.json`, and jobs still pending from an interrupted run are collected (`--requeue-pending` to reissue).
+Rerunning a spec is resumable: runs whose `run<k>.meta.json` exists are skipped, commits come from the
+experiment's `_experiment.yaml` (below), and jobs still pending from an interrupted run are collected (`--requeue-pending` to reissue).
 `ARGS=--retry-failed` redoes stored runs whose status is not `ok`; `--rerun <tool>[,<tool>]` redoes every stored run
 of those tools, whatever its status (after a worker change, e.g. `--rerun deepseek,cryptobomforge`).
 `ARGS=--overwrite-old` runs the whole spec afresh: it first removes every stored run (CBOMs, meta files, unsupported
-marks, normalised CBOMs, also of tools and repos the spec no longer names, since the analysis reads whatever is
-stored) and the old `_ANALYSIS/`, and cancels jobs an earlier run left pending. `lock.json` stays, so the same commits
-are scanned, and `_run-log.json` keeps the earlier sessions (the new one records `runs_overwritten`). Nothing is
+marks, normalised CBOMs, also of tools and repos the spec no longer names, which nothing reads any more) and the
+old `_ANALYSIS/`, and cancels jobs an earlier run left pending. `_experiment.yaml` keeps its commits, so the
+same snapshots are scanned, and `_run-log.json` keeps the earlier sessions (the new one records `runs_overwritten`). Nothing is
 removed when the spec or a snapshot fails to resolve. For fresh pins, `make experiment-delete NAME=<exp>` first.
 
 **Mutants (`mutation:`, Phase 4).** For every repo of a spec with a `mutation:` block the runner makes `per_repo`
@@ -80,17 +80,28 @@ insertion mutants before anything is enqueued (`mutation/mutants.py`): one catal
 has a caller (or a `main`), committed on the pinned commit as the branch `bfcbom/ins-<snippet>-<style>-<hash>` of the
 base mirror and scanned like any variant. A snippet only goes where its library is already declared (pyca
 `cryptography` for Python's asymmetric and AES snippets, Go 1.24 or `golang.org/x/crypto` for Go's PBKDF2); dependency
-files are never edited. `mutants.json` pins the mutants like `lock.json` pins the commits: a resumed or
+files are never edited. `mutants.json` pins the mutants like `_experiment.yaml` pins the commits: a resumed or
 `--overwrite-old` run keeps them (a changed `mutation:` block is ignored with a note) and rebuilds missing branches
 with the same SHA from the recorded inserts. Per mutant it records the snippet, style, catalog version, file, host
 (name, line, number of callers by name), the line naming the algorithm (`call_line`), the related lines, the inserted
 spans, the line shifts, the inserts, the expected record and the patch. Repos without a catalog language or a host get
 none, with a note.
 
-**What an experiment folder holds.** `_experiment.yaml` (the spec as run), `_run-log.json` (one entry per
+**Which repos an experiment used** is answered by one file, its record `_experiment.yaml`: the spec as run, every
+repo with the branch and commit it was resolved to (a fixture with its `path` and published commit), the tools, the
+repetitions and the `mutation:` block. `experiment run` writes it once the snapshots resolve (a failing resolve leaves
+the old record), and the next run keeps its commits for every repo the spec still names, so a resumed experiment never
+moves to a newer upstream commit; a repo the spec dropped leaves the record, and `mutants.json` holds the mutants of
+exactly the record's repos. The runner's overview and the analysis read only the stored runs of the repos, tools and
+repetitions the record names (`common/experiment.py:iter_results`), so a run stored under an earlier version of the
+spec never reaches a table; the `_SUMMARY.md` header repeats the counts. The record is itself a fully pinned spec:
+`experiment run` on it replays exactly those snapshots. The spec in `experiments/` and its corpus file are the input
+that produced it; an export carries the record.
+
+**What an experiment folder holds.** `_experiment.yaml` (the record, above), `_run-log.json` (one entry per
 `experiment run` / `collect` session: start and end, the Docker VM's RAM and CPUs, the memory budget and waves, and the
 peak RAM in use on the VM, sampled every 2 s), `_ANALYSIS/` (the derived tables and `_SUMMARY.md`, regenerated by
-`analysis report`), `lock.json`, `mutants.json` (with a `mutation:` block) and one folder per snapshot, with one
+`analysis report`), `mutants.json` (with a `mutation:` block) and one folder per snapshot, with one
 subfolder per variant (`original` and the mutants). The leading underscores keep the first three on top of a
 file listing. Every `run<k>.meta.json` also records the worker container's peak working set during the job (sampled
 every second, the figure `docker stats` shows), its memory limit and the OOM kills during the job (`peak_memory_mb`,
@@ -261,8 +272,8 @@ spec, as described in [Normalisation](#normalisation). It writes:
 | `<snapshot>/<variant>/<tool>/run<k>.norm.json` | next to `run<k>.json`: declared format/version, adapter spec and versions, the original's sha256 (detects a stale file), stats, the records |
 | `analysis/normalize.json` | per tool: formats declared, records per asset type, fill rate per dimension (reported vs derived), where values came from (standard field, property, occurrence, name, API context), spec issues, conflicts, top unmapped values |
 | `_ANALYSIS/vocab.csv` | one row per (tool, source, raw value): status (`mapped`, `partial`, `unmapped`, `ambiguous`, `known`, or the entry's `kind`: `api`, `non-crypto`), what it mapped to, leftover tokens, via, interpretive, kind, count; the reviewable mapping table |
-| `_ANALYSIS/coverage.csv` | one row per (tool, dimension): algorithm records, values the tool reported vs values we derived, as counts and shares (fill-rate heatmaps) |
-| `_ANALYSIS/conformance.csv` | one row per (tool, scope, issue kind): `record` scope counts values read from standard fields that break the declared version's schema (field, enum, type, deprecated), `document` scope counts CBOMs (dialect, version); tools without issues have no row |
+| `_ANALYSIS/coverage.csv` | one row per (tool, dimension), over the original variants: algorithm assets (CBOM components) with a value the tool reported vs only one we derived, as counts and shares of the assets (fill-rate heatmaps); every row also carries the tool's `assets`, their `records` (occurrences) and the assets per resolution (`mapped`, `ambiguous`, `api`, `non-crypto`, `undefined`) |
+| `_ANALYSIS/conformance.csv` | one row per (tool, scope, issue kind): `asset` scope counts assets with a value read from standard fields that break the declared version's schema (field, enum, type, deprecated), `document` scope counts CBOMs (dialect, version); tools without issues have no row |
 
 **`schema <exp>`** answers RQ1 (`analysis/schema.py`): every CBOM that declares a CycloneDX version with a vendored
 schema (1.6, 1.7) is validated as a whole document with `jsonschema` (offline, `referencing` registry), reported per
@@ -440,7 +451,7 @@ algos.drop_duplicates(["snapshot", "variant", "algorithm"])["k_L3"].value_counts
 ```
 
 **Export.** The analysis files live inside the experiment folder, so the normal export takes them along together with
-the spec, `lock.json`, every CBOM and its meta file. The export runs `analysis report` first, so the tables and
+the record, every CBOM and its meta file. The export runs `analysis report` first, so the tables and
 `_ANALYSIS/_SUMMARY.md` in the zip match the stored runs (`ARGS=--no-report` skips it):
 
 ```

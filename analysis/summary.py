@@ -23,7 +23,8 @@ from common.experiment import load_run_log, spec_path
 SUMMARY_FILE = "_SUMMARY.md"
 LANGUAGE_ORDER = ["java", "python", "go", "javascript", "typescript", "c", "cpp"]
 LEVEL_ORDER = ("L0", "L1", "L2", "L3", "L4")
-COVERAGE_SHOWN = ["family", "key_size", "mode", "padding", "curve", "digest", "location"]
+RESOLUTION_SHOWN = ["mapped", "ambiguous", "api", "non-crypto", "undefined"]  # analysis/normalize/engine.RESOLUTIONS
+COVERAGE_SHOWN = ["key_size", "mode", "padding", "curve", "digest"]
 FILES = {
     "runs.csv": "one row per stored run, all repetitions (status, duration, tool version, raw CBOM counts by asset "
     "type, LLM tokens and costs)",
@@ -32,8 +33,9 @@ FILES = {
     "micro-assets-run{k}.csv": "one row per (micro project, tool, asset): found at call site (strict, lenient), repo",
     "algorithms-run{k}.csv": "one row per (repo, level L0-L4, tool, algorithm): what each tool reports, no locations",
     "levels-run{k}.csv": "share of each tool's algorithms another voter group confirms, per level L0-L4",
-    "coverage.csv": "fill rate of the algorithm records per tool and dimension (reported vs derived)",
-    "conformance.csv": "spec issues per tool and kind (records: field, enum, type, deprecated; documents)",
+    "coverage.csv": "per tool and dimension: algorithm assets with a value (reported vs derived), their records and "
+    "resolutions",
+    "conformance.csv": "spec issues per tool and kind (assets: field, enum, type, deprecated; documents)",
     "schema-run{k}.csv": "RQ1: one row per CBOM: declared format and version, schema validity, error count and kinds",
     "meaningful-run{k}.csv": "RQ1: per tool, asset type and dimension, assets with a value from standard fields / any",
     "traceability-run{k}.csv": "RQ1: per (snapshot, tool, asset type), records with a file, with a file and line, "
@@ -156,7 +158,8 @@ def _header(spec: dict, info: dict, run: int) -> list[str]:
     when = info.get("generated_at") or datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
     lines.append(
         f"Generated {when} by `analysis report`: {len(repos)} repos, {len(tools)} tools, "
-        f"{spec.get('repetitions', 1)} repetition(s). Vocabulary {vocab.get('algorithms', '?')}, "
+        f"{spec.get('repetitions', 1)} repetition(s), as listed with their commits in `_experiment.yaml`. "
+        f"Vocabulary {vocab.get('algorithms', '?')}, "
         f"CycloneDX registry {vocab.get('registry', '?')}."
     )
     lines += ["The data behind every table are the CSV files listed at the end (`;` joins lists inside a cell).", ""]
@@ -511,19 +514,30 @@ def _coverage(cov: list[dict], conf: list[dict]) -> list[str]:
     for tool in sorted(by_tool):
         dims = by_tool[tool]
         first = next(iter(dims.values()))
+        assets = _int(first["assets"])
         table.append(
-            [tool, first["cboms"], first["algorithm_records"]]
+            [tool, first["cboms"], assets, first["records"]]
+            + [_pct(_int(first[k]) / assets if assets else None) for k in RESOLUTION_SHOWN]
             + [_pct(dims.get(d, {}).get("reported_share")) for d in COVERAGE_SHOWN]
             + [", ".join(issues.get(tool, [])) or "none"]
         )
     lines = ["## Normalisation", ""]
     lines += [
-        "Share of the algorithm records (all repetitions) with a value the tool reported, per dimension, and the "
-        "spec issues of the values read from standard fields (RQ1, a first check; full schema validation to do).",
+        "What the normaliser makes of each tool's algorithm assets (original variants, all repetitions). `assets` = "
+        "CBOM components of asset type algorithm (as in the RQ2 table for one run); `records` = their occurrences, "
+        "one normalised record each, the unit the matchers work on. The shares are of the assets. What an asset's "
+        "name is: `mapped` an algorithm identity (only these are items in the ladder, the matchers and the scores), "
+        "`ambiguous` a list of candidates, `api` a code identifier, `non-crypto` a rule outside cryptography, "
+        "`undefined` a name nobody understands. Then the share of assets with a value the tool gave, from any field, "
+        "property, name or API context (derived values not counted), and the spec issues: assets with a "
+        "standard-field value the declared version does not allow, by kind; `dialect` and `version` count CBOMs.",
         "",
     ]
-    header = ["tool", "CBOMs", "algorithm records", *[d.replace("_", " ") for d in COVERAGE_SHOWN], "spec issues"]
-    lines += md_table(header, table, "lrr" + "r" * len(COVERAGE_SHOWN) + "l")
+    header = [
+        "tool", "CBOMs", "assets", "records", *RESOLUTION_SHOWN, *[d.replace("_", " ") for d in COVERAGE_SHOWN],
+        "spec issues",
+    ]  # fmt: skip
+    lines += md_table(header, table, "lrrr" + "r" * (len(RESOLUTION_SHOWN) + len(COVERAGE_SHOWN)) + "l")
     return lines + [""]
 
 

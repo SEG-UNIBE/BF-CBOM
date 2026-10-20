@@ -15,6 +15,41 @@ reports, not defects to repair before the analysis starts. Normalisation is unav
 done in steps (the ladder), and the raw reality (L0, L1) is reported next to the best effort (L4). Nothing is ever
 guessed: a name nobody can read stays `undefined` and never becomes an item that another tool could confirm.
 
+## Units: asset, record, item
+
+Every table counts one of three units. They differ by orders of magnitude for the same output, so a number is only
+readable with its unit (the normalisation table counted records until 2026-10-20 and showed CryptoScan's 199 assets
+as 13,996).
+
+| Unit | What it is | Identified by | Counted in |
+|---|---|---|---|
+| **asset** | one crypto asset component of a CBOM, as the tool wrote it | `component_index` in the CBOM | RQ2 (what the tools report), RQ1 meaningful, the normalisation table (`coverage.csv`, `conformance.csv`, `normalize.json`) |
+| **record** | one occurrence of an asset: an asset found at five lines gives five records, an asset without occurrences one record without a location | `record_id` = `<tool>:<component>:<occurrence>`, its location `site_id` = `<tool>:<file>:<line>` | `records-run<k>.csv`, RQ1 traceability, the matchers' clusters and call-site groups (`members-*.csv`) |
+| **item** | one algorithm in one repository (snapshot and variant): one distinct L4 identity, however many assets and records of a tool carry it; a tool reports the item when one of its `mapped` records has that identity | algorithm: (snapshot, unit); parameter: (snapshot, unit, value); location: (snapshot, unit, file:line) | the ladder (`levels-`, `algorithms-run<k>.csv`), the scores, stability, the tools-per-algorithm distribution, E4 |
+
+- **Asset to record.** The normaliser writes one record per (component, occurrence) (`normalize/record.py`), and
+  the values sit on the record, since occurrence evidence has the highest precedence. A component's records nearly
+  always agree; where occurrences carry their own key size or curve (CryptoScan), one asset yields several items.
+- **Record to item.** Only `mapped` records have an item (the `resolution` table below): an `api`, `ambiguous`,
+  `non-crypto` or `undefined` record counts as an asset and a record, never as an item. Records of the same identity
+  in one repository are one item of the tool, whether one asset with 800 occurrences carries them or 800 assets.
+- **Packaging.** How a tool splits its findings into assets and records is its output format, not what it found.
+  On the pilot corpus (the 12 repos in the paper languages, export of 2026-10-19), roughly:
+
+  | tool | assets | records | items (repo level) |
+  |---|---:|---:|---:|
+  | CBOMkit | 89 | 299 | 67 |
+  | CryptoScan | 142 | 9,326 | 170 |
+  | CipherRadar | 4,002 | 4,002 | 127 |
+  | pqcheck | 1,145 | 1,145 | 87 |
+
+  CBOMkit and CryptoScan list an algorithm once with its occurrences, CipherRadar and pqcheck write one component
+  per finding. Asset and record counts therefore describe a tool's output, item counts what it reports.
+- **Two more words.** A *unit* is an L4 identity: the identity of an algorithm item (`levels.py`) and the expected
+  value of an E4 mutant (`expected.unit`). A *site* is a record's file and line (call-site level, refinement 1).
+  In the micro ground truth (`corpus/micro/ground_truth.yaml`, `micro-assets-run<k>.csv`) an "asset" is one
+  expected crypto use at a call site, i.e. an item at site level, not a CBOM component.
+
 ## What an adapter spec may contain
 
 One spec per tool (`adapters/<tool>.yaml`) reads that tool's CBOMs into records. Its contents, from most to least
@@ -64,8 +99,8 @@ check. One predicate decides it everywhere (`common/tools_registry.py:votes`).
 | `non-crypto` | a finding outside cryptography reported as an asset | securin-xbom's `...sqli.jpa-sqli` | no |
 | `undefined` | a name nobody can read | `0`, `UNKNOWN`, `Sig` | no |
 
-The shares per tool are RQ2 results (`records-run<k>.csv`, `normalize.json`). Only `mapped` records enter the
-ladder and the scores.
+The shares of each tool's algorithm assets are RQ2 results (the summary's normalisation table, `coverage.csv`,
+`normalize.json`; per record in `records-run<k>.csv`). Only `mapped` records enter the ladder and the scores.
 
 ## The ladder, by example
 

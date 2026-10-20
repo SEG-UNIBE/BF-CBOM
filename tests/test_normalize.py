@@ -12,7 +12,7 @@ import pytest
 import yaml
 
 from analysis.groundtruth import expected_agreement, load_ground_truth
-from analysis.normalize import normalize_cbom
+from analysis.normalize import Report, normalize_cbom
 from analysis.normalize.locations import relative_location
 from analysis.normalize.specs import ADAPTER_DIR, SpecError, load_adapter, spec_files
 from analysis.normalize.vocab import load_vocabulary
@@ -578,3 +578,14 @@ def test_a_list_in_a_field_is_ambiguous_not_unknown():
     r = normalize_cbom(_bom(comp), "deepseek").records[0]
     assert r.values.get("digest") is None and r.resolution == "ambiguous" and r.ambiguous.startswith("SHA-256, RIPEMD")
     assert all(u["src"] != "properties[bf-cbom:digest]" for u in r.unmapped)  # the list is understood, not unknown
+
+
+def test_coverage_counts_assets_not_occurrences():
+    occ = [{"location": "src/a.py", "line": k} for k in range(1, 6)]  # one asset found at five lines
+    bom = _bom(_comp("AES-128-GCM", ap={"mode": "gcm"}, occ=occ), _comp("RSA"), _comp("Cipher.getInstance"))
+    report = Report()
+    report.add(normalize_cbom(bom, "cbomkit"))
+    rows = {r["dimension"]: r for r in report.coverage_rows()}
+    assert (rows["mode"]["assets"], rows["mode"]["records"]) == (3, 7)
+    assert (rows["mode"]["mapped"], rows["mode"]["api"]) == (2, 1)
+    assert (rows["mode"]["reported"], rows["location"]["reported"]) == (1, 1)  # once per asset, not five times

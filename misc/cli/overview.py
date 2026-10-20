@@ -95,7 +95,7 @@ def build(exp_dir: Path) -> Overview:
         per_tool = expected_jobs(spec, exp_dir) // max(len(spec.tools), 1)
         rows = {t: ToolRow(t, expected=per_tool) for t in spec.tools}
     problems: list[Problem] = []
-    for meta, _ in iter_results(exp_dir):
+    for meta, _ in iter_results(exp_dir, spec) if spec is not None else ():  # unreadable spec copy: nothing to read
         tool = meta.get("worker") or "?"
         row = rows.setdefault(tool, ToolRow(tool))
         status = meta.get("status") or "?"

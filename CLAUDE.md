@@ -56,14 +56,17 @@ Shared context for coworkers and for Claude Code (which loads this file automati
   clone's default branch; a mutant is a branch `bfcbom/<id>`), enqueues through the normal Redis protocol and
   stores the results on `results-data`. A spec's `mutation:` block makes every repo's variants the original plus
   generated insertion mutants (`mutation/mutants.py`, Phase 4), pinned in `mutants.json` like the commits in
-  `lock.json`. Resumable: a run with a stored meta file is skipped, `--retry-failed` redoes the runs that are not ok,
+  `_experiment.yaml`. Resumable: a run with a stored meta file is skipped, `--retry-failed` redoes the runs that are not ok,
   `--rerun <tools>` every run of those tools, `--overwrite-old` the whole spec (every stored run and the old
-  `_ANALYSIS/` removed first, pending jobs cancelled; `lock.json` and `mutants.json` keep the commits and mutants
-  pinned, the run log is kept; `common/experiment.py:clear_stored_runs`). A spec entry with `path:` publishes a
+  `_ANALYSIS/` removed first, pending jobs cancelled; `_experiment.yaml` and `mutants.json` keep the commits and
+  mutants pinned, the run log is kept; `common/experiment.py:clear_stored_runs`). A spec entry with `path:` publishes a
   directory as a deterministic commit (`publish_fixture`). Spec format and the list of specs: `experiments/README.md`.
-- **Experiment folder:** `_experiment.yaml`, `_run-log.json` (runner sessions: times, VM RAM and CPUs, budget, waves,
+- **Experiment folder:** `_experiment.yaml` (the record: the spec as run, every repo with its resolved branch and
+  commit, written once the snapshots resolve; the next run keeps those commits, so it replaces a lock file; the one
+  answer to which repos, tools and repetitions an experiment covers, and the overview and the analysis read only the
+  stored runs it names, `iter_results`), `_run-log.json` (runner sessions: times, VM RAM and CPUs, budget, waves,
   peak VM RAM, worker image IDs), `_ANALYSIS/` (with `_SUMMARY.md`; emptied and rebuilt by every `report`),
-  `lock.json`, `mutants.json` (with a `mutation:` block: every mutant's snippet, style, host, lines, inserts and
+  `mutants.json` (with a `mutation:` block: every mutant's snippet, style, host, lines, inserts and
   patch), then `<owner>__<repo>@<sha12>/<variant>/<tool>/run<k>.json` plus `run<k>.meta.json`. A folder without
   `_experiment.yaml` is ignored by every command (`experiment list` names it for deletion).
 - **Provenance.** `RepoInfo.commit` is resolved at inspection start (`coordinator/redis_io.py:enrich_repo`) and checked
@@ -92,14 +95,20 @@ Shared context for coworkers and for Claude Code (which loads this file automati
   would then also stratify by number of developers (GitHub contributors) next to language, stars, last push and
   size (size cap: `GITSERVER_MEMORY`, below).
 - **Corpus and fixtures** (`corpus/`, mounted read-only into the runner): `micro/<language>/` hand-written micro
-  projects with `micro/ground_truth.yaml` (11 assets each, five languages); `pilot-2026-10-08.yaml` (16 pinned real
-  projects, the development set); `icpc-2026.yaml` (the 23 ICPC paper repos at HEAD of 2026-10-18, held out);
+  projects with `micro/ground_truth.yaml` (11 assets each, five languages); `pilot-2026-10-08.yaml` (12 pinned real
+  projects in Java, Python and Go, the development set; all 16 pilot projects in `pilot-2026-10-08-all.yaml`, read
+  by CipherSift's `tailored_on`); `icpc-2026.yaml` (the 23 ICPC paper repos at HEAD of 2026-10-18, held out);
   `exclusions.yaml` (repos the corpus builder never samples, with reasons). `make corpus` builds a stratified GitHub
   corpus of Java, Python and Go repos (`common/corpus.py`; needs `GITHUB_TOKEN` in `docker/env/coordinator.env`).
   Repos above `CORPUS_MAX_REPO_SIZE_MB` (default `GITSERVER_MEMORY`/4: the git server must serve CBOMkit's full clone
   from a container with that limit; Makefile) are never sampled and listed as excluded with the reason.
 - **Analysis** (`analysis/`, offline, reads the results volume only; `make analysis ARGS="<command> <exp>"` writes
   `<exp>/_ANALYSIS/`; `experiment export` runs `report` first):
+  - **Units** (`analysis/README.md` "Units"): an *asset* is a CBOM component as the tool wrote it, a *record* one
+    occurrence of an asset (the normalised form), an *item* one algorithm (a distinct L4 identity, the *unit*) in one
+    repository, per dimension (unit, value) and (unit, file:line). Asset and record counts depend on how a tool
+    packages its findings (CipherRadar: one component per finding; CBOMkit: one per algorithm with its
+    occurrences); the ladder and the scores count items.
   - `normalize/`: CBOM -> normalised records (below); `normalize` also writes `run<k>.norm.json` next to each CBOM.
   - `schema.py`: RQ1, whole-document validation, meaningful shares, traceability; `snapshots.py` reads a pinned
     commit's files from the git mirror or a cache fetched with `--fetch`.

@@ -70,7 +70,7 @@ def test_missing_branches_are_rebuilt_from_mutants_json_with_the_same_sha(tmp_pa
     logged: list[str] = []
     again = ensure_mutants(repo, commit, MutationSpec(per_repo=5, seed=9), manifest, mirror_dir=mirror,
                            log=logged.append)  # fmt: skip
-    assert again == ids  # mutants.json wins over a changed spec, as lock.json does
+    assert again == ids  # mutants.json wins over a changed spec, as the record's commits do
     assert any("keeping the mutants in mutants.json" in m for m in logged)
     for i in ids:
         assert _git(bare, "rev-parse", f"refs/heads/bfcbom/{i}").strip() == recorded[i]

@@ -54,4 +54,5 @@ def test_tailored_repos_from_a_corpus_yaml_and_a_fixture_directory(tmp_path):
 def test_ciphersift_is_tailored_on_the_pilot_corpus_and_the_micro_projects():
     repos = reg.tailored_repos("ciphersift")
     assert "bfcbom/micro-java" in repos and "apache/kafka" in repos
+    assert "curl/curl" in repos  # the full pilot list (pilot-2026-10-08-all.yaml), not only the paper-language one
     assert "authlib/authlib" not in repos  # ICPC is held out

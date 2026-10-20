@@ -7,10 +7,10 @@ into the `runner` container (`RESULTS_DIR`, `GIT_MIRROR_DIR`) so that nothing la
 Layout of one experiment (under RESULTS_DIR):
 
     <exp>/
-      _experiment.yaml         copy of the spec as it was run (leading underscore: listed first)
+      _experiment.yaml         the record: the spec as run, every repo with its resolved branch and commit (leading
+                               underscore: listed first); the next run keeps these commits
       _run-log.json            one entry per `experiment run` session: times, host RAM/CPUs, budget, waves, peak RAM
       _ANALYSIS/               derived tables and _SUMMARY.md (`analysis report`; regenerated, never input)
-      lock.json                resolved snapshot per repo and variant (commit SHAs, git URLs)
       mutants.json             with a `mutation:` block: every mutant (snippet, style, host, lines, inserts, patch)
       <owner>__<repo>@<sha12>/<variant>/<tool>/run<k>.json        the CBOM
       <owner>__<repo>@<sha12>/<variant>/<tool>/run<k>.meta.json   JobResult without the CBOM body
@@ -28,7 +28,7 @@ import shutil
 import subprocess
 import tempfile
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 
 import yaml
@@ -166,9 +166,9 @@ def _as_repo_spec(item: dict, *, base_dir: Path | None = None) -> RepoSpec:
     if commit is not None and not _SHA_RE.match(str(commit)):
         raise ExperimentError(f"commit for {full_name} must be a full 40-hex SHA")
     path = item.get("path")
-    if path:
-        if item.get("git_url") or commit:
-            raise ExperimentError(f"{full_name}: 'path' cannot be combined with git_url or commit")
+    if path:  # a `commit` next to it pins the fixture as published (written so into _experiment.yaml)
+        if item.get("git_url"):
+            raise ExperimentError(f"{full_name}: 'path' cannot be combined with git_url")
         p = Path(str(path))
         if not p.is_absolute() and base_dir is not None:
             p = base_dir / p
@@ -255,9 +255,18 @@ def analysis_dir(exp_dir: Path) -> Path:
 
 
 def write_spec_copy(exp_dir: Path, spec: ExperimentSpec) -> Path:
+    exp_dir.mkdir(parents=True, exist_ok=True)
     path = spec_path(exp_dir)
     path.write_text(yaml.safe_dump(spec_to_dict(spec), sort_keys=False), encoding="utf-8")
     return path
+
+
+def pinned_repos(exp_dir: Path) -> dict[str, RepoSpec]:
+    """The repos of the experiment's record (`_experiment.yaml`) by full name, each with the branch and commit it was
+    resolved to; empty before the first run."""
+    if not spec_path(exp_dir).exists():
+        return {}
+    return {r.full_name: r for r in load_spec(spec_path(exp_dir)).repos}
 
 
 def is_experiment(exp_dir: Path) -> bool:
@@ -302,9 +311,9 @@ _SNAPSHOT_DIR = re.compile(r".+__.+@[0-9a-f]+")  # repo_dir_name's shape
 def clear_stored_runs(exp_dir: Path) -> int:
     """Remove every stored run of an experiment (`experiment run --overwrite-old`): all snapshot folders, with every
     CBOM, meta file, unsupported mark and normalised CBOM in them, also of tools, repos and repetitions the spec no
-    longer names (the analysis reads whatever is stored, `iter_results`), and `_ANALYSIS/`, which described them.
-    Kept: the spec copy, the run log (the history of sessions), `lock.json` (the pinned commits, so the rerun
-    scans the same snapshots) and `mutants.json` (the pinned mutants). Returns the number of stored runs removed."""
+    longer names (which `iter_results` already skips), and `_ANALYSIS/`, which described them.
+    Kept: `_experiment.yaml` (with the pinned commits, so the rerun scans the same snapshots), the run log (the
+    history of sessions) and `mutants.json` (the pinned mutants). Returns the number of stored runs removed."""
     removed = 0
     for d in sorted(exp_dir.iterdir()) if exp_dir.is_dir() else []:
         if not d.is_dir():
@@ -495,7 +504,7 @@ def variant_commit(spec: RepoSpec, variant: str, base_commit: str, *, mirror_dir
     return sha
 
 
-# ----- lock: resolved snapshots -----
+# ----- resolved snapshots -----
 
 
 @dataclass
@@ -522,23 +531,6 @@ class Snapshot:
             stars=self.stars,
             commit=self.variant_commit,
         )
-
-
-def lock_path(exp_dir: Path) -> Path:
-    return exp_dir / "lock.json"
-
-
-def load_lock(exp_dir: Path) -> dict[str, dict]:
-    p = lock_path(exp_dir)
-    if not p.exists():
-        return {}
-    return json.loads(p.read_text(encoding="utf-8")).get("repos", {})
-
-
-def save_lock(exp_dir: Path, locked: dict[str, dict]) -> None:
-    exp_dir.mkdir(parents=True, exist_ok=True)
-    payload = {"locked_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "repos": locked}
-    lock_path(exp_dir).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 MUTANTS_FILE = "mutants.json"
@@ -579,22 +571,25 @@ def resolve_snapshots(
 ) -> list[Snapshot]:
     """Pin every repo to a commit, mirror it, and return one Snapshot per (repo, variant).
 
-    Commits already in the experiment's lock file win over the spec, so a resumed experiment
-    never silently moves to a newer upstream commit. With a `mutation:` block the variants are the
-    original plus the repo's mutants, which mutants.json pins the same way (mutation/mutants.py).
+    Then the spec is written as the experiment's record, `_experiment.yaml`: the spec as run, every repo with the
+    branch and commit it was resolved to. Commits already in the record win over the spec, so a resumed experiment
+    never silently moves to a newer upstream commit; a repo the spec no longer names leaves the record. Nothing is
+    written when a repo fails to resolve. With a `mutation:` block the variants are the original plus the repo's
+    mutants, which mutants.json pins the same way (mutation/mutants.py), for exactly the record's repos.
     """
-    locked = load_lock(exp_dir)
+    prior = pinned_repos(exp_dir)
+    resolved: list[RepoSpec] = []
     manifest = load_mutants(exp_dir) if spec.mutation is not None else None
     snapshots: list[Snapshot] = []
     cap_mb = repo_size_cap_mb()
     for repo in spec.repos:
-        prior = locked.get(repo.full_name) or {}
-        branch = repo.branch or prior.get("branch") or "main"
-        commit = prior.get("commit") or repo.commit
+        before = prior.get(repo.full_name)
+        branch = repo.branch or (before and before.branch) or "main"
+        commit = (before and before.commit) or repo.commit
         if repo.is_fixture:
             published = publish_fixture(repo, mirror_dir=mirror_dir)
             if commit and commit != published:
-                log(f"  {repo.full_name}: fixture changed since lock.json ({published[:12]}); keeping {commit[:12]}")
+                log(f"  {repo.full_name}: fixture changed since pinned ({published[:12]}); keeping {commit[:12]}")
             commit = commit or published
         if not commit:
             commit = resolve_remote_commit(repo.source_url, branch)
@@ -607,7 +602,7 @@ def resolve_snapshots(
                 f"  warning: mirror of {repo.full_name} is {size} MB, above the repo size cap {cap_mb} MB "
                 f"(GITSERVER_MEMORY / {SIZE_CAP_RATIO}); a full clone through the git server may be killed"
             )
-        locked[repo.full_name] = {"branch": branch, "commit": commit, "source_url": repo.source_url}
+        resolved.append(replace(repo, branch=branch, commit=commit))
         variants = repo.variants
         if spec.mutation is not None:
             from mutation.mutants import ensure_mutants  # the runner only: workers bake common/ without mutation/
@@ -632,8 +627,10 @@ def resolve_snapshots(
                     size_kb=repo.size_kb,
                 )
             )
-    save_lock(exp_dir, locked)
+    write_spec_copy(exp_dir, replace(spec, repos=resolved))
     if manifest is not None:
+        names = {r.full_name for r in resolved}
+        manifest["repos"] = {n: e for n, e in (manifest.get("repos") or {}).items() if n in names}
         save_mutants(exp_dir, manifest)
     return snapshots
 
@@ -782,9 +779,18 @@ def write_result(exp_dir: Path, job: PlannedJob, result: JobResult) -> Path:
     return cbom_path
 
 
-def iter_results(exp_dir: Path):
-    """Yield (meta dict, cbom path) for every stored run of an experiment."""
+def iter_results(exp_dir: Path, spec: ExperimentSpec | None = None):
+    """Yield (meta dict, cbom path) for every stored run of the repos, tools and repetitions the experiment's spec
+    copy names. `_experiment.yaml` is the one record of what an experiment covers: a run stored under an earlier
+    version of the spec (a repo or tool dropped since, fewer repetitions) is never read; `--overwrite-old` removes
+    such runs (clear_stored_runs). `spec`: the spec copy, when the caller has it loaded already."""
+    spec = spec or load_spec(spec_path(exp_dir))
+    repos, tools = {r.full_name for r in spec.repos}, set(spec.tools)
     for meta_path in sorted(exp_dir.glob("*/*/*/run*.meta.json")):
+        snapshot, tool = meta_path.parts[-4], meta_path.parts[-2]
+        k = meta_path.name[len("run") : -len(".meta.json")]
+        if repo_full_name(snapshot) not in repos or tool not in tools or not k.isdigit() or int(k) > spec.repetitions:
+            continue
         meta = json.loads(meta_path.read_text(encoding="utf-8"))
         yield meta, meta_path.with_name(meta_path.name.replace(".meta.json", ".json"))
 

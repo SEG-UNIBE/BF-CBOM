@@ -127,10 +127,10 @@ def test_repo_dict_to_info_prefers_explicit_branch_and_keeps_commit():
     assert repo_dict_to_info({"full_name": "o/r", "default_branch": "dev"}).branch == "dev"
 
 
-# ----- mirroring, lock, planning, persistence -----
+# ----- mirroring, pinning, planning, persistence -----
 
 
-def test_mirror_lock_plan_and_write(upstream, tmp_path: Path):
+def test_mirror_pin_plan_and_write(upstream, tmp_path: Path):
     src, sha1, sha2 = upstream
     mirrors = tmp_path / "mirrors"
     results = tmp_path / "results"
@@ -150,7 +150,8 @@ def test_mirror_lock_plan_and_write(upstream, tmp_path: Path):
     assert _git("rev-parse", "HEAD", cwd=scan) == sha2
     assert (scan / "objects" / "info" / "alternates").exists()
     assert _git("config", "uploadpack.allowAnySHA1InWant", cwd=bare) == "true"
-    assert ex.load_lock(exp_dir)["own/repo"]["commit"] == sha2
+    record = ex.pinned_repos(exp_dir)["own/repo"]  # _experiment.yaml, written once the snapshots resolved
+    assert (record.branch, record.commit) == ("main", sha2)
 
     # a worker can fetch exactly that commit from the mirror
     co = clone_repo(str(scan), branch=snap.scan_branch, target_dir=str(tmp_path / "wt"), commit=sha2)
@@ -167,7 +168,7 @@ def test_mirror_lock_plan_and_write(upstream, tmp_path: Path):
     with pytest.raises(ex.ExperimentError):
         ex.variant_commit(spec.repos[0], "m-missing", sha2, mirror_dir=mirrors)
 
-    # the lock wins over upstream moving on
+    # the record wins over upstream moving on
     (src / "b.py").write_text("x = 1\n")
     _git("add", ".", cwd=src)
     _git("commit", "-q", "-m", "three", cwd=src)
@@ -275,17 +276,19 @@ def test_publish_fixture_is_deterministic_and_resolvable(tmp_path: Path):
     assert snaps[0].scan_url == f"http://gs/bfcbom/micro-x--{sha2[:12]}.git"
     scan = ex.scan_repo_path("bfcbom/micro-x", sha2, mirror)
     assert _git("rev-parse", "HEAD", cwd=scan) == sha2
-    # the lock keeps the commit even if the fixture changes again
+    # the record keeps the commit even if the fixture changes again
     (src / "pkg" / "a.py").write_text("import ssl\n")
     snaps2 = ex.resolve_snapshots(loaded, exp_dir, mirror_dir=mirror, server_url="http://gs", log=lambda m: None)
     assert snaps2[0].commit == sha2
+    fixture = ex.pinned_repos(exp_dir)["bfcbom/micro-x"]  # a fixture's record: its path and its published commit
+    assert (fixture.path, fixture.commit) == (str(src.resolve()), sha2)
 
 
-def test_spec_rejects_path_with_commit_or_url():
+def test_spec_rejects_path_with_url_and_keeps_a_fixtures_pinned_commit():
     with pytest.raises(ex.ExperimentError):
-        ex.spec_from_dict(
-            {"name": "ok", "tools": ["x"], "repos": [{"full_name": "a/b", "path": "p", "commit": "a" * 40}]}
-        )
+        ex.spec_from_dict({"name": "ok", "tools": ["x"], "repos": [{"full_name": "a/b", "path": "p", "git_url": "u"}]})
+    pinned = {"name": "ok", "tools": ["x"], "repos": [{"full_name": "a/b", "path": "p", "commit": "a" * 40}]}
+    assert ex.spec_from_dict(pinned).repos[0].commit == "a" * 40  # as _experiment.yaml records it
 
 
 # ----- memory budget / waves -----
@@ -353,6 +356,8 @@ def test_mark_unsupported_records_meta_and_plan_skips_it(tmp_path: Path):
     )
     registry = {"cbomkit": {"languages": ["java", "python"]}, "cryptoscan": {"languages": ["go"]}}
     exp_dir = tmp_path / "scope"
+    exp_dir.mkdir()
+    ex.write_spec_copy(exp_dir, spec)
     recorded = ex.mark_unsupported(spec, [snap], exp_dir, registry=registry)
     assert recorded == [("cbomkit", "o/r")]
     metas = sorted(exp_dir.glob("*/*/cbomkit/run*.meta.json"))
@@ -374,3 +379,20 @@ def test_repo_spec_keeps_expect_crypto_as_metadata():
     assert [r.expect_crypto for r in spec.repos] == ["low", None]
     repos = ex.spec_to_dict(spec)["repos"]
     assert repos[0]["expect_crypto"] == "low" and "expect_crypto" not in repos[1]
+
+
+def test_the_record_pins_and_names_exactly_the_specs_repos(tmp_path: Path, upstream):
+    src, sha1, _ = upstream
+    exp_dir, mirrors = tmp_path / "e", tmp_path / "mirrors"
+    both = [{"full_name": f"own/{n}", "git_url": str(src), "commit": sha1, "language": "Python"} for n in "ab"]
+    for repos in (both, both[:1]):  # the spec drops own/b
+        spec = ex.spec_from_dict({"name": "e", "tools": ["t1"], "repos": repos, "mutation": {"per_repo": 1}})
+        ex.resolve_snapshots(spec, exp_dir, mirror_dir=mirrors, server_url="http://gs", log=lambda m: None)
+    assert {n: r.commit for n, r in ex.pinned_repos(exp_dir).items()} == {"own/a": sha1}  # own/b left the record
+    assert set(ex.load_mutants(exp_dir)["repos"]) == {"own/a"}  # and so does mutants.json
+    for repo, tool, k in [("own/a", "t1", 1), ("own/b", "t1", 1), ("own/a", "t2", 1), ("own/a", "t1", 2)]:
+        meta = ex.result_paths(exp_dir, repo, sha1, "original", tool, k)[1]
+        meta.parent.mkdir(parents=True, exist_ok=True)
+        meta.write_text(json.dumps({"worker": tool, "status": "ok", "repo": repo}))
+    # a dropped repo, a dropped tool and a repetition beyond the spec's are stored but never read
+    assert [(m["repo"], m["worker"]) for m, _ in ex.iter_results(exp_dir)] == [("own/a", "t1")]

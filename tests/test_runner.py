@@ -116,7 +116,7 @@ def test_run_stores_results_resumes_retries_and_exports(world, tmp_path):
     assert result.exit_code == 0, result.output
     exp = results / "e-fake"
     metas = sorted(p.relative_to(exp).as_posix() for p in exp.glob("*/*/*/run1.meta.json"))
-    assert len(metas) == 4 and (exp / "_experiment.yaml").exists() and (exp / "lock.json").exists()
+    assert len(metas) == 4 and all(r.commit for r in ex.pinned_repos(exp).values()) and not (exp / "lock.json").exists()
     statuses = {(p.parents[2].name.split("@")[0], p.parent.name): json.loads(p.read_text())["status"]
                 for p in exp.glob("*/*/*/run1.meta.json")}  # fmt: skip
     assert statuses[("o__second", "t2")] == "error" and sum(s == "ok" for s in statuses.values()) == 3
@@ -145,7 +145,7 @@ def test_run_stores_results_resumes_retries_and_exports(world, tmp_path):
     exported = _run(["export", "e-fake", "--dest", str(dest), "--no-report"])
     assert exported.exit_code == 0, exported.output
     names = zipfile.ZipFile(dest / "e-fake.zip").namelist()
-    assert "e-fake/_experiment.yaml" in names and "e-fake/_run-log.json" in names and "e-fake/lock.json" in names
+    assert "e-fake/_experiment.yaml" in names and "e-fake/_run-log.json" in names
     assert sum(n.endswith("run1.json") for n in names) == 4
 
 
@@ -153,7 +153,7 @@ def test_overwrite_old_reruns_the_whole_spec_on_the_pinned_commits(world):
     spec, results, r = world["spec"], world["results"], world["redis"]
     assert _run(["run", str(spec), "--idle-timeout", "20"]).exit_code == 0
     exp = results / "e-fake"
-    lock = ex.load_lock(exp)
+    pins = {n: r.commit for n, r in ex.pinned_repos(exp).items()}
     first = next(exp.glob("o__first@*")) / "original"
     stale_tool = first / "t9"  # a tool the spec no longer names: iter_results (the analysis) would still read it
     stale_tool.mkdir()
@@ -173,7 +173,8 @@ def test_overwrite_old_reruns_the_whole_spec_on_the_pinned_commits(world):
     assert "0 run(s) already on disk, 0 still pending from an earlier run, 4 to enqueue" in out.output
     assert len(world["workers"].seen) == 8  # every run of the spec again
     assert len(list(exp.glob("*/*/*/run1.meta.json"))) == 4 and not stale_tool.exists() and not norm.exists()
-    assert not (exp / ex.ANALYSIS_DIR / "_SUMMARY.md").exists() and ex.load_lock(exp) == lock
+    assert not (exp / ex.ANALYSIS_DIR / "_SUMMARY.md").exists()
+    assert {n: r.commit for n, r in ex.pinned_repos(exp).items()} == pins
     assert not r.hexists(experiment_cmd._pending_key("e-fake"), "stale-job")
     first_session, second = ex.load_run_log(exp)
     assert (first_session["runs_overwritten"], second["runs_overwritten"]) == (0, 5)

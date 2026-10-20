@@ -41,7 +41,6 @@ from common.experiment import (
     resolve_snapshots,
     save_run_log_entry,
     write_result,
-    write_spec_copy,
 )
 from common.memory import HostSampler
 from common.models import JobResult
@@ -220,8 +219,8 @@ def run(
         False,
         "--overwrite-old",
         help="Run the whole spec afresh: remove every stored run first (also of tools and repos the spec no longer "
-        "names) and the old _ANALYSIS/, cancel jobs an earlier run left pending; the pinned commits (lock.json) and "
-        "the run log are kept",
+        "names) and the old _ANALYSIS/, cancel jobs an earlier run left pending; the pinned commits (_experiment.yaml) "
+        "and the run log are kept",
     ),
     skip_unsupported: bool = typer.Option(
         True,
@@ -248,9 +247,7 @@ def run(
         spec = load_spec(spec_path)
     except (ExperimentError, OSError, yaml.YAMLError) as e:
         _err(f"invalid experiment spec: {e}", 2)
-    exp_dir = experiment_dir(spec.name)
-    exp_dir.mkdir(parents=True, exist_ok=True)
-    write_spec_copy(exp_dir, spec)
+    exp_dir = experiment_dir(spec.name)  # created with its record once the snapshots resolve
     typer.secho(
         f"experiment {spec.name}: {len(spec.repos)} repos x {spec.tools} x {spec.repetitions} rep(s)",
         fg=typer.colors.BLUE,
@@ -272,7 +269,7 @@ def run(
         overwritten = clear_stored_runs(exp_dir)
         typer.secho(
             f"--overwrite-old: removed {overwritten} stored run(s) and the old {ANALYSIS_DIR}/, cancelled "
-            f"{len(pending)} pending job(s); commits stay pinned (lock.json)",
+            f"{len(pending)} pending job(s); commits stay pinned (_experiment.yaml)",
             fg=typer.colors.BLUE,
             err=True,
         )
@@ -664,7 +661,7 @@ def export(
     dest: Path = DEST_OPT,
     no_report: bool = typer.Option(False, "--no-report", help="Zip as stored, without running `analysis report`"),
 ):
-    """Zip one experiment (spec, run log, lock, all CBOMs and meta files, _ANALYSIS/ with _SUMMARY.md). The only way
+    """Zip one experiment (its record, run log, all CBOMs and meta files, _ANALYSIS/ with _SUMMARY.md). The only way
     data leaves the volume. Runs `analysis report` first, so the CSV tables and _SUMMARY.md in the zip are current."""
     exp_dir = experiment_dir(name)
     if not exp_dir.exists():

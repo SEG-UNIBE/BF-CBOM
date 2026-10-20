@@ -156,7 +156,7 @@ tools:
     languages: [java, python, go]
     voter_group: ciphersift
     status: integrated              # workers/ciphersift; release pinned in docker/Dockerfile.worker-ciphersift
-    tailored_on: [corpus/micro, corpus/pilot-2026-10-08.yaml]   # paths from the repo root; benchmark-informed rules and defaults (its spec/DECISIONS.md): no held-out data for it
+    tailored_on: [corpus/micro, corpus/pilot-2026-10-08-all.yaml]   # paths from the repo root; benchmark-informed rules and defaults (its spec/DECISIONS.md): no held-out data for it
     notes: >
       Written from a behavioural specification of Crypsy; its Java/Python rules were converted from the earlier BF-CBOM
       Crypsy adaptation (spec/PROVENANCE.md). Also lists crypto libraries from Maven/Gradle, PyPI and Go manifests.

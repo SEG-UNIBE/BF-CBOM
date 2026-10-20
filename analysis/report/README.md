@@ -28,7 +28,7 @@ sets = groups.assign(voter=groups["voters"].str.split(";")).explode("voter")
 memberships = pd.crosstab(sets["group_id"], sets["voter"]).astype(bool)   # the UpSet input (e.g. upsetplot.plot)
 ```
 
-**Fill-rate heatmap (RQ2).** Share of algorithm records per tool and dimension with a reported value.
+**Fill-rate heatmap (RQ2).** Share of algorithm assets per tool and dimension with a reported value.
 ```python
 cov = pd.read_csv(f"{A}/coverage.csv")
 heat = cov.pivot(index="tool", columns="dimension", values="reported_share")
