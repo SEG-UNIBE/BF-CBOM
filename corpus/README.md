@@ -6,7 +6,7 @@ Repository lists and fixtures for the batch experiments (`experiments/*.yaml`, s
 
 | path | content |
 |---|---|
-| `micro/<language>/` | hand-written micro projects (Java, Python, Go, JavaScript, C) with 11 known crypto assets each; published to the local git server as fixture repos `bfcbom/micro-<language>` (`path:` in an experiment spec) |
+| `micro/<language>/` | hand-written micro projects (Java, Python, Go, JavaScript, C) with 11 expected items each (known crypto calls at known lines); published to the local git server as fixture repos `bfcbom/micro-<language>` (`path:` in an experiment spec) |
 | `micro/ground_truth.yaml` | the 11 assets with files, lines, families and the expected canonical record per language; read by `analysis/groundtruth.py` (`bf-cbom analysis micro <exp>`) |
 | `exclusions.yaml` | reviewed repos and name patterns the corpus builder never samples (the generators' own repos and test suites, CBOM benchmarks, BF-CBOM itself), each with its reason; `tailored_on` repos of `common/tools.yaml` are excluded as well (refinements 11 and 13) |
 | `pilot-2026-10-08.yaml` | the 12 real projects of the pilot experiment in Java, Python and Go (of its 16; the TypeScript, C and JavaScript ones were removed 2026-10-20) pinned to the commits scanned then; use with `corpus: ../corpus/pilot-2026-10-08.yaml` |

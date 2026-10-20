@@ -200,8 +200,8 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert scores[("algorithm", "cbomkit")]["ds_support"] and scores[("location", "cbomkit")]["items"]
     assert list(_read_csv(out / "coverage.csv")[0]) == COVERAGE_COLUMNS
     assert (out / "conformance.csv").read_text(encoding="utf-8").startswith(",".join(CONFORMANCE_COLUMNS))
-    algos = _read_csv(out / "algorithms-run1.csv")
-    assert list(algos[0]) == lv.ALGORITHM_COLUMNS and all(int(a["k_L0"]) <= int(a["k_L4"]) for a in algos)
+    algos = _read_csv(out / "items-run1.csv")
+    assert list(algos[0]) == lv.ITEM_COLUMNS and all(int(a["k_L0"]) <= int(a["k_L4"]) for a in algos)
     levels = _read_csv(out / "matchlevels-run1.csv")
     assert [r["level"] for r in levels] == list(lv.LEVELS) and all(r["matcher"] == "exact" for r in levels)
     assert int(levels[0]["items"]) == int(levels[-1]["items"])  # the unit is fixed across levels
@@ -209,14 +209,16 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert k2plus == sorted(k2plus)  # cumulative: agreement never drops at a higher level
     assert {a["tool"] for a in algos} == {"cbomkit", "cipherradar"} and algos[0]["language"] == "Java"
     info = json.loads((out / "tables-run1.json").read_text())
-    assert info["rows"]["algorithms-run1.csv"] == len(algos) and info["vocabulary"]["algorithms"]
+    assert info["rows"]["items-run1.csv"] == len(algos) and info["vocabulary"]["algorithms"]
     summary = (out / "_SUMMARY.md").read_text(encoding="utf-8")
     assert summary.startswith("# exp-tables: analysis summary (run 1)")
-    sections = ("## Runs", "## What the tools report", "## Micro projects", "## RQ1", "## Agreement ladder",
-                "## Matching (RQ3)", "## Scores")  # fmt: skip
+    assert info["voters"]["cipherradar"] == {"voter_group": "grep-rules", "role": "voter", "engine": "opengrep-rules"}
+    sections = ("## Runs", "## What the tools report", "## Micro projects", "## RQ1", "## Voter groups",
+                "## Agreement ladder", "## Matching (RQ3)", "## Scores")  # fmt: skip
     for section in (*sections, "## Files"):
         assert section in summary
     assert "| cbomkit | pass 11 |" in summary and "| pqcheck | – |" in summary
+    assert summary.index("## Voter groups") < summary.index("## Agreement ladder")
     assert "| cbomkit | 11 / 11 · 11 |" in summary
 
 
@@ -248,7 +250,7 @@ def test_summary_markdown_from_csv_rows():
     from analysis import summary as sm
 
     assert sm.md_table(["a", "b"], [["x|y", 1]]) == ["| a | b |", "| --- | ---: |", "| x\\|y | 1 |"]
-    base = {"n_assets": "11"}
+    base = {"n_items": "11"}
     rows = [
         {**base, "language": "java", "tool": "weak", "verdict": "fail", "strict": "0", "lenient": "2", "repo": "7"},
         {**base, "language": "go", "tool": "weak", "verdict": "error"},
@@ -420,3 +422,17 @@ def test_workaround_line_collects_the_recorded_setup_workarounds():
         == "cryptoscan --exclude a/b/bad.go (Go panic in patterns.MatchWithContext on these files)"
     )
     assert workaround_line("cradar cmd: cradar scan\n") is None and workaround_line(None) is None
+
+
+def test_every_integrated_tool_declares_its_packaging():
+    """analysis/README.md "Packaging per tool" has a row for every integrated tool (refinement: compare by items)."""
+    import re
+
+    from common.tools_registry import load_tools
+
+    readme = (Path(__file__).resolve().parents[1] / "analysis" / "README.md").read_text(encoding="utf-8")
+    section = readme.split("### Packaging per tool", 1)[1].split("\n## ", 1)[0]
+    rows = [line.split("|")[1] for line in section.splitlines() if line.startswith("| ") and "---" not in line][1:]
+    declared = {re.sub(r"[^a-z0-9]", "", name.lower()) for row in rows for name in row.split(",")}
+    integrated = {t for t, info in load_tools().items() if info.get("status") == "integrated"}
+    assert {t for t in integrated if re.sub(r"[^a-z0-9]", "", t) not in declared} == set()

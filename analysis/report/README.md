@@ -12,14 +12,14 @@ A = "exports/e1-icpc-corpus/_ANALYSIS"   # or any copied export
 
 Observers (`role: observer` in `common/tools.yaml`: qelens, cryptarium, qScan) are in every table; their records never
 confirm anyone and they are in no `voters` list, so voter-based figures exclude them already. To leave them out of a
-per-tool figure, drop them by role where the table has the column (`levels-`, `algorithms-`, `score-run<k>.csv`) and
+per-tool figure, drop them by role where the table has the column (`levels-`, `items-`, `score-run<k>.csv`) and
 by name elsewhere:
 ```python
 OBSERVERS = {"qelens", "cryptarium", "qscan"}   # or: tools.yaml entries with role == "observer"
 scores = pd.read_csv(f"{A}/score-run1.csv").query("role == 'voter'")
 ```
 
-**Tools per algorithm, UpSet plot (RQ2).** Which voter groups report which algorithms per repository.
+**Tools per item, UpSet plot (RQ2).** Which voter groups report which items per repository.
 ```python
 groups = pd.read_csv(f"{A}/groups-exact-run1.csv").query("scope == 'repo'")
 members = pd.read_csv(f"{A}/members-exact-run1.csv").query("implied != True")

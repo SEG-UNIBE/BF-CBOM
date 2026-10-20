@@ -83,11 +83,11 @@ PARAMETER_LEVELS = ("L2", "L3", "L4")  # parameters do not exist in a raw name
 DIM_FIRST_LEVEL = {"digest": "L3"}
 CLOSURE_LEVELS = ("L3", "L4")  # an implied algorithm is a parsed fact: it exists from L3 on
 LEVEL_COLUMNS = [
-    "dimension", "level", "tool", "voter_group", "role", "algorithms", "confirmed", "share", "confirmed_strict",
+    "dimension", "level", "tool", "voter_group", "role", "items", "confirmed", "share", "confirmed_strict",
     "multi_unit_clusters",
 ]  # fmt: skip
-ALGORITHM_COLUMNS = [
-    "repo", "snapshot", "variant", "run", "language", "tool", "voter_group", "role", "tailored", "algorithm", "implied",
+ITEM_COLUMNS = [
+    "repo", "snapshot", "variant", "run", "language", "tool", "voter_group", "role", "tailored", "unit", "implied",
     "records", "spellings", *[f"k_{lv}" for lv in LEVELS],
 ]  # fmt: skip
 _FAMILY_FIELD = "cryptoProperties.algorithmProperties.algorithmFamily"
@@ -357,7 +357,7 @@ class LevelRow:
     level: str
     tool: str
     voter_group: str
-    algorithms: int  # the tool's items (distinct algorithms per repository); for a parameter: (item, value) pairs
+    items: int  # the tool's items (distinct units per repository); for a parameter: (item, value) pairs
     confirmed: int  # ... that a record of another voter group matches at this level or below
     dimension: str = "algorithm"  # `algorithm`, or one of PARAMETER_DIMS
     confirmed_strict: int = 0  # ... confirmed through cluster members alone (no generic or implied attachment)
@@ -366,7 +366,7 @@ class LevelRow:
 
     @property
     def share(self) -> float:
-        return self.confirmed / self.algorithms if self.algorithms else 0.0
+        return self.confirmed / self.items if self.items else 0.0
 
     def to_dict(self) -> dict:
         return {
@@ -375,7 +375,7 @@ class LevelRow:
             "tool": self.tool,
             "voter_group": self.voter_group,
             "role": self.role,
-            "algorithms": self.algorithms,
+            "items": self.items,
             "confirmed": self.confirmed,
             "share": round(self.share, 3),
             "confirmed_strict": self.confirmed_strict,
@@ -484,7 +484,7 @@ def ladder(
     return rows
 
 
-def algorithm_rows(
+def item_rows(
     records: dict[tuple[str, str, str], list[NormRecord]],
     voter_of: dict[str, str],
     *,
@@ -494,12 +494,13 @@ def algorithm_rows(
     tailored: dict[str, frozenset[str]] | None = None,
     closure: bool = False,
 ) -> list[dict]:
-    """Which algorithms each tool reports per repository: one row per (snapshot, variant, tool, item) with the
+    """Which items each tool reports per repository: one row per (snapshot, variant, tool, item; `unit` = its L4
+    identity) with the
     number of records and distinct spellings behind it and, per level, the voter groups in the item's largest
     cluster (`k_<level>`, the tool's own group included; observers are no voter groups, see `role`). `records`:
     {(snapshot, variant, tool): records}; `tailored`: {tool: repos it was tuned on} (the `tailored` column,
-    refinement 13); with `closure` the algorithms the records imply get rows too (`implied` true, refinement 2).
-    Location-free, so every tool takes part; the basis for UpSet plots and the tools-per-algorithm distribution."""
+    refinement 13); with `closure` the items the records imply get rows too (`implied` true, refinement 2).
+    Location-free, so every tool takes part; the basis for UpSet plots and the tools-per-item distribution."""
     vocab = vocab or load_vocabulary()
     languages = languages or {}
     tailored = tailored or {}
@@ -526,7 +527,7 @@ def algorithm_rows(
                         "voter_group": voter_of.get(tool, tool),
                         "role": role(voter_of, tool),
                         "tailored": repo in tailored.get(tool, ()),
-                        "algorithm": key,
+                        "unit": key,
                         "implied": all(r.record_id in item.implied for r in own),
                         "records": len(own),
                         "spellings": len({(r.name or "").strip() for r in own}),
@@ -541,9 +542,9 @@ def table_lines(rows: list[LevelRow]) -> list[str]:
     rows = [r for r in rows if r.dimension == "algorithm"]
     by = {(r.tool, r.level): r for r in rows}
     tools = [t for t in dict.fromkeys(r.tool for r in rows) if t != "all"] + ["all"]
-    head = f"{'tool':<15}" + "".join(f"{lv:>8}" for lv in LEVELS) + f"{'algorithms':>12}"
+    head = f"{'tool':<15}" + "".join(f"{lv:>8}" for lv in LEVELS) + f"{'items':>12}"
     lines = [head]
     for t in tools:
         cells = "".join(f"{by[(t, lv)].share:>8.0%}" for lv in LEVELS)
-        lines.append(f"{t:<15}{cells}{by[(t, 'L4')].algorithms:>12}")
+        lines.append(f"{t:<15}{cells}{by[(t, 'L4')].items:>12}")
     return lines

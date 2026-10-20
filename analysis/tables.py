@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import csv
 import json
+import statistics
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -28,7 +29,8 @@ from .costs import cost_usd, load_prices
 from .groundtruth import TruthProject, TruthScore
 from .levels import UNIT_LEVEL, identity
 from .matchers import MatchGroup, agreement
-from .normalize.record import RECORD_COLUMNS, NormRecord
+from .normalize.record import RECORD_COLUMNS, NormalizedCbom, NormRecord
+from .normalize.report import assets_of
 
 LIST_SEP = ";"
 ASSET_COMPONENT_TYPES = ("cryptographic-asset", "crypto-asset")  # the latter: IBM draft 1.4-cbom-1.0
@@ -85,13 +87,17 @@ AGREEMENT_COLUMNS = [
     "matcher", "repo", "snapshot", "variant", "run", "group_id", "scope", "key", "dimension", "reporting",
     "agreeing", "majority", "values",
 ]  # fmt: skip
+UNIT_COLUMNS = [
+    "tool", "role", "cboms", "assets", "records", "items", "records_per_asset_median", "records_per_asset_max",
+    "multi_occurrence_share", "assets_per_item", "unlocated_share",
+]  # fmt: skip
 MICRO_COLUMNS = [
-    "project", "language", "tool", "run", "tailored", "status", "verdict", "n_assets",
+    "project", "language", "tool", "run", "tailored", "status", "verdict", "n_items",
     "strict", "lenient", "repo", "recall_strict", "recall_lenient", "recall_repo",
     "sites_in_file", "sites_correct", "precision", "passes_bar", "missed", "repo_missed", "repo_extra",
 ]  # fmt: skip
-MICRO_ASSET_COLUMNS = [
-    "project", "language", "tool", "run", "asset", "families", "insertion_style",
+MICRO_ITEM_COLUMNS = [
+    "project", "language", "tool", "run", "item", "families", "insertion_style",
     "callsite_strict", "callsite_lenient", "repo",
 ]  # fmt: skip
 
@@ -427,6 +433,42 @@ class MicroEntry:
     tailored: bool = False  # the tool was tuned on this project (tools.yaml tailored_on, refinement 13)
 
 
+def unit_rows(cboms: list[NormalizedCbom], voter_of: dict[str, str] | None = None) -> list[dict]:
+    """How each tool packages its findings (analysis/README.md "Units"), over the algorithm assets of `cboms` (one
+    run's CBOMs of the original variants): per tool its assets (CBOM components), their records (occurrences) and its
+    items (distinct L4 identities of its `mapped` records per CBOM, i.e. per repository, as the ladder counts them,
+    tailored repositories included), with the records per asset, the share of assets listed at more than one place,
+    the assets per item (above 1: one component per finding) and the share of assets without a file."""
+    acc: dict[str, dict] = {}
+    for n in cboms:
+        t = acc.setdefault(n.tool, {"cboms": 0, "per_asset": [], "items": 0, "unlocated": 0})
+        t["cboms"] += 1
+        assets = [rs for rs in assets_of(n) if rs[0].values.get("asset_type") == "algorithm"]
+        t["per_asset"] += [len(rs) for rs in assets]
+        t["unlocated"] += sum(not any(r.file for r in rs) for rs in assets)
+        units = {identity(r, UNIT_LEVEL) for rs in assets for r in rs if r.resolution in (None, "mapped")}
+        t["items"] += len(units - {None})
+    rows = []
+    for tool, t in sorted(acc.items()):
+        per, n_assets = t["per_asset"], len(t["per_asset"])
+        rows.append(
+            {
+                "tool": tool,
+                "role": "voter" if votes(voter_of, tool) else "observer",
+                "cboms": t["cboms"],
+                "assets": n_assets,
+                "records": sum(per),
+                "items": t["items"],
+                "records_per_asset_median": statistics.median(per) if per else None,
+                "records_per_asset_max": max(per, default=None),
+                "multi_occurrence_share": round(sum(k > 1 for k in per) / n_assets, 3) if n_assets else None,
+                "assets_per_item": round(n_assets / t["items"], 2) if t["items"] else None,
+                "unlocated_share": round(t["unlocated"] / n_assets, 3) if n_assets else None,
+            }
+        )
+    return rows
+
+
 def micro_verdict(status: str, score: TruthScore | None) -> str:
     """pass/fail (inclusion bar: lenient call-site recall) for a scored run; otherwise why there is no grade:
     unsupported (outside the tool's languages), missing (not run), error (failed, timed out, cancelled, unreadable)."""
@@ -447,7 +489,7 @@ def micro_rows(entries: list[MicroEntry], *, run: int) -> list[dict]:
             "tailored": e.tailored,
             "status": e.status,
             "verdict": micro_verdict(e.status, s),
-            "n_assets": len(e.project.assets),
+            "n_items": len(e.project.assets),
         }
         if s is not None:
             recall_repo = s.recall_repo
@@ -472,7 +514,7 @@ def micro_rows(entries: list[MicroEntry], *, run: int) -> list[dict]:
     return rows
 
 
-def micro_asset_rows(entries: list[MicroEntry], *, run: int) -> list[dict]:
+def micro_item_rows(entries: list[MicroEntry], *, run: int) -> list[dict]:
     """Long format: one row per (project, tool, asset) of every scored run, which level found the asset."""
     rows = []
     for e in entries:
@@ -486,7 +528,7 @@ def micro_asset_rows(entries: list[MicroEntry], *, run: int) -> list[dict]:
                     "language": e.project.language,
                     "tool": e.tool,
                     "run": run,
-                    "asset": a.id,
+                    "item": a.id,
                     "families": sorted(a.families),
                     "insertion_style": a.insertion_style,
                     "callsite_strict": a.id in s.hits_strict,

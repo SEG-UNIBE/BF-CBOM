@@ -23,8 +23,7 @@ from .record import ASSET_DIMS, NormalizedCbom, NormRecord, unmapped_text
 
 VOCAB_COLUMNS = ["tool", "source", "raw", "status", "mapped", "unmapped_tokens", "via", "interpretive", "kind", "count"]
 COVERAGE_COLUMNS = [
-    "tool", "cboms", "assets", "records", *RESOLUTIONS, "dimension", "reported", "derived", "reported_share",
-    "derived_share",
+    "tool", "cboms", "assets", *RESOLUTIONS, "dimension", "reported", "derived", "reported_share", "derived_share",
 ]  # fmt: skip
 CONFORMANCE_COLUMNS = ["tool", "cboms", "scope", "kind", "count"]
 FILL_DIMS = ("family", "algorithm", "primitive", "functions", "mode", "padding", "curve", "key_size", "digest")
@@ -48,6 +47,21 @@ def source_kind(src: str | None) -> str:
     if src == "dependencies":
         return "dependency"
     return "field"
+
+
+def asset_resolution(records: list[NormRecord]) -> str:
+    """What an asset's name amounts to: the best of its records' resolutions (RESOLUTIONS order; the records of one
+    asset differ only where occurrences carry their own values)."""
+    found = {r.resolution or "undefined" for r in records}
+    return next(x for x in RESOLUTIONS if x in found)
+
+
+def assets_of(n: NormalizedCbom) -> list[list[NormRecord]]:
+    """The CBOM's assets (components), each as its records (one per occurrence), in component order."""
+    by: dict[int, list[NormRecord]] = defaultdict(list)
+    for r in n.records:
+        by[r.component_index].append(r)
+    return [by[i] for i in sorted(by)]
 
 
 class Report:
@@ -87,10 +101,7 @@ class Report:
                 t["counts"][k] += v
         for k, v in (n.stats.get("skipped") or {}).items():
             t["skipped"][k] += v
-        assets: dict[int, list[NormRecord]] = defaultdict(list)
-        for r in n.records:
-            assets[r.component_index].append(r)
-        for records in assets.values():
+        for records in assets_of(n):
             self._add_asset(t, records)
         self._add_mappings(n)
 
@@ -114,8 +125,7 @@ class Report:
             return
         t["counts"]["algorithm_assets"] += 1
         t["counts"]["algorithm_records"] += len(records)
-        resolutions = {r.resolution or "undefined" for r in records}
-        t["resolution"][next(x for x in RESOLUTIONS if x in resolutions)] += 1
+        t["resolution"][asset_resolution(records)] += 1
         sources: set[tuple[str, str]] = set()
         for r in records:
             for d in FILL_DIMS + ("protocol",):
@@ -176,8 +186,8 @@ class Report:
     def coverage_rows(self) -> list[dict]:
         """Fill rates of the algorithm assets, long format: one row per (tool, dimension). `reported` counts assets
         with a value the tool gave (any source but derivation), `derived` assets with only a value we derived (key
-        size from the curve, ...). `assets` and `records` (their occurrences) and the assets per resolution
-        (RESOLUTIONS) repeat on every row of a tool."""
+        size from the curve, ...). `assets` and the assets per resolution (RESOLUTIONS) repeat on every row of a
+        tool; how the assets split into records and items is units-run<k>.csv (analysis/tables.py:unit_rows)."""
         rows = []
         for tool, t in sorted(self.tools.items()):
             assets = t["counts"]["algorithm_assets"]
@@ -185,7 +195,6 @@ class Report:
                 "tool": tool,
                 "cboms": t["cboms"],
                 "assets": assets,
-                "records": t["counts"]["algorithm_records"],
                 **{k: t["resolution"][k] for k in RESOLUTIONS},
             }
             for d in COVERAGE_DIMS:
@@ -272,4 +281,7 @@ class Report:
         return lines
 
 
-__all__ = ["ASSET_DIMS", "CONFORMANCE_COLUMNS", "COVERAGE_COLUMNS", "Report", "VOCAB_COLUMNS", "source_kind"]
+__all__ = [
+    "ASSET_DIMS", "CONFORMANCE_COLUMNS", "COVERAGE_COLUMNS", "Report", "VOCAB_COLUMNS", "asset_resolution", "assets_of",
+    "source_kind",
+]  # fmt: skip

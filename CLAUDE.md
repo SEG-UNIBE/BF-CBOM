@@ -95,7 +95,7 @@ Shared context for coworkers and for Claude Code (which loads this file automati
   would then also stratify by number of developers (GitHub contributors) next to language, stars, last push and
   size (size cap: `GITSERVER_MEMORY`, below).
 - **Corpus and fixtures** (`corpus/`, mounted read-only into the runner): `micro/<language>/` hand-written micro
-  projects with `micro/ground_truth.yaml` (11 assets each, five languages); `pilot-2026-10-08.yaml` (12 pinned real
+  projects with `micro/ground_truth.yaml` (11 expected items each, five languages); `pilot-2026-10-08.yaml` (12 pinned real
   projects in Java, Python and Go, the development set; all 16 pilot projects in `pilot-2026-10-08-all.yaml`, read
   by CipherSift's `tailored_on`); `icpc-2026.yaml` (the 23 ICPC paper repos at HEAD of 2026-10-18, held out);
   `exclusions.yaml` (repos the corpus builder never samples, with reasons). `make corpus` builds a stratified GitHub
@@ -113,7 +113,7 @@ Shared context for coworkers and for Claude Code (which loads this file automati
   - `schema.py`: RQ1, whole-document validation, meaningful shares, traceability; `snapshots.py` reads a pinned
     commit's files from the git mirror or a cache fetched with `--fetch`.
   - `levels.py`: the L0-L4 ladder on a fixed unit (refinement 14): `level_matches` clusters a repo's records level
-    by level; the exact matcher, the ladder and the tools-per-algorithm distribution share it.
+    by level; the exact matcher, the ladder and the tools-per-item distribution share it.
   - `matchers/`: n-way matchers on the records, `exact.py` and `raqun.py`, compared by `compare.py` (Phase 3).
     **Open (2026-10-18): RaQuN runs nowhere yet.** `raqun.py` imports `RaQuN_Lab` in the process that runs the
     analysis (the runner image, or the host venv for a copied export); both install the project with `uv sync`,
@@ -281,7 +281,7 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
     candidates), `api` (a code identifier such as `Cipher.getInstance`, recognised by shape for every tool, or a
     reference label a tool invented, `kind: api` on its dictionary entry), `non-crypto` (a finding outside
     cryptography reported as an asset: securin-xbom's audit rules), `undefined` (a name nobody understands; never
-    guessed). Only `mapped` records are algorithm items;
+    guessed). Only `mapped` records become items;
     the shares per tool are reported. The asset types and their subtypes are CycloneDX's enums (`assetType`,
     `relatedCryptoMaterialProperties.type`, `primitive`; a test keeps `cbom-norm.schema.json` equal to them).
   - `record_id` = `<tool>:<component>:<occurrence>`, `site_id` = `<tool>:<file>:<line>`.
@@ -312,8 +312,8 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
     `matchers/base.py`) must not assume (a)-(c) are the only ones.
   - Every matcher reports per group and dimension (algorithm, key size, mode, padding, curve, digest, location) how
     many voters report and agree (`base.py:agreement`); `compare.py` compares two matchers by co-membership.
-- **Score** (`score.py`, RQ4), per tool × dimension × level on the exact matcher's groups: items are units (L4
-  identities; a parameter: (unit, value); a location: (unit, file:line)), confirmed when a group holding the tool's
+- **Score** (`score.py`, RQ4), per tool × dimension × level on the exact matcher's groups: items are (repo, unit)
+  pairs (unit = L4 identity; a parameter: (unit, value); a location: (unit, file:line)), confirmed when a group holding the tool's
   record also holds another voter group's (same value / same call site), so a group is never counted twice; the
   point estimate is the **mean of the per-repository confirmation rates** (refinement 1; the pooled rate is a
   column), with bootstrap CIs over repos of that mean; a **rank and a CI only with items in ≥ 3 repos and ≥ 10 items**
@@ -321,12 +321,12 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
   second model; leave-one-voter-out with Kendall τ. Tailored (tool, repo) pairs are excluded (`--include-tailored`).
   Observers (`role: observer`) get rates and CIs, confirmed by the voters, but confirm nobody and get no rank; the
   rule is `common/tools_registry.py:votes` on the voter map, used by the ladder, the matchers' agreement and k, and
-  the scores; the `role` column marks them in `levels-`, `algorithms-` and `score-run<k>.csv`.
+  the scores; the `role` column marks them in `levels-`, `items-` and `score-run<k>.csv`.
   `stability.py`: Jaccard across repeated runs and majority consensus sets (`--consensus`).
 - **Tables** (`tables.py`), flat long-format CSVs in three layers, so new matchers only add files: **runs**
   (`runs.csv`, one row per stored run with status, timing, memory, provenance, LLM usage and `cost_usd`), **records**
   (`records-run<k>.csv`), **matches** (`groups-`, `members-`, `agreement-<matcher>-run<k>.csv`, `matchers-run<k>.csv`).
-  Plus `micro-run<k>.csv`, `micro-assets-run<k>.csv`, `algorithms-run<k>.csv`, `levels-run<k>.csv`, `coverage.csv`,
+  Plus `micro-run<k>.csv`, `micro-items-run<k>.csv`, `items-run<k>.csv`, `units-run<k>.csv`, `levels-run<k>.csv`, `coverage.csv`,
   `conformance.csv`, the RQ1, score and stability tables. Join keys: (snapshot, variant, run, record_id) and
   (snapshot, variant, run, group_id); group ids restart per snapshot and variant. Full list: `experiments/README.md`.
 - **Report** (`analysis/report/README.md`): plot recipes on the CSVs (UpSet of tools per asset, fill-rate heatmaps,
@@ -398,10 +398,10 @@ Implementation notes and gotchas: `notes.md` "Phase 4: mutation harness".
 - **On the VM:** replica scaling (`--scale` with `EXPERIMENT_REPLICAS`) and traceability against the mirror.
 
 ## Method refinements (pitch review 2026-10-15; numbers are cited from code)
-1. **Unit of analysis.** Every RQ is reported at **repo level** (the set of canonical algorithm records per repo; all
-   tools take part) and at **call-site level** ((record, file, line ±k); only tools with locations). The micro check
-   follows the same split (`analysis/groundtruth.py:score_records`): call-site recall (the asset at the right file and
-   line ±2; the inclusion bar) and repo-level recall (the asset's own family, `expected.family`, anywhere in the
+1. **Unit of analysis.** Every RQ is reported at **repo level** (the items per repo; all tools take part) and at
+   **call-site level** ((item, file, line ±k); only tools with locations). The micro check follows the same split
+   (`analysis/groundtruth.py:score_records`): call-site recall (the expected item at the right file and line ±2; the
+   inclusion bar) and repo-level recall (the expected item's own family, `expected.family`, anywhere in the
    project), side by side, never pooled. The micro projects are not changed to suit a tool: plain constant algorithm
    strings are the common real-world pattern, and a tool's blindness to them is a finding.
 2. **Implied assets are not disagreement.** HMAC-SHA256 implies SHA-256, PBKDF2 implies HMAC; CBOMkit expands such
@@ -437,7 +437,7 @@ Implementation notes and gotchas: `notes.md` "Phase 4: mutation harness".
 14. **Normalisation can create agreement; report how much.** The vocabulary and the specs were developed on the
     outputs we evaluate, and a too eager normaliser would work against our own hypothesis that tools report
     heterogeneous things. Every agreement number is reported as a ladder (`levels`) that varies only *when two
-    reports count as the same algorithm*, on a fixed unit (an algorithm = its L4 identity) with a cumulative
+    reports count as the same algorithm*, on fixed items (an item = an L4 identity in a repository) with a cumulative
     relation (a match is never lost at a higher level, so shares only grow and each step is attributable): L0 raw
     names, L1 case and separators ignored, L2 standard vocabulary (whole names, 1.7 `algorithmFamily`, JOSE/SSH/JCA
     identifiers), L3 composite names parsed, L4 everything tool-specific (the tools' own spellings and labels, no

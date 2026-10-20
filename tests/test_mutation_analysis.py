@@ -162,7 +162,7 @@ def test_report_judges_mutants_and_keeps_them_out_of_the_agreement_tables(tmp_pa
     assert judged["cbomkit-jar"]["found_site"] == "false" and judged["cbomkit-jar"]["found_repo"] == "false"
     assert judged["cbomkit"]["extra_units"] == "" and judged["cbomkit"]["lost_sites"] == "0"
     assert {r["variant"] for r in rows("records-run1.csv")} == {"original"}  # E3 tables: originals only
-    assert {r["variant"] for r in rows("algorithms-run1.csv")} == {"original"}
+    assert {r["variant"] for r in rows("items-run1.csv")} == {"original"}
     assert [r["variant"] for r in rows("mutants.csv")] == [mid]
     assert len({r["variant"] for r in rows("runs.csv")}) == 2  # runs.csv lists every stored run
     assert (exp / snapshot / mid / "cbomkit" / "run1.norm.json").exists()  # mutants are normalised too

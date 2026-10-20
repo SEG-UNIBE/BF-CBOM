@@ -3,10 +3,10 @@
 from analysis.levels import (
     LEVELS,
     PARAMETER_LEVELS,
-    algorithm_rows,
     algorithms_at,
     clusters_at,
     identity,
+    item_rows,
     ladder,
     level_matches,
 )
@@ -41,7 +41,7 @@ def test_ladder_counts_confirmations_by_other_voter_groups():
         ("s", "c"): _records("c", "SHA-256", "AES-256-GCM"),  # same voter group as a: never confirms a
     }
     rows = {(r.level, r.tool): r for r in ladder(records, {"a": "g1", "b": "g2", "c": "g1"}, dims=("algorithm",))}
-    assert [(rows[(lv, "a")].confirmed, rows[(lv, "a")].algorithms) for lv in LEVELS] == [
+    assert [(rows[(lv, "a")].confirmed, rows[(lv, "a")].items) for lv in LEVELS] == [
         (0, 2), (1, 2), (1, 2), (2, 2), (2, 2)]  # fmt: skip
     assert rows[("L3", "all")].share == 1.0
 
@@ -54,7 +54,7 @@ def test_ladder_excludes_tailored_pairs_on_both_sides():
     voters = {"a": "g1", "b": "g2"}
     rows = {(r.level, r.tool): r for r in ladder(records, voters, exclude={("s", "b")}, dims=("algorithm",))}
     assert ("L3", "b") not in rows  # b was tuned on s: not scored there ...
-    assert (rows[("L3", "a")].algorithms, rows[("L3", "a")].confirmed) == (1, 0)  # ... and it confirms nobody
+    assert (rows[("L3", "a")].items, rows[("L3", "a")].confirmed) == (1, 0)  # ... and it confirms nobody
 
 
 def test_tool_labels_resolve_at_l4_and_no_spec_makes_judgements(tmp_path):
@@ -92,9 +92,9 @@ def test_parameter_ladder_admits_values_by_source():
     rows = {(r.dimension, r.level, r.tool): r for r in ladder(records, {"a": "g1", "b": "g2", "c": "g3"})}
     assert ("key_size", "L0", "b") not in rows and ("key_size", "L2", "b") in rows
     l2 = rows[("key_size", "L2", "b")]
-    assert (l2.algorithms, l2.confirmed) == (1, 0)  # the pair exists (fixed unit), parsed values are not admitted
-    assert (rows[("key_size", "L3", "b")].algorithms, rows[("key_size", "L3", "b")].confirmed) == (1, 1)
-    assert (rows[("mode", "L4", "all")].algorithms, rows[("mode", "L4", "all")].confirmed) == (2, 2)
+    assert (l2.items, l2.confirmed) == (1, 0)  # the pair exists (fixed unit), parsed values are not admitted
+    assert (rows[("key_size", "L3", "b")].items, rows[("key_size", "L3", "b")].confirmed) == (1, 1)
+    assert (rows[("mode", "L4", "all")].items, rows[("mode", "L4", "all")].confirmed) == (2, 2)
     assert set(PARAMETER_LEVELS) == {r.level for r in rows.values() if r.dimension != "algorithm"}
 
 
@@ -105,8 +105,8 @@ def test_closure_adds_implied_algorithms_without_pooling():
     assert set(algorithms_at([hmac], "L3", vocab)) == {"HMAC"}
     assert set(algorithms_at([hmac], "L3", vocab, closure=True)) == {"HMAC", "SHA-256"}
     assert set(algorithms_at([hmac], "L2", vocab, closure=True)) == {"hmacsha256"}  # nothing parsed at L2
-    rows = algorithm_rows({("s", "original", "a"): [hmac]}, {"a": "a"}, run=1, closure=True)
-    assert {(r["algorithm"], r["implied"]) for r in rows} == {("HMAC", False), ("SHA-256", True)}
+    rows = item_rows({("s", "original", "a"): [hmac]}, {"a": "a"}, run=1, closure=True)
+    assert {(r["unit"], r["implied"]) for r in rows} == {("HMAC", False), ("SHA-256", True)}
     assert all(r["k_L0"] == 1 and r["k_L4"] == 1 for r in rows)
     (pbkdf,) = _records("a", "PBKDF2WithHmacSHA1")
     assert vocab.implied(pbkdf.values) == ["SHA-1", "HMAC"]
@@ -117,7 +117,7 @@ def test_ladder_is_cumulative_on_the_fixed_l4_unit():
     # a: two spellings of one algorithm; b: one. The unit stays one item, confirmed from L1 on (aes = AES)
     records = {("s", "a"): _records("a", "AES-256-GCM", "aes"), ("s", "b"): _records("b", "AES")}
     rows = {(r.level, r.tool): r for r in ladder(records, {"a": "g1", "b": "g2"}, dims=("algorithm",))}
-    assert [(rows[(lv, "a")].algorithms, rows[(lv, "a")].confirmed) for lv in LEVELS] == [(1, 0)] + [(1, 1)] * 4
+    assert [(rows[(lv, "a")].items, rows[(lv, "a")].confirmed) for lv in LEVELS] == [(1, 0)] + [(1, 1)] * 4
     # the same raw string, resolved differently: a's "foo" has algorithmFamily AES, b's RSA
     records = {
         ("s", "a"): _records("a", "foo", family_field="AES"),
@@ -132,7 +132,7 @@ def test_ladder_is_cumulative_on_the_fixed_l4_unit():
     # a name nobody understands has no unit: it is no item and matches nothing
     records = {("s", "a"): _records("a", "AES", "parseCsvMap"), ("s", "b"): _records("b", "parseCsvMap")}
     rows = {(r.level, r.tool): r for r in ladder(records, {"a": "g1", "b": "g2"}, dims=("algorithm",))}
-    assert (rows[("L4", "a")].algorithms, rows[("L4", "a")].confirmed) == (1, 0) and rows[("L4", "b")].algorithms == 0
+    assert (rows[("L4", "a")].items, rows[("L4", "a")].confirmed) == (1, 0) and rows[("L4", "b")].items == 0
 
 
 def test_generic_reports_attach_without_merging_and_bridges_do_not_merge():
@@ -181,12 +181,10 @@ def test_observers_get_ladder_rows_but_confirm_nobody():
     rows = {(r.dimension, r.level, r.tool): r.to_dict() for r in ladder({**records, **observer}, voter_of)}
     assert {k: v for k, v in rows.items() if k[2] != "o"} == plain  # voters and the pooled `all` rows: unchanged
     o = rows[("algorithm", "L4", "o")]
-    assert (o["algorithms"], o["confirmed"], o["role"]) == (3, 2, "observer")  # AES and SHA-256 confirmed by a, b
+    assert (o["items"], o["confirmed"], o["role"]) == (3, 2, "observer")  # AES and SHA-256 confirmed by a, b
     assert rows[("algorithm", "L4", "a")]["confirmed"] == 1  # a's SHA-256: only the observer reports it, no vote
-    algos = algorithm_rows(
-        {("s", "original", t): recs for (_, t), recs in {**records, **observer}.items()}, voter_of, run=1
-    )
-    md5 = next(r for r in algos if r["algorithm"] == "MD5")
+    algos = item_rows({("s", "original", t): recs for (_, t), recs in {**records, **observer}.items()}, voter_of, run=1)
+    md5 = next(r for r in algos if r["unit"] == "MD5")
     assert (md5["role"], md5["k_L4"]) == ("observer", 0)  # only an observer reports it: no voter group
     assert voter_groups({"x": {"role": "observer"}, "y": {}}).observers == {"x"}
     assert voter_groups({"x": {"role": "observer"}}, observers_vote=True).observers == frozenset()

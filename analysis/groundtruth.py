@@ -128,7 +128,7 @@ class TruthScore:
         return {
             "tool": self.tool,
             "project": self.project,
-            "n_assets": self.n_assets,
+            "n_items": self.n_assets,
             "recall_strict": round(self.recall_strict, 3),
             "recall_lenient": round(self.recall_lenient, 3),
             "recall_repo": None if recall_repo is None else round(recall_repo, 3),

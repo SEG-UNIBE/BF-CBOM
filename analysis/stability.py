@@ -1,9 +1,9 @@
 """Run-to-run stability of a tool (E0, CLAUDE.md Phase 5) and consensus sets for repeated runs.
 
-For every (tool, snapshot, variant) with at least two stored ok runs: the Jaccard similarity of the algorithm sets
+For every (tool, snapshot, variant) with at least two stored ok runs: the Jaccard similarity of the item sets
 (identity at a ladder level, `analysis/levels.py`) between runs, the coefficient of variation of the record count,
-and the consensus set: the algorithms (L4 identity, the unit of the ladder and the scores) present in more than half
-of the runs (an inserted asset of Phase 4 counts as detected only when it is in most runs). Scoring uses the
+and the consensus set: the items (L4 identity, as in the ladder and the scores) present in more than half of the runs
+(an inserted snippet of Phase 4 counts as detected only when it is in most runs). Scoring uses the
 consensus sets instead of run k's sets when repetitions exceed one (`--consensus`, the default then).
 """
 
@@ -18,7 +18,7 @@ from .normalize.record import NormRecord
 from .normalize.vocab import Vocabulary, load_vocabulary
 
 STABILITY_COLUMNS = [
-    "repo", "snapshot", "variant", "tool", "level", "runs", "records_mean", "records_cv", "algorithms_mean",
+    "repo", "snapshot", "variant", "tool", "level", "runs", "records_mean", "records_cv", "items_mean",
     "jaccard_mean", "jaccard_min", "consensus", "unstable",
 ]  # fmt: skip
 
@@ -62,7 +62,7 @@ def stability_rows(
                 "runs": len(by_run),
                 "records_mean": round(mean, 1),
                 "records_cv": round(statistics.pstdev(counts) / mean, 3) if mean else None,
-                "algorithms_mean": round(statistics.mean(len(s) for s in sets.values()), 1),
+                "items_mean": round(statistics.mean(len(s) for s in sets.values()), 1),
                 "jaccard_mean": round(statistics.mean(pairs), 3),
                 "jaccard_min": round(min(pairs), 3),
                 "consensus": sorted(majority),

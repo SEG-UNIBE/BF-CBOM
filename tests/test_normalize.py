@@ -580,12 +580,20 @@ def test_a_list_in_a_field_is_ambiguous_not_unknown():
     assert all(u["src"] != "properties[bf-cbom:digest]" for u in r.unmapped)  # the list is understood, not unknown
 
 
-def test_coverage_counts_assets_not_occurrences():
+def test_coverage_and_units_count_assets_records_and_items():
+    from analysis.tables import unit_rows
+
     occ = [{"location": "src/a.py", "line": k} for k in range(1, 6)]  # one asset found at five lines
+    one_per_place = [_comp("AES", occ=[{"location": "src/b.py", "line": k}]) for k in (1, 2)]  # one per finding
     bom = _bom(_comp("AES-128-GCM", ap={"mode": "gcm"}, occ=occ), _comp("RSA"), _comp("Cipher.getInstance"))
+    n = normalize_cbom(bom, "cbomkit")
     report = Report()
-    report.add(normalize_cbom(bom, "cbomkit"))
+    report.add(n)
     rows = {r["dimension"]: r for r in report.coverage_rows()}
-    assert (rows["mode"]["assets"], rows["mode"]["records"]) == (3, 7)
-    assert (rows["mode"]["mapped"], rows["mode"]["api"]) == (2, 1)
+    assert (rows["mode"]["assets"], rows["mode"]["mapped"], rows["mode"]["api"]) == (3, 2, 1)
     assert (rows["mode"]["reported"], rows["location"]["reported"]) == (1, 1)  # once per asset, not five times
+    (u,) = unit_rows([n])
+    assert (u["assets"], u["records"], u["items"], u["records_per_asset_max"]) == (3, 7, 2, 5)  # AES, RSA; the API none
+    assert (u["multi_occurrence_share"], u["unlocated_share"]) == (round(1 / 3, 3), round(2 / 3, 3))
+    (v,) = unit_rows([normalize_cbom(_bom(*one_per_place), "cipherradar")])
+    assert (v["assets"], v["records"], v["items"], v["assets_per_item"]) == (2, 2, 1, 2.0)  # two components, one item

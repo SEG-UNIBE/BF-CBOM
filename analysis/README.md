@@ -23,9 +23,9 @@ as 13,996).
 
 | Unit | What it is | Identified by | Counted in |
 |---|---|---|---|
-| **asset** | one crypto asset component of a CBOM, as the tool wrote it | `component_index` in the CBOM | RQ2 (what the tools report), RQ1 meaningful, the normalisation table (`coverage.csv`, `conformance.csv`, `normalize.json`) |
-| **record** | one occurrence of an asset: an asset found at five lines gives five records, an asset without occurrences one record without a location | `record_id` = `<tool>:<component>:<occurrence>`, its location `site_id` = `<tool>:<file>:<line>` | `records-run<k>.csv`, RQ1 traceability, the matchers' clusters and call-site groups (`members-*.csv`) |
-| **item** | one algorithm in one repository (snapshot and variant): one distinct L4 identity, however many assets and records of a tool carry it; a tool reports the item when one of its `mapped` records has that identity | algorithm: (snapshot, unit); parameter: (snapshot, unit, value); location: (snapshot, unit, file:line) | the ladder (`levels-`, `algorithms-run<k>.csv`), the scores, stability, the tools-per-algorithm distribution, E4 |
+| **asset** | one crypto asset component of a CBOM, as the tool wrote it | `component_index` in the CBOM | RQ2 (what the tools report), RQ1 meaningful, the normalisation section (`units-run<k>.csv`, `coverage.csv`, `conformance.csv`, `normalize.json`) |
+| **record** | one occurrence of an asset: an asset found at five lines gives five records, an asset without occurrences one record without a location | `record_id` = `<tool>:<component>:<occurrence>`, its location `site_id` = `<tool>:<file>:<line>` | `records-run<k>.csv`, `units-run<k>.csv`, RQ1 traceability, the matchers' clusters and call-site groups (`members-*.csv`) |
+| **item** | one algorithm in one repository (snapshot and variant): one distinct L4 identity, however many assets and records of a tool carry it; a tool reports the item when one of its `mapped` records has that identity | algorithm: (snapshot, unit); parameter: (snapshot, unit, value); location: (snapshot, unit, file:line) | the ladder (`levels-`, `items-run<k>.csv`), the scores, stability, the tools-per-item distribution, E4 |
 
 - **Asset to record.** The normaliser writes one record per (component, occurrence) (`normalize/record.py`), and
   the values sit on the record, since occurrence evidence has the highest precedence. A component's records nearly
@@ -33,22 +33,51 @@ as 13,996).
 - **Record to item.** Only `mapped` records have an item (the `resolution` table below): an `api`, `ambiguous`,
   `non-crypto` or `undefined` record counts as an asset and a record, never as an item. Records of the same identity
   in one repository are one item of the tool, whether one asset with 800 occurrences carries them or 800 assets.
-- **Packaging.** How a tool splits its findings into assets and records is its output format, not what it found.
-  On the pilot corpus (the 12 repos in the paper languages, export of 2026-10-19), roughly:
+- **Packaging.** How a tool splits its findings into assets and records is its output format, not what it found:
+  CBOMkit lists an algorithm once with its occurrences, CipherRadar writes one component per finding. Asset and
+  record counts therefore describe a tool's output, item counts what it reports. Every tool's format: "Packaging per
+  tool" below; an experiment's numbers: its `units-run<k>.csv`.
+- **Two more words.** A *unit* is an L4 identity: the identity of an item (the `unit` column of
+  `items-run<k>.csv`) and the expected value of an E4 mutant (`expected.unit`). A *site* is a record's file and line
+  (call-site level, refinement 1). The micro ground truth's entries are *expected items* at site level, a known
+  crypto call at known lines (`micro-items-run<k>.csv`; `corpus/micro/ground_truth.yaml` keeps the pilot's key
+  `assets`).
+- **Where "algorithm" stays.** Only as the CycloneDX asset type (an *algorithm asset*), as the `algorithm`
+  dimension (next to key size, mode, padding, curve, digest and location) and as the record field `algorithm`. What
+  is counted or compared is always an item.
 
-  | tool | assets | records | items (repo level) |
-  |---|---:|---:|---:|
-  | CBOMkit | 89 | 299 | 67 |
-  | CryptoScan | 142 | 9,326 | 170 |
-  | CipherRadar | 4,002 | 4,002 | 127 |
-  | pqcheck | 1,145 | 1,145 | 87 |
+### Packaging per tool
 
-  CBOMkit and CryptoScan list an algorithm once with its occurrences, CipherRadar and pqcheck write one component
-  per finding. Asset and record counts therefore describe a tool's output, item counts what it reports.
-- **Two more words.** A *unit* is an L4 identity: the identity of an algorithm item (`levels.py`) and the expected
-  value of an E4 mutant (`expected.unit`). A *site* is a record's file and line (call-site level, refinement 1).
-  In the micro ground truth (`corpus/micro/ground_truth.yaml`, `micro-assets-run<k>.csv`) an "asset" is one
-  expected crypto use at a call site, i.e. an item at site level, not a CBOM component.
+What one CBOM component is for each tool, and where its places in the code are. This is the tool's output format,
+read as shipped (the adapter spec's `notes:` in `adapters/<tool>.yaml` say more), so this table changes only when a
+tool is added or its pinned version changes, together with its spec; `tests/test_analysis.py` checks that every
+integrated tool has a row. The numbers of an experiment are in its `units-run<k>.csv` and the summary's "Units per
+tool": records per asset, assets per item, the share without a location.
+
+| Tool | One component is | Its places |
+|---|---|---|
+| CBOMkit, cbomkit-jar | an algorithm (registry or JCA name); key material separate, linked through `dependencies` | every occurrence in `evidence.occurrences` |
+| CryptoScan | a category (RSA, ECC, HMAC-SHA2, also a list such as `RSA, ECC, AES`) | every match an occurrence; its `symbol` is the matched text and carries its own values, so one asset can stand for several items |
+| xgrep | an algorithm (registry-style name) | occurrences |
+| SCANOSS | an (algorithm, parameters) pair | every match an occurrence |
+| Q-DARPAN | an algorithm | up to 30+ places, written by the tool into properties `qdarpan:location.N` and copied into occurrences by our worker |
+| qScan ° | an (asset type, algorithm, discriminator) triple | occurrences as `location: <file>:<line>` |
+| CryptobomForge | one entry of CodeQL's crypto inventory (IBM's draft format) | `detectionContext` windows of 5-9 lines |
+| CipherSift | a (rule, name, parameter, OID) combination | occurrences, the `symbol` is the API |
+| CipherRadar | a finding | one occurrence (absolute path of its temporary clone) |
+| pqcheck | a finding (with detector id and confidence); declared dependencies are separate library components, skipped | one occurrence |
+| qelens ° | a finding, many of them on import lines | one occurrence |
+| securin-xbom | a semgrep finding, named after the rule id | one occurrence |
+| cdxgen | an algorithm name (lower case, with OID); also crypto files (certificates, keys) | only for JS/TS (occurrences) and Go (property `cdx:golem:crypto:sourceLocation`); Java and Python algorithms have none |
+| Cryptarium ° | a distinct finding id | none: the CBOM has no locations (only the tool's JSON format has them) |
+| DeepSeek, ChatGPT, Claude | a site the model reported (CycloneDX assembled by our worker, `common/llm_cbom.py`) | one occurrence, file and line checked against the clone |
+
+Three patterns follow. Tools that list an algorithm once with its places (CBOMkit, CryptoScan, xgrep, SCANOSS,
+Q-DARPAN, qScan, CryptobomForge) have about one asset per item, so their asset counts are close to what they report.
+Tools that write one component per finding (CipherRadar, pqcheck, qelens, securin-xbom, Cryptarium, the LLM workers)
+have one record per asset and, wherever an algorithm is used more than once, several assets per item. CipherSift
+sits in between: one component per rule match combination, with occurrences. Hence: asset and record counts
+describe a tool's output format, items what it reports, and every cross-tool comparison counts items.
 
 ## What an adapter spec may contain
 

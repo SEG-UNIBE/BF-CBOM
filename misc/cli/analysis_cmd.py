@@ -45,7 +45,7 @@ from common.experiment import (
     pinned_repos,
     spec_path,
 )
-from common.tools_registry import load_tools, tailored_map, voter_groups
+from common.tools_registry import VoterMap, load_tools, role, tailored_map, voter_groups
 
 # (meta, path of run<k>.json, its normalised CBOM)
 Normalized = tuple[dict, Path, NormalizedCbom]
@@ -68,7 +68,7 @@ CLOSURE_OPT = typer.Option(
     False,
     "--closure",
     help="Close every tool's algorithm set under the vocabulary's `implies` relation (refinement 2): the ladder and "
-    "algorithms-run<k>.csv (implied rows marked) count HMAC-SHA256 as HMAC and SHA-256 for every tool",
+    "items-run<k>.csv (implied rows marked) count HMAC-SHA256 as HMAC and SHA-256 for every tool",
 )
 RAQUN_OPT = typer.Option(
     None,
@@ -80,7 +80,7 @@ SAMPLES_OPT = typer.Option(200, "--samples", help="Bootstrap resamples over repo
 CONSENSUS_OPT = typer.Option(
     True,
     "--consensus/--no-consensus",
-    help="With repeated runs, score a tool's consensus set (algorithms in more than half of its runs) instead of "
+    help="With repeated runs, score a tool's consensus set (items in more than half of its runs) instead of "
     "run k's set (analysis/stability.py)",
 )
 FETCH_OPT = typer.Option(
@@ -122,7 +122,7 @@ def _expects(exp_dir: Path) -> dict[str, str | None]:
     return {r["full_name"]: r.get("expect_crypto") for r in _spec(exp_dir).get("repos") or []}
 
 
-def _voter_of(merge_llm: bool = False, observers_vote: bool = False) -> dict[str, str]:
+def _voter_of(merge_llm: bool = False, observers_vote: bool = False) -> VoterMap:
     return voter_groups(merge_llm=merge_llm, observers_vote=observers_vote)
 
 
@@ -373,9 +373,9 @@ def _levels_step(
     include_tailored: bool = False,
     closure: bool = False,
 ) -> list[lv.LevelRow]:
-    """The L0-L4 ladder (levels-run<k>.csv) and which algorithms each tool reports (algorithms-run<k>.csv).
-    (tool, repo) pairs the tool was tuned on (refinement 13) are marked in algorithms-run<k>.csv and left out of
-    the ladder unless `include_tailored`; `closure` adds the implied algorithms (refinement 2)."""
+    """The L0-L4 ladder (levels-run<k>.csv) and which items each tool reports (items-run<k>.csv).
+    (tool, repo) pairs the tool was tuned on (refinement 13) are marked in items-run<k>.csv and left out of
+    the ladder unless `include_tailored`; `closure` adds the implied items (refinement 2)."""
     ladder_in: dict[tuple[str, str], list] = {}
     presence_in: dict[tuple[str, str, str], list] = {}
     tailored = tailored_map()
@@ -391,10 +391,10 @@ def _levels_step(
     voter_of = _voter_of(merge_llm, observers_vote)
     rows = lv.ladder(ladder_in, voter_of, exclude=set() if include_tailored else excluded, closure=closure)
     write(f"levels-run{run}.csv", [r.to_dict() for r in rows], lv.LEVEL_COLUMNS)
-    algorithms = lv.algorithm_rows(
+    items = lv.item_rows(
         presence_in, voter_of, run=run, languages=_languages(exp_dir), tailored=tailored, closure=closure
     )
-    write(f"algorithms-run{run}.csv", algorithms, lv.ALGORITHM_COLUMNS)
+    write(f"items-run{run}.csv", items, lv.ITEM_COLUMNS)
     return rows
 
 
@@ -437,6 +437,7 @@ def _tables_step(
             language=languages.get(tbl.full_name(snapshot)),
         )
     write(f"records-run{run}.csv", norm_rows, tbl.RECORDS_COLUMNS)
+    write(f"units-run{run}.csv", tbl.unit_rows([n for _, _, n in normalized], voter_of), tbl.UNIT_COLUMNS)
     # the exact matcher at every level feeds matchlevels-run<k>.csv (RQ3, matcher x level); the full group, member
     # and agreement tables are written at the scoring level only
     matchlevel_rows: list[dict] = []
@@ -487,7 +488,7 @@ def _tables_step(
     entries = _micro_entries(exp_dir, run, all_assets, normalized)
     if entries:
         write(f"micro-run{run}.csv", tbl.micro_rows(entries, run=run), tbl.MICRO_COLUMNS)
-        write(f"micro-assets-run{run}.csv", tbl.micro_asset_rows(entries, run=run), tbl.MICRO_ASSET_COLUMNS)
+        write(f"micro-items-run{run}.csv", tbl.micro_item_rows(entries, run=run), tbl.MICRO_ITEM_COLUMNS)
     else:
         typer.echo("no micro projects in this experiment: micro tables skipped")
     return groups_by_snapshot
@@ -657,16 +658,25 @@ def score_cmd(
     )
 
 
-def _write_info(out_dir: Path, run: int, settings: dict, counts: dict[str, int], normalized: list[Normalized]):
-    """tables-run<k>.json: settings, row counts, and the vocabulary and adapter spec versions used."""
+def _write_info(
+    out_dir: Path, run: int, settings: dict, counts: dict[str, int], normalized: list[Normalized], voter_of: VoterMap
+):
+    """tables-run<k>.json: settings, row counts, the vocabulary and adapter spec versions used, and the voter map the
+    numbers rest on (each spec tool's voter group, role and engine, after --merge-llm / --observers-vote)."""
     vocabulary = next((n.vocabulary for _, _, n in normalized), {})
     adapters = {n.tool: n.adapter.get("spec") for _, _, n in normalized}
+    registry = load_tools()
+    voters = {
+        t: {"voter_group": voter_of.get(t, t), "role": role(voter_of, t), "engine": registry.get(t, {}).get("engine")}
+        for t in _spec(out_dir.parent).get("tools") or []
+    }
     info = {
         "settings": settings,
         "rows": counts,
         "generated_at": datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"),
         "vocabulary": vocabulary,
         "adapters": dict(sorted(adapters.items())),
+        "voters": voters,
     }
     (out_dir / f"tables-run{run}.json").write_text(json.dumps(info, indent=2) + "\n", encoding="utf-8")
 
@@ -697,9 +707,9 @@ def levels(
     include_tailored: bool = INCLUDE_TAILORED_OPT,
     closure: bool = CLOSURE_OPT,
 ):
-    """How much agreement normalisation creates: share of each tool's algorithms (per repository) that another
+    """How much agreement normalisation creates: share of each tool's items (per repository) that another
     voter group also reports, at levels L0 (raw names) to L4 (full adapter specs). See analysis/levels.py.
-    Also writes algorithms-run<k>.csv: which algorithms each tool reports per repository and level."""
+    Also writes items-run<k>.csv: which items each tool reports per repository and level."""
     exp_dir = _experiment(name)
     counts: dict[str, int] = {}
     rows = _levels_step(
@@ -714,7 +724,7 @@ def levels(
     )
     for level in lv.LEVELS:
         typer.echo(f"  {level}: {lv.LEVEL_NAMES[level]}")
-    typer.echo("share of a tool's algorithms (per repository) that another voter group also reports:")
+    typer.echo("share of a tool's items (per repository) that another voter group also reports:")
     for line in lv.table_lines(rows):
         typer.echo("  " + line)
 
@@ -752,7 +762,7 @@ def tables(
         raqun=raqun,
         all_assets=all_assets,
     )
-    _write_info(out_dir, run, settings, counts, normalized)
+    _write_info(out_dir, run, settings, counts, normalized, _voter_of(merge_llm, observers_vote))
     typer.echo(f"written to {out_dir}")
 
 
@@ -837,7 +847,7 @@ def run_report(
         "closure": closure,
         "fetch": fetch,
     }
-    _write_info(out_dir, run, settings, counts, normalized)
+    _write_info(out_dir, run, settings, counts, normalized, _voter_of(merge_llm, observers_vote))
     return sm.write(out_dir, run=run)
 
 
@@ -859,7 +869,7 @@ def report(
 ):
     """Everything in one pass: normalised CBOMs, every CSV table (runs, records, RQ1 schema/meaningful/traceability,
     the exact matcher's groups/members/agreement, scores and leave-one-out, stability, micro at two levels,
-    algorithms per tool and level, ladder, coverage, conformance; with mutants the E4 tables mutants.csv,
+    items per tool and level, ladder, coverage, conformance; with mutants the E4 tables mutants.csv,
     mutation.csv and mutation-rates.csv, the agreement tables on the originals only) and _ANALYSIS/_SUMMARY.md with
     Markdown tables."""
     exp_dir = _experiment(name)
