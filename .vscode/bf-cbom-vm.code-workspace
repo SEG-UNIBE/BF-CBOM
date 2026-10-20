@@ -1,25 +1,31 @@
 {
-  // Lives in .vscode/, so the folder path is "..", the repo root. Open this file on the VM (File > Open Workspace from File...) to get brick red bars there.
-  // Locally, open the folder itself: .vscode/settings.json gives the bright red.
+  // Lives in .vscode/, so the folder path is "..", the repo root. Open this file on the VM (File > Open Workspace from File...) for deep burgundy bars.
+  // Locally, open the folder itself: .vscode/settings.json gives the warmer, brighter brick red.
   "folders": [{ "path": ".." }],
   "settings": {
     "workbench.colorCustomizations": {
-      "titleBar.activeBackground": "#b71c1c",
+      "titleBar.activeBackground": "#70243D",
       "titleBar.activeForeground": "#ffffff",
-      "titleBar.inactiveBackground": "#8f1a1a",
+      "titleBar.inactiveBackground": "#4D2030",
       "titleBar.inactiveForeground": "#ffffffcc",
-      "titleBar.border": "#7f1515",
-      "commandCenter.background": "#ffffff26",
+      "titleBar.border": "#A44B67",
+      "commandCenter.background": "#00000020",
       "commandCenter.foreground": "#ffffff",
-      "commandCenter.activeBackground": "#ffffff40",
-      "commandCenter.border": "#ffffff66",
-      "activityBar.background": "#b71c1c",
+      "commandCenter.activeBackground": "#00000040",
+      "commandCenter.activeForeground": "#ffffff",
+      "commandCenter.border": "#ffffff40",
+      "activityBar.background": "#501B2E",
       "activityBar.foreground": "#ffffff",
-      "activityBar.inactiveForeground": "#ffffffb3",
+      "activityBar.inactiveForeground": "#ffffffcc",
       "activityBar.activeBorder": "#ffffff",
-      "activityBar.border": "#7f1515",
+      "activityBar.border": "#70243D",
       "activityBarBadge.background": "#ffffff",
-      "activityBarBadge.foreground": "#b71c1c"
+      "activityBarBadge.foreground": "#501B2E",
+      "statusBar.background": "#501B2E",
+      "statusBar.foreground": "#ffffff",
+      "statusBar.border": "#70243D",
+      "statusBar.noFolderBackground": "#501B2E",
+      "statusBar.noFolderForeground": "#ffffff"
     }
   }
 }

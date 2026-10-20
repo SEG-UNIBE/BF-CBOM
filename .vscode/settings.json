@@ -1,23 +1,29 @@
 {
-  // Local workstation: bright red bars. On the VM, open bf-cbom-vm.code-workspace instead of the folder:
+  // Local workstation: bright warm red bars. On the VM, open bf-cbom-vm.code-workspace for deep burgundy:
   // a workspace file's colors replace these (folder-level window settings are ignored in a workspace).
   "workbench.colorCustomizations": {
-    "titleBar.activeBackground": "#f52929",
+    "titleBar.activeBackground": "#D33C32",
     "titleBar.activeForeground": "#ffffff",
-    "titleBar.inactiveBackground": "#c42121",
+    "titleBar.inactiveBackground": "#A93730",
     "titleBar.inactiveForeground": "#ffffffcc",
-    "titleBar.border": "#a51b1b",
-    // darker translucent box behind the command center keeps its text readable on the bright red
-    "commandCenter.background": "#00000040",
+    "titleBar.border": "#EF7564",
+    // Darken the command center slightly to keep white text readable in every state.
+    "commandCenter.background": "#00000020",
     "commandCenter.foreground": "#ffffff",
-    "commandCenter.activeBackground": "#00000059",
-    "commandCenter.border": "#00000026",
-    "activityBar.background": "#f52929",
+    "commandCenter.activeBackground": "#00000040",
+    "commandCenter.activeForeground": "#ffffff",
+    "commandCenter.border": "#ffffff40",
+    "activityBar.background": "#BC352D",
     "activityBar.foreground": "#ffffff",
     "activityBar.inactiveForeground": "#ffffffcc",
     "activityBar.activeBorder": "#ffffff",
-    "activityBar.border": "#a51b1b",
+    "activityBar.border": "#D33C32",
     "activityBarBadge.background": "#ffffff",
-    "activityBarBadge.foreground": "#c42121"
+    "activityBarBadge.foreground": "#BC352D",
+    "statusBar.background": "#BC352D",
+    "statusBar.foreground": "#ffffff",
+    "statusBar.border": "#D33C32",
+    "statusBar.noFolderBackground": "#BC352D",
+    "statusBar.noFolderForeground": "#ffffff"
   }
 }
