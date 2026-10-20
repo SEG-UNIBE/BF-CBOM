@@ -53,15 +53,18 @@ Shared context for coworkers and for Claude Code (which loads this file automati
 - **Batch experiments.** `make experiment EXP=experiments/<x>.yaml` runs `bf-cbom experiment run` in the runner
   (`misc/cli/experiment_cmd.py`, logic in `common/experiment.py`): it pins every repo's commit, mirrors it to the
   `gitserver` service (one served repo `<owner>/<repo>--<sha12>.git` per snapshot, because CBOMkit only checks out a
-  clone's default branch; mutants will be branches `bfcbom/<variant>`), enqueues through the normal Redis protocol and
-  stores the results on `results-data`. Resumable: a run with a stored meta file is skipped, `--retry-failed` redoes
-  the runs that are not ok, `--rerun <tools>` every run of those tools, `--overwrite-old` the whole spec (every stored
-  run and the old `_ANALYSIS/` removed first, pending jobs cancelled; `lock.json` keeps the commits pinned, the run log
-  is kept; `common/experiment.py:clear_stored_runs`). A spec entry with `path:` publishes a directory as a deterministic commit
-  (`publish_fixture`). Spec format and the list of specs: `experiments/README.md`.
+  clone's default branch; a mutant is a branch `bfcbom/<id>`), enqueues through the normal Redis protocol and
+  stores the results on `results-data`. A spec's `mutation:` block makes every repo's variants the original plus
+  generated insertion mutants (`mutation/mutants.py`, Phase 4), pinned in `mutants.json` like the commits in
+  `lock.json`. Resumable: a run with a stored meta file is skipped, `--retry-failed` redoes the runs that are not ok,
+  `--rerun <tools>` every run of those tools, `--overwrite-old` the whole spec (every stored run and the old
+  `_ANALYSIS/` removed first, pending jobs cancelled; `lock.json` and `mutants.json` keep the commits and mutants
+  pinned, the run log is kept; `common/experiment.py:clear_stored_runs`). A spec entry with `path:` publishes a
+  directory as a deterministic commit (`publish_fixture`). Spec format and the list of specs: `experiments/README.md`.
 - **Experiment folder:** `_experiment.yaml`, `_run-log.json` (runner sessions: times, VM RAM and CPUs, budget, waves,
   peak VM RAM, worker image IDs), `_ANALYSIS/` (with `_SUMMARY.md`; emptied and rebuilt by every `report`),
-  `lock.json`, then `<owner>__<repo>@<sha12>/<variant>/<tool>/run<k>.json` plus `run<k>.meta.json`. A folder without
+  `lock.json`, `mutants.json` (with a `mutation:` block: every mutant's snippet, style, host, lines, inserts and
+  patch), then `<owner>__<repo>@<sha12>/<variant>/<tool>/run<k>.json` plus `run<k>.meta.json`. A folder without
   `_experiment.yaml` is ignored by every command (`experiment list` names it for deletion).
 - **Provenance.** `RepoInfo.commit` is resolved at inspection start (`coordinator/redis_io.py:enrich_repo`) and checked
   out exactly by `clone_repo`. `JobResult` carries `tool_version`, `image_ref` (env `BF_CBOM_IMAGE`), `bfcbom_commit`
@@ -92,9 +95,9 @@ Shared context for coworkers and for Claude Code (which loads this file automati
   projects with `micro/ground_truth.yaml` (11 assets each, five languages); `pilot-2026-10-08.yaml` (16 pinned real
   projects, the development set); `icpc-2026.yaml` (the 23 ICPC paper repos at HEAD of 2026-10-18, held out);
   `exclusions.yaml` (repos the corpus builder never samples, with reasons). `make corpus` builds a stratified GitHub
-  corpus (`common/corpus.py`; needs `GITHUB_TOKEN` in `docker/env/coordinator.env`). Repos above
-  `CORPUS_MAX_REPO_SIZE_MB` (default `GITSERVER_MEMORY`/4: the git server must serve CBOMkit's full clone from a
-  container with that limit; Makefile) are never sampled and listed as excluded with the reason.
+  corpus of Java, Python and Go repos (`common/corpus.py`; needs `GITHUB_TOKEN` in `docker/env/coordinator.env`).
+  Repos above `CORPUS_MAX_REPO_SIZE_MB` (default `GITSERVER_MEMORY`/4: the git server must serve CBOMkit's full clone
+  from a container with that limit; Makefile) are never sampled and listed as excluded with the reason.
 - **Analysis** (`analysis/`, offline, reads the results volume only; `make analysis ARGS="<command> <exp>"` writes
   `<exp>/_ANALYSIS/`; `experiment export` runs `report` first):
   - `normalize/`: CBOM -> normalised records (below); `normalize` also writes `run<k>.norm.json` next to each CBOM.
@@ -114,6 +117,8 @@ Shared context for coworkers and for Claude Code (which loads this file automati
     says how to limit it).
   - `score.py`, `stability.py`, `costs.py`: RQ4 scores, run-to-run stability, LLM costs from
     `analysis/data/llm_prices.yaml`.
+  - `mutation.py`: E4, each tool's detection of the inserted calls (Phase 4); every agreement analysis (RQ1, ladder,
+    matchers, scores, stability) reads the original variants only, so a mutated repo is never counted twice.
   - `groundtruth.py`: micro recall at call sites and at repo level, precision, inclusion bar, field-by-field
     comparison with `expected`.
   - `tables.py` (flat CSV tables), `summary.py` (`_SUMMARY.md`, rendered from the CSVs only).
@@ -174,14 +179,14 @@ real projects.
 - **RQ3:** how well can assets be matched, per kind of information (algorithm, parameters, location)?
 - **RQ4:** can tools be scored and ranked without ground truth?
 
-Decisions: mutants are hosted on the local git server; the LLM generator reads the code; the corpus is ~100 Java +
-~100 Python repos, mutation runs on a ~30-repo subset.
+Decisions: mutants are hosted on the local git server; the LLM generator reads the code; the corpus is ~100 repos per
+paper language, mutation runs on a ~30-repo subset per language.
 
-**Paper languages (decided 2026-10-20):** the paper analyses Java and Python, at most also Go; every other language
-(C, JavaScript/TypeScript, Rust, ...) is irrelevant for now: tools still run where they declare support, but no
-analysis, figure or tuning effort goes into those languages.
+**Paper languages (decided 2026-10-20):** the paper analyses Java, Python and Go (Go added the same day, with the
+mutation harness); every other language (C, JavaScript/TypeScript, Rust, ...) is irrelevant for now: tools still run
+where they declare support, but no analysis, figure or tuning effort goes into those languages.
 
-## Status (2026-10-19)
+## Status (2026-10-20)
 - **Export review of 2026-10-19** (`docs/findings.md` "Export review"): the first VM runs of e0-stability,
   e1-pilot-corpus and e1-icpc-corpus were checked for plausibility. Fixed since: the git server's 256 MiB limit killed
   CBOMkit's full clones of keycloak and ansible (`GITSERVER_MEMORY`, 4g); cdxgen was OOM-killed at 8 GiB on four Java
@@ -203,22 +208,25 @@ analysis, figure or tuning effort goes into those languages.
   ignored). Vocabulary 2026-10-20.2. The DeepSeek rerun below picks up the new assembly.
 - **Observers added (2026-10-19):** qelens, cryptarium and qScan are workers with `role: observer` and are in the
   three experiment specs; the reruns below pick them up. Vocabulary 2026-10-19.2 (their specs only).
+- **Phase 4 built (2026-10-20):** insertion mutants for Java, Python and Go (`mutation/`, below); the smoke spec
+  `experiments/e4-mutation-smoke.yaml` waits for the VM. Removal mutants come after E1 (they need its voters).
 - **Waiting for the VM:** `make up-prod`, then each experiment as a whole (the user's preference, 2026-10-20):
   `make experiment EXP=experiments/e1-pilot-corpus.yaml ARGS="--overwrite-old" EXPERIMENT_MEMORY_BUDGET_GB=0`, the
   same for e1-icpc-corpus and e0-stability (DeepSeek needs credit first; `make experiment-delete NAME=e0-micro`,
-  superseded by e0-stability); then build the E1 corpus with `GITHUB_TOKEN` and prune it, check replicas.
+  superseded by e0-stability); `make experiment EXP=experiments/e4-mutation-smoke.yaml EXPERIMENT_MEMORY_BUDGET_GB=0`;
+  then build the E1 corpus (Java, Python and Go) with `GITHUB_TOKEN` and prune it, check replicas.
 - **Waiting for the user:** how RaQuN gets into the runner (see "Analysis", `matchers/`): a `pyproject.toml` in the
   PyQuN fork (draft in `notes.md` WP6), then pin it in the `raqun` extra and the misc-pyqun image, or the stopgap;
   an explicit DeepSeek model id (the default `deepseek-chat` is no longer on DeepSeek's model page and is priced as
   `deepseek-flash` meanwhile); human review of the micro ground truth, the hand-check
-  verdicts and the `languages` lists (all AI-made); whether Go becomes a third paper language (Java and Python
-  are fixed; nothing beyond Go).
+  verdicts, the `languages` lists and the mutation snippet catalogs (all AI-made).
 - **External:** the SCANOSS research key, the Cryptoscope artifact, the two-rater review of the matcher validation
   sample (a review of `vocab.csv` with Cohen's κ is an option, not decided).
 - **Small open analysis items:** CryptobomForge's IBM-draft windows are CodeQL's `contextRegion` (finding ±2 lines),
   so the exact line could be read as the window centre (one over-credit on micro-python); Jaro-Winkler candidates
   for curating the mapping table; per-field columns in `micro-run<k>.csv`; inferring `functions` from API names.
-- **Next:** Phase 4, the mutation harness. Phases 5 and 6 not started.
+- **Next:** the E4 smoke run, then removal mutants and the E4 subset (~30 repos per language from the E1 corpus,
+  enough Python repos that already depend on `cryptography`). Phases 5 and 6 not started.
 
 ## Phases 1-3 (done 2026-10-15 to 2026-10-18)
 What exists and the decisions behind it. Numbers: `docs/findings.md`; implementation notes per work package:
@@ -316,23 +324,41 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
   ladder, ranking with CIs, cost per confirmed asset). The figures are built by the user later, following the
   `dataviz` skill.
 
-## Phase 4: mutation harness (`mutation/`, RQ4 validation; next)
-- **Snippet catalog** (`mutation/catalog/{java,python}.yaml`), about 15 assets per language: RSA-2048 keygen, EC P-256
-  / Ed25519 signing, AES-128/256-GCM/CBC, SHA-1/256, HMAC, PBKDF2, TLS context. Each snippet has its expected canonical
-  record, its imports and three insertion styles: direct call, wrapper function, indirection through a variable or
-  constant (`alg = "RSA"; getInstance(alg)`; refinement 5, the pilot's shared blind spot).
-- **Insert** with tree-sitter into an existing method that has a caller (or an entry point), or a new file in an
-  existing package, so it compiles in context; never under test directories (refinement 6). Record the expected file,
-  line and insertion kind (a covariate).
-- **Remove:** delete or neutralise call sites that ≥2 independent voters reported, confirmed by tree-sitter queries;
-  removed assets are expected to disappear. Removal candidates are easier by construction, so insertion and removal
-  results are reported apart, never pooled (refinement 7).
-- **Variants:** one insertion or removal per mutant; ~30 repos × ~10 mutants × 2 languages, about 600 mutants, each a
-  branch on the git server; the runner scans original and mutant. Choose the subset among the smaller repos.
-- **Ground truth from mutation**, per tool: insertion detected (by algorithm, parameters, location), removal reflected,
-  no other changes in the diff (stability). With repeated runs, an inserted asset counts as detected only if it
-  appears in most runs of the mutant and not in the original; this also exposes LLM answers from memorised popular
-  repos, which cannot react to the change.
+## Phase 4: mutation harness (`mutation/`, RQ4 validation; insertion built 2026-10-20)
+Implementation notes and gotchas: `notes.md` "Phase 4: mutation harness".
+- **Snippet catalog** (`mutation/catalog/{java,python,go}.yaml`, versioned): the same 15 ids per language (RSA-2048
+  keygen, EC P-256 keygen, ECDSA / Ed25519 signing, AES-128/256-GCM, AES-256-CBC, 3DES-CBC (Python: SHA3-256),
+  RSA-OAEP, SHA-1/256, MD5, HMAC-SHA256, PBKDF2, TLS 1.3 context). Each has its expected canonical record (`unit` =
+  the L4 identity), the identities it also contains, its imports and the `direct` and `indirect` templates (the
+  algorithm name or a parameter in its own variable, Go: a function value; refinement 5); `wrapper` (a helper next
+  to the host plus one call) is derived. A snippet only goes where its library is already there (decided 2026-10-20):
+  Java is JCA throughout, Python's pyca snippets need a declared `cryptography` (stdlib ones go anywhere), Go's PBKDF2
+  needs `go >= 1.24` or a required `golang.org/x/crypto`; dependency files are never edited, so every mutant is one
+  edit of one file.
+- **Insert** (`lang.py`, `insert.py`; tree-sitter for Java and Go, Python's `ast`): into a first-party method or
+  function with a caller elsewhere in the repo (by name, `host_callers` recorded as a covariate) or a `main`, never in
+  test, vendor, example or generated code (refinement 6); before its first statement (Java inside its own try/catch,
+  Go inside its own block, so locals never clash); imports where the language keeps them (Java sorted into its group,
+  fully qualified on a name clash; Python after the absolute imports, aliased on a clash; Go sorted into the import
+  group, `crand` next to `math/rand`); the mutated file must parse. Mutants in context are not compiled (no project
+  builds); `tests/test_mutation.py` compiles or runs every snippet x style in small hosts (javac, go build, Python).
+  New-file insertion is not built (repos without a host are reported).
+- **Variants** (`mutants.py`): a spec's `mutation:` block (`per_repo`, `styles`, `snippets`, `seed`) gives every repo
+  that many mutants, (snippet, style) pairs drawn round-robin over the styles from a seeded shuffle, hosts from files
+  not used yet; each a commit on the pinned commit (fixed author and date: the SHA depends only on the content), a
+  branch `bfcbom/ins-<snippet>-<style>-<hash>` in the base mirror. `mutants.json` records file, host, call line, spans,
+  line shifts, the inserts (a missing branch is rebuilt from them with the same SHA) and the patch (Phase 6's mutant
+  patches). E4 proper: ~30 repos x ~10 mutants x 3 languages, chosen among the smaller repos of the E1 corpus.
+- **Ground truth from mutation** (`analysis/mutation.py`, `mutation.csv`, `mutation-rates.csv`): per (mutant, tool)
+  against the same tool on the original, counting only new records (an original finding moved by the inserted lines
+  is not new): found at the site (the line naming the algorithm ±2), on the inserted span, in the file, in the repo
+  (`masked` when the original already has the unit), leniently by group; parameters on the inserted lines; extra and
+  lost units and sites (the "no other change" check, read next to the tool's run-to-run instability). With repeated
+  runs a dimension counts when it holds in most of the mutant's runs, which also exposes LLM answers from memorised
+  popular repos. Rates: the mean of per-repository rates with bootstrap CIs over repos (`score.py`'s support).
+- **Remove (later, after E1):** delete or neutralise call sites that >=2 independent voters reported, confirmed by
+  tree-sitter queries; removed assets are expected to disappear. Removal candidates are easier by construction, so
+  insertion and removal results are reported apart, never pooled (refinement 7).
 
 ## Phase 5: experiments
 - **E0 (stability):** every tool 3× on the five micro projects and ten small pilot repos
@@ -356,8 +382,9 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
 - One command, `bf-cbom experiment reproduce`, reruns the analysis from the raw results.
 
 ## Verification still to do
-- **Mutation smoke test:** insert an RSA-2048 keygen into one Java and one Python repo; at least CBOMkit and CryptoScan
-  report it at the recorded file and line; a removal mutant drops the asset.
+- **Mutation smoke test** (`experiments/e4-mutation-smoke.yaml`, on the VM): the RSA-2048 keygen in three styles into
+  pyjwt, jjwt and golang-jwt; at least CBOMkit and CryptoScan report the direct insertion at the recorded file and
+  line; later a removal mutant drops the asset.
 - **End to end:** E0 on 5 repos from the spec to the tables with `bf-cbom experiment reproduce`.
 - **On the VM:** replica scaling (`--scale` with `EXPERIMENT_REPLICAS`) and traceability against the mirror.
 
@@ -384,14 +411,14 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
 8. **Worker replicas.** Workers are stateless BLPOP consumers, so `docker compose up --scale worker-<tool>=N` works;
    E0 timings decide N per tool; the memory budget counts replicas (`EXPERIMENT_REPLICAS`).
 9. **Statistics for few tools** (Phase 5). Kendall τ over a handful of ranks is coarse: add Spearman between agreement
-   score and mutation detection rate over all tool × dimension × language cells, with bootstrap over repos; Java and
-   Python are two replications of the method.
+   score and mutation detection rate over all tool × dimension × language cells, with bootstrap over repos; Java,
+   Python and Go are three replications of the method.
 10. **LLM recall ceiling.** The pre-filter bounds what the LLM sees: keep it import-based and generous, versioned
     (`PROMPT_VERSION`) and stated as part of the tool in the paper.
 11. **Corpus exclusions.** No repos from the tools' own test suites or published benchmarks, none whose crypto sits
     only in dependencies (the scope is first-party source), none exceeding a tool's timeout at E0
     (`corpus/exclusions.yaml`, `make corpus-prune`).
-12. **Minimum viable paper:** the exact matcher, insertion-only mutation and both languages with the independent
+12. **Minimum viable paper:** the exact matcher, insertion-only mutation and the paper languages with the independent
     engines already integrated; RaQuN, removal mutants and Dawid-Skene are additions on top.
 13. **Benchmark-informed tools.** A tool adapted while looking at our results (CipherSift: `tailored_on` in
     `tools.yaml`) has inflated scores there by construction, also in agreement-based scoring. Its tailored (tool, repo)

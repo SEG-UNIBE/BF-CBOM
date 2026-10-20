@@ -821,6 +821,61 @@ def _stability(rows: list[dict]) -> list[str]:
     return lines + [""]
 
 
+MUTANT_PATCHES = 12  # patches shown in the summary (all are in mutants.csv and mutants.json)
+
+
+def _mutation(mutants: list[dict], rows: list[dict], rates: list[dict]) -> list[str]:
+    if not mutants:
+        return []
+    styles = list(dict.fromkeys(m["style"] for m in mutants))
+    by_lang: dict[str, int] = defaultdict(int)
+    for m in mutants:
+        by_lang[m["language"]] += 1
+    lines = ["## E4: insertion mutants", ""]
+    lines += [
+        f"{len(mutants)} mutants in {len({m['repo'] for m in mutants})} repositories "
+        f"({', '.join(f'{lang} {n}' for lang, n in sorted(by_lang.items(), key=lambda kv: _lang_key(kv[0] or '')))}); "
+        "each inserts one catalog snippet (mutation/catalog/) in one style into a first-party method with a caller "
+        "(`mutants.csv`). A tool detects it when a new record of the expected unit appears at the line naming the "
+        "algorithm ±2 (site) or anywhere on the inserted lines (span), in most of the mutant's runs; at the "
+        "repository level when the unit is new to the repository (`masked` when the original already has it). "
+        "Rate = mean of the per-repository rates (`mutation-rates.csv`), detected/judged mutants in brackets; "
+        "per mutant and tool: `mutation.csv`.",
+        "",
+    ]
+    cell = {(r["tool"], r["language"], r["style"], r["dimension"]): r for r in rates}
+    role = {r["tool"]: r.get("role") for r in rows}
+    pairs = sorted({(r["tool"], r["language"]) for r in rows}, key=lambda tl: (_lang_key(tl[1] or ""), tl[0]))
+    table = []
+    for tool, lang in pairs:
+
+        def show(style: str, dim: str, tool: str = tool, lang: str = lang) -> str:
+            r = cell.get((tool, lang, style, dim))
+            return f"{_pct(r['rate'])} ({r['detected']}/{r['mutants']})" if r else ""
+
+        ok = [r for r in rows if (r["tool"], r["language"]) == (tool, lang) and r.get("status") == "ok"]
+        masked = sum(_true(r.get("masked")) for r in ok)
+        table.append(
+            [lang, _tool({"tool": tool, "role": role.get(tool)})]
+            + [show(st, "found_site") for st in styles]
+            + [show("all", "found_span"), show("all", "found_repo"), masked, len(ok)]
+        )
+    header = ["language", "tool"] + [f"site, {st}" for st in styles]
+    header += ["span, all", "repository, all", "masked", "judged"]
+    lines += md_table(header, table, "ll" + "r" * (len(header) - 2))
+    if any(r.get("role") == "observer" for r in rows):
+        lines += ["", OBSERVER_NOTE]
+    failed = [r for r in rows if r.get("status") != "ok"]
+    if failed:
+        lines += ["", f"Not judged ({len(failed)} mutant × tool): the run on the mutant or on the original is missing "
+                  "or not ok (`status` in `mutation.csv`)."]  # fmt: skip
+    lines += ["", f"### Mutant patches (first {min(MUTANT_PATCHES, len(mutants))} of {len(mutants)})", ""]
+    for m in mutants[:MUTANT_PATCHES]:
+        lines += [f"`{m['variant']}` in `{m['repo']}`, `{m['file']}:{m['call_line']}` ({m['host']}):", ""]
+        lines += ["```diff", m.get("patch") or "", "```", ""]
+    return lines
+
+
 def _ladder(all_rows: list[dict]) -> list[str]:
     rows = [r for r in all_rows if r.get("dimension", "algorithm") == "algorithm"]
     if not rows:
@@ -1054,6 +1109,7 @@ def render(analysis_dir: Path, *, run: int = 1) -> str:
     lines += _matching(rows("matchlevels-run{k}.csv"), rows("groups-exact-run{k}.csv"), rows("matchers-run{k}.csv"))
     lines += _scores(rows("score-run{k}.csv"), rows("loo-run{k}.csv"))
     lines += _stability(rows("stability.csv"))
+    lines += _mutation(rows("mutants.csv"), rows("mutation.csv"), rows("mutation-rates.csv"))
     lines += _llm(rows("runs.csv"), rows("score-run{k}.csv"))
     lines += _files(info, run)
     return "\n".join(lines).rstrip() + "\n"

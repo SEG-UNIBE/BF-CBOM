@@ -1,0 +1,29 @@
+# E4 smoke: the mutation harness end to end (CLAUDE.md "Verification still to do"). One small pilot repository per
+# paper language (the development set, not held out) gets three insertion mutants of the RSA-2048 key generation, one
+# per style (direct, wrapper, indirect); every non-LLM tool scans the originals and the mutants once. Expected: at least
+# CBOMkit and CryptoScan report the direct insertion at the recorded file and line in all three repositories
+# (`mutation.csv`, the patches in `_SUMMARY.md` to check the mutants read as plausible code).
+#   make experiment EXP=experiments/e4-mutation-smoke.yaml EXPERIMENT_MEMORY_BUDGET_GB=0
+#   make experiment-export NAME=e4-mutation-smoke
+name: e4-mutation-smoke
+description: "mutation harness smoke test (E4): RSA-2048 keygen inserted in three styles into pyjwt, jjwt and golang-jwt"
+tools: [cbomkit, cbomkit-jar, cdxgen, cryptobomforge, cryptoscan, pqcheck, qdarpan, securin-xbom, cipherradar, xgrep, ciphersift, scanoss, qelens, cryptarium, qscan]
+repetitions: 1
+mutation:
+  per_repo: 3
+  styles: [direct, wrapper, indirect]
+  snippets: [rsa-2048-keygen]
+  seed: 1
+repos:
+  - full_name: jpadilla/pyjwt
+    language: Python
+    branch: master
+    commit: 868cf4ab2ca5a0a39da40e5a14dd740b203662b2
+  - full_name: jwtk/jjwt
+    language: Java
+    branch: main
+    commit: 0df975627c2c1d796b6d0309b7eb25fc53e15f9b
+  - full_name: golang-jwt/jwt
+    language: Go
+    branch: main
+    commit: 7ceae619e739dc8a7bf577214aa8ebf26668e9db

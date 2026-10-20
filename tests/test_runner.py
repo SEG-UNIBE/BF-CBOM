@@ -153,7 +153,7 @@ def test_overwrite_old_reruns_the_whole_spec_on_the_pinned_commits(world):
     spec, results, r = world["spec"], world["results"], world["redis"]
     assert _run(["run", str(spec), "--idle-timeout", "20"]).exit_code == 0
     exp = results / "e-fake"
-    lock = (exp / "lock.json").read_text()
+    lock = ex.load_lock(exp)
     first = next(exp.glob("o__first@*")) / "original"
     stale_tool = first / "t9"  # a tool the spec no longer names: iter_results (the analysis) would still read it
     stale_tool.mkdir()
@@ -173,11 +173,51 @@ def test_overwrite_old_reruns_the_whole_spec_on_the_pinned_commits(world):
     assert "0 run(s) already on disk, 0 still pending from an earlier run, 4 to enqueue" in out.output
     assert len(world["workers"].seen) == 8  # every run of the spec again
     assert len(list(exp.glob("*/*/*/run1.meta.json"))) == 4 and not stale_tool.exists() and not norm.exists()
-    assert not (exp / ex.ANALYSIS_DIR / "_SUMMARY.md").exists() and (exp / "lock.json").read_text() == lock
+    assert not (exp / ex.ANALYSIS_DIR / "_SUMMARY.md").exists() and ex.load_lock(exp) == lock
     assert not r.hexists(experiment_cmd._pending_key("e-fake"), "stale-job")
     first_session, second = ex.load_run_log(exp)
     assert (first_session["runs_overwritten"], second["runs_overwritten"]) == (0, 5)
     assert second["results_stored"] == 4
+
+
+def test_mutation_block_runs_originals_and_mutants_and_keeps_them_pinned(world, tmp_path):
+    src = tmp_path / "upstream" / "mutable"
+    (src / "pkg").mkdir(parents=True)
+    (src / "pkg" / "core.py").write_text(
+        "import json\n\n\ndef load(text):\n    return json.loads(text)\n\n\ndef main():\n    return load('{}')\n"
+    )
+    _git("init", "-q", "-b", "main", cwd=src)
+    _git("-c", "user.name=t", "-c", "user.email=t@t", "add", ".", cwd=src)
+    _git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "init", cwd=src)
+    spec = tmp_path / "e4.yaml"
+    spec.write_text(
+        yaml.safe_dump(
+            {
+                "name": "e4-fake",
+                "tools": TOOLS,
+                "repos": [{"full_name": "o/mutable", "git_url": str(src), "language": "Python"}],
+                "mutation": {"per_repo": 2, "styles": ["direct", "indirect"], "snippets": ["sha-256", "md5"]},
+            }
+        )
+    )
+    out = _run(["run", str(spec), "--idle-timeout", "20"])
+    assert out.exit_code == 0, out.output
+    exp = world["results"] / "e4-fake"
+    manifest = ex.load_mutants(exp)
+    mutants = manifest["repos"]["o/mutable"]["mutants"]
+    assert [m["style"] for m in mutants] == ["direct", "indirect"] and len(world["workers"].seen) == 6
+    snapshot = next(exp.glob("o__mutable@*"))
+    assert sorted(p.name for p in snapshot.iterdir()) == sorted(["original", *(m["id"] for m in mutants)])
+    meta = json.loads((snapshot / mutants[0]["id"] / "t1" / "run1.meta.json").read_text())
+    assert meta["variant"] == mutants[0]["id"] and meta["variant_commit"] == mutants[0]["commit"]
+    assert ex.expected_jobs(ex.load_spec(spec), exp) == 6 and "mutation" in yaml.safe_load(
+        ex.spec_path(exp).read_text()
+    )
+
+    again = _run(["run", str(spec), "--idle-timeout", "20", "--overwrite-old"])
+    assert again.exit_code == 0, again.output
+    assert ex.load_mutants(exp)["repos"] == manifest["repos"]  # the mutants stay pinned like the commits
+    assert len(world["workers"].seen) == 12
 
 
 def test_parse_replicas():

@@ -20,6 +20,10 @@ dependencies = [
     "websocket-client>=1.8.0",
     "typer>=0.12.5",
     "pyyaml>=6.0.2",
+    # the mutation harness (mutation/lang.py) parses Java and Go; Python uses its own `ast`
+    "tree-sitter>=0.26.0",
+    "tree-sitter-java>=0.23.5",
+    "tree-sitter-go>=0.25.0",
 ]
 
 [tool.pytest.ini_options]
@@ -68,6 +72,7 @@ dev = [
     "pytest>=8.4.1",
     "ruff>=0.12.11",
     "watchdog>=6.0.0",
+    "cryptography>=50.0.2",  # tests/test_mutation.py runs the catalog's pyca snippets
 ]
 
 [tool.setuptools.packages.find]

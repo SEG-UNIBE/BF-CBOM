@@ -1,0 +1,326 @@
+# Snippet catalog for Go insertion mutants (Phase 4; loader mutation/catalog.py, format in java.yaml's header).
+#
+# Everything is standard library except PBKDF2 on modules older than Go 1.24: its first form is `crypto/pbkdf2`
+# (`go >= 1.24` in the module's go.mod), the second `golang.org/x/crypto/pbkdf2` where go.mod already requires
+# golang.org/x/crypto; a module meeting neither gets no PBKDF2 mutant (go.mod is never edited, decided 2026-10-20).
+# Go rejects unused variables and imports, so every snippet uses what it declares; the host's results are unknown, so
+# errors panic. Inside a host the snippet sits in its own block (`scope`), so its locals never clash with the host's.
+# Go's APIs take no algorithm strings: `indirect` holds a parameter or a function value in a variable instead.
+# The calls mirror corpus/micro/go (AI-made like it; on the human-review list before paper use).
+version: "2026-10-20.1"
+language: go
+scope: |
+  {
+      $body
+  }
+
+snippets:
+  - id: rsa-2048-keygen
+    expected: {unit: RSA, family: RSA, key_size: 2048}
+    also: [CSPRNG]
+    helper: generateRSAKey
+    imports: [crypto/rand, crypto/rsa]
+    direct: |
+      $key, $err := $rsa.GenerateKey($rand.Reader, 2048) @call
+      if $err != nil {
+          panic($err)
+      }
+      _ = $key
+    indirect: |
+      $bits := 2048 @related
+      $key, $err := $rsa.GenerateKey($rand.Reader, $bits) @call
+      if $err != nil {
+          panic($err)
+      }
+      _ = $key
+
+  - id: ec-p256-keygen
+    expected: {unit: ECDSA, family: ECDSA, curve: secp256r1}
+    also: [CSPRNG]
+    helper: generateECKey
+    imports: [crypto/ecdsa, crypto/elliptic, crypto/rand]
+    direct: |
+      $key, $err := $ecdsa.GenerateKey($elliptic.P256(), $rand.Reader) @call
+      if $err != nil {
+          panic($err)
+      }
+      _ = $key
+    indirect: |
+      $curve := $elliptic.P256() @related
+      $key, $err := $ecdsa.GenerateKey($curve, $rand.Reader) @call
+      if $err != nil {
+          panic($err)
+      }
+      _ = $key
+
+  - id: ecdsa-p256-sign
+    expected: {unit: ECDSA, family: ECDSA, digest: SHA-256}
+    also: [CSPRNG, SHA-256]
+    helper: signWithECDSA
+    imports: [crypto/ecdsa, crypto/elliptic, crypto/rand, crypto/sha256]
+    direct: |
+      $key, $err := $ecdsa.GenerateKey($elliptic.P256(), $rand.Reader)
+      if $err != nil {
+          panic($err)
+      }
+      $digest := $sha256.Sum256([]byte("data"))
+      $signature, $err := $ecdsa.SignASN1($rand.Reader, $key, $digest[:]) @call
+      if $err != nil {
+          panic($err)
+      }
+      _ = $signature
+    indirect: |
+      $sum := $sha256.Sum256 @related
+      $key, $err := $ecdsa.GenerateKey($elliptic.P256(), $rand.Reader)
+      if $err != nil {
+          panic($err)
+      }
+      $digest := $sum([]byte("data"))
+      $signature, $err := $ecdsa.SignASN1($rand.Reader, $key, $digest[:]) @call
+      if $err != nil {
+          panic($err)
+      }
+      _ = $signature
+
+  - id: ed25519-sign
+    expected: {unit: Ed25519, family: EdDSA}
+    also: [CSPRNG]
+    helper: signWithEd25519
+    imports: [crypto/ed25519, crypto/rand]
+    direct: |
+      _, $priv, $err := $ed25519.GenerateKey($rand.Reader)
+      if $err != nil {
+          panic($err)
+      }
+      $signature := $ed25519.Sign($priv, []byte("data")) @call
+      _ = $signature
+    indirect: |
+      $sign := $ed25519.Sign @related
+      _, $priv, $err := $ed25519.GenerateKey($rand.Reader)
+      if $err != nil {
+          panic($err)
+      }
+      $signature := $sign($priv, []byte("data")) @call
+      _ = $signature
+
+  - id: aes-128-gcm
+    expected: {unit: AES, family: AES, key_size: 128, mode: GCM}
+    helper: encryptWithAESGCM
+    imports: [crypto/aes, crypto/cipher]
+    direct: |
+      $block, $err := $aes.NewCipher(make([]byte, 16)) @call
+      if $err != nil {
+          panic($err)
+      }
+      $gcm, $err := $cipher.NewGCM($block)
+      if $err != nil {
+          panic($err)
+      }
+      $ciphertext := $gcm.Seal(nil, make([]byte, $gcm.NonceSize()), []byte("data"), nil)
+      _ = $ciphertext
+    indirect: |
+      $keySize := 16 @related
+      $block, $err := $aes.NewCipher(make([]byte, $keySize)) @call
+      if $err != nil {
+          panic($err)
+      }
+      $gcm, $err := $cipher.NewGCM($block)
+      if $err != nil {
+          panic($err)
+      }
+      $ciphertext := $gcm.Seal(nil, make([]byte, $gcm.NonceSize()), []byte("data"), nil)
+      _ = $ciphertext
+
+  - id: aes-256-gcm
+    expected: {unit: AES, family: AES, key_size: 256, mode: GCM}
+    helper: encryptWithAESGCM
+    imports: [crypto/aes, crypto/cipher]
+    direct: |
+      $block, $err := $aes.NewCipher(make([]byte, 32)) @call
+      if $err != nil {
+          panic($err)
+      }
+      $gcm, $err := $cipher.NewGCM($block)
+      if $err != nil {
+          panic($err)
+      }
+      $ciphertext := $gcm.Seal(nil, make([]byte, $gcm.NonceSize()), []byte("data"), nil)
+      _ = $ciphertext
+    indirect: |
+      $keySize := 32 @related
+      $block, $err := $aes.NewCipher(make([]byte, $keySize)) @call
+      if $err != nil {
+          panic($err)
+      }
+      $gcm, $err := $cipher.NewGCM($block)
+      if $err != nil {
+          panic($err)
+      }
+      $ciphertext := $gcm.Seal(nil, make([]byte, $gcm.NonceSize()), []byte("data"), nil)
+      _ = $ciphertext
+
+  - id: aes-256-cbc
+    expected: {unit: AES, family: AES, key_size: 256, mode: CBC}
+    helper: encryptWithAESCBC
+    imports: [crypto/aes, crypto/cipher]
+    direct: |
+      $block, $err := $aes.NewCipher(make([]byte, 32)) @call
+      if $err != nil {
+          panic($err)
+      }
+      $mode := $cipher.NewCBCEncrypter($block, make([]byte, $aes.BlockSize))
+      $ciphertext := make([]byte, $aes.BlockSize)
+      $mode.CryptBlocks($ciphertext, make([]byte, $aes.BlockSize))
+    indirect: |
+      $newMode := $cipher.NewCBCEncrypter @related
+      $block, $err := $aes.NewCipher(make([]byte, 32)) @call
+      if $err != nil {
+          panic($err)
+      }
+      $mode := $newMode($block, make([]byte, $aes.BlockSize))
+      $ciphertext := make([]byte, $aes.BlockSize)
+      $mode.CryptBlocks($ciphertext, make([]byte, $aes.BlockSize))
+
+  - id: 3des-cbc
+    expected: {unit: 3DES, family: 3DES, mode: CBC}
+    helper: encryptWithTripleDES
+    imports: [crypto/cipher, crypto/des]
+    direct: |
+      $block, $err := $des.NewTripleDESCipher(make([]byte, 24)) @call
+      if $err != nil {
+          panic($err)
+      }
+      $mode := $cipher.NewCBCEncrypter($block, make([]byte, $des.BlockSize))
+      $ciphertext := make([]byte, $des.BlockSize)
+      $mode.CryptBlocks($ciphertext, make([]byte, $des.BlockSize))
+    indirect: |
+      $newBlock := $des.NewTripleDESCipher @related
+      $block, $err := $newBlock(make([]byte, 24)) @call
+      if $err != nil {
+          panic($err)
+      }
+      $mode := $cipher.NewCBCEncrypter($block, make([]byte, $des.BlockSize))
+      $ciphertext := make([]byte, $des.BlockSize)
+      $mode.CryptBlocks($ciphertext, make([]byte, $des.BlockSize))
+
+  - id: rsa-oaep-sha256
+    expected: {unit: RSAES-OAEP, family: RSAES-OAEP, padding: OAEP, digest: SHA-256}
+    also: [RSA, CSPRNG, SHA-256]
+    helper: encryptWithRSAOAEP
+    imports: [crypto/rand, crypto/rsa, crypto/sha256]
+    direct: |
+      $key, $err := $rsa.GenerateKey($rand.Reader, 2048)
+      if $err != nil {
+          panic($err)
+      }
+      $ciphertext, $err := $rsa.EncryptOAEP($sha256.New(), $rand.Reader, &$key.PublicKey, []byte("data"), nil) @call
+      if $err != nil {
+          panic($err)
+      }
+      _ = $ciphertext
+    indirect: |
+      $newHash := $sha256.New @related
+      $key, $err := $rsa.GenerateKey($rand.Reader, 2048)
+      if $err != nil {
+          panic($err)
+      }
+      $ciphertext, $err := $rsa.EncryptOAEP($newHash(), $rand.Reader, &$key.PublicKey, []byte("data"), nil) @call
+      if $err != nil {
+          panic($err)
+      }
+      _ = $ciphertext
+
+  - id: sha-1
+    expected: {unit: SHA-1, family: SHA-1}
+    helper: sha1Digest
+    imports: [crypto/sha1]
+    direct: |
+      $digest := $sha1.Sum([]byte("data")) @call
+      _ = $digest
+    indirect: |
+      $sum := $sha1.Sum @related
+      $digest := $sum([]byte("data")) @call
+      _ = $digest
+
+  - id: sha-256
+    expected: {unit: SHA-256, family: SHA-2}
+    helper: sha256Digest
+    imports: [crypto/sha256]
+    direct: |
+      $digest := $sha256.Sum256([]byte("data")) @call
+      _ = $digest
+    indirect: |
+      $sum := $sha256.Sum256 @related
+      $digest := $sum([]byte("data")) @call
+      _ = $digest
+
+  - id: md5
+    expected: {unit: MD5, family: MD5}
+    helper: md5Digest
+    imports: [crypto/md5]
+    direct: |
+      $digest := $md5.Sum([]byte("data")) @call
+      _ = $digest
+    indirect: |
+      $sum := $md5.Sum @related
+      $digest := $sum([]byte("data")) @call
+      _ = $digest
+
+  - id: hmac-sha256
+    expected: {unit: HMAC, family: HMAC, digest: SHA-256}
+    also: [SHA-256]
+    helper: hmacSHA256
+    imports: [crypto/hmac, crypto/sha256]
+    direct: |
+      $mac := $hmac.New($sha256.New, []byte("key")) @call
+      $mac.Write([]byte("data"))
+      $tag := $mac.Sum(nil)
+      _ = $tag
+    indirect: |
+      $newHash := $sha256.New @related
+      $mac := $hmac.New($newHash, []byte("key")) @call
+      $mac.Write([]byte("data"))
+      $tag := $mac.Sum(nil)
+      _ = $tag
+
+  - id: pbkdf2-hmac-sha256
+    expected: {unit: PBKDF2, family: PBKDF2, digest: SHA-256, iterations: 600000}
+    also: [SHA-256]
+    helper: deriveKeyWithPBKDF2
+    forms:
+      - requires: {go: "1.24"}
+        imports: [crypto/pbkdf2, crypto/sha256]
+        direct: |
+          $derivedKey, $err := $pbkdf2.Key($sha256.New, "changeit", make([]byte, 16), 600000, 32) @call
+          if $err != nil {
+              panic($err)
+          }
+          _ = $derivedKey
+        indirect: |
+          $newHash := $sha256.New @related
+          $derivedKey, $err := $pbkdf2.Key($newHash, "changeit", make([]byte, 16), 600000, 32) @call
+          if $err != nil {
+              panic($err)
+          }
+          _ = $derivedKey
+      - requires: {golang.org/x/crypto: ""}
+        imports: [crypto/sha256, golang.org/x/crypto/pbkdf2]
+        direct: |
+          $derivedKey := $pbkdf2.Key([]byte("changeit"), make([]byte, 16), 600000, 32, $sha256.New) @call
+          _ = $derivedKey
+        indirect: |
+          $newHash := $sha256.New @related
+          $derivedKey := $pbkdf2.Key([]byte("changeit"), make([]byte, 16), 600000, 32, $newHash) @call
+          _ = $derivedKey
+
+  - id: tls13-context
+    expected: {unit: null, protocol: TLS, protocol_version: "1.3"}
+    helper: newTLSConfig
+    imports: [crypto/tls]
+    direct: |
+      $config := &$tls.Config{MinVersion: $tls.VersionTLS13} @call
+      _ = $config
+    indirect: |
+      var $minVersion uint16 = $tls.VersionTLS13 @related
+      $config := &$tls.Config{MinVersion: $minVersion} @call
+      _ = $config

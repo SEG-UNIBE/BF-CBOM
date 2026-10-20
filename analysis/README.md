@@ -138,3 +138,13 @@ and are counted apart; `material` and `primitive` are the standard's per-type en
 values `other` and `unknown`; protocols fold to the `protocolProperties.type` enum or are `other` there (SSL,
 OpenPGP, OTR). A test keeps `data/cbom-norm.schema.json` equal to the vendored 1.7 schema, and the RQ1 tables are
 per asset type with that type's own field set.
+
+## Mutants (E4)
+
+A mutant's CBOMs are normalised like every other, with the same specs and vocabulary; nothing in the normaliser knows
+about mutants. `analysis/mutation.py` compares each tool's records on a mutant with its records on the original and
+asks whether a new record of the snippet's expected unit (its L4 identity, as at the top of the ladder) appeared at the
+inserted call, on the inserted lines, in the file or in the repository. The expected units are written in the
+vocabulary (`tests/test_mutation.py` checks them), so detection rests on the same normalisation as the agreement
+numbers; a lenient column (`found_group`, the coarse group at the site) shows how much a stricter reading costs. The
+agreement analyses never see the mutants (they read the original variants only).

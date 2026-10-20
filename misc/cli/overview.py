@@ -15,7 +15,7 @@ from pathlib import Path
 
 import typer
 
-from common.experiment import ExperimentError, iter_results, load_run_log, load_spec, spec_path
+from common.experiment import ExperimentError, expected_jobs, iter_results, load_run_log, load_spec, spec_path
 
 # statuses in display order; anything else a worker reports is appended after these
 STATUS_ORDER = ("ok", "error", "timeout", "cancelled", "unsupported")
@@ -92,7 +92,7 @@ def build(exp_dir: Path) -> Overview:
         spec = None
     rows: dict[str, ToolRow] = {}
     if spec is not None:
-        per_tool = spec.expected_jobs // max(len(spec.tools), 1)
+        per_tool = expected_jobs(spec, exp_dir) // max(len(spec.tools), 1)
         rows = {t: ToolRow(t, expected=per_tool) for t in spec.tools}
     problems: list[Problem] = []
     for meta, _ in iter_results(exp_dir):
@@ -117,7 +117,7 @@ def build(exp_dir: Path) -> Overview:
     problems.sort(key=lambda p: (p.tool, p.repo, p.variant, p.run))
     return Overview(
         name=exp_dir.name,
-        expected=spec.expected_jobs if spec is not None else None,
+        expected=expected_jobs(spec, exp_dir) if spec is not None else None,
         tools=list(rows.values()),
         problems=problems,
         sessions=load_run_log(exp_dir),

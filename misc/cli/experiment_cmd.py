@@ -31,6 +31,7 @@ from common.experiment import (
     PlannedJob,
     Snapshot,
     clear_stored_runs,
+    expected_jobs,
     experiment_dir,
     is_experiment,
     load_spec,
@@ -348,7 +349,7 @@ def run(
         mapping={
             "status": "running" if total else "completed",
             "started_at": now_iso(),
-            "expected_jobs": str(spec.expected_jobs),
+            "expected_jobs": str(expected_jobs(spec, exp_dir)),
             "issued_jobs": "0",
             "skipped_jobs": str(skipped),
             "results_dir": str(exp_dir),
@@ -710,7 +711,7 @@ def env():
 @corpus_app.command("build")
 def corpus_build(
     out: Path = CORPUS_OUT_OPT,
-    languages: str = typer.Option("Java,Python", help="Comma-separated GitHub languages"),
+    languages: str = typer.Option("Java,Python,Go", help="Comma-separated GitHub languages (the paper's three)"),
     per_language: int = typer.Option(100),
     pushed_within_days: int = typer.Option(365),
     no_crypto_filter: bool = typer.Option(False, "--no-crypto-filter", help="Skip the clone+grep crypto pre-filter"),

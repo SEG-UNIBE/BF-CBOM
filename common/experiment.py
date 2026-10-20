@@ -11,6 +11,7 @@ Layout of one experiment (under RESULTS_DIR):
       _run-log.json            one entry per `experiment run` session: times, host RAM/CPUs, budget, waves, peak RAM
       _ANALYSIS/               derived tables and _SUMMARY.md (`analysis report`; regenerated, never input)
       lock.json                resolved snapshot per repo and variant (commit SHAs, git URLs)
+      mutants.json             with a `mutation:` block: every mutant (snippet, style, host, lines, inserts, patch)
       <owner>__<repo>@<sha12>/<variant>/<tool>/run<k>.json        the CBOM
       <owner>__<repo>@<sha12>/<variant>/<tool>/run<k>.meta.json   JobResult without the CBOM body
 
@@ -93,6 +94,44 @@ class RepoSpec:
         return f"https://github.com/{self.full_name}.git"
 
 
+MUTATION_STYLES = ("direct", "wrapper", "indirect")  # mutation/catalog.py:STYLES (refinement 5)
+
+
+@dataclass
+class MutationSpec:
+    """A spec's `mutation:` block: every repo gets `per_repo` insertion mutants as variants (mutation/mutants.py)."""
+
+    per_repo: int = 10
+    styles: list[str] = field(default_factory=lambda: list(MUTATION_STYLES))
+    snippets: list[str] | None = None  # None: the whole catalog of the repo's language
+    seed: int = 1
+
+    def to_dict(self) -> dict:
+        return {"per_repo": self.per_repo, "styles": list(self.styles), "snippets": self.snippets, "seed": self.seed}
+
+
+def _as_mutation_spec(item) -> MutationSpec:
+    if not isinstance(item, dict):
+        raise ExperimentError("'mutation' must be a mapping (per_repo, styles, snippets, seed)")
+    unknown = set(item) - {"per_repo", "styles", "snippets", "seed"}
+    if unknown:
+        raise ExperimentError(f"unknown 'mutation' keys: {sorted(unknown)}")
+    styles = [str(s) for s in item.get("styles") or MUTATION_STYLES]
+    if not set(styles) <= set(MUTATION_STYLES):
+        raise ExperimentError(f"mutation styles must be among {list(MUTATION_STYLES)}, got {styles}")
+    snippets = item.get("snippets")
+    if snippets in (None, "all"):
+        snippets = None
+    elif isinstance(snippets, list):
+        snippets = [str(s) for s in snippets]
+    else:
+        raise ExperimentError("mutation 'snippets' must be 'all' or a list of snippet ids")
+    per_repo = int(item.get("per_repo", 10))
+    if per_repo < 1:
+        raise ExperimentError("mutation 'per_repo' must be >= 1")
+    return MutationSpec(per_repo=per_repo, styles=styles, snippets=snippets, seed=int(item.get("seed", 1)))
+
+
 @dataclass
 class ExperimentSpec:
     name: str
@@ -100,10 +139,14 @@ class ExperimentSpec:
     repos: list[RepoSpec]
     repetitions: int = 1
     description: str = ""
+    mutation: MutationSpec | None = None
 
     @property
     def expected_jobs(self) -> int:
-        return sum(len(r.variants) for r in self.repos) * len(self.tools) * self.repetitions
+        """Planned runs; with a `mutation:` block an upper bound (a repo with few hosts gets fewer mutants, the exact
+        count is in mutants.json: `expected_jobs`)."""
+        per_repo = (lambda r: 1 + self.mutation.per_repo) if self.mutation else (lambda r: len(r.variants))
+        return sum(per_repo(r) for r in self.repos) * len(self.tools) * self.repetitions
 
 
 def _opt_str(value) -> str | None:
@@ -177,8 +220,20 @@ def spec_from_dict(data: dict, *, base_dir: Path | None = None) -> ExperimentSpe
         if r.full_name in seen:
             raise ExperimentError(f"duplicate repo {r.full_name}")
         seen.add(r.full_name)
+    mutation = _as_mutation_spec(data["mutation"]) if data.get("mutation") is not None else None
+    if mutation is not None:
+        listed = [r.full_name for r in repos if r.variants != [ORIGINAL_VARIANT]]
+        if listed:
+            raise ExperimentError(
+                f"'variants' cannot be combined with 'mutation' (the mutants are generated): {listed}"
+            )
     return ExperimentSpec(
-        name=name, tools=tools, repos=repos, repetitions=repetitions, description=str(data.get("description") or "")
+        name=name,
+        tools=tools,
+        repos=repos,
+        repetitions=repetitions,
+        description=str(data.get("description") or ""),
+        mutation=mutation,
     )
 
 
@@ -248,8 +303,8 @@ def clear_stored_runs(exp_dir: Path) -> int:
     """Remove every stored run of an experiment (`experiment run --overwrite-old`): all snapshot folders, with every
     CBOM, meta file, unsupported mark and normalised CBOM in them, also of tools, repos and repetitions the spec no
     longer names (the analysis reads whatever is stored, `iter_results`), and `_ANALYSIS/`, which described them.
-    Kept: the spec copy, the run log (the history of sessions) and `lock.json` (the pinned commits, so the rerun
-    scans the same snapshots). Returns the number of stored runs removed."""
+    Kept: the spec copy, the run log (the history of sessions), `lock.json` (the pinned commits, so the rerun
+    scans the same snapshots) and `mutants.json` (the pinned mutants). Returns the number of stored runs removed."""
     removed = 0
     for d in sorted(exp_dir.iterdir()) if exp_dir.is_dir() else []:
         if not d.is_dir():
@@ -486,6 +541,34 @@ def save_lock(exp_dir: Path, locked: dict[str, dict]) -> None:
     lock_path(exp_dir).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+MUTANTS_FILE = "mutants.json"
+
+
+def mutants_path(exp_dir: Path) -> Path:
+    return exp_dir / MUTANTS_FILE
+
+
+def load_mutants(exp_dir: Path) -> dict:
+    """mutants.json: {"repos": {full_name: {commit, language, mutation, catalog_version, hosts, mutants, notes}}}."""
+    p = mutants_path(exp_dir)
+    return json.loads(p.read_text(encoding="utf-8")) if p.exists() else {"repos": {}}
+
+
+def save_mutants(exp_dir: Path, manifest: dict) -> None:
+    exp_dir.mkdir(parents=True, exist_ok=True)
+    manifest["written_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    mutants_path(exp_dir).write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def expected_jobs(spec: ExperimentSpec, exp_dir: Path) -> int:
+    """Planned runs of the experiment: with mutants made already, their exact number (mutants.json)."""
+    if spec.mutation is None or not mutants_path(exp_dir).exists():
+        return spec.expected_jobs
+    repos = load_mutants(exp_dir).get("repos", {})
+    variants = sum(1 + len((repos.get(r.full_name) or {}).get("mutants", [])) for r in spec.repos)
+    return variants * len(spec.tools) * spec.repetitions
+
+
 def resolve_snapshots(
     spec: ExperimentSpec,
     exp_dir: Path,
@@ -497,9 +580,11 @@ def resolve_snapshots(
     """Pin every repo to a commit, mirror it, and return one Snapshot per (repo, variant).
 
     Commits already in the experiment's lock file win over the spec, so a resumed experiment
-    never silently moves to a newer upstream commit.
+    never silently moves to a newer upstream commit. With a `mutation:` block the variants are the
+    original plus the repo's mutants, which mutants.json pins the same way (mutation/mutants.py).
     """
     locked = load_lock(exp_dir)
+    manifest = load_mutants(exp_dir) if spec.mutation is not None else None
     snapshots: list[Snapshot] = []
     cap_mb = repo_size_cap_mb()
     for repo in spec.repos:
@@ -523,7 +608,13 @@ def resolve_snapshots(
                 f"(GITSERVER_MEMORY / {SIZE_CAP_RATIO}); a full clone through the git server may be killed"
             )
         locked[repo.full_name] = {"branch": branch, "commit": commit, "source_url": repo.source_url}
-        for variant in repo.variants:
+        variants = repo.variants
+        if spec.mutation is not None:
+            from mutation.mutants import ensure_mutants  # the runner only: workers bake common/ without mutation/
+
+            mutants = ensure_mutants(repo, commit, spec.mutation, manifest, mirror_dir=mirror_dir, log=log)
+            variants = [ORIGINAL_VARIANT, *mutants]
+        for variant in variants:
             vc = variant_commit(repo, variant, commit, mirror_dir=mirror_dir)
             ensure_scan_repo(repo, variant, commit, vc, mirror_dir=mirror_dir)
             snapshots.append(
@@ -542,6 +633,8 @@ def resolve_snapshots(
                 )
             )
     save_lock(exp_dir, locked)
+    if manifest is not None:
+        save_mutants(exp_dir, manifest)
     return snapshots
 
 
@@ -703,4 +796,5 @@ def spec_to_dict(spec: ExperimentSpec) -> dict:
         "tools": list(spec.tools),
         "repetitions": spec.repetitions,
         "repos": [{k: v for k, v in asdict(r).items() if v not in (None, [], "")} for r in spec.repos],
+        **({"mutation": spec.mutation.to_dict()} if spec.mutation is not None else {}),
     }

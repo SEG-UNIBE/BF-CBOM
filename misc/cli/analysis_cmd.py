@@ -20,7 +20,7 @@ from pathlib import Path
 import typer
 import yaml
 
-from analysis import levels as lv, schema as sch, score as sc, summary as sm, tables as tbl
+from analysis import levels as lv, mutation as mu, schema as sch, score as sc, summary as sm, tables as tbl
 from analysis.groundtruth import SCORED_ASSET_TYPES, load_ground_truth, project_for_repo, score_records
 from analysis.matchers import ExactMatcher, raqun as rq
 from analysis.matchers.compare import MATCHERS_COLUMNS, compare
@@ -35,12 +35,14 @@ from analysis.normalize import (
 from analysis.snapshots import SnapshotStore
 from analysis.stability import STABILITY_COLUMNS, stability_rows
 from common.experiment import (
+    ORIGINAL_VARIANT,
     RESULTS_DIR,
     analysis_dir,
     experiment_dir,
     is_experiment,
     iter_results,
     load_lock,
+    load_mutants,
     spec_path,
 )
 from common.tools_registry import load_tools, tailored_map, voter_groups
@@ -227,8 +229,17 @@ def _store(exp_dir: Path, *, fetch: bool = False) -> SnapshotStore:
     return store
 
 
-def _normalize_runs(exp_dir: Path, *, run: int | None = None, store: SnapshotStore | None = None):
-    """Yield (meta, cbom path, NormalizedCbom) for every stored ok CBOM (all repetitions, or only `run`)."""
+def _original(item: Normalized) -> bool:
+    """A run on an original snapshot. Mutants (variants) feed the mutation step only: in the agreement analyses a
+    mutated repository would count once per mutant (E3 is computed on the originals)."""
+    return item[1].parents[1].name == ORIGINAL_VARIANT
+
+
+def _normalize_runs(
+    exp_dir: Path, *, run: int | None = None, store: SnapshotStore | None = None, mutants: bool = False
+):
+    """Yield (meta, cbom path, NormalizedCbom) for every stored ok CBOM (all repetitions, or only `run`) of the
+    original snapshots, with `mutants` also of the mutants."""
     languages = _languages(exp_dir)
     store = store or SnapshotStore()
     files_cache: dict[tuple[str, str | None], frozenset[str] | None] = {}
@@ -236,6 +247,8 @@ def _normalize_runs(exp_dir: Path, *, run: int | None = None, store: SnapshotSto
         if meta.get("status") != "ok" or not cbom_path.exists():
             continue
         if run is not None and cbom_path.name != f"run{run}.json":
+            continue
+        if not mutants and cbom_path.parents[1].name != ORIGINAL_VARIANT:
             continue
         body = cbom_path.read_bytes()
         try:
@@ -288,7 +301,7 @@ def _normalize_step(
     report = Report()
     done: list[Normalized] = []
     fallback: set[str] = set()
-    for meta, cbom_path, n in _normalize_runs(exp_dir, store=store):
+    for meta, cbom_path, n in _normalize_runs(exp_dir, store=store, mutants=True):
         _write_json(norm_path(cbom_path), n.to_dict())
         report.add(n)
         done.append((meta, cbom_path, n))
@@ -518,6 +531,38 @@ def _raqun_step(run, per_snapshot, exact_by_level, write: Writer, *, level, vote
     return level_rows
 
 
+def _mutation_step(
+    exp_dir: Path, all_runs: list[Normalized], write: Writer, *, window: int, merge_llm: bool, observers_vote: bool,
+    samples: int,
+) -> None:  # fmt: skip
+    """E4 (analysis/mutation.py), for an experiment with mutants (mutants.json): mutants.csv, mutation.csv (one row
+    per mutant and tool, majority over the repetitions) and mutation-rates.csv."""
+    manifest = load_mutants(exp_dir)
+    if not manifest.get("repos"):
+        return
+    records: dict[tuple[str, str, str], dict[int, list]] = defaultdict(dict)
+    for meta, cbom_path, n in all_runs:
+        snapshot, variant = cbom_path.parents[2].name, cbom_path.parents[1].name
+        records[(snapshot, variant, n.tool)][int(meta.get("run_index") or 1)] = n.records
+    statuses: dict[tuple[str, str, str], dict[int, str]] = defaultdict(dict)
+    for meta, cbom_path in iter_results(exp_dir):
+        key = (cbom_path.parents[2].name, cbom_path.parents[1].name, meta.get("worker") or cbom_path.parent.name)
+        statuses[key][int(meta.get("run_index") or 1)] = str(meta.get("status") or "?")
+    languages = _languages(exp_dir)
+    rows = mu.detection_rows(
+        manifest,
+        records,
+        statuses,
+        list(_spec(exp_dir).get("tools") or []),
+        window=window,
+        languages=languages,
+        voter_of=_voter_of(merge_llm, observers_vote),
+    )
+    write("mutants.csv", mu.mutant_rows(manifest, languages=languages), mu.MUTANTS_COLUMNS)
+    write("mutation.csv", rows, mu.MUTATION_COLUMNS)
+    write("mutation-rates.csv", mu.rate_rows(rows, samples=samples), mu.RATE_COLUMNS)
+
+
 def _stability_step(all_runs: list[Normalized], write: Writer, *, level: str) -> dict[tuple[str, str, str], set[str]]:
     """stability.csv over every repetition (analysis/stability.py); returns the consensus sets of repeated runs."""
     runs: dict[tuple[str, str, str], dict[int, list]] = defaultdict(dict)
@@ -734,7 +779,8 @@ def run_report(
     write = _writer(out_dir, counts)
     store = _store(exp_dir, fetch=fetch)
     _, done = _normalize_step(exp_dir, write, store=store)
-    normalized = [x for x in done if x[1].name == f"run{run}.json"]
+    originals = [x for x in done if _original(x)]
+    normalized = [x for x in originals if x[1].name == f"run{run}.json"]
     _schema_step(exp_dir, run, normalized, write, store=store)
     _levels_step(
         exp_dir,
@@ -759,7 +805,7 @@ def run_report(
         raqun=raqun,
         all_assets=all_assets,
     )
-    sets = _stability_step(done, write, level=level)
+    sets = _stability_step(originals, write, level=level)
     _score_step(
         exp_dir,
         run,
@@ -773,6 +819,8 @@ def run_report(
         samples=samples,
         consensus=sets if consensus else None,
     )
+    _mutation_step(exp_dir, done, write, window=window, merge_llm=merge_llm, observers_vote=observers_vote,
+                   samples=samples)  # fmt: skip
     settings = {
         "run": run,
         "window": window,
@@ -809,7 +857,9 @@ def report(
 ):
     """Everything in one pass: normalised CBOMs, every CSV table (runs, records, RQ1 schema/meaningful/traceability,
     the exact matcher's groups/members/agreement, scores and leave-one-out, stability, micro at two levels,
-    algorithms per tool and level, ladder, coverage, conformance) and _ANALYSIS/_SUMMARY.md with Markdown tables."""
+    algorithms per tool and level, ladder, coverage, conformance; with mutants the E4 tables mutants.csv,
+    mutation.csv and mutation-rates.csv, the agreement tables on the originals only) and _ANALYSIS/_SUMMARY.md with
+    Markdown tables."""
     exp_dir = _experiment(name)
     path = run_report(
         exp_dir,

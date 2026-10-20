@@ -20,6 +20,7 @@ COPY --chown=appuser:appuser coordinator/redis_io.py coordinator/logger_config.p
 COPY --chown=appuser:appuser misc/__init__.py ./misc/
 COPY --chown=appuser:appuser misc/cli/ ./misc/cli/
 COPY --chown=appuser:appuser analysis/ ./analysis/
+COPY --chown=appuser:appuser mutation/ ./mutation/
 COPY --chown=appuser:appuser docs/logo.txt ./docs/logo.txt
 
 # ./corpus is mounted at /app/corpus (fixtures published to the git server, micro ground truth)

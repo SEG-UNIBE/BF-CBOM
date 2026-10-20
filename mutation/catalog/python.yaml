@@ -1,0 +1,205 @@
+# Snippet catalog for Python insertion mutants (Phase 4; loader mutation/catalog.py, format in java.yaml's header).
+#
+# The standard-library snippets (hashlib, hmac, ssl) fit every project; the pyca ones (`requires: cryptography`) only
+# projects that already declare `cryptography` (decided 2026-10-20: dependency files are never edited, so every mutant
+# is one edit). pyca's `backend` argument is optional from 3.1, the minimum below. TripleDES is left out: pyca 43
+# moved it to `hazmat.decrepit`, so its import would depend on the project's pinned version; sha3-256 takes its place.
+# The calls mirror corpus/micro/python (AI-made like it; on the human-review list before paper use). Imports are
+# statements; `$name` refers to a name they bind. Locals carry a prefix so that clashes (renamed) stay rare.
+version: "2026-10-20.1"
+language: python
+
+snippets:
+  - id: rsa-2048-keygen
+    expected: {unit: RSA, family: RSA, key_size: 2048}
+    requires: {cryptography: "3.1"}
+    helper: generate_rsa_key
+    imports: ["from cryptography.hazmat.primitives.asymmetric import rsa"]
+    direct: |
+      $rsa_private_key = $rsa.generate_private_key(public_exponent=65537, key_size=2048) @call
+      $rsa_public_key = $rsa_private_key.public_key()
+    indirect: |
+      $rsa_key_size = 2048 @related
+      $rsa_private_key = $rsa.generate_private_key(public_exponent=65537, key_size=$rsa_key_size) @call
+      $rsa_public_key = $rsa_private_key.public_key()
+
+  - id: ec-p256-keygen
+    expected: {unit: EC, family: EC, curve: secp256r1}
+    requires: {cryptography: "3.1"}
+    helper: generate_ec_key
+    imports: ["from cryptography.hazmat.primitives.asymmetric import ec"]
+    direct: |
+      $ec_private_key = $ec.generate_private_key($ec.SECP256R1()) @call
+      $ec_public_key = $ec_private_key.public_key()
+    indirect: |
+      $ec_curve = $ec.SECP256R1() @related
+      $ec_private_key = $ec.generate_private_key($ec_curve) @call
+      $ec_public_key = $ec_private_key.public_key()
+
+  - id: ecdsa-p256-sign
+    expected: {unit: ECDSA, family: ECDSA, digest: SHA-256}
+    also: [EC]
+    requires: {cryptography: "3.1"}
+    helper: sign_with_ecdsa
+    imports:
+      - "from cryptography.hazmat.primitives import hashes"
+      - "from cryptography.hazmat.primitives.asymmetric import ec"
+    direct: |
+      $ec_private_key = $ec.generate_private_key($ec.SECP256R1())
+      $ecdsa_signature = $ec_private_key.sign(b"data", $ec.ECDSA($hashes.SHA256())) @call
+    indirect: |
+      $signature_hash = $hashes.SHA256() @related
+      $ec_private_key = $ec.generate_private_key($ec.SECP256R1())
+      $ecdsa_signature = $ec_private_key.sign(b"data", $ec.ECDSA($signature_hash)) @call
+
+  - id: ed25519-sign
+    expected: {unit: Ed25519, family: EdDSA}
+    requires: {cryptography: "3.1"}
+    helper: sign_with_ed25519
+    imports: ["from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey"]
+    direct: |
+      $ed25519_private_key = $Ed25519PrivateKey.generate() @call
+      $ed25519_signature = $ed25519_private_key.sign(b"data")
+    indirect: |
+      $signing_key_type = $Ed25519PrivateKey @related
+      $ed25519_private_key = $signing_key_type.generate() @call
+      $ed25519_signature = $ed25519_private_key.sign(b"data")
+
+  - id: aes-128-gcm
+    expected: {unit: AES, family: AES, key_size: 128, mode: GCM}
+    also: [CSPRNG]
+    requires: {cryptography: "3.1"}
+    helper: encrypt_with_aes_gcm
+    imports: ["import os", "from cryptography.hazmat.primitives.ciphers.aead import AESGCM"]
+    direct: |
+      $aes_key = $AESGCM.generate_key(bit_length=128)
+      $aes_ciphertext = $AESGCM($aes_key).encrypt($os.urandom(12), b"data", None) @call
+    indirect: |
+      $aes_key_bits = 128 @related
+      $aes_key = $AESGCM.generate_key(bit_length=$aes_key_bits)
+      $aes_ciphertext = $AESGCM($aes_key).encrypt($os.urandom(12), b"data", None) @call
+
+  - id: aes-256-gcm
+    expected: {unit: AES, family: AES, key_size: 256, mode: GCM}
+    also: [CSPRNG]
+    requires: {cryptography: "3.1"}
+    helper: encrypt_with_aes_gcm
+    imports: ["import os", "from cryptography.hazmat.primitives.ciphers.aead import AESGCM"]
+    direct: |
+      $aes_key = $AESGCM.generate_key(bit_length=256)
+      $aes_ciphertext = $AESGCM($aes_key).encrypt($os.urandom(12), b"data", None) @call
+    indirect: |
+      $aes_key_bits = 256 @related
+      $aes_key = $AESGCM.generate_key(bit_length=$aes_key_bits)
+      $aes_ciphertext = $AESGCM($aes_key).encrypt($os.urandom(12), b"data", None) @call
+
+  - id: aes-256-cbc
+    expected: {unit: AES, family: AES, key_size: 256, mode: CBC}
+    also: [CSPRNG]
+    requires: {cryptography: "3.1"}
+    helper: encrypt_with_aes_cbc
+    imports: ["import os", "from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes"]
+    direct: |
+      $aes_cipher = $Cipher($algorithms.AES($os.urandom(32)), $modes.CBC($os.urandom(16))) @call
+      $aes_encryptor = $aes_cipher.encryptor()
+      $aes_ciphertext = $aes_encryptor.update(b"0123456789abcdef") + $aes_encryptor.finalize()
+    indirect: |
+      $aes_mode = $modes.CBC($os.urandom(16)) @related
+      $aes_cipher = $Cipher($algorithms.AES($os.urandom(32)), $aes_mode) @call
+      $aes_encryptor = $aes_cipher.encryptor()
+      $aes_ciphertext = $aes_encryptor.update(b"0123456789abcdef") + $aes_encryptor.finalize()
+
+  - id: sha3-256
+    expected: {unit: SHA3-256, family: SHA-3}
+    helper: sha3_digest
+    imports: ["import hashlib"]
+    direct: |
+      $sha3_digest = $hashlib.sha3_256(b"data").hexdigest() @call
+    indirect: |
+      $hash_name = "sha3_256" @related
+      $sha3_digest = $hashlib.new($hash_name, b"data").hexdigest() @call
+
+  - id: rsa-oaep-sha256
+    expected: {unit: RSAES-OAEP, family: RSAES-OAEP, padding: OAEP, digest: SHA-256}
+    also: [RSA]
+    requires: {cryptography: "3.1"}
+    helper: encrypt_with_rsa_oaep
+    imports:
+      - "from cryptography.hazmat.primitives import hashes"
+      - "from cryptography.hazmat.primitives.asymmetric import padding, rsa"
+    direct: |
+      $rsa_private_key = $rsa.generate_private_key(public_exponent=65537, key_size=2048)
+      $rsa_ciphertext = $rsa_private_key.public_key().encrypt(
+          b"data",
+          $padding.OAEP(mgf=$padding.MGF1(algorithm=$hashes.SHA256()), algorithm=$hashes.SHA256(), label=None), @call
+      )
+    indirect: |
+      $oaep_hash = $hashes.SHA256() @related
+      $rsa_private_key = $rsa.generate_private_key(public_exponent=65537, key_size=2048)
+      $rsa_ciphertext = $rsa_private_key.public_key().encrypt(
+          b"data",
+          $padding.OAEP(mgf=$padding.MGF1(algorithm=$oaep_hash), algorithm=$oaep_hash, label=None), @call
+      )
+
+  - id: sha-1
+    expected: {unit: SHA-1, family: SHA-1}
+    helper: sha1_digest
+    imports: ["import hashlib"]
+    direct: |
+      $sha1_digest = $hashlib.sha1(b"data").hexdigest() @call
+    indirect: |
+      $hash_name = "sha1" @related
+      $sha1_digest = $hashlib.new($hash_name, b"data").hexdigest() @call
+
+  - id: sha-256
+    expected: {unit: SHA-256, family: SHA-2}
+    helper: sha256_digest
+    imports: ["import hashlib"]
+    direct: |
+      $sha256_digest = $hashlib.sha256(b"data").hexdigest() @call
+    indirect: |
+      $hash_name = "sha256" @related
+      $sha256_digest = $hashlib.new($hash_name, b"data").hexdigest() @call
+
+  - id: md5
+    expected: {unit: MD5, family: MD5}
+    helper: md5_digest
+    imports: ["import hashlib"]
+    direct: |
+      $md5_digest = $hashlib.md5(b"data").hexdigest() @call
+    indirect: |
+      $hash_name = "md5" @related
+      $md5_digest = $hashlib.new($hash_name, b"data").hexdigest() @call
+
+  - id: hmac-sha256
+    expected: {unit: HMAC, family: HMAC, digest: SHA-256}
+    helper: hmac_sha256
+    imports: ["import hashlib", "import hmac"]
+    direct: |
+      $hmac_tag = $hmac.new(b"key", b"data", $hashlib.sha256).hexdigest() @call
+    indirect: |
+      $hmac_digest = $hashlib.sha256 @related
+      $hmac_tag = $hmac.new(b"key", b"data", $hmac_digest).hexdigest() @call
+
+  - id: pbkdf2-hmac-sha256
+    expected: {unit: PBKDF2, family: PBKDF2, digest: SHA-256, iterations: 600000}
+    also: [CSPRNG]
+    helper: derive_key_with_pbkdf2
+    imports: ["import hashlib", "import os"]
+    direct: |
+      $derived_key = $hashlib.pbkdf2_hmac("sha256", b"changeit", $os.urandom(16), 600000) @call
+    indirect: |
+      $kdf_hash_name = "sha256" @related
+      $derived_key = $hashlib.pbkdf2_hmac($kdf_hash_name, b"changeit", $os.urandom(16), 600000) @call
+
+  - id: tls13-context
+    expected: {unit: null, protocol: TLS, protocol_version: "1.3"}
+    helper: create_tls_context
+    imports: ["import ssl"]
+    direct: |
+      $tls_context = $ssl.SSLContext($ssl.PROTOCOL_TLS_CLIENT) @call
+      $tls_context.minimum_version = $ssl.TLSVersion.TLSv1_3
+    indirect: |
+      $tls_version = $ssl.TLSVersion.TLSv1_3 @related
+      $tls_context = $ssl.SSLContext($ssl.PROTOCOL_TLS_CLIENT) @call
+      $tls_context.minimum_version = $tls_version

@@ -50,7 +50,13 @@ CRYPTO_PATTERNS: dict[str, str] = {
     r"|org\.bouncycastle|javax\.net\.ssl",
     "python": r"^\s*(from|import)\s+(cryptography|hashlib|hmac|ssl|Crypto|Cryptodome|nacl|OpenSSL|ecdsa|rsa|bcrypt"
     r"|passlib|jwt)\b",
+    # an import path in quotes (single or grouped imports); crypto/rand alone is not enough (IDs, nonces)
+    "go": r'"crypto/(aes|cipher|des|ecdh|ecdsa|ed25519|elliptic|hkdf|hmac|md5|mlkem|pbkdf2|rc4|rsa|sha1|sha256|sha3'
+    r'|sha512|tls|x509)"|"golang\.org/x/crypto/',
 }
+SOURCE_EXTENSIONS = {"java": "java", "python": "py", "go": "go"}
+# per language, first-party exclusions beyond NON_FIRST_PARTY directories (Go keeps tests next to the code)
+EXTRA_EXCLUDES = {"go": ["**/*_test.go", "**/testdata/**"]}
 # Repos that are themselves CBOM tooling or benchmarks would bias the comparison.
 DEFAULT_EXCLUDE_PATTERNS = [r"cbom", r"benchmark", r"sonar-cryptography", r"cryptobom", r"crypto-finder", r"cryptoscan"]
 # Rule of thumb: a repo whose packed size is below GITSERVER_MEMORY / SIZE_CAP_RATIO clones through the git server
@@ -87,7 +93,7 @@ def clamp_size_bins(bins: list[tuple[int, int]], cap_mb: int | None) -> list[tup
 
 @dataclass
 class CorpusParams:
-    languages: list[str] = field(default_factory=lambda: ["Java", "Python"])
+    languages: list[str] = field(default_factory=lambda: ["Java", "Python", "Go"])  # the paper's (2026-10-20)
     per_language: int = 100
     star_bins: list[tuple[int, int]] = field(
         default_factory=lambda: [(50, 300), (300, 2000), (2000, 15000), (15000, 1_000_000)]
@@ -214,9 +220,11 @@ def exclusion_reason(
 
 
 def grep_pathspecs(language: str) -> list[str]:
-    """`git grep` pathspecs for first-party source of `language`: its extensions, minus NON_FIRST_PARTY directories."""
-    ext = "java" if language.lower() == "java" else "py"
-    return [f"*.{ext}", *(f":(exclude,glob)**/{d}/**" for d in NON_FIRST_PARTY)]
+    """`git grep` pathspecs for first-party source of `language`: its extensions, minus NON_FIRST_PARTY directories
+    (and Go's test files and testdata)."""
+    ext = SOURCE_EXTENSIONS[language.lower()]
+    excludes = [f"**/{d}/**" for d in NON_FIRST_PARTY] + EXTRA_EXCLUDES.get(language.lower(), [])
+    return [f"*.{ext}", *(f":(exclude,glob){x}" for x in excludes)]
 
 
 def build_corpus(

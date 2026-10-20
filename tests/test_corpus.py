@@ -1,6 +1,7 @@
 """Corpus builder exclusions, first-party grep scope and pruning (common/corpus.py; refinements 11 and 13)."""
 
 import json
+import re
 
 from common import corpus
 
@@ -28,6 +29,16 @@ def test_grep_pathspecs_cover_first_party_source_only():
     specs = corpus.grep_pathspecs("Java")
     assert specs[0] == "*.java" and ":(exclude,glob)**/test/**" in specs and ":(exclude,glob)**/vendor/**" in specs
     assert corpus.grep_pathspecs("Python")[0] == "*.py"
+    go = corpus.grep_pathspecs("Go")
+    assert go[0] == "*.go" and ":(exclude,glob)**/*_test.go" in go and ":(exclude,glob)**/testdata/**" in go
+
+
+def test_go_crypto_pattern_matches_crypto_imports_not_rand_alone():
+    pattern = re.compile(corpus.CRYPTO_PATTERNS["go"])
+    assert pattern.search('\t"crypto/aes"') and pattern.search('import "crypto/tls"')
+    assert pattern.search('\tcrand "crypto/rand"\n\t"golang.org/x/crypto/pbkdf2"')
+    assert not pattern.search('\t"crypto/rand"') and not pattern.search('"github.com/acme/crypto/aes"')
+    assert corpus.CorpusParams().languages == ["Java", "Python", "Go"]
 
 
 def test_prune_corpus_drops_repos_with_timeouts(tmp_path):
