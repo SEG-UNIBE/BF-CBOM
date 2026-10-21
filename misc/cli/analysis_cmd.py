@@ -46,10 +46,28 @@ from common.experiment import (
     spec_path,
 )
 from common.tools_registry import VoterMap, load_tools, role, tailored_map, voter_groups
+from misc.cli import progress
 
 # (meta, path of run<k>.json, its normalised CBOM)
 Normalized = tuple[dict, Path, NormalizedCbom]
 Writer = Callable[[str, list[dict], list[str]], None]
+
+
+def _label(x: tuple) -> str:
+    """The run an item of a step is about, for the progress line: `<owner>/<repo>[@variant] · <tool> · run<k>`."""
+    cbom_path = x[1]
+    variant = cbom_path.parents[1].name
+    where = tbl.full_name(cbom_path.parents[2].name) + ("" if variant == ORIGINAL_VARIANT else f"@{variant}")
+    return f"{where} · {cbom_path.parent.name} · {cbom_path.stem}"
+
+
+def _sized(x: tuple) -> str:
+    """`_label` with the CBOM's size, which is what makes one item slow."""
+    try:
+        return f"{_label(x)} · {x[1].stat().st_size / 1e6:.1f} MB"
+    except OSError:
+        return _label(x)
+
 
 analysis_app = typer.Typer(
     help="Offline analysis of stored experiments (normalisation, RQ1 schema, matching, micro ground truth, CSV tables)",
@@ -223,9 +241,11 @@ def _store(exp_dir: Path, *, fetch: bool = False) -> SnapshotStore:
     with the pinned commits of `_experiment.yaml` from their source URLs; fixtures are published, not fetched)."""
     store = SnapshotStore()
     if fetch:
-        for name, repo in sorted(pinned_repos(exp_dir).items()):
-            if repo.commit and not repo.is_fixture:
-                store.fetch(name, repo.source_url, repo.commit, log=lambda m: typer.echo(m, err=True))
+        repos = [
+            (name, repo) for name, repo in sorted(pinned_repos(exp_dir).items()) if repo.commit and not repo.is_fixture
+        ]
+        for name, repo in progress.track(repos, "fetch snapshots", item=lambda x: x[0]):
+            store.fetch(name, repo.source_url, repo.commit, log=lambda m: typer.echo(m, err=True))
     return store
 
 
@@ -243,13 +263,15 @@ def _normalize_runs(
     languages = _languages(exp_dir)
     store = store or SnapshotStore()
     files_cache: dict[tuple[str, str | None], frozenset[str] | None] = {}
-    for meta, cbom_path in iter_results(exp_dir):
-        if meta.get("status") != "ok" or not cbom_path.exists():
-            continue
-        if run is not None and cbom_path.name != f"run{run}.json":
-            continue
-        if not mutants and cbom_path.parents[1].name != ORIGINAL_VARIANT:
-            continue
+    stored = [
+        (meta, cbom_path)
+        for meta, cbom_path in iter_results(exp_dir)
+        if meta.get("status") == "ok"
+        and cbom_path.exists()
+        and (run is None or cbom_path.name == f"run{run}.json")
+        and (mutants or cbom_path.parents[1].name == ORIGINAL_VARIANT)
+    ]
+    for meta, cbom_path in progress.track(stored, "normalise CBOMs", item=_sized):
         body = cbom_path.read_bytes()
         try:
             cbom = json.loads(body)
@@ -328,7 +350,7 @@ def _schema_step(exp_dir: Path, run: int, normalized: list[Normalized], write: W
     languages = _languages(exp_dir)
     cbom_by = {t: info.get("cbom_by") for t, info in load_tools().items()}
     schema_rows = []
-    for meta, cbom_path, _ in normalized:
+    for meta, cbom_path, _ in progress.track(normalized, "RQ1: schema validation", item=_sized):
         try:
             cbom = json.loads(cbom_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
@@ -337,8 +359,9 @@ def _schema_step(exp_dir: Path, run: int, normalized: list[Normalized], write: W
         tool = meta.get("worker") or cbom_path.parent.name
         schema_rows.append(sch.schema_row(meta, cbom_path, cbom, language=language, cbom_by=cbom_by.get(tool)))
     write(f"schema-run{run}.csv", schema_rows, sch.SCHEMA_COLUMNS)
-    write(f"meaningful-run{run}.csv", sch.meaningful_rows(normalized, cbom_by), sch.MEANINGFUL_COLUMNS)
-    trace = sch.traceability_rows(normalized, store, languages=languages)
+    meaningful = sch.meaningful_rows(progress.track(normalized, "RQ1: meaningful", item=_label), cbom_by)
+    write(f"meaningful-run{run}.csv", meaningful, sch.MEANINGFUL_COLUMNS)
+    trace = sch.traceability_rows(progress.track(normalized, "RQ1: traceable", item=_label), store, languages=languages)
     write(f"traceability-run{run}.csv", trace, sch.TRACE_COLUMNS)
     if trace and not any(r.get("source") for r in trace):
         typer.secho(
@@ -402,11 +425,13 @@ def _levels_step(
     if not ladder_in:
         _err(f"no ok results for run{run} in {exp_dir}")
     voter_of = _voter_of(merge_llm, observers_vote)
-    rows = lv.ladder(ladder_in, voter_of, exclude=set() if include_tailored else excluded, closure=closure)
+    with progress.step("ladder L0-L4"):
+        rows = lv.ladder(ladder_in, voter_of, exclude=set() if include_tailored else excluded, closure=closure)
     write(f"levels-run{run}.csv", [r.to_dict() for r in rows], lv.LEVEL_COLUMNS)
-    items = lv.item_rows(
-        presence_in, voter_of, run=run, languages=_languages(exp_dir), tailored=tailored, closure=closure
-    )
+    with progress.step("items per tool and level"):
+        items = lv.item_rows(
+            presence_in, voter_of, run=run, languages=_languages(exp_dir), tailored=tailored, closure=closure
+        )
     write(f"items-run{run}.csv", items, lv.ITEM_COLUMNS)
     return rows
 
@@ -433,16 +458,14 @@ def _tables_step(
     Returns the exact groups per (snapshot, variant)."""
     store = store or SnapshotStore()
     languages = _languages(exp_dir)
-    write(
-        "runs.csv",
-        tbl.run_rows(exp_dir, languages, tailored=tailored_map(), expects=_expects(exp_dir)),
-        tbl.RUNS_COLUMNS,
-    )
+    with progress.step("runs"):
+        runs = tbl.run_rows(exp_dir, languages, tailored=tailored_map(), expects=_expects(exp_dir))
+    write("runs.csv", runs, tbl.RUNS_COLUMNS)
     voter_of = _voter_of(merge_llm, observers_vote)
     norm_rows: list[dict] = []
     commits: dict[str, str | None] = {}
     location_kinds: list[dict[str, str]] = []
-    for meta, cbom_path, n in normalized:
+    for meta, cbom_path, n in progress.track(normalized, "records and their places", item=_label):
         snapshot, variant = cbom_path.parents[2].name, cbom_path.parents[1].name
         commits.setdefault(snapshot, meta.get("base_commit"))
         repo, commit = tbl.full_name(snapshot), meta.get("variant_commit") or meta.get("base_commit")
@@ -471,7 +494,7 @@ def _tables_step(
     matchlevel_rows: list[dict] = []
     per_snapshot = _match_input(normalized, include_tailored)
     exact_by_level: dict[str, dict[tuple[str, str], list]] = {}
-    for lv_name in lv.LEVELS:
+    for lv_name in progress.track(lv.LEVELS, "exact matcher, per level", item=str):
         matcher = ExactMatcher(level=lv_name, window=window, closure=closure, voter_of=voter_of)
         at_level = {key: matcher.match(records) for key, records in per_snapshot.items()}
         exact_by_level[lv_name] = at_level
@@ -530,7 +553,7 @@ def _raqun_step(run, per_snapshot, exact_by_level, write: Writer, *, level, vote
     a_rows: list[dict] = []
     cmp_rows: list[dict] = []
     level_rows: list[dict] = []
-    for lv_name in lv.LEVELS:
+    for lv_name in progress.track(lv.LEVELS, "RaQuN, per level", item=str):
         matcher = rq.RaqunMatcher(level=lv_name, voter_of=voter_of)
         at_level = {key: matcher.match(records) for key, records in sorted(per_snapshot.items())}
         level_rows.append(tbl.matchlevel_row(matcher.name, lv_name, run, at_level, voter_of))
@@ -580,18 +603,20 @@ def _mutation_step(
         key = (cbom_path.parents[2].name, cbom_path.parents[1].name, meta.get("worker") or cbom_path.parent.name)
         statuses[key][int(meta.get("run_index") or 1)] = str(meta.get("status") or "?")
     languages = _languages(exp_dir)
-    rows = mu.detection_rows(
-        manifest,
-        records,
-        statuses,
-        list(_spec(exp_dir).get("tools") or []),
-        window=window,
-        languages=languages,
-        voter_of=_voter_of(merge_llm, observers_vote),
-    )
+    with progress.step("E4: mutant detection"):
+        rows = mu.detection_rows(
+            manifest,
+            records,
+            statuses,
+            list(_spec(exp_dir).get("tools") or []),
+            window=window,
+            languages=languages,
+            voter_of=_voter_of(merge_llm, observers_vote),
+        )
+        rates = mu.rate_rows(rows, samples=samples)
     write("mutants.csv", mu.mutant_rows(manifest, languages=languages), mu.MUTANTS_COLUMNS)
     write("mutation.csv", rows, mu.MUTATION_COLUMNS)
-    write("mutation-rates.csv", mu.rate_rows(rows, samples=samples), mu.RATE_COLUMNS)
+    write("mutation-rates.csv", rates, mu.RATE_COLUMNS)
 
 
 def _stability_step(all_runs: list[Normalized], write: Writer, *, level: str) -> dict[tuple[str, str, str], set[str]]:
@@ -600,7 +625,8 @@ def _stability_step(all_runs: list[Normalized], write: Writer, *, level: str) ->
     for meta, cbom_path, n in all_runs:
         snapshot, variant = cbom_path.parents[2].name, cbom_path.parents[1].name
         runs[(snapshot, variant, n.tool)][int(meta.get("run_index") or 1)] = n.records
-    rows, consensus = stability_rows(runs, level=level, repo_of=tbl.full_name)
+    with progress.step("run-to-run stability"):
+        rows, consensus = stability_rows(runs, level=level, repo_of=tbl.full_name)
     write("stability.csv", rows, STABILITY_COLUMNS)
     return consensus
 
@@ -645,17 +671,20 @@ def _score_step(
             obs.restrict(f"{snapshot}/{variant}", tool, set(keys))  # keep the items in the tool's consensus set
         return obs
 
-    obs = observe(voter_of)
-    rows, loo = sc.score_rows(obs, samples=samples)
+    with progress.step(f"RQ4: scores, {samples} bootstraps"):
+        obs = observe(voter_of)
+        rows, loo = sc.score_rows(obs, samples=samples)
     write(f"score-run{run}.csv", rows, sc.SCORE_COLUMNS)
     write(f"loo-run{run}.csv", loo, sc.LOO_COLUMNS)
-    groupings = {"declared": obs, "per-tool": observe(VoterMap({t: t for t in voter_of}, voter_of.observers))}
-    if not merge_llm:
-        groupings["llm-merged"] = observe(_voter_of(True, observers_vote))
-    groupings["engine-merged"] = observe(
-        voter_groups(merge_llm=merge_llm, observers_vote=observers_vote, engine_family=True)
-    )
-    write(f"grouping-run{run}.csv", sc.grouping_rows(groupings), sc.GROUPING_COLUMNS)
+    with progress.step("RQ4: other voter groupings"):
+        groupings = {"declared": obs, "per-tool": observe(VoterMap({t: t for t in voter_of}, voter_of.observers))}
+        if not merge_llm:
+            groupings["llm-merged"] = observe(_voter_of(True, observers_vote))
+        groupings["engine-merged"] = observe(
+            voter_groups(merge_llm=merge_llm, observers_vote=observers_vote, engine_family=True)
+        )
+        grouping = sc.grouping_rows(groupings)
+    write(f"grouping-run{run}.csv", grouping, sc.GROUPING_COLUMNS)
 
 
 @analysis_app.command("score")
@@ -809,6 +838,7 @@ def tables(
     typer.echo(f"written to {out_dir}")
 
 
+@progress.session()
 def run_report(
     exp_dir: Path,
     *,
@@ -893,7 +923,8 @@ def run_report(
         "fetch": fetch,
     }
     _write_info(out_dir, run, settings, counts, normalized, _voter_of(merge_llm, observers_vote))
-    return sm.write(out_dir, run=run)
+    with progress.step(sm.SUMMARY_FILE):
+        return sm.write(out_dir, run=run)
 
 
 @analysis_app.command("report")

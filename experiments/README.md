@@ -264,7 +264,10 @@ make analysis ARGS="score e0-micro"      # RQ4: confirmation, exclusivity, Dawid
 levels, who finds each micro asset, fill rates and spec issues, the L0-L4 ladder, how many voter groups report each
 algorithm per repository, LLM token counts, the list of files). The summary is rendered only from the CSV files, so
 it never shows anything they don't hold; `python -m analysis.summary <exp>/_ANALYSIS/` rebuilds it from an export.
-`experiment export` runs `report` first (skip with `--no-report`), so every zip carries current tables.
+Its numbers carry `'` between thousands (13'043); the CSVs keep plain numbers.
+`experiment export` runs `report` first (skip with `--no-report`), so every zip carries current tables. On a
+terminal both show a live line per step (done/total, remaining time, elapsed time and the run being worked on), so a
+long step reads as working; off a terminal each step prints one line when it ends.
 
 **`normalize <exp>`** reads every stored ok CBOM (all repetitions) into normalised records with its tool's adapter
 spec, as described in [Normalisation](#normalisation). It writes:

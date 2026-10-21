@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 import statistics
 import sys
 from collections import Counter, defaultdict
@@ -66,11 +67,12 @@ FILES = {
 
 
 def md_table(header: list[str], rows: list[list], align: str | None = None) -> list[str]:
-    """GitHub Markdown table; `align` has one letter per column (l or r), default: first left, rest right."""
+    """GitHub Markdown table; `align` has one letter per column (l or r), default: first left, rest right. A cell
+    that is a number gets thousands separators (`_n`)."""
     align = align or "l" + "r" * (len(header) - 1)
 
     def cell(v) -> str:
-        return "" if v is None else str(v).replace("|", "\\|").replace("\n", " ")
+        return "" if v is None else _n(v).replace("|", "\\|").replace("\n", " ")
 
     sep = ["---:" if a == "r" else "---" for a in align]
     out = ["| " + " | ".join(cell(h) for h in header) + " |", "| " + " | ".join(sep) + " |"]
@@ -107,7 +109,20 @@ def _pct(v) -> str:
 def _num(v) -> str:
     """A count or ratio without trailing zeros (2.0 -> 2, 1.25 -> 1.2)."""
     f = _float(v)
-    return "" if f is None else f"{f:.1f}".removesuffix(".0")
+    return "" if f is None else _n(f"{f:.1f}".removesuffix(".0"))
+
+
+NUMBER = re.compile(r"-?\d+(\.\d+)?")
+
+
+def _n(v) -> str:
+    """A number with ' between thousands (13043 -> 13'043, 1234.5 -> 1'234.5); anything else as it is. Table cells
+    get it in `md_table`, counts in the text explicitly; the CSVs keep plain numbers."""
+    s = "" if v is None else str(v)
+    if not NUMBER.fullmatch(s):
+        return s
+    head, dot, tail = s.partition(".")
+    return f"{int(head):,}".replace(",", "'") + dot + tail
 
 
 def _ts(v) -> datetime | None:
@@ -168,7 +183,7 @@ def _header(spec: dict, info: dict, run: int) -> list[str]:
     tools = spec.get("tools") or []
     when = info.get("generated_at") or datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
     lines.append(
-        f"Generated {when} by `analysis report`: {len(repos)} repos, {len(tools)} tools, "
+        f"Generated {when} by `analysis report`: {_n(len(repos))} repos, {len(tools)} tools, "
         f"{spec.get('repetitions', 1)} repetition(s), as listed with their commits in `_experiment.yaml`. "
         f"Vocabulary {vocab.get('algorithms', '?')}, "
         f"CycloneDX registry {vocab.get('registry', '?')}."
@@ -198,11 +213,14 @@ def _experiment(rows: list[dict], sessions: list[dict]) -> list[str]:
         table.append(["sessions", ", ".join(f"{n} {k}" for k, n in sorted(outcomes.items()))])
     tool_time = sum(_float(r.get("duration_sec")) or 0 for r in ran)
     if ran:
-        table.append(["tool time", f"{_span(tool_time)} summed over {len(ran)} runs (excluding unsupported)"])
+        table.append(["tool time", f"{_span(tool_time)} summed over {_n(len(ran))} runs (excluding unsupported)"])
     queue = [q for r in ran if (q := _float(r.get("queue_sec"))) is not None]
     if queue:
         table.append(
-            ["queue wait", f"median {statistics.median(queue):.0f} s, max {max(queue):.0f} s before a job started"]
+            [
+                "queue wait",
+                f"median {_n(round(statistics.median(queue)))} s, max {_n(round(max(queue)))} s before a job started",
+            ]
         )
     host = next((e.get("host") for e in reversed(sessions) if e.get("host")), None) or {}
     if host.get("ram_total_mb"):
@@ -284,29 +302,29 @@ def _runs(rows: list[dict]) -> list[str]:
     lines += md_table([*header, "tool version"], table, "l" + "r" * (len(header) - 1) + "l")
     failed = [r for r in rows if r["status"] not in ("ok", "unsupported")]
     if failed:
-        lines += ["", f"Runs without a result ({len(failed)}):", ""]
+        lines += ["", f"Runs without a result ({_n(len(failed))}):", ""]
         for r in failed[:25]:
             err = f": {r['error']}" if r.get("error") else ""
             lines.append(f"- `{r['tool']}` on `{r['repo']}` ({r['variant']}, run {r['run']}): {r['status']}{err}")
         if len(failed) > 25:
-            lines.append(f"- ... and {len(failed) - 25} more (runs.csv)")
+            lines.append(f"- ... and {_n(len(failed) - 25)} more (runs.csv)")
     workarounds = [r for r in rows if r.get("workaround")]
     if workarounds:
         lines += [
             "",
-            f"Runs with a recorded setup workaround ({len(workarounds)}; refinement 15: the tool is unchanged, the "
+            f"Runs with a recorded setup workaround ({_n(len(workarounds))}; refinement 15: the tool is unchanged, the "
             "input it crashes on is excluded and named):",
             "",
         ]
         for r in workarounds[:25]:
             lines.append(f"- `{r['tool']}` on `{r['repo']}` ({r['variant']}, run {r['run']}): {r['workaround']}")
         if len(workarounds) > 25:
-            lines.append(f"- ... and {len(workarounds) - 25} more (runs.csv)")
+            lines.append(f"- ... and {_n(len(workarounds) - 25)} more (runs.csv)")
     oomed = [r for r in rows if r["status"] == "ok" and _int(r.get("oom_kills")) > 0]
     if oomed:
         lines += [
             "",
-            f"Runs stored ok although the container was OOM-killed meanwhile ({len(oomed)}; not clean results, "
+            f"Runs stored ok although the container was OOM-killed meanwhile ({_n(len(oomed))}; not clean results, "
             "`experiment run --retry-failed` redoes them):",
             "",
         ]
@@ -316,7 +334,7 @@ def _runs(rows: list[dict]) -> list[str]:
                 f"at {_gib(r.get('memory_limit_mb'))} GiB"
             )
         if len(oomed) > 25:
-            lines.append(f"- ... and {len(oomed) - 25} more (runs.csv)")
+            lines.append(f"- ... and {_n(len(oomed) - 25)} more (runs.csv)")
     return lines + [""]
 
 
@@ -537,8 +555,8 @@ def _places(units: list[dict]) -> list[str]:
     ]
     if unread:
         lines[0] += (
-            f" {unread} records are `unread`: the snapshot files are on the VM's git mirror (`analysis report` there, "
-            "or `--fetch` for a copied export)."
+            f" {_n(unread)} records are `unread`: the snapshot files are on the VM's git mirror (`analysis report` "
+            "there, or `--fetch` for a copied export)."
         )
     lines += [""] + md_table(["tool", "records", *LOCATION_KINDS], table) + [""]
     return lines
@@ -558,7 +576,7 @@ def _normalisation(units: list[dict], cov: list[dict], conf: list[dict]) -> list
                 u["assets"],
                 u["records"],
                 u["items"],
-                f"{_num(u.get('records_per_asset_median'))} / {u.get('records_per_asset_max') or ''}",
+                f"{_num(u.get('records_per_asset_median'))} / {_n(u.get('records_per_asset_max'))}",
                 _pct(u.get("multi_occurrence_share")),
                 _num(u.get("assets_per_item")),
                 _pct(u.get("unlocated_share")),
@@ -587,7 +605,7 @@ def _normalisation(units: list[dict], cov: list[dict], conf: list[dict]) -> list
         issues: dict[str, list[str]] = defaultdict(list)
         for r in conf:
             unit = " CBOMs" if r["scope"] == "document" else ""
-            issues[r["tool"]].append(f"{r['kind']} {r['count']}{unit}")
+            issues[r["tool"]].append(f"{r['kind']} {_n(r['count'])}{unit}")
         roles = {u["tool"]: u.get("role") for u in units}
         table = []
         for tool in sorted(by_tool):
@@ -641,7 +659,7 @@ def _rq1(schema: list[dict], meaningful: list[dict], trace: list[dict]) -> list[
                     if "=" in item:
                         k, n = item.rsplit("=", 1)
                         kinds[k] += _int(n)
-            top = "; ".join(f"{k} ({n})" for k, n in kinds.most_common(3))
+            top = "; ".join(f"{k} ({_n(n)})" for k, n in kinds.most_common(3))
             versions = "; ".join(sorted({f"{r.get('bom_format')} {r.get('spec_version')}" for r in rs}))
             table.append(
                 [
@@ -803,11 +821,13 @@ def _matching(levels: list[dict], groups: list[dict], matchers: list[dict]) -> l
         table = []
         for r in levels:
             items = _int(r["items"])
-            shares = [f"{_int(r[c])} ({_int(r[c]) / items:.0%})" if items else "" for c in ("k1", "k2", "k3", "k4plus")]
+            shares = [
+                f"{_n(_int(r[c]))} ({_int(r[c]) / items:.0%})" if items else "" for c in ("k1", "k2", "k3", "k4plus")
+            ]
             cells = [r["matcher"], r["level"], items, *shares]
             for d in MATCH_DIMS:
                 n = _int(r.get(f"{d}_groups"))
-                cells.append(f"{_pct(r.get(f'{d}_agree'))} ({n})" if n else "")
+                cells.append(f"{_pct(r.get(f'{d}_agree'))} ({_n(n)})" if n else "")
             table.append(cells)
         lines += md_table(header, table, "ll" + "r" * (len(header) - 2)) + [""]
     lines += _overlap(groups)
@@ -955,10 +975,12 @@ def _mutation(mutants: list[dict], rows: list[dict], rates: list[dict]) -> list[
     by_lang: dict[str, int] = defaultdict(int)
     for m in mutants:
         by_lang[m["language"]] += 1
+    per_lang = ", ".join(
+        f"{lang} {_n(n)}" for lang, n in sorted(by_lang.items(), key=lambda kv: _lang_key(kv[0] or ""))
+    )
     lines = ["## E4: insertion mutants", ""]
     lines += [
-        f"{len(mutants)} mutants in {len({m['repo'] for m in mutants})} repositories "
-        f"({', '.join(f'{lang} {n}' for lang, n in sorted(by_lang.items(), key=lambda kv: _lang_key(kv[0] or '')))}); "
+        f"{_n(len(mutants))} mutants in {_n(len({m['repo'] for m in mutants}))} repositories ({per_lang}); "
         "each inserts one catalog snippet (mutation/catalog/) in one style into a first-party method with a caller "
         "(`mutants.csv`). A tool detects it when a new record of the expected unit appears at the line naming the "
         "algorithm ±2 (site) or anywhere on the inserted lines (span), in most of the mutant's runs; at the "
@@ -975,7 +997,7 @@ def _mutation(mutants: list[dict], rows: list[dict], rates: list[dict]) -> list[
 
         def show(style: str, dim: str, tool: str = tool, lang: str = lang) -> str:
             r = cell.get((tool, lang, style, dim))
-            return f"{_pct(r['rate'])} ({r['detected']}/{r['mutants']})" if r else ""
+            return f"{_pct(r['rate'])} ({_n(r['detected'])}/{_n(r['mutants'])})" if r else ""
 
         ok = [r for r in rows if (r["tool"], r["language"]) == (tool, lang) and r.get("status") == "ok"]
         masked = sum(_true(r.get("masked")) for r in ok)
@@ -991,9 +1013,9 @@ def _mutation(mutants: list[dict], rows: list[dict], rates: list[dict]) -> list[
         lines += ["", OBSERVER_NOTE]
     failed = [r for r in rows if r.get("status") != "ok"]
     if failed:
-        lines += ["", f"Not judged ({len(failed)} mutant × tool): the run on the mutant or on the original is missing "
-                  "or not ok (`status` in `mutation.csv`)."]  # fmt: skip
-    lines += ["", f"### Mutant patches (first {min(MUTANT_PATCHES, len(mutants))} of {len(mutants)})", ""]
+        lines += ["", f"Not judged ({_n(len(failed))} mutant × tool): the run on the mutant or on the original is "
+                  "missing or not ok (`status` in `mutation.csv`)."]  # fmt: skip
+    lines += ["", f"### Mutant patches (first {min(MUTANT_PATCHES, len(mutants))} of {_n(len(mutants))})", ""]
     for m in mutants[:MUTANT_PATCHES]:
         lines += [f"`{m['variant']}` in `{m['repo']}`, `{m['file']}:{m['call_line']}` ({m['host']}):", ""]
         lines += ["```diff", m.get("patch") or "", "```", ""]
@@ -1078,7 +1100,7 @@ def _ladder(all_rows: list[dict]) -> list[str]:
             f"{lv} {_pct(_int(r.get('confirmed_strict')) / _int(r['items']))}" if _int(r.get("items")) else lv
             for lv, r in alls.items()
         )
-        multi = ", ".join(f"{lv} {_int(r.get('multi_unit_clusters'))}" for lv, r in alls.items())
+        multi = ", ".join(f"{lv} {_n(_int(r.get('multi_unit_clusters')))}" for lv, r in alls.items())
         lines += [
             "",
             f"Confirmed through cluster members alone, all voters (no generic or implied attachment): {strict}. "
@@ -1129,7 +1151,8 @@ def _overlap(groups: list[dict]) -> list[str]:
         n = len(best)
         sites = sum(_int(g.get("n_sites")) for g in rows)
         coloc = sum(_int(g.get("colocated_voters")) >= 2 for g in rows)
-        return [label, n] + [f"{c.get(b, 0)} ({c.get(b, 0) / n:.0%})" if n else "" for b in buckets] + [sites, coloc]
+        shares = [f"{_n(c.get(b, 0))} ({c.get(b, 0) / n:.0%})" if n else "" for b in buckets]
+        return [label, n, *shares, sites, coloc]
 
     table = [line("all", repo)]
     for lg in sorted({(g.get("language") or "?").lower() for g in repo}, key=_lang_key):
@@ -1169,7 +1192,7 @@ def _llm(rows: list[dict], scores: list[dict] | None = None) -> list[str]:
                 sum(_int(r.get("requests")) for r in rs),
                 sum(_int(r.get("requests_failed")) for r in rs) or "",
                 chunks_total,
-                f"{skipped} ({capped} runs)" if skipped else "",
+                f"{_n(skipped)} ({_n(capped)} runs)" if skipped else "",
                 sum(inputs),
                 sum(_int(r.get("cached_input_tokens")) for r in rs),
                 sum(outputs),
@@ -1236,7 +1259,7 @@ def _files(info: dict, run: int) -> list[str]:
     for pattern, meaning in FILES.items():
         name = pattern.format(k=run)
         if name in counts:
-            lines.append(f"- `{name}` ({counts[name]} rows): {meaning}")
+            lines.append(f"- `{name}` ({_n(counts[name])} rows): {meaning}")
     lines += [
         "- `normalize.json`: coverage per tool in full (sources, conflicts, top unmapped values)",
         "- `../_run-log.json`: one entry per runner session (times, host RAM and CPUs, budget, waves, peak RAM)",

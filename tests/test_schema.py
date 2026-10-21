@@ -34,6 +34,18 @@ def test_validate_document_against_the_declared_version():
     assert draft == {"schema": None, "valid": None, "errors": None, "error_kinds": {}}
 
 
+def test_unique_items_is_jsonschemas_check_in_linear_time():
+    aes = _comp("AES", ap={"primitive": "block-cipher"})
+    reordered = {"cryptoProperties": aes["cryptoProperties"], "name": "AES", "type": "cryptographic-asset"}
+    twice = schema.validate_document(_bom(aes, reordered))
+    assert twice["valid"] is False and twice["error_kinds"] == {"uniqueItems:components": 1}
+    assert schema.validate_document(_bom(aes, _comp("SHA-256")))["valid"] is True
+    v = schema.validator("1.6")
+    cases = [([1, 1.0], True), ([[1], [1.0]], True), ([True, 1], False), (["1", 1], False), ([{}, []], False)]
+    for items, duplicate in cases:
+        assert any(schema._unique_items(v, True, items, {})) is duplicate
+
+
 def test_meaningful_counts_standard_fields_apart_from_any_source_per_asset_type(tmp_path):
     bom = _bom(
         _comp("AES-256-GCM"),  # key size and mode only in the name

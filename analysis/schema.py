@@ -93,6 +93,29 @@ _MAX_KINDS = 6
 # ----- conformance -----
 
 
+_TRUE, _FALSE = object(), object()
+
+
+def _hashable(v):
+    """A JSON value as a hashable one with jsonschema's equality (key order ignored, 1 == 1.0, true != 1)."""
+    if isinstance(v, dict):
+        return frozenset((k, _hashable(x)) for k, x in v.items())
+    if isinstance(v, list):
+        return tuple(_hashable(x) for x in v)
+    if isinstance(v, bool):
+        return _TRUE if v else _FALSE
+    return v
+
+
+def _unique_items(validator, unique, instance, schema):
+    """`uniqueItems` in linear time. jsonschema compares unhashable items pair by pair, and a CBOM's `components`
+    are unique items: 55 s for one 10'141-component CBOM, quadratic in the components."""
+    if unique and validator.is_type(instance, "array") and len({_hashable(x) for x in instance}) < len(instance):
+        from jsonschema.exceptions import ValidationError
+
+        yield ValidationError("has non-unique elements")
+
+
 @lru_cache(maxsize=4)
 def validator(version: str):
     """Draft-07 validator of the vendored bom-<version> schema with its local references, or None."""
@@ -106,7 +129,8 @@ def validator(version: str):
         names += ("cryptography-defs.schema.json",)
     docs = {n: json.loads((SCHEMA_DIR / n).read_text(encoding="utf-8")) for n in names}
     registry = Registry().with_resources((d["$id"], Resource.from_contents(d)) for d in docs.values())
-    return jsonschema.Draft7Validator(docs[names[0]], registry=registry)
+    cls = jsonschema.validators.extend(jsonschema.Draft7Validator, {"uniqueItems": _unique_items})
+    return cls(docs[names[0]], registry=registry)
 
 
 def _path_class(path) -> str:

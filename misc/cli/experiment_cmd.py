@@ -50,7 +50,7 @@ from coordinator.redis_io import (
     ingest_worker_results,
     now_iso,
 )
-from misc.cli import overview
+from misc.cli import overview, progress
 
 experiment_app = typer.Typer(
     help="Batch experiments (reproducible, resumable; results stay on the results-data volume)",
@@ -672,18 +672,19 @@ def export(
     exp_dir = experiment_dir(name)
     if not exp_dir.exists():
         _err(f"no experiment '{name}' under {RESULTS_DIR}")
-    if not no_report:
-        from misc.cli.analysis_cmd import run_report  # local import: the analysis is not needed for the runs
+    with progress.session():
+        if not no_report:
+            from misc.cli.analysis_cmd import run_report  # local import: the analysis is not needed for the runs
 
-        try:
-            run_report(exp_dir)
-        except Exception as e:  # incl. typer.Exit; an export must never fail because the analysis did
-            typer.secho(f"analysis report failed ({e!r}); exporting the stored files only", fg=typer.colors.YELLOW)
-    dest.mkdir(parents=True, exist_ok=True)
-    out = dest / f"{name}.zip"
-    with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        for path in sorted(exp_dir.rglob("*")):
-            if path.is_file():
+            try:
+                run_report(exp_dir)
+            except Exception as e:  # incl. typer.Exit; an export must never fail because the analysis did
+                typer.secho(f"analysis report failed ({e!r}); exporting the stored files only", fg=typer.colors.YELLOW)
+        dest.mkdir(parents=True, exist_ok=True)
+        out = dest / f"{name}.zip"
+        files = [p for p in sorted(exp_dir.rglob("*")) if p.is_file()]
+        with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            for path in progress.track(files, "zip", item=lambda p: str(p.relative_to(exp_dir))):
                 zf.write(path, arcname=str(Path(name) / path.relative_to(exp_dir)))
     typer.echo(f"wrote {out} ({out.stat().st_size / 1e6:.1f} MB)")
 

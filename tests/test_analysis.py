@@ -240,6 +240,8 @@ def test_export_runs_the_report_and_zips_the_summary(tmp_path, monkeypatch):
     dest = tmp_path / "out"
     result = CliRunner().invoke(experiment_cmd.experiment_app, ["export", "exp-tables", "--dest", str(dest)])
     assert result.exit_code == 0, result.output
+    # off a terminal, every step prints one line when it ends (misc/cli/progress.py)
+    assert "normalise CBOMs: " in result.output and "zip: " in result.output
     names = zipfile.ZipFile(dest / "exp-tables.zip").namelist()
     assert "exp-tables/_ANALYSIS/_SUMMARY.md" in names and "exp-tables/_ANALYSIS/micro-run1.csv" in names
     assert (exp / "_ANALYSIS" / "_SUMMARY.md").exists()
@@ -255,6 +257,10 @@ def test_summary_markdown_from_csv_rows():
     from analysis import summary as sm
 
     assert sm.md_table(["a", "b"], [["x|y", 1]]) == ["| a | b |", "| --- | ---: |", "| x\\|y | 1 |"]
+    # numbers get ' between thousands, in cells and through `_n`; other text stays as it is
+    assert sm.md_table(["n", "x"], [[13043, "1234.5"]])[2] == "| 13'043 | 1'234.5 |"
+    values = (999, "-1000", "1.4.0", "2026-10-21", None)
+    assert [sm._n(v) for v in values] == ["999", "-1'000", "1.4.0", "2026-10-21", ""]
     base = {"n_items": "11"}
     rows = [
         {**base, "language": "java", "tool": "weak", "verdict": "fail", "strict": "0", "lenient": "2", "repo": "7"},
