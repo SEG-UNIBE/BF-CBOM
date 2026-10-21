@@ -441,6 +441,7 @@ def run(
             "started_at": now_iso(),
             "expected_jobs": str(expected_jobs(spec, exp_dir)),
             "issued_jobs": "0",
+            "failed_jobs": "0",  # stored this session with a status other than ok (the stack board shows it)
             "skipped_jobs": str(skipped),
             "results_dir": str(exp_dir),
             "tools": json.dumps(spec.tools),
@@ -592,6 +593,8 @@ def _collect(
             if session is not None:
                 session.entry["results_stored"] = session.entry.get("results_stored", 0) + 1
             r.hset(_status_key(name), mapping={"stored_jobs": str(done), "updated_at": now_iso()})
+            if result.status != "ok":
+                r.hincrby(_status_key(name), "failed_jobs", 1)
             colour = typer.colors.GREEN if result.status == "ok" else typer.colors.RED
             typer.secho(
                 f"[{done}/{total}] {result.status:<7} {job.tool:<15} {job.snapshot.full_name}@{job.snapshot.variant} "

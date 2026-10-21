@@ -25,6 +25,7 @@ from coordinator.redis_io import (
 )
 from misc.cli.analysis_cmd import analysis_app
 from misc.cli.experiment_cmd import experiment_app
+from misc.cli.stack_cmd import stack_app
 
 app = typer.Typer(
     add_completion=False,
@@ -41,6 +42,7 @@ export_app = typer.Typer(
 app.add_typer(export_app, name="export")
 app.add_typer(experiment_app, name="experiment")
 app.add_typer(analysis_app, name="analysis")
+app.add_typer(stack_app, name="stack")
 
 
 EXPORT_DEST_OPTION = typer.Option(..., "--dest", "-d", help="Directory to write the ZIP")

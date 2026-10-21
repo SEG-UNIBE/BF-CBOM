@@ -120,6 +120,8 @@ def test_run_stores_results_resumes_retries_and_exports(world, tmp_path):
     statuses = {(p.parents[2].name.split("@")[0], p.parent.name): json.loads(p.read_text())["status"]
                 for p in exp.glob("*/*/*/run1.meta.json")}  # fmt: skip
     assert statuses[("o__second", "t2")] == "error" and sum(s == "ok" for s in statuses.values()) == 3
+    status = world["redis"].hgetall(experiment_cmd._status_key("e-fake"))  # what the stack board reads
+    assert (status["stored_jobs"], status["failed_jobs"], status["expected_jobs"]) == ("4", "1", "4")
     meta = json.loads(next(exp.glob("o__first@*/original/t1/run1.meta.json")).read_text())
     assert meta["enqueued_at"] and meta["tool_version"] == "t1 1.0" and meta["variant"] == "original"
     (session,) = ex.load_run_log(exp)

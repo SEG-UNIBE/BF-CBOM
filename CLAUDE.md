@@ -8,11 +8,13 @@ normalisation, analysis outputs),
 `docs/pilot-2026-10-08/` (the colleague's pilot).
 
 ## Rules
-- **Start with make, never plain compose.** `make up-prod`; clean rebuild `make clean-docker && make up-prod
+- **Start with make, never plain compose.** `make up-prod` starts the stack detached and opens the live board
+  (`misc/cli/stack_cmd.py`; Ctrl-C closes it, the stack keeps running; `make board` reopens it, `make logs` shows the
+  raw logs, `make down` stops the stack); clean rebuild `make clean-docker && make up-prod
   NO_CACHE=1`. Never run plain `docker compose up` or `docker compose run`: the Makefile exports the image tag
   (`VERSION`) and `BASE_IMAGE`; without them compose looks for `:latest` images and tries to build from a nonexistent
   `base`. Every runner command has a target: `experiment`, `experiment-list` / `-status` / `-collect` / `-cancel` /
-  `-delete` / `-export`, `analysis`, `corpus`, `corpus-prune`. After every pull run `make up-prod` first: the runner
+  `-delete` / `-export`, `analysis`, `corpus`, `corpus-prune`, `board`. After every pull run `make up-prod` first: the runner
   bakes the CLI and the workers bake `common/`.
 - **Nothing lands on the host unless exported.** Results and git mirrors stay in the named volumes `results-data` and
   `git-data`; `make experiment-export` is the only path out, which is why the CLI runs inside the `runner` container.
@@ -48,7 +50,8 @@ normalisation, analysis outputs),
 ## How it works
 - **Coordinator and workers.** Streamlit UI on :8501 (`coordinator/`); Redis is the job queue (`jobs:<worker>` /
   `results:<worker>`); one Docker image per generator (`workers/<tool>/main.py`) on `common/worker.py:run_worker`. A
-  worker runs each job in a killable subprocess (hard timeout), publishes `worker:<name>:alive` heartbeats, marks the
+  worker runs each job in a killable subprocess (hard timeout), publishes `worker:<name>:alive` heartbeats (state,
+  the job with its start, the container's memory and limit, the last result; read by the UI and the board), marks the
   job running via the routing hash `jobs:routing` (`common/jobs.py:mark_job_running`; a job the hash no longer lists,
   cancelled or deleted while queued, is skipped) and pushes the `JobResult` to
   `results:<name>`; the coordinator ingests via `coordinator/redis_io.py:ingest_worker_results`; experiment jobs are

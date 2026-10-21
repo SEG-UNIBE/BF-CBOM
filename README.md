@@ -243,9 +243,10 @@ make up-prod
 
 Note that it can take up to 20 minutes, depending on your hardware and internet speed.
 
-Docker Compose will launch and manage all containers. Stop the stack anytime with `Ctrl+C`.
-The command stays attached to the terminal.
-Run further commands (e.g. `make experiment`) in a second terminal.
+The stack starts in the background, and a live board opens once it is up: the experiments that run, every worker
+with its job, its memory, its queue and its last result, and whether Redis, the git server and the UI answer.
+`Ctrl+C` closes the board, but the stack keeps running, so the same terminal is free for `make experiment`.
+`make board` reopens the board, `make logs` shows the containers' raw logs, and `make down` stops the stack.
 
 For the command-line interface, see [Local CLI](#local-cli-optional) below.
 
@@ -271,7 +272,7 @@ From the repository root (inside Git Bash), start the environment:
 make up-prod
 ```
 
-Stop anytime with `Ctrl+C`.
+`Ctrl+C` closes the live board; stop the stack with `make down`.
 
 ### Local CLI (optional)
 

@@ -13,7 +13,7 @@ import redis
 
 from .config import BLPOP_TIMEOUT_SEC, REDIS_HOST, REDIS_PORT, REDIS_SOCKET_TIMEOUT_SEC
 from .jobs import job_is_routed, mark_job_running
-from .memory import JobSampler
+from .memory import JobSampler, limit_bytes, mib, working_set_bytes
 from .models import JobInstruction, JobResult, Trace
 from .utils import normalize_json
 
@@ -35,9 +35,28 @@ def heartbeat_key(worker_name: str) -> str:
     return f"worker:{worker_name}:alive"
 
 
-def publish_heartbeat(r: redis.Redis, worker_name: str, state: str, job_id: str | None = None) -> None:
-    """Best-effort liveness marker read by the coordinator (missing key == worker down)."""
-    payload = json.dumps({"state": state, "job_id": job_id, "ts": time.time()})
+def publish_heartbeat(
+    r: redis.Redis,
+    worker_name: str,
+    state: str,
+    job_id: str | None = None,
+    *,
+    job: dict | None = None,
+    last: dict | None = None,
+) -> None:
+    """Best-effort liveness marker read by the coordinator and the stack board (missing key == worker down): the
+    state, the job it runs (`job`: repo, run, started), the container's memory and the previous job's result."""
+    payload = json.dumps(
+        {
+            "state": state,
+            "job_id": job_id,
+            "ts": time.time(),
+            "job": job,
+            "mem_mb": mib(working_set_bytes()),
+            "mem_limit_mb": mib(limit_bytes()),
+            "last": last,
+        }
+    )
     try:
         r.set(heartbeat_key(worker_name), payload, ex=HEARTBEAT_TTL_SEC)
     except redis.exceptions.RedisError:
@@ -225,11 +244,12 @@ def run_worker(
     r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True, socket_timeout=REDIS_SOCKET_TIMEOUT_SEC)
     log.info(f"{name} worker listening for jobs... (queue: jobs:{name})")
 
+    last = None  # the previous job's result, for the stack board
     while True:
         log.info("awaiting new jobs...\n\n")
         item = None
         while item is None:
-            publish_heartbeat(r, name, "idle")
+            publish_heartbeat(r, name, "idle", last=last)
             try:
                 item = r.blpop(f"jobs:{name}", timeout=BLPOP_TIMEOUT_SEC)  # None on timeout -> keep waiting
             except redis.exceptions.RedisError as err:
@@ -251,14 +271,17 @@ def run_worker(
             continue
         mark_job_running(r, instr.job_id, name)  # queued -> running in the coordinator's job record
 
+        repo = instr.repo_info.full_name + (f"@{instr.repo_info.commit[:7]}" if instr.repo_info.commit else "")
+        job = {"repo": repo, "run": instr.run_index, "started": time.time()}
         result = run_job_with_timeout(
             handle_instruction,
             instr,
             timeout_sec,
             worker_name=name,
             log=log,
-            on_tick=functools.partial(publish_heartbeat, r, name, "busy", instr.job_id),
+            on_tick=functools.partial(publish_heartbeat, r, name, "busy", instr.job_id, job=job, last=last),
         )
+        last = {"repo": repo, "status": result.status, "duration_sec": result.duration_sec, "finished_at": time.time()}
 
         result.tool_version = result.tool_version or tool_version
         result.image_ref = image_ref

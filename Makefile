@@ -72,20 +72,27 @@ up-dev: export AVAILABLE_WORKERS := $(DEV_WORKERS)
 up-dev: build-all
 	docker compose up
 
-# Prod: all workers except the dev-only ones. Opt-in groups via EXTRA_PROFILES, e.g.
+# Prod: all workers except the dev-only ones, started in the background; then the live board (`make board`; Ctrl-C
+# closes it, the stack keeps running: `make logs` for the raw logs, `make down` stops it). Opt-in groups via
+# EXTRA_PROFILES, e.g.
 #   make up-prod EXTRA_PROFILES=llm   (chatgpt + claude workers; need API keys in docker/env/)
+# A service that is not up within the wait shows on the board (as down), so make goes on.
+up_detached = docker compose up -d --wait --wait-timeout 300 $(1) \
+	|| echo "some services are not up yet; the board shows which"
 EXTRA_PROFILES ?=
 up-prod: export COMPOSE_PROFILES := prod$(if $(EXTRA_PROFILES),$(comma)$(EXTRA_PROFILES),)
 up-prod: export AVAILABLE_WORKERS := $(PROD_WORKERS)
 up-prod: build-all
-	docker compose up
+	$(call up_detached)
+	@$(MAKE) --no-print-directory board
 
 # Prod from prebuilt GHCR images (no local build; see .github/workflows/images.yml)
 up-prod-pull: export COMPOSE_PROFILES := prod$(if $(EXTRA_PROFILES),$(comma)$(EXTRA_PROFILES),)
 up-prod-pull: export AVAILABLE_WORKERS := $(PROD_WORKERS)
 up-prod-pull: ensure-env
 	docker compose pull
-	docker compose up --no-build
+	$(call up_detached,--no-build)
+	@$(MAKE) --no-print-directory board
 
 # All: exactly what's in AVAILABLE_WORKERS
 up-all: export COMPOSE_PROFILES := all
@@ -94,6 +101,13 @@ up-all: build-all
 
 down:
 	docker compose down
+
+# The live board of the running stack (misc/cli/stack_cmd.py): experiments, workers, queues; ARGS="--once" prints one
+# snapshot. BOARD_SERVICES: every container of the stack, running or exited, so a crashed worker shows as down.
+board: ensure-env
+	docker compose run --rm -e TERM -e COLORTERM -e BF_CBOM_VERSION=$(VERSION) \
+		-e BOARD_SERVICES="$$(docker ps -a --filter label=com.docker.compose.project=bf-cbom --format '{{.Label "com.docker.compose.service"}}' | sort -u | paste -sd, -)" \
+		runner stack board $(ARGS)
 
 # ---- Batch experiments (results stay in the results-data volume; see experiments/README.md) ----
 # make experiment EXP=experiments/e4-mutation-smoke.yaml
@@ -163,7 +177,7 @@ ensure-env: $(ENV_FILES)
 $(ENV_DIR)/%.env: $(ENV_DIR)/%.env.template
 	@$(ENSURE_ENV_SCRIPT) $< $@
 
-.PHONY: clean-docker build-base build-all release up-dev up-prod up-prod-pull up-all down logs ps show-workers \
+.PHONY: clean-docker build-base build-all release up-dev up-prod up-prod-pull up-all down board logs ps show-workers \
 	experiment experiment-status experiment-list experiment-collect experiment-cancel experiment-delete \
 	experiment-export corpus corpus-prune corpus-export analysis clean-cache
 
