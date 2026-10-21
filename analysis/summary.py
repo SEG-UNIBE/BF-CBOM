@@ -14,6 +14,7 @@ import re
 import statistics
 import sys
 from collections import Counter, defaultdict
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -372,13 +373,25 @@ def _negatives(rows: list[dict], run: int) -> list[str]:
     return lines + [""]
 
 
+ASSET_TYPES = ("algorithm", "certificate", "protocol", "related-crypto-material")  # CycloneDX assetType, its order
 ASSET_KINDS = [  # runs.csv column -> table header, in the order of the RQ2 table
     ("algorithm_assets", "algorithm"),
     ("certificate_assets", "certificate"),
     ("protocol_assets", "protocol"),
-    ("material_assets", "key material"),
+    ("material_assets", "related-crypto-material"),
     ("other_assets", "other"),
 ]
+
+
+def _asset_types(values: Iterable[str]) -> list[str]:
+    """The asset types among `values`: CycloneDX's four in the standard's order, then any other value."""
+    present = set(values)
+    return [t for t in ASSET_TYPES if t in present] + sorted(present - set(ASSET_TYPES))
+
+
+def _asset_type_heading(at: str) -> list[str]:
+    note = "" if at in ASSET_TYPES else " (none of CycloneDX's four)"
+    return [f"#### Asset type `{at}`{note}", ""]
 
 
 def _reported(rows: list[dict], run: int) -> list[str]:
@@ -409,12 +422,13 @@ def _reported(rows: list[dict], run: int) -> list[str]:
     lines += [
         f"Read from the CBOMs as the tools wrote them, before normalisation (run {run}, original variants, ok runs "
         "only). `components` is every component in the CBOM (inventory tools list dependencies here), `crypto assets` "
-        "those typed as crypto assets, split by the declared `assetType`; `file` / `file+line` = share of crypto "
-        "assets with a file, and with a file and a line, in the CBOM (`evidence.occurrences`, or `detectionContext` "
-        "in IBM's draft: a line is an addition to the file, so the two are counted apart); `empty` = ok runs that "
-        "reported no crypto asset; `median` = crypto assets per repo. Asset counts follow each tool's packaging (one "
-        "component per algorithm, or one per finding), so they compare output formats, not findings: how many "
-        'items each tool reports is in the normalisation section ("Units per tool").',
+        "those typed as crypto assets, split by the declared CycloneDX `assetType` (`other`: a value outside its "
+        "four); `file` / `file+line` = share of crypto assets with a file, and with a file and a line, in the CBOM "
+        "(`evidence.occurrences`, or `detectionContext` in IBM's draft: a line is an addition to the file, so the two "
+        "are counted apart); `empty` = ok runs that reported no crypto asset; `median` = crypto assets per repo. Asset "
+        "counts follow each tool's packaging (one component per algorithm, or one per finding), so they compare "
+        'output formats, not findings: how many items each tool reports is in the normalisation section ("Units per '
+        'tool").',
         "",
     ]
     header = ["tool", "repos ok", "components", "crypto assets", *[h for _, h in ASSET_KINDS], "file", "file+line",
@@ -706,7 +720,9 @@ def _rq1(schema: list[dict], meaningful: list[dict], trace: list[dict]) -> list[
                 ]
             )
         lines += [
-            "**Conformance:** every CBOM validated as a whole document against the official CycloneDX JSON schema of "
+            "### Conformance",
+            "",
+            "Every CBOM validated as a whole document against the official CycloneDX JSON schema of "
             "the version it declares (vendored 1.6 and 1.7). `CBOM by`: `tool` = the tool writes the document, "
             "`BF-CBOM` = our worker assembles it (the LLM workers), so validity there measures BF-CBOM, not the tool "
             "(refinement 3). `no schema` = another dialect or version "
@@ -717,13 +733,15 @@ def _rq1(schema: list[dict], meaningful: list[dict], trace: list[dict]) -> list[
         lines += md_table(header, table, "lllrrrrrl") + [""]
     if meaningful:
         lines += [
-            "**Meaningful:** share of crypto assets (components) of each CycloneDX asset type carrying the standard's "
-            "own fields for that type, `standard fields / any source` (names, properties, symbols, derivations; "
-            "shown where the normaliser reads such a value); the gap is what sits outside the standard. The asset "
-            "types and their fields are CycloneDX's (`assetType` and the per-type property sets).",
+            "### Meaningful",
+            "",
+            "Share of crypto assets (components) of each CycloneDX asset type carrying the standard's own fields for "
+            "that type, `standard fields / any source` (names, properties, symbols, derivations; shown where the "
+            "normaliser reads such a value); the gap is what sits outside the standard. The asset types (`assetType`, "
+            "one table each, in the standard's order) and their fields (the per-type property sets) are CycloneDX's.",
             "",
         ]
-        for at in dict.fromkeys(r["asset_type"] for r in meaningful):
+        for at in _asset_types(r["asset_type"] for r in meaningful):
             rs = [r for r in meaningful if r["asset_type"] == at]
             dims = list(dict.fromkeys(r["dimension"] for r in rs))
             by = {(r["tool"], r["dimension"]): r for r in rs}
@@ -740,16 +758,20 @@ def _rq1(schema: list[dict], meaningful: list[dict], trace: list[dict]) -> list[
                     else:
                         cells.append(f"{_pct(r['standard_share'])} / {_pct(r['any_share'])}")
                 table.append([t, by[(t, dims[0])]["assets"], *cells])
-            lines += [f"*{at}*", ""] + md_table(["tool", "assets", *[d.replace("_", " ") for d in dims]], table) + [""]
+            header = ["tool", "assets", *[d.replace("_", " ") for d in dims]]
+            lines += _asset_type_heading(at) + md_table(header, table) + [""]
     if trace:
         with_source = [r for r in trace if r.get("source")]
-        types = list(dict.fromkeys(r.get("asset_type") or "?" for r in trace))
+        types = _asset_types(r.get("asset_type") or "unknown" for r in trace)
         lines += [
-            "**Traceable:** per CycloneDX asset type: `file` = the record names a file, `file+line` = a file and a "
+            "### Traceable",
+            "",
+            "Per CycloneDX asset type, one table each: `file` = the record names a file, `file+line` = a file and a "
             "line; weak = the file exists at the commit and the line is inside it; strong = lines ±2 also hold a "
             "vocabulary token (an algorithm, family, curve, identifier or API spelling), refinement 4. Weak and strong "
-            "are shares of the records with a file and a line. Library records excluded; key material is listed apart "
-            "because secrets and keys in configuration files would otherwise dominate the picture."
+            "are shares of the records with a file and a line. Library records excluded; secrets and keys in "
+            "configuration files (`related-crypto-material`) have their own table, so they do not dilute the "
+            "algorithm rows."
             + (
                 ""
                 if with_source
@@ -759,7 +781,7 @@ def _rq1(schema: list[dict], meaningful: list[dict], trace: list[dict]) -> list[
             "",
         ]
         for at in types:
-            rs_type = [r for r in trace if (r.get("asset_type") or "?") == at]
+            rs_type = [r for r in trace if (r.get("asset_type") or "unknown") == at]
             by_tool_t: dict[str, list[dict]] = defaultdict(list)
             for r in rs_type:
                 by_tool_t[r["tool"]].append(r)
@@ -783,9 +805,8 @@ def _rq1(schema: list[dict], meaningful: list[dict], trace: list[dict]) -> list[
                         _pct(strong / line_checked) if line_checked else "",
                     ]
                 )
-            lines += (
-                [f"*{at}*", ""] + md_table(["tool", "records", "file", "file+line", "weak", "strong"], table) + [""]
-            )
+            header = ["tool", "records", "file", "file+line", "weak", "strong"]
+            lines += _asset_type_heading(at) + md_table(header, table) + [""]
     return lines
 
 

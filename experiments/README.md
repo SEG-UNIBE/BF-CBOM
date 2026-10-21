@@ -299,7 +299,9 @@ type, version, cipher suites), the share of assets carrying a value from the sta
 normaliser reads such a value, from any source. `traceability-run<k>.csv` gives per (snapshot, tool, asset type) how
 many records name a file (`located_file`), a file and a line (`located_line`), how many of those with a line exist at
 the pinned commit with the line inside the file (weak) and how many also have a vocabulary token within ±2 lines
-(strong, refinement 4); key material is kept apart from algorithms. The traceability check needs
+(strong, refinement 4); `related-crypto-material` (keys, secrets) is kept apart from algorithms. In `_SUMMARY.md`
+every asset type has its own table under `#### Asset type`, CycloneDX's four in the standard's order (algorithm,
+certificate, protocol, related-crypto-material), then `unknown` for values outside them. The traceability check needs
 the snapshot's files: on the VM the git mirror; on a laptop with a copied export `--fetch` pulls each pinned commit once
 into `SNAPSHOT_CACHE_DIR` (default `~/.cache/bf-cbom/snapshots`, one shallow `git fetch` per repo). `report` runs all
 of this too (`report --fetch`).

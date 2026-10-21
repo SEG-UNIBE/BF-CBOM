@@ -226,6 +226,8 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
         assert section in summary
     assert "| cbomkit | pass 11 |" in summary and "| pqcheck | – |" in summary
     assert "Per repository (`units-repo-run<k>.csv`)" in summary
+    meaningful, algorithm = summary.index("### Meaningful"), summary.index("#### Asset type `algorithm`")
+    assert meaningful < algorithm < summary.index("### Traceable")
     assert summary.index("## Voter groups") < summary.index("## Agreement ladder")
     assert "| cbomkit | 11 / 11 · 11 |" in summary
 
@@ -264,6 +266,9 @@ def test_summary_markdown_from_csv_rows():
     assert sm.md_table(["n", "x"], [[13043, "1234.5"]])[2] == "| 13'043 | 1'234.5 |"
     values = (999, "-1000", "1.4.0", "2026-10-21", None)
     assert [sm._n(v) for v in values] == ["999", "-1'000", "1.4.0", "2026-10-21", ""]
+    # CycloneDX's asset types in the standard's order, then a value outside them
+    types = ["unknown", "related-crypto-material", "algorithm", "certificate"]
+    assert sm._asset_types(types) == ["algorithm", "certificate", "related-crypto-material", "unknown"]
     base = {"n_items": "11"}
     rows = [
         {**base, "language": "java", "tool": "weak", "verdict": "fail", "strict": "0", "lenient": "2", "repo": "7"},
