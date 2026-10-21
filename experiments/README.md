@@ -22,13 +22,15 @@ experiment.
 
 | Spec | Tools | Repos | Purpose |
 |---|---|---|---|
-| `e0-stability.yaml` | every tool but the ChatGPT and Claude workers (16), 3 repetitions | 5 micro projects (`corpus/micro`) + the 10 fastest pilot repos | E0: run-to-run variance (`stability.csv`), consensus sets for the scores, and the micro check against the hand-written ground truth (`make analysis ARGS="micro e0-stability"`); 720 jobs |
+| `e0-micro.yaml` | every tool but the ChatGPT and Claude workers (16), once | the 5 micro projects (`corpus/micro`) | the voter bar: the micro check against the hand-written ground truth (`make analysis ARGS="micro e0-micro"`), which decides `role` in `common/tools.yaml` (at least 6 of 11 at their lines in one paper language); 80 jobs |
+| `e0-stability.yaml` | the same 16, 3 repetitions | 5 micro projects + the 10 fastest pilot repos | E0: run-to-run variance (`stability.csv`) and consensus sets for the scores; 720 jobs |
 | `e1-pilot-corpus.yaml` | the same 16 | the 12 pilot projects in Java, Python and Go (`corpus/pilot-2026-10-08.yaml`) | first real workload: location-aware agreement on the pilot's pinned projects; large repos (Kafka, Keycloak) push CBOMkit towards its timeout |
 | `e1-icpc-corpus.yaml` | the same 16 | 23 projects of the ICPC 2026 paper (`corpus/icpc-2026.yaml`, HEAD of 2026-10-18) | held-out counterpart of the pilot corpus: none of these repos was used to tune the vocabulary, the specs or CipherSift; six are marked `expect_crypto: low` (negative cases) |
 | `e4-mutation-smoke.yaml` | every non-LLM tool (15) | pyjwt, jjwt, golang-jwt (pilot), 3 mutants each | the mutation harness end to end: the RSA-2048 keygen inserted in each style; CBOMkit and CryptoScan should find the direct one at its line (`mutation.csv`) |
 
 After a change to one worker, `make experiment EXP=experiments/e4-mutation-smoke.yaml ARGS="--rerun <tool>"` redoes
-its runs on three small repos, one per paper language (an LLM worker: on e0-stability). E1 on the full corpus (Java,
+its runs on three small repos, one per paper language (an LLM worker: on e0-stability); its micro check, the same on
+`e0-micro.yaml` (5 jobs). E1 on the full corpus (Java,
 Python and Go) and E4 on its mutation subset (see `CLAUDE.md`, Phases 4 and 5) have no specs yet; E1 needs the corpus
 from `make corpus` first, pruned with
 `make corpus-prune ARGS="--in /data/results/corpus/corpus.yaml --from e0-stability"` to drop repos a tool
@@ -259,7 +261,7 @@ make analysis ARGS="report e0-stability"     # all of the below in one pass, plu
 make analysis ARGS="normalize e0-stability"  # every CBOM -> normalised records (run<k>.norm.json next to it)
 make analysis ARGS="schema e0-stability"     # RQ1: schema validity, meaningful shares, traceability (--fetch on a laptop)
 make analysis ARGS="levels e0-stability"     # how much agreement normalisation creates: L0 (raw) to L4 (tool specs)
-make analysis ARGS="micro e0-stability"      # score each tool against the micro projects' ground truth, two levels
+make analysis ARGS="micro e0-micro"          # score each tool against the micro projects' ground truth, two levels
 make analysis ARGS="tables e0-stability"     # flat CSV tables (runs, records, exact-matcher groups, micro) for pandas/R
 make analysis ARGS="score e0-stability"      # RQ4: confirmation, exclusivity, Dawid-Skene, leave-one-out, CIs; stability
 ```

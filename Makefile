@@ -142,7 +142,7 @@ corpus-export:
 	mkdir -p exports
 	docker compose run --rm -v "$(CURDIR)/exports:/export" runner sh -c 'cp /data/results/corpus/*.yaml /export/'
 
-# make analysis ARGS="report e0-stability"  /  ARGS="micro e0-stability"  -> results volume: <exp>/_ANALYSIS/
+# make analysis ARGS="report e0-stability"  /  ARGS="micro e0-micro"  -> results volume: <exp>/_ANALYSIS/
 analysis:
 	docker compose run --rm --no-deps runner analysis $(ARGS)
 

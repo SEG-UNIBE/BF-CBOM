@@ -17,8 +17,8 @@
 #   analysed like every tool, and the panel confirms their findings, but they never confirm another tool, never count
 #   in k, exclusivity or Dawid-Skene and are never ranked; `--observers-vote` makes them voters, the sensitivity check).
 # Pilot verdicts (2026-10-08, docs/pilot-2026-10-08/README.md): pass/borderline/fail per language.
-# `micro_<date>`: lenient call-site recall on the micro projects (measured on e0-micro, now in e0-stability:
-#   `make analysis ARGS="micro e0-stability"`; the inclusion bar is 6/11);
+# `micro_<date>`: lenient call-site recall on the micro projects (measured on e0-micro:
+#   `make analysis ARGS="micro e0-micro"`; the inclusion bar is 6/11 in one paper language);
 #   scored from the normalised records since 2026-10-18.
 # `memory_gb`: the worker's compose memory limit (docker-compose.yml, kept equal by a test); the batch
 #   runner sums it over the tools it feeds at once to stay within EXPERIMENT_MEMORY_BUDGET_GB (waves).
@@ -49,6 +49,9 @@ tools:
     status: integrated              # workers/cbomkit-jar; source-only scan (CBOMKIT_JAVA_REQUIRE_BUILD=false), CBOMKIT_LANGUAGES from the repo language
     pilot: {java: pass, python: pass, go: pass}
   cdxgen:
+    # role pending (2026-10-21): below the bar on these numbers, but its Go locations are read only since 2026-10-20
+    # (it found the inserted RSA keygen at its line in all three Go mutants of e4-mutation-smoke); the next e0-micro
+    # decides: micro-go >= 6/11 keeps it a voter, else `role: observer`
     micro_2026-10-17: {java: 0/11, python: 0/11, go: 0/11, javascript: 4/11}
     engine: cdxgen
     memory_gb: 16                   # 4 OOM-killed Gradle on bisq/bisq2 (2026-10-18); 8 still OOM-killed on Chat2DB, bisq, bisq2, kafka (2026-10-19)

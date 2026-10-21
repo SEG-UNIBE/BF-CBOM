@@ -260,9 +260,14 @@ where they declare support, but no analysis, figure or tuning effort goes into t
   `experiments/e4-mutation-smoke.yaml` waits for the VM. Removal mutants come after E1 (they need its voters).
 - **Waiting for the VM:** `make up-prod`, then each experiment as a whole (the user's preference, 2026-10-20):
   `make experiment EXP=experiments/e1-pilot-corpus.yaml ARGS="--overwrite-old" EXPERIMENT_MEMORY_BUDGET_GB=0`, the
-  same for e1-icpc-corpus and e0-stability (DeepSeek needs credit first; `make experiment-delete` for e0-micro
-  and the former smoke experiments, whose specs went 2026-10-21: e0-stability and e4-mutation-smoke cover them); `make experiment EXP=experiments/e4-mutation-smoke.yaml EXPERIMENT_MEMORY_BUDGET_GB=0`;
+  same for e1-icpc-corpus, e0-stability and e0-micro (DeepSeek needs credit first; `make experiment-delete
+  NAME=<x>` for the former smoke experiments e0-smoke, e0-cbomkit-smoke, e0-llm-smoke and e0-phase2-smoke, whose
+  specs went 2026-10-21); `make experiment EXP=experiments/e4-mutation-smoke.yaml EXPERIMENT_MEMORY_BUDGET_GB=0`;
   then build the E1 corpus (Java, Python and Go) with `GITHUB_TOKEN` and prune it, check replicas.
+- **cdxgen's role waits for e0-micro** (decided 2026-10-21): it is below the voter bar on the micro numbers of
+  2026-10-17, but those predate reading its Go locations (2026-10-20), and it found the inserted RSA keygen at its
+  line in all three Go mutants of e4-mutation-smoke. micro-go >= 6/11 keeps it a voter, else `role: observer`
+  (`common/tools.yaml`; the paper's Review 5 comment).
 - **Waiting for the user:** how RaQuN gets into the runner (see "Analysis", `matchers/`): a `pyproject.toml` in the
   PyQuN fork, then pin it in the `raqun` extra and the misc-pyqun image, or the stopgap;
   an explicit DeepSeek model id (the default `deepseek-chat` is no longer on DeepSeek's model page and is priced as
@@ -410,7 +415,8 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
   insertion and removal results are reported apart, never pooled (refinement 7).
 
 ## Phase 5: experiments
-- **E0 (stability):** every tool 3× on the five micro projects and ten small pilot repos
+- **E0 (the voter bar, stability):** every tool once on the five micro projects (`experiments/e0-micro.yaml`): the
+  inclusion check that decides each tool's `role`; and every tool 3× on the micro projects and ten small pilot repos
   (`experiments/e0-stability.yaml`), for determinism and run-to-run variance; needed before any agreement claim; its timings decide replicas and pruning.
 - **E1 (RQ1, RQ2):** all tools on the full corpus: validity, meaningfulness and traceability rates; assets per tool and
   fill rates per dimension; the tools-per-asset distribution (exact matcher, so RQ2 does not depend on RaQuN).
