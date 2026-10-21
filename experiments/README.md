@@ -10,7 +10,21 @@ make experiment-export NAME=e4-mutation-smoke            # exports/e4-mutation-s
 make experiment-list                                     # experiments stored on the volume
 make experiment-delete NAME=e4-mutation-smoke            # remove one from the volume (asks first)
 make corpus ARGS="--per-language 100"                    # stratified corpus -> results volume corpus/corpus.yaml
+make board                                               # live board of the stack: experiments, workers, queues
+make board ARGS=--once                                   # one snapshot of it, then exit
 ```
+
+**Watching a run.** `make experiment` shows its own progress while it runs (a line per tool with its count, the job
+it runs and for how long). `make board`, in a second terminal, shows the whole stack (an experiment's bar counts the
+results the runner has stored, so after `ARGS=--no-wait` it moves once `make experiment-collect` runs):
+- every running experiment with a bar, results stored out of expected, its wave, the failures so far and the time
+  left;
+- every worker: busy, idle or down, the job it runs (repo, run, experiment) and for how long, the container's RAM
+  against its limit, the jobs queued for it and its last result;
+- whether Redis, the git server and the UI answer, and the host's RAM.
+
+`Ctrl+C` closes the board; the experiment and the stack go on (`make up-prod` opens the board by itself once the
+stack is up; `make logs` shows the containers' raw logs, `make down` stops the stack).
 
 When a run ends it prints an overview (`misc/cli/overview.py`): runs stored out of expected, per tool the counts per
 status, median and longest duration, peak RAM against the limit and OOM kills, the LLM token usage with an estimated

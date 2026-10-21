@@ -170,7 +170,7 @@ Pull the published release images from GHCR and start the stack, without buildin
 make up-prod-pull
 ```
 
-Open [http://localhost:8501](http://localhost:8501) once the containers are up, and stop the stack anytime with `Ctrl+C`.
+The stack starts in the background and a live board opens once it is up (`Ctrl+C` closes the board, `make down` stops the stack; see [the commands](#macos--linux)). Open [http://localhost:8501](http://localhost:8501) for the UI.
 The images need roughly 30 GB of disk space. Plan for at least 100 GB free if you build images yourself (see [Disk Space](#disk-space)).
 
 ### Building the Images Yourself
@@ -246,7 +246,18 @@ Note that it can take up to 20 minutes, depending on your hardware and internet 
 The stack starts in the background, and a live board opens once it is up: the experiments that run, every worker
 with its job, its memory, its queue and its last result, and whether Redis, the git server and the UI answer.
 `Ctrl+C` closes the board, but the stack keeps running, so the same terminal is free for `make experiment`.
-`make board` reopens the board, `make logs` shows the containers' raw logs, and `make down` stops the stack.
+The same commands work on every platform and after `make up-prod-pull`:
+
+```bash
+make board                # reopen the live board (Ctrl+C closes it; the stack keeps running)
+make board ARGS=--once    # print one snapshot of it and exit (e.g. over ssh, or into a file)
+make logs                 # the containers' raw logs, followed
+make ps                   # the containers and their state
+make down                 # stop the stack
+```
+
+The board shows the logo when the terminal is at least 130 columns wide and tall enough, otherwise one header line.
+Workers that are down appear in red: a container that exited, or one that has not sent a heartbeat for 30 s.
 
 For the command-line interface, see [Local CLI](#local-cli-optional) below.
 
@@ -272,7 +283,7 @@ From the repository root (inside Git Bash), start the environment:
 make up-prod
 ```
 
-`Ctrl+C` closes the live board; stop the stack with `make down`.
+`Ctrl+C` closes the live board; stop the stack with `make down` (all commands: [macOS / Linux](#macos--linux)).
 
 ### Local CLI (optional)
 
@@ -366,8 +377,9 @@ Ruff is configured in `pyproject.toml` for both formatting and linting; unit tes
 
 ### Worker Liveness
 
-Every worker refreshes a short-lived `worker:<name>:alive` key in Redis (see `common/worker.py`).
+Every worker refreshes a short-lived `worker:<name>:alive` key in Redis (see `common/worker.py`): its state, the job it runs and since when, the container's memory and limit, and its last result.
 The Setup page pre-selects only live workers, the Execution page warns before starting jobs for a worker that is down, and the Analysis page disables matching when the `pyqun` matcher is not running.
+The live board (`make board`, `misc/cli/stack_cmd.py`) shows the same keys for every worker, together with the queues (`jobs:<worker>`) and the running experiments.
 
 ### Job States
 
@@ -401,6 +413,7 @@ Reproducible, resumable batch runs for the research agenda described in `CLAUDE.
 ```bash
 make experiment EXP=experiments/e4-mutation-smoke.yaml   # pin, mirror, enqueue, collect (resumable)
 make experiment-status NAME=e4-mutation-smoke
+make board                                               # live board: running experiments, every worker's job, RAM, queue and last result
 make experiment-export NAME=e4-mutation-smoke            # -> exports/e4-mutation-smoke.zip (runs the analysis report first), the only path to the host
 make experiment-list                                     # experiments stored on the volume
 make experiment-delete NAME=e4-mutation-smoke            # remove one from the volume (asks first; ARGS=--yes skips)
