@@ -563,8 +563,10 @@ def resolve_snapshots(
     mirror_dir: Path = GIT_MIRROR_DIR,
     server_url: str = GITSERVER_URL,
     log=print,
+    each=lambda repos: repos,
 ) -> list[Snapshot]:
-    """Pin every repo to a commit, mirror it, and return one Snapshot per (repo, variant).
+    """Pin every repo to a commit, mirror it, and return one Snapshot per (repo, variant). `each` wraps the loop over
+    the spec's repos (the CLI counts them on its progress line).
 
     Then the spec is written as the experiment's record, `_experiment.yaml`: the spec as run, every repo with the
     branch and commit it was resolved to. Commits already in the record win over the spec, so a resumed experiment
@@ -578,7 +580,7 @@ def resolve_snapshots(
     manifest = load_mutants(exp_dir) if spec.mutation is not None else None
     snapshots: list[Snapshot] = []
     cap_mb = repo_size_cap_mb()
-    for repo in spec.repos:
+    for repo in each(spec.repos):
         before = prior.get(repo.full_name)
         branch = repo.branch or (before and before.branch) or "main"
         commit = (before and before.commit) or repo.commit

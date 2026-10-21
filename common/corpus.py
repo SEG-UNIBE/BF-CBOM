@@ -232,11 +232,14 @@ def build_corpus(
     token: str | None,
     *,
     log=print,
+    status=lambda language, picked, now: None,
     exclusions: dict | None = None,
     tailored: dict[str, frozenset[str]] | None = None,
 ) -> dict:
     """Stratified sample per language over stars x size cells, filtered and pinned to commits. Exclusions default to
-    corpus/exclusions.yaml and the registry's `tailored_on`; every excluded candidate is listed with its reason."""
+    corpus/exclusions.yaml and the registry's `tailored_on`; every excluded candidate is listed with its reason.
+    `status(language, picked, now)` follows the search (the CLI's progress line): `now` is the cell searched or the
+    repo checked, None once the language is done."""
     exclusions = load_exclusions() if exclusions is None else exclusions
     tailored = tailored_map() if tailored is None else tailored
     rng = random.Random(params.seed)
@@ -253,6 +256,7 @@ def build_corpus(
     for language in params.languages:
         picked_for_lang: list[dict] = []
         for stars, size in cells:
+            status(language, len(picked_for_lang), f"searching {stars[0]}-{stars[1]} stars, {size[0]}-{size[1]} KB")
             candidates = search_cell(language, stars, size, pushed_since, token)
             stats["searched"] += len(candidates)
             rng.shuffle(candidates)
@@ -277,6 +281,7 @@ def build_corpus(
                     )
                     continue
                 if params.crypto_filter:
+                    status(language, len(picked_for_lang), f"{cand['full_name']}: cloning for the crypto check")
                     hit = has_crypto_usage(cand["git_url"], cand["branch"], language)
                     if hit is None:
                         stats["clone_failed"] += 1
@@ -296,6 +301,7 @@ def build_corpus(
                 taken += 1
                 log(f"  + {cand['full_name']} ({language}, {cand['stars']}★, {cand['size_kb']} KB) {commit[:12]}")
             time.sleep(2.5 if token else 6.5)  # stay under the search rate limit
+        status(language, len(picked_for_lang), None)
         log(f"{language}: {len(picked_for_lang)} repos")
         chosen.extend(picked_for_lang)
     return {

@@ -68,6 +68,9 @@ normalisation, analysis outputs),
   cancelled, like `experiment delete`; `common/experiment.py:remove_experiment`). Results are regenerated, never kept:
   the spec pins the commits and the mutants are deterministic, so a rerun repeats them (decided 2026-10-20). A spec entry with `path:` publishes a
   directory as a deterministic commit (`publish_fixture`). Spec format and the list of specs: `experiments/README.md`.
+  On a terminal `run`, `collect`, `report`, `export` and `corpus build` show live progress (`misc/cli/progress.py`,
+  rich; a run's board has a line per tool with its count, the job it runs and for how long, the queue and the
+  failures), with the per-result lines scrolling above; off a terminal only plain lines.
 - **Experiment folder:** `_experiment.yaml` (the record: the spec as run, every repo with its resolved branch and
   commit, written once the snapshots resolve; a resumed run keeps those commits, so it replaces a lock file; the one
   answer to which repos, tools and repetitions an experiment covers, and the overview and the analysis read only the

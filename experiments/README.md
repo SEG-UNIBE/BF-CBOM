@@ -127,7 +127,15 @@ make experiment EXP=experiments/e1-pilot-corpus.yaml EXPERIMENT_MEMORY_BUDGET_GB
 ```
 
 or change the default in the Makefile once per machine. The wave plan is printed before anything is
-enqueued and stored in the experiment's Redis status (`waves`, `wave`). `--no-wait` enqueues only the
+enqueued and stored in the experiment's Redis status (`waves`, `wave`).
+
+**Watching a run.** On a terminal `run` and `collect` keep a live board at the bottom (`misc/cli/progress.py`): one
+line for all results (done/total, remaining time, elapsed time, the wave and the statuses so far), then one per tool
+with its count, the job it runs now and for how long (the longest-running one first, from the start times the workers
+write to Redis), how many wait and what failed; tools of a later wave wait with their clock still. Every stored
+result still prints its own line above the board (status, tool, snapshot, run, duration, path). Pinning and
+mirroring count the repos the same way, and so does `corpus build` per language (repos picked out of the quota, the
+cell searched or the repo cloned for the crypto check). Off a terminal only the lines print. `--no-wait` enqueues only the
 first wave; after `make experiment-collect NAME=<exp>` rerun `run` for the next one. Jobs left pending by an interrupted
 run are already in the queues and are collected in wave 1 regardless of the budget.
 
@@ -267,7 +275,8 @@ it never shows anything they don't hold; `python -m analysis.summary <exp>/_ANAL
 Its numbers carry `'` between thousands (13'043); the CSVs keep plain numbers.
 `experiment export` runs `report` first (skip with `--no-report`), so every zip carries current tables. On a
 terminal both show a live line per step (done/total, remaining time, elapsed time and the run being worked on), so a
-long step reads as working; off a terminal each step prints one line when it ends.
+long step reads as working, like a run's board ("Watching a run"); off a terminal each step prints one line when it
+ends.
 
 **`normalize <exp>`** reads every stored ok CBOM (all repetitions) into normalised records with its tool's adapter
 spec, as described in [Normalisation](#normalisation). It writes:

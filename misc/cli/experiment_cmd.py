@@ -13,6 +13,8 @@ import os
 import time
 import uuid
 import zipfile
+from collections import Counter, defaultdict
+from datetime import datetime
 from pathlib import Path
 
 import redis
@@ -23,6 +25,7 @@ from common import corpus as corpus_mod
 from common.experiment import (
     GIT_MIRROR_DIR,
     GITSERVER_URL,
+    ORIGINAL_VARIANT,
     RESULTS_DIR,
     SPEC_FILE,
     ExperimentError,
@@ -195,6 +198,94 @@ class _Session:
         self.save(status=status, finished_at=now_iso(), **fields)
 
 
+def _where(job: PlannedJob) -> str:
+    variant = job.snapshot.variant
+    return job.snapshot.full_name + ("" if variant == ORIGINAL_VARIANT else f"@{variant}")
+
+
+def _running_for(started_at: str) -> float | None:
+    """Seconds since a worker's `started_at` (UTC ISO, common/jobs.py:now_iso)."""
+    try:
+        return time.time() - datetime.fromisoformat(started_at.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
+class _Board:
+    """The live view of a batch on a terminal (misc/cli/progress.py): one line for all results, with the wave and the
+    statuses so far, then one per tool with its count, the job it runs now and for how long, what is still queued and
+    what failed. The per-result lines keep scrolling above it; off a terminal they are all there is."""
+
+    def __init__(self, jobs: list[PlannedJob], *, stored: int = 0, waves: list[list[str]] | None = None):
+        per_tool = Counter(j.tool for j in jobs)
+        self.waves = waves or [sorted(per_tool)]
+        self.wave_label = ""
+        self.statuses: Counter = Counter()
+        self.done: Counter = Counter()
+        self.failed: dict[str, Counter] = defaultdict(Counter)
+        self.started: set[str] = set()
+        self.all = progress.line("results", total=stored + len(jobs), done=stored)
+        tools = [t for wave in self.waves for t in wave if per_tool[t]]
+        self.lines = {t: progress.line(f"  {t}", total=per_tool[t], start=False) for t in tools}
+
+    def wave(self, i: int) -> None:
+        """Wave `i` (from 1) is enqueued: its tools' clocks start."""
+        if len(self.waves) > 1:
+            self.wave_label = f"wave {i}/{len(self.waves)}"
+        for t in self.waves[i - 1]:
+            progress.begin(self.lines.get(t))
+            self.started.add(t)
+        self._summary()
+
+    def stored(self, job: PlannedJob, status: str, done: int) -> None:
+        self.statuses[status] += 1
+        self.done[job.tool] += 1
+        if status != "ok":
+            self.failed[job.tool][status] += 1
+        progress.update(self.all, done=done)
+        progress.update(self.lines.get(job.tool), done=self.done[job.tool])
+        self._summary()
+
+    def poll(self, r: redis.Redis, name: str, pending: dict[str, PlannedJob]) -> None:
+        """Name what every tool runs now (the start times its workers write to Redis), what waits and what failed."""
+        if not progress.live():
+            return
+        try:
+            running = r.hgetall(_running_key(name))
+        except redis.exceptions.RedisError:
+            return
+        busy: dict[str, list[tuple[float, PlannedJob]]] = defaultdict(list)
+        queued: Counter = Counter()
+        for jid, job in pending.items():
+            secs = _running_for(running[jid]) if jid in running else None
+            if secs is None:
+                queued[job.tool] += 1
+            else:
+                busy[job.tool].append((secs, job))
+        for i, wave in enumerate(self.waves, 1):
+            for t in wave:
+                if t not in self.lines:
+                    continue
+                parts = []
+                if busy[t]:  # the longest-running job first: that is the one that might be stuck
+                    secs, job = max(busy[t], key=lambda x: x[0])
+                    parts.append(f"{_where(job)} · run{job.run_index} · {progress.clock(secs)}")
+                    if len(busy[t]) > 1:
+                        parts.append(f"+{len(busy[t]) - 1} running")
+                if queued[t]:
+                    parts.append(f"{progress.count(queued[t])} queued")
+                if t not in self.started:
+                    parts.append(f"wave {i}")
+                parts += [f"{progress.count(n)} {s}" for s, n in sorted(self.failed[t].items())]
+                progress.update(self.lines[t], item=" · ".join(parts))
+
+    def _summary(self) -> None:
+        statuses = sorted(self.statuses, key=lambda s: (s != "ok", s))
+        parts = [self.wave_label] if self.wave_label else []
+        parts += [f"{progress.count(self.statuses[s])} {s}" for s in statuses]
+        progress.update(self.all, item=" · ".join(parts))
+
+
 @experiment_app.command("run")
 def run(
     spec_path: Path = SPEC_ARG,
@@ -264,7 +355,13 @@ def run(
 
     typer.secho("resolving snapshots and mirroring to the git server...", fg=typer.colors.BLUE, err=True)
     try:
-        snapshots = resolve_snapshots(spec, exp_dir, log=lambda m: typer.echo(m, err=True))
+        with progress.session():
+            snapshots = resolve_snapshots(
+                spec,
+                exp_dir,
+                log=lambda m: typer.echo(m, err=True),
+                each=lambda repos: progress.track(repos, "pin and mirror", item=lambda repo: repo.full_name),
+            )
     except ExperimentError as e:
         _err(str(e), 2)
 
@@ -385,6 +482,7 @@ def run(
     _print_overview(exp_dir, outcome="completed", session=session.entry, spec_file=_display_spec(spec_path))
 
 
+@progress.session()
 def _run_waves(
     r: redis.Redis,
     spec,
@@ -402,6 +500,7 @@ def _run_waves(
     """Enqueue wave by wave and collect each before the next; returns the number of results stored."""
     done = 0
     issued = 0
+    board = None if no_wait else _Board([*pending.values(), *jobs], waves=waves)
     for i, wave in enumerate(waves, 1):
         wave_jobs = [j for j in jobs if j.tool in wave]
         pipe = r.pipeline()
@@ -436,9 +535,9 @@ def _run_waves(
             _print_overview(exp_dir, outcome="enqueued (--no-wait)", spec_file=spec_file)
             return done
         session.save(wave=f"{i}/{len(waves)}")
-        done = _collect(
-            r, spec.name, spec.tools, exp_dir, wave_pending, idle_timeout, done=done, total=total, session=session
-        )
+        board.wave(i)
+        done = _collect(r, spec.name, spec.tools, exp_dir, wave_pending, idle_timeout, done=done, total=total,
+                        session=session, board=board)  # fmt: skip
     return done
 
 
@@ -453,6 +552,7 @@ def _collect(
     done: int = 0,
     total: int | None = None,
     session: _Session | None = None,
+    board: _Board | None = None,
 ) -> int:
     """Persist results until `pending` is empty; returns the cumulative count of stored results."""
     inbox = f"results:{_route_key(name)}"
@@ -499,6 +599,10 @@ def _collect(
                 fg=colour,
                 err=True,
             )
+            if board is not None:
+                board.stored(job, result.status, done)
+        if board is not None:
+            board.poll(r, name, pending)
         if got_any:
             last_progress = time.monotonic()
         else:
@@ -586,9 +690,11 @@ def collect(
     session = _Session(exp_dir, "collect", tools=tools, jobs_pending_before=len(pending))
     outcome = "interrupted"
     try:
-        _collect(
-            r, name, tools, exp_dir, pending, idle_timeout, done=stored, total=stored + len(pending), session=session
-        )
+        with progress.session():
+            board = _Board(list(pending.values()), stored=stored)
+            board.wave(1)
+            _collect(r, name, tools, exp_dir, pending, idle_timeout, done=stored, total=stored + len(pending),
+                     session=session, board=board)  # fmt: skip
         outcome = "completed"
     except typer.Exit as e:
         outcome = "stopped" if e.exit_code else "completed"
@@ -752,7 +858,19 @@ def corpus_build(
             fg=typer.colors.YELLOW,
             err=True,
         )
-    corpus = corpus_mod.build_corpus(params, token, log=lambda m: typer.echo(m, err=True))
+    with progress.session():
+        lines = {lang: progress.line(lang, total=params.per_language, start=False) for lang in params.languages}
+        begun: set[str] = set()
+
+        def status(language: str, picked: int, now: str | None) -> None:
+            if language not in begun:
+                begun.add(language)
+                progress.begin(lines[language])
+            progress.update(lines[language], done=picked, item=now or "")
+            if now is None:
+                progress.end(lines[language])
+
+        corpus = corpus_mod.build_corpus(params, token, log=lambda m: typer.echo(m, err=True), status=status)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(yaml.safe_dump(corpus, sort_keys=False), encoding="utf-8")
     typer.echo(f"wrote {len(corpus['repos'])} repos to {out} (stats: {corpus['stats']})")

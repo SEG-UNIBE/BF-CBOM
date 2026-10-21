@@ -250,3 +250,29 @@ def test_list_shows_experiments_and_folders_in_an_older_layout(tmp_path, monkeyp
     lines = out.splitlines()
     assert lines[0].split()[0] == "experiment" and lines[1].split()[0] == "e-new"
     assert "make experiment-delete NAME=e-old" in out and "corpus" not in out
+
+
+def test_board_names_the_running_job_its_time_what_waits_and_what_failed(monkeypatch):
+    from rich.progress import Progress
+
+    from misc.cli import progress
+
+    monkeypatch.setattr(progress, "_live", Progress())  # a display that is never drawn
+    snap = {"source_url": "u", "branch": "main", "commit": "c", "variant_commit": "c", "scan_url": "s"}
+
+    def job(jid, tool, repo, variant="original"):
+        snapshot = ex.Snapshot(full_name=repo, variant=variant, scan_branch="b", **snap)
+        return ex.PlannedJob(job_id=jid, snapshot=snapshot, tool=tool, run_index=1)
+
+    jobs = [job("1", "t1", "o/big"), job("2", "t1", "o/small", "ins-x"), job("3", "t1", "o/third")]
+    jobs.append(job("4", "t2", "o/big"))
+    board = experiment_cmd._Board(jobs, waves=[["t1"], ["t2"]])
+    board.wave(1)
+    board.stored(jobs[2], "error", 1)
+    r = fakeredis.FakeRedis(decode_responses=True)
+    long_ago = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 3725))
+    r.hset("exp:e:running", mapping={"1": long_ago})
+    board.poll(r, "e", {j.job_id: j for j in jobs[:2]})
+    item = {t.description.strip(): t.fields["item"] for t in progress._live.tasks}
+    assert item["t1"].startswith("o/big · run1 · 1:02:0") and item["t1"].endswith(" · 1 queued · 1 error")
+    assert item["t2"] == "wave 2" and item["results"] == "wave 1/2 · 1 error"

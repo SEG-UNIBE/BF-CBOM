@@ -1,11 +1,13 @@
-"""Live progress for the long CLI commands (`analysis report`, `experiment export`), so that a slow step reads as
-working, not stuck.
+"""Live progress for the long CLI commands (`experiment run` / `collect`, `analysis report`, `experiment export`,
+`corpus build`), so that a slow step reads as working, not stuck.
 
 On a terminal every step gets a line on stderr: a spinner while it runs (a check mark once done), its name, a bar,
 `done/total` and the remaining time where the items are known in advance, the elapsed time and the item being worked
 on. The display redraws ten times a second from its own thread, so the spinner and the clock keep moving while one
-large item takes long, and what the steps print scrolls above it. The finished lines stay, which shows where the time
-went. Off a terminal (a pipe, a log file, the tests) each step prints one plain line when it ends.
+large item takes long, and what the commands print scrolls above it. The finished lines stay, which shows where the
+time went. `track` and `step` are steps that end by themselves; `line` is a line the caller keeps up to date (a
+batch's tools). Off a terminal (a pipe, a log file, the tests) a step prints one plain line when it ends and a `line`
+shows nothing.
 """
 
 from __future__ import annotations
@@ -22,14 +24,16 @@ from rich.progress import BarColumn, Progress, ProgressColumn, SpinnerColumn, Ta
 from rich.table import Column
 from rich.text import Text
 
+ETA_WINDOW_SEC = 1800  # the remaining time comes from the rate over this window (a batch's results come unevenly)
+
 _live: Progress | None = None  # the outermost session's display; None outside a session and off a terminal
 
 
-def _count(n: int) -> str:
+def count(n: int) -> str:
     return f"{n:,}".replace(",", "'")
 
 
-def _clock(seconds: float) -> str:
+def clock(seconds: float) -> str:
     m, s = divmod(int(seconds), 60)
     return f"{m // 60}:{m % 60:02d}:{s:02d}"
 
@@ -40,9 +44,9 @@ class _CountColumn(ProgressColumn):
     def render(self, task: Task) -> Text:
         if task.fields.get("of") is None:
             return Text("")
-        text = f"{_count(task.fields['done'])}/{_count(task.fields['of'])}"
+        text = f"{count(task.fields['done'])}/{count(task.fields['of'])}"
         if not task.finished and task.time_remaining is not None:
-            text += f" eta {_clock(task.time_remaining)}"
+            text += f" eta {clock(task.time_remaining)}"
         return Text(text)
 
 
@@ -77,6 +81,7 @@ def session() -> Iterator[None]:
         console=console,
         expand=True,
         refresh_per_second=10,
+        speed_estimate_period=ETA_WINDOW_SEC,
         redirect_stdout=False,
         redirect_stderr=False,
     )
@@ -90,19 +95,53 @@ def session() -> Iterator[None]:
         _live = None
 
 
+def live() -> bool:
+    """Whether a display is showing (a session on a terminal)."""
+    return _live is not None
+
+
+def line(name: str, *, total: int | None = None, done: int = 0, start: bool = True):
+    """A line the caller keeps up to date with `update` (None, showing nothing, off a terminal): `total` counts,
+    None gives a pulsing bar; a line added with `start=False` keeps its clock still until `begin`."""
+    if _live is None:
+        return None
+    bar = None if total is None else max(total, 1)
+    return _live.add_task(name, total=bar, completed=done, start=start, done=done, of=total, item="")
+
+
+def update(task, *, done: int | None = None, item: str | None = None) -> None:
+    """Move a line to `done` and/or name what it works on now."""
+    if _live is None or task is None:
+        return
+    fields: dict = {} if done is None else {"completed": done, "done": done}
+    if item is not None:
+        fields["item"] = item
+    _live.update(task, **fields)
+
+
+def begin(task) -> None:
+    """Start the clock of a line added with `start=False`."""
+    if _live is not None and task is not None:
+        _live.start_task(task)
+
+
+def end(task) -> None:
+    """Mark a line done although its count fell short of the total (a check mark, the clock stops)."""
+    if _live is not None and task is not None:
+        _live.update(task, total=1, completed=1)
+
+
 def track(items: Iterable, name: str, *, total: int | None = None, item: Callable | None = None) -> Iterator:
     """Yield `items` (sized, or with `total`), counting them on the step's line; `item(x)` names the one in work."""
     of = len(items) if total is None else total  # type: ignore[arg-type]
     start = time.monotonic()
-    task = _live.add_task(name, total=of or 1, done=0, of=of, item="") if _live else None
+    task = line(name, total=of)
     done = 0
     for x in items:
-        if _live is not None:
-            _live.update(task, item=item(x) if item else "")
+        update(task, item=item(x) if item else "")
         yield x
         done += 1
-        if _live is not None:
-            _live.update(task, advance=1, done=done)
+        update(task, done=done)
     _finish(task, name, start, done)
 
 
@@ -110,14 +149,15 @@ def track(items: Iterable, name: str, *, total: int | None = None, item: Callabl
 def step(name: str) -> Iterator[None]:
     """A step without a count: a pulsing bar and the clock."""
     start = time.monotonic()
-    task = _live.add_task(name, total=None, of=None, item="") if _live else None
+    task = line(name)
     yield
     _finish(task, name, start)
 
 
 def _finish(task, name: str, start: float, done: int | None = None) -> None:
     if _live is not None:
-        _live.update(task, total=1, completed=1, item="")
+        update(task, item="")
+        end(task)
         return
-    count = "" if done is None else f"{_count(done)} in "
-    typer.echo(f"{name}: {count}{time.monotonic() - start:.1f} s", err=True)
+    counted = "" if done is None else f"{count(done)} in "
+    typer.echo(f"{name}: {counted}{time.monotonic() - start:.1f} s", err=True)
