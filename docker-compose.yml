@@ -279,9 +279,10 @@ services:
       - LLM_MAX_CHUNK_CHARS=40000
       - LLM_MAX_CHUNKS=1000
       - LLM_CONCURRENCY=4
-      - LLM_MAX_OUTPUT_TOKENS=8192
-      - LLM_API_TIMEOUT_SEC=300
-      - LLM_TEMPERATURE=0  # deepseek-chat accepts it; keeps answers as stable as possible
+      # deepseek-v4-pro thinks by default: the output limit covers the reasoning (DeepSeek's own thinking-mode default
+      # is 64K), answers take longer, and a temperature has no effect, so none is sent (the CBOM says `default`)
+      - LLM_MAX_OUTPUT_TOKENS=65536
+      - LLM_API_TIMEOUT_SEC=900
     env_file: docker/env/worker-deepseek.env
     restart: on-failure:3
     deploy:

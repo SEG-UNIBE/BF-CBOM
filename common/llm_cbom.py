@@ -7,7 +7,8 @@ of them use identical prompts and file selection and differ in the model alone.
 
 Determinism knobs: deterministic file order, PROMPT_VERSION recorded in the CBOM, and the sampling
 temperature from LLM_TEMPERATURE (unset: the parameter is not sent, as current Claude and OpenAI reasoning
-models reject non-default values; the value is recorded in the CBOM as bf-cbom:temperature).
+models reject non-default values and DeepSeek ignores it while thinking; the value is recorded in the CBOM as
+bf-cbom:temperature).
 Request knobs (env): LLM_TEMPERATURE, OPENAI_MAX_TOKENS_PARAM (max_tokens, or max_completion_tokens for
 OpenAI reasoning models).
 Budget knobs (env): LLM_MAX_FILES, LLM_MAX_CHUNK_CHARS, LLM_MAX_CHUNKS (a safety valve, not a cost cap: a run that hits

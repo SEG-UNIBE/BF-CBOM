@@ -12,7 +12,7 @@ prices:
       Official page lists deepseek-flash (served by DeepSeek-V4.1-Flash-1017) and the legacy name deepseek-v4-flash.
       `deepseek-chat` (the worker's default until 2026-10-18) is not on the page any more; third-party sources say it
       was a deprecated alias of V4-Flash (non-thinking) until 2026-07-24, yet it still answered on 2026-10-17. Priced
-      as deepseek-flash; verify with `models_answered` of a new run and move the worker to an explicit model id.
+      as deepseek-flash for those runs; the worker asks for deepseek-v4-pro since 2026-10-21 (entry below).
     valid_from: "2026-10-18"
     input: 0.30
     cached_input: 0.006

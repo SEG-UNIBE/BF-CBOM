@@ -8,7 +8,7 @@ from common.llm_cbom import OpenAICompatProvider
 from common.llm_worker import API_TIMEOUT_SEC, run_llm_worker
 
 NAME = os.getenv("WORKER_NAME") or os.path.basename(os.path.dirname(__file__))
-MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-pro")  # thinks by default; deepseek-chat until 2026-10-21
 BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")

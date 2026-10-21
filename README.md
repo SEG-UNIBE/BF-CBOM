@@ -67,7 +67,7 @@ CycloneDX's official generator, primarily for SBOMs but with CBOM extensions sin
 Santander Security Research's CLI tool that turns CodeQL SARIF output into a CBOM (IBM's pre-standard draft format). The worker runs CodeQL's experimental crypto queries, which exist for Python and C/C++ only.
 
 - **[`DeepSeek`](https://www.deepseek.com/)**:
-LLM-based approach: the worker clones the repository, selects source files that reference crypto APIs, sends them with line numbers to DeepSeek's model (temperature 0; for models that reject it, no temperature is sent) and assembles a CycloneDX 1.7 CBOM with file and line per asset, the algorithm families and curves mapped onto the 1.7 registry (`common/llm_cbom.py`; other providers plug in as thin adapters).
+LLM-based approach: the worker clones the repository, selects source files that reference crypto APIs, sends them with line numbers to DeepSeek's `deepseek-v4-pro` (the provider's defaults: it reasons before answering, and no temperature is sent) and assembles a CycloneDX 1.7 CBOM with file and line per asset, the algorithm families and curves mapped onto the 1.7 registry (`common/llm_cbom.py`; other providers plug in as thin adapters).
 
 - **`ChatGPT` / `Claude`** (prepared, opt-in): the same code-reading pipeline with OpenAI or Anthropic models. Put the API key into `docker/env/worker-chatgpt.env` or `docker/env/worker-claude.env` and start with `make up-prod EXTRA_PROFILES=llm`; without keys these workers are not started.
 

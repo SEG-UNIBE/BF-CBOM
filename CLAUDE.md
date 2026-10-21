@@ -270,8 +270,7 @@ where they declare support, but no analysis, figure or tuning effort goes into t
   (`common/tools.yaml`; the paper's Review 5 comment).
 - **Waiting for the user:** how RaQuN gets into the runner (see "Analysis", `matchers/`): a `pyproject.toml` in the
   PyQuN fork, then pin it in the `raqun` extra and the misc-pyqun image, or the stopgap;
-  an explicit DeepSeek model id (the default `deepseek-chat` is no longer on DeepSeek's model page and is priced as
-  `deepseek-flash` meanwhile); human review of the micro ground truth, the hand-check
+  human review of the micro ground truth, the hand-check
   verdicts, the `languages` lists and the mutation snippet catalogs (all AI-made).
 - **External:** the SCANOSS research key, the Cryptoscope artifact, the two-rater review of the matcher validation
   sample (a review of `vocab.csv` with Cohen's κ is an option, not decided).
@@ -296,8 +295,11 @@ exclusion is recorded with its reason (refinement 11); `make corpus-prune` drops
   files with crypto API patterns, send line-numbered chunks with file paths, require file and line per asset,
   assemble CycloneDX 1.7 (free-text values mapped onto the enums, algorithm family and curve onto the 1.7 registry,
   originals kept in `bf-cbom:<field>`; `PROMPT_VERSION`, `ASSEMBLY_VERSION` in the metadata). Each provider worker is a thin adapter (client, model id,
-  key), so all providers share prompts and file selection and differences come from the model. Temperature 0 where
-  the API accepts it, 3 repetitions, since temperature 0 is not determinism (refinement 10).
+  key), so all providers share prompts and file selection and differences come from the model. Models: DeepSeek
+  `deepseek-v4-pro` (since 2026-10-21; `deepseek-chat` before), OpenAI `gpt-5`, Anthropic `claude-sonnet-5-5`, each
+  with the provider's defaults, so none takes or applies a temperature (gpt-5 and Sonnet 5.5 reject one,
+  DeepSeek ignores it while thinking, its default) and 3 repetitions measure the variance (refinement 10). For the
+  reasoning models the output limit covers the reasoning (`LLM_MAX_OUTPUT_TOKENS`, DeepSeek 64K).
 - **Costs are computed offline, never in the worker:** prices change and differ per model, cache hit and time of day.
   `analysis/data/llm_prices.yaml` is dated and sourced; `analysis/costs.py` prices the stored usage, so costs can be
   recomputed for any price date and the paper states the table version.
