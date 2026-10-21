@@ -1,8 +1,9 @@
 """Job bookkeeping shared by workers, the coordinator and the batch runner.
 
 Routing: the coordinator and the runner register every job id in the hash `jobs:routing` (job id ->
-inspection id, or `exp:<name>` for batch experiments). Workers use it to mark a job as running the moment
-they pop it, so the UI can tell queued from running and show how long a job has been going.
+inspection id, or `exp:<name>` for batch experiments), in the same transaction that queues it. Workers use it to
+mark a job as running the moment they pop it, so the UI can tell queued from running and show how long a job has
+been going, and skip a job it no longer lists: cancelled or deleted while it waited, nobody collects its result.
 
 Language scope: `common/tools.yaml` lists the languages each tool supports. `tool_supports` decides
 whether a (tool, repository language) pair is worth running; unsupported pairs are recorded with status
@@ -55,6 +56,16 @@ def tool_supports(tool: str, language: str | None, registry: dict[str, dict] | N
     if not languages or not lang:
         return True
     return lang in {normalize_language(str(x)) for x in languages}
+
+
+def job_is_routed(r: redis.Redis, job_id: str) -> bool:
+    """False only when `jobs:routing` has no entry for `job_id` (cancelled or deleted while queued); True when Redis
+    cannot be asked, so a connection blip never drops work."""
+    try:
+        return bool(r.hexists(JOB_ROUTING_KEY, job_id))
+    except redis.exceptions.RedisError as e:
+        logger.warning("could not check the routing of job %s: %s", job_id, e)
+        return True
 
 
 def mark_job_running(r: redis.Redis, job_id: str, worker: str) -> bool:

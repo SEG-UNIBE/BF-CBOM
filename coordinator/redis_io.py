@@ -687,19 +687,7 @@ def cancel_inspection(r: redis.Redis, insp_id: str) -> int:
         if stt not in ("completed", "failed", "cancelled"):
             pending.append(job_id)
 
-    # Remove queued messages for pending jobs from worker queues
-    pending_set = set(pending)
-    for w in workers:
-        queue = f"jobs:{w}"
-        raw_list = r.lrange(queue, 0, -1) or []
-        for raw in raw_list:
-            try:
-                obj = json.loads(raw)
-            except Exception:
-                continue
-            jid = obj.get("job_id")
-            if jid and jid in pending_set:
-                r.lrem(queue, 1, raw)
+    _unqueue(r, workers, set(pending))
 
     # Mark pending jobs as cancelled
     pipe = r.pipeline()
@@ -712,6 +700,19 @@ def cancel_inspection(r: redis.Redis, insp_id: str) -> int:
     pipe.hset(f"insp:{insp_id}", mapping={"status": "cancelled", "cancelled_at": now_iso()})
     pipe.execute()
     return len(pending)
+
+
+def _unqueue(r: redis.Redis, workers: list[str], job_ids: set[str]) -> None:
+    """Remove the queued instructions of `job_ids` from the workers' queues."""
+    for w in workers:
+        queue = f"jobs:{w}"
+        for raw in r.lrange(queue, 0, -1) or []:
+            try:
+                jid = json.loads(raw).get("job_id")
+            except Exception:
+                continue
+            if jid in job_ids:
+                r.lrem(queue, 1, raw)
 
 
 def reset_inspection_jobs(r: redis.Redis, insp_id: str) -> int:
@@ -791,13 +792,15 @@ def delete_inspection(r: redis.Redis, insp_id: str) -> int:
     - `insp:{id}:repos` list
     - `insp:{id}:jobs` list
     - `insp:{id}:job_index` hash
-    - `insp:{id}:job:{job_id}` hashes for all jobs
+    - `insp:{id}:job:{job_id}` hashes for all jobs and their `jobs:routing` entries
+    - its jobs still waiting in the worker queues (a job a worker already took finishes; its result is dropped)
     - membership in `inspects` set
 
     Returns count of deleted per-job hashes (for reference).
     """
     # Gather job ids
     jobs = r.lrange(f"insp:{insp_id}:jobs", 0, -1) or []
+    _unqueue(r, get_insp_workers(r, insp_id), set(jobs))
     deleted_jobs = 0
     pipe = r.pipeline()
     # Delete per-job hashes

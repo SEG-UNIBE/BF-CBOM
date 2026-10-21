@@ -12,7 +12,7 @@ from multiprocessing.connection import Connection
 import redis
 
 from .config import BLPOP_TIMEOUT_SEC, REDIS_HOST, REDIS_PORT, REDIS_SOCKET_TIMEOUT_SEC
-from .jobs import mark_job_running
+from .jobs import job_is_routed, mark_job_running
 from .memory import JobSampler
 from .models import JobInstruction, JobResult, Trace
 from .utils import normalize_json
@@ -205,6 +205,7 @@ def run_worker(
     """
     Generic worker runner that:
     - Listens on Redis list `jobs:{name}` for JobInstruction JSON
+    - Skips a job that `jobs:routing` no longer lists (cancelled or deleted while queued; common/jobs.py)
     - Executes `handle_instruction` in a subprocess with a hard timeout
     - Catches timeouts/crashes and returns structured JobResult
     - Pushes results to `results:{name}`
@@ -245,6 +246,9 @@ def run_worker(
             instr.job_id,
             instr.repo_info.full_name,
         )
+        if not job_is_routed(r, instr.job_id):
+            log.warning("Skipping job %s: no longer routed (cancelled or deleted while queued)", instr.job_id)
+            continue
         mark_job_running(r, instr.job_id, name)  # queued -> running in the coordinator's job record
 
         result = run_job_with_timeout(

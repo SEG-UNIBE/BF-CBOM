@@ -49,7 +49,8 @@ normalisation, analysis outputs),
 - **Coordinator and workers.** Streamlit UI on :8501 (`coordinator/`); Redis is the job queue (`jobs:<worker>` /
   `results:<worker>`); one Docker image per generator (`workers/<tool>/main.py`) on `common/worker.py:run_worker`. A
   worker runs each job in a killable subprocess (hard timeout), publishes `worker:<name>:alive` heartbeats, marks the
-  job running via the routing hash `jobs:routing` (`common/jobs.py:mark_job_running`) and pushes the `JobResult` to
+  job running via the routing hash `jobs:routing` (`common/jobs.py:mark_job_running`; a job the hash no longer lists,
+  cancelled or deleted while queued, is skipped) and pushes the `JobResult` to
   `results:<name>`; the coordinator ingests via `coordinator/redis_io.py:ingest_worker_results`; experiment jobs are
   routed to `results:exp:<name>`.
 - **Job states:** held, queued, running, completed, failed, timeout, cancelled, unsupported; one table
