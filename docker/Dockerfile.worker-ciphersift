@@ -1,8 +1,10 @@
 # syntax=docker/dockerfile:1.7
 # docker/Dockerfile.worker-ciphersift
 # CipherSift (Apache-2.0, https://github.com/SEG-UNIBE/ciphersift): built from the source archive of a release
-# tag, pinned by sha256 (bump deliberately, see notes.md "CipherSift"). Java 23+ tool with bundled tree-sitter
-# natives (compiled from the sources vendored in the release), run on a Temurin 25 JRE in our base image.
+# tag, pinned by sha256. Java 23+ tool with bundled tree-sitter natives (compiled from the sources vendored in the
+# release), run on a Temurin 25 JRE in our base image. New release: set CIPHERSIFT_VERSION and CIPHERSIFT_SHA256
+# (curl -sL https://github.com/SEG-UNIBE/ciphersift/archive/refs/tags/v<x>.tar.gz | shasum -a 256), rebuild,
+# rerun e0-micro.
 ARG BASE_IMAGE=base
 ARG BASE_TAG=latest
 

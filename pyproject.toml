@@ -59,7 +59,7 @@ indent-style = "space"
 
 [project.optional-dependencies]
 # RaQuN as an analysis matcher (analysis/matchers/raqun.py): the PyQuN package (the user's fork, pinned by commit once
-# it ships a pyproject.toml; see notes.md "WP6") plus its runtime dependencies.
+# it ships a pyproject.toml; CLAUDE.md "Analysis", `matchers/`) plus its runtime dependencies.
 raqun = ["scikit-learn>=1.5", "scipy>=1.13", "psutil>=6"]
 
 [tool.uv]

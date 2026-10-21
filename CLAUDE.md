@@ -1,8 +1,8 @@
 # CLAUDE.md in BF-CBOM git repo
 
 Shared context for coworkers and for Claude Code (which loads this file automatically). Details live elsewhere:
-`notes.md` (build, operations, per-tool recipes and gotchas, implementation notes per work package),
-`docs/findings.md` (results so far), `experiments/README.md` (spec format, normalisation, analysis outputs),
+`README.md` (setup, starting the stack), `docs/findings.md` (results so far), `experiments/README.md` (spec format,
+normalisation, analysis outputs),
 `analysis/README.md` (what a spec may contain, the ladder by example, how family and group are argued),
 `analysis/report/README.md` (plot recipes), `analysis/data/CHANGELOG.md` (vocabulary versions),
 `docs/pilot-2026-10-08/` (the colleague's pilot).
@@ -23,8 +23,12 @@ Shared context for coworkers and for Claude Code (which loads this file automati
 - **Results are disposable until the paper's runs.** One code path per feature, no compatibility with older result
   layouts; old experiments are rerun, not migrated.
 - **Benchmark every tool as shipped, in its best fair run** (refinement 15). Fix our setup, never the tool.
-- **Pinned builds:** base images, uv, git sources and CodeQL packs are pinned (bumping: `notes.md`). Never pin an old
-  dependency to dodge a bug; fix our code.
+- **Pinned builds:** base images, uv, git sources and CodeQL packs are pinned. Never pin an old dependency to dodge a
+  bug; fix our code. Bumping: an image digest from `docker buildx imagetools inspect <image:tag> --format
+  '{{json .Manifest.Digest}}'`, a git ref (`*_REF` ARG) from `git ls-remote <url> HEAD`, `CODEQL_VERSION` together
+  with its packs (versions in `github/codeql` at tag `codeql-cli/v<version>`, `<lang>/ql/src/qlpack.yml`), pinned
+  requirements (`workers/cryptobomforge/`, `misc/pyqun/`) by editing `requirements.in` and rerunning the
+  `uv pip compile` line atop `requirements.txt`; rebuild and test after every bump.
 - **The vocabulary is frozen** (refinement 14): `analysis/data/algorithms.yaml` and `analysis/adapters/*.yaml` change
   only with a version bump and a reason in `analysis/data/CHANGELOG.md` (`tests/test_vocab_frozen.py`). The pilot
   corpus is the development set; ICPC and the E1 corpus are held out.
@@ -38,6 +42,8 @@ Shared context for coworkers and for Claude Code (which loads this file automati
   with the last judgement entry). A tool's field that contradicts its own name is a recorded conflict, not an error
   to repair. Full policy and a worked ladder example: `analysis/README.md`.
 - **Lint, format, tests:** `uv run ruff check --fix`, `uv run ruff format`, `uv run pytest` (CI runs all three).
+  `uv add` / `uv remove` re-sync the venv exactly and drop optional extras installed there (`uv sync --extra raqun`
+  restores RaQuN's); `uv run` does not.
 
 ## How it works
 - **Coordinator and workers.** Streamlit UI on :8501 (`coordinator/`); Redis is the job queue (`jobs:<worker>` /
@@ -125,8 +131,13 @@ Shared context for coworkers and for Claude Code (which loads this file automati
     __init__.py`, no `analysis/` code). Options: (1) package the fork and pin it in the `raqun` extra, installed by
     the runner Dockerfile (clean, also replaces the misc-pyqun hack); (2) stopgap: clone PyQuN at the pinned
     commit in the runner Dockerfile and put it on `PYTHONPATH`, a second copy of the UI hack. Decide before the
-    E2 runs; RaQuN per level also multiplies its runtime by six (`notes.md` "Ladder and matcher on a fixed unit"
-    says how to limit it).
+    E2 runs; RaQuN per level also multiplies its runtime by six (`--no-raqun` skips it; running it at the scoring
+    level only is not built). For (1), the fork needs a `pyproject.toml` (hatchling, mapping the flat repo root to
+    the package `RaQuN_Lab` the code imports; numpy, scikit-learn, scipy, psutil), then `pyqun @ git+<fork>@<sha>`
+    in the `raqun` extra. The fork should also take over two fixes BF-CBOM works around or suffers from: the
+    Stopwatch that `misc/pyqun/Stopwatch.py` replaces (per-thread CPU times via psutil break in a worker), and
+    `MatchCandidates.sort`, which drops the result of `sorted(...)`, so greedy matching merges candidates in set
+    order, not by similarity (one reason RaQuN's groups differ run to run).
   - `score.py`, `stability.py`, `costs.py`: RQ4 scores, run-to-run stability, LLM costs from
     `analysis/data/llm_prices.yaml`.
   - `mutation.py`: E4, each tool's detection of the inserted calls (Phase 4); every agreement analysis (RQ1, ladder,
@@ -151,7 +162,8 @@ New worker: `workers/<tool>/main.py` with `run_worker`, `docker/Dockerfile.worke
 adapter if the native output isn't CycloneDX. Tools that only orchestrate other scanners are not integrated (OQS
 Scanner, decided 2026-10-17; pqc-mat, whose code scanner is CodeQL's crypto queries through cryptobom-forge, the
 CryptobomForge engine repackaged, decided 2026-10-19). Versions are pinned in the Dockerfiles and recorded per run;
-recipes in `notes.md`. **Observers** (`role: observer` in `tools.yaml`, decided 2026-10-19): tools that failed the
+each tool's invocation and caveats are in the table below, the details in its `workers/<tool>/main.py` and
+`docker/Dockerfile.worker-<tool>`. **Observers** (`role: observer` in `tools.yaml`, decided 2026-10-19): tools that failed the
 pilot's inclusion bar (AI-made micro ground truth) are run and analysed like every tool and confirmed by the voters,
 but they never confirm another tool, count in no k, exclusivity or Dawid-Skene and are never ranked, so the voters'
 numbers are identical with and without them; `--observers-vote` makes them voters (sensitivity check). Whether they
@@ -248,7 +260,7 @@ where they declare support, but no analysis, figure or tuning effort goes into t
   superseded by e0-stability); `make experiment EXP=experiments/e4-mutation-smoke.yaml EXPERIMENT_MEMORY_BUDGET_GB=0`;
   then build the E1 corpus (Java, Python and Go) with `GITHUB_TOKEN` and prune it, check replicas.
 - **Waiting for the user:** how RaQuN gets into the runner (see "Analysis", `matchers/`): a `pyproject.toml` in the
-  PyQuN fork (draft in `notes.md` WP6), then pin it in the `raqun` extra and the misc-pyqun image, or the stopgap;
+  PyQuN fork, then pin it in the `raqun` extra and the misc-pyqun image, or the stopgap;
   an explicit DeepSeek model id (the default `deepseek-chat` is no longer on DeepSeek's model page and is priced as
   `deepseek-flash` meanwhile); human review of the micro ground truth, the hand-check
   verdicts, the `languages` lists and the mutation snippet catalogs (all AI-made).
@@ -261,8 +273,7 @@ where they declare support, but no analysis, figure or tuning effort goes into t
   enough Python repos that already depend on `cryptography`). Phases 5 and 6 not started.
 
 ## Phases 1-3 (done 2026-10-15 to 2026-10-18)
-What exists and the decisions behind it. Numbers: `docs/findings.md`; implementation notes per work package:
-`notes.md` ("Completing Phases 1-3, WP1-WP8").
+What exists and the decisions behind it. Numbers: `docs/findings.md`.
 
 ### Phase 1: reproducible experiment infrastructure
 Commit pinning, provenance, the git server, the batch runner with its results volume and the corpus builder, all as
@@ -360,7 +371,6 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
   `dataviz` skill.
 
 ## Phase 4: mutation harness (`mutation/`, RQ4 validation; insertion built 2026-10-20)
-Implementation notes and gotchas: `notes.md` "Phase 4: mutation harness".
 - **Snippet catalog** (`mutation/catalog/{java,python,go}.yaml`, versioned): the same 15 ids per language (RSA-2048
   keygen, EC P-256 keygen, ECDSA / Ed25519 signing, AES-128/256-GCM, AES-256-CBC, 3DES-CBC (Python: SHA3-256),
   RSA-OAEP, SHA-1/256, MD5, HMAC-SHA256, PBKDF2, TLS 1.3 context). Each has its expected canonical record (`unit` =
@@ -475,8 +485,8 @@ Implementation notes and gotchas: `notes.md` "Phase 4: mutation harness".
     2026-10-19); `confirmed_strict` and `multi_unit_clusters` say how much rests on generic attachments and on
     spellings that cover several identities; records without an L4 identity (`resolution`) are not items.
     Hypotheses are tested at L2/L3, the L0 -> L4 gap is reported as representational heterogeneity, rankings are
-    checked across levels (decided 2026-10-18 after review: the first ladder changed key *and* unit per level and
-    was not monotone; `notes.md` "Ladder and matcher on a fixed unit"). The vocabulary is frozen before E1 (Rules).
+    checked across levels (decided 2026-10-18 after review: the first ladder changed key *and* unit per level, so
+    its shares were fractions of different populations and not monotone). The vocabulary is frozen before E1 (Rules).
     **Family and group:** `family` is the standard's own canonical level (CycloneDX 1.7 `algorithmFamily`, the
     registry), so L2 normalises to the vocabulary the tools claim to implement; the additions (RSA, EC, CSPRNG,
     PRNG, PBE, FN-DSA, NTRU-Prime, Hybrid-KEM, crypt, the generic SHA marker) are marked `registry: false`, listed

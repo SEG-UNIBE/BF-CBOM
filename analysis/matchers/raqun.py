@@ -10,9 +10,9 @@ that a match holds at most one element per model. Location-free, like RaQuN; the
 variant stays the UI's "Find Similar Components" (misc/pyqun) as a comparison, not an analysis matcher.
 
 PyQuN is optional: `available()` says whether `RaQuN_Lab` imports (the `raqun` extra and the package from the
-user's fork, notes.md "WP6"); the CLI skips this matcher otherwise. RaQuN iterates Python sets and breaks ties in
-an arbitrary order, so its groups are not bit-for-bit reproducible between runs; the comparison table against the
-exact matcher (`compare.py`) quantifies that.
+user's fork, CLAUDE.md "Analysis", `matchers/`); the CLI skips this matcher otherwise. RaQuN iterates Python sets
+and breaks ties in an arbitrary order, so its groups are not bit-for-bit reproducible between runs; the comparison
+table against the exact matcher (`compare.py`) quantifies that.
 """
 
 from __future__ import annotations

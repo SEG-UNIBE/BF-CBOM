@@ -31,7 +31,7 @@ Strict recall out of 11 (Java / Python / Go / JS / C): CBOMkit 11 / 5 / 0 / 0 / 
 CryptobomForge 0 everywhere. Precision 100 % except CryptoScan (7/11 Go) and CipherRadar (12/13 Go, 3/5 C).
 The CryptoScan, CryptobomForge and CBOMkit-server (Go) numbers were **our setup errors**, not the tools: CryptoScan
 without `--include-quantum-safe` and on a `demo/` folder it skips, CryptobomForge on CodeQL's security suite instead
-of the crypto queries, a CBOMkit image without Go (`notes.md` "Coworker hand-over"). An example for the paper of why
+of the crypto queries, a CBOMkit image without Go (all fixed 2026-10-17). An example for the paper of why
 the audit matters (refinement 15).
 
 ### 2026-10-17, after the hand-over fixes
@@ -191,7 +191,7 @@ code of 2026-10-19 (per-key clusters, `resolution`, macro rates); the runs thems
   at its 8 GiB limit on Chat2DB, bisq, bisq2 and kafka with the runs stored `ok` (peaks at the limit). CBOMkit's two
   pilot errors (keycloak, ansible) were "Git clone from http://gitserver/... failed" in under a minute while
   cbomkit-jar scanned both: the git server's 256 MiB limit against a full JGit clone. All three are fixed in the
-  setup (notes.md "Export review follow-up").
+  setup (CLAUDE.md, Status, "Export review of 2026-10-19").
 - **CBOMkit's two packagings agree exactly** wherever both ran: 130 of 130 (repo, tool) cells on ICPC and all 9 E0
   repos give identical algorithm sets; the server variant takes ~4.9 GB resident and is slower.
 - **Tool crashes to report, not fix:** CryptoScan 1.4.0 panics in `patterns.MatchWithContext` on allure2, bisq,
