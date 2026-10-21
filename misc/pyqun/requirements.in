@@ -1,8 +1,0 @@
-numpy
-redis  # keep the same version as uv.lock
-scikit-learn
-psutil
-dataclasses-json
-requests
-tqdm
-sentence-transformers

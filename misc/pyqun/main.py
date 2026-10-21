@@ -1,13 +1,21 @@
 #!/usr/bin/env python3
 import csv
+import json
 import logging
 import multiprocessing
 import os
+import string
 import time
-from pathlib import Path
 
 import numpy as np
 import redis
+from RaQuN_Lab.datamodel.modelset.attribute.DefaultAttribute import DefaultAttribute
+from RaQuN_Lab.datamodel.modelset.Element import Element
+from RaQuN_Lab.datamodel.modelset.Model import Model
+from RaQuN_Lab.datamodel.modelset.ModelSet import ModelSet
+from RaQuN_Lab.strategies.RaQuN.candidatesearch.NNCandidateSearch.NNCandidateSearch import NNCandidateSearch
+from RaQuN_Lab.strategies.RaQuN.candidatesearch.NNCandidateSearch.vectorization.Vectorizer import Vectorizer
+from RaQuN_Lab.strategies.RaQuN.RaQuN import VanillaRaQuN
 from sentence_transformers import SentenceTransformer
 
 from common.config import BLPOP_TIMEOUT_SEC, REDIS_HOST, REDIS_PORT, REDIS_SOCKET_TIMEOUT_SEC
@@ -18,27 +26,13 @@ NAME = "pyqun"
 JOB_QUEUE = f"jobs:{NAME}"
 RESULT_LIST = f"results:{NAME}"
 TIMEOUT_SEC = int(os.getenv("CALC_TIMEOUT_SEC", "120"))
-MODELS_CSV_PATH = os.getenv("PYQUN_MODELS_CSV", "/opt/RaQuN_Lab/pyqun_models.csv")
+MODELS_CSV_PATH = os.getenv("PYQUN_MODELS_CSV", "/app/pyqun_models.csv")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(NAME)
 
 
 redis_client: redis.Redis | None = None
-
-import json
-import string
-import sys
-
-sys.path.insert(0, str(Path(__file__).parent.absolute()))
-
-from RaQuN_Lab.datamodel.modelset.attribute.DefaultAttribute import DefaultAttribute
-from RaQuN_Lab.datamodel.modelset.Element import Element
-from RaQuN_Lab.datamodel.modelset.Model import Model
-from RaQuN_Lab.datamodel.modelset.ModelSet import ModelSet
-from RaQuN_Lab.strategies.RaQuN.candidatesearch.NNCandidateSearch.NNCandidateSearch import NNCandidateSearch
-from RaQuN_Lab.strategies.RaQuN.candidatesearch.NNCandidateSearch.vectorization.Vectorizer import Vectorizer
-from RaQuN_Lab.strategies.RaQuN.RaQuN import VanillaRaQuN
 
 
 class BERTEmbedding(Vectorizer):
@@ -228,9 +222,6 @@ def _run_raqun(json_files: list[str]):
             logger.info("  Element: %s, Attributes: %s", element.name, [attr.value for attr in element.attributes])
     model_set = ModelSet(set(model_list))
 
-    # KDTree queries fail when asking for more neighbours than there are elements
-    PyQuN_algo.search.neighbourhood_size = min(NEIGHBOURHOOD_SIZE, len(model_set.get_elements()))
-
     matches, _ = PyQuN_algo.match(model_set)
 
     return list(matches)
@@ -278,6 +269,7 @@ def _run_match_with_timeout(func, args, timeout_seconds):
     """
     Run a function in a separate process with a timeout.
     """
+    # one process: the module-level PyQuN_algo keeps its fitted KNN tree, so a larger pool needs one instance per job
     with multiprocessing.Pool(processes=1) as pool:
         result = pool.apply_async(func, args=(args,))
         deadline = time.monotonic() + timeout_seconds

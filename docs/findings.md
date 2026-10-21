@@ -140,7 +140,9 @@ below.
 - **RaQuN vs exact** (16 repos, 18,237 records both grouped): exact 418 groups, RaQuN 695 (k = 1..7, 9: 391 / 137 / 56 /
   46 / 29 / 28 / 6 / 2); co-membership pair Jaccard 54 % pooled (0.43-0.84 per repo); 88 % of RaQuN's groups lie inside
   one exact group, 65 % of the exact groups inside one RaQuN group. RaQuN splits an algorithm into its parameter sets
-  and keeps at most one asset per tool; the exact matcher pools them.
+  and keeps at most one asset per tool; the exact matcher pools them. These RaQuN numbers come from PyQuN before
+  v1.0.0, whose greedy matching took the candidates unsorted, and from elements that still included `undefined`
+  names and our `group`; they are not comparable with later reports (2026-10-21).
 
 ## Scores on e1-pilot-corpus (2026-10-18)
 Algorithm dimension at L3, confirmation rate with 95 % CI over repos (items): securin-xbom 96 % [81, 100] (23),
@@ -170,7 +172,7 @@ curve 25 / 54 / 86 % (196), digest 0 / 4 / 38 % (217). Held-out ICPC corpus: poo
 (845 algorithms); CipherSift 39 -> 86 % (the standard vocabulary alone adds 38 points: it writes registry names),
 CryptoScan 33 -> 70, securin-xbom 49 -> 59, DeepSeek 58 -> 72, xgrep 87 -> 99, CBOMkit 84 -> 93.
 
-**Matcher x level (exact matcher; RaQuN needs the PyQuN package, not installed on the laptop).** Pilot corpus, 433
+**Matcher x level (exact matcher; RaQuN needed the PyQuN package, then not installed on the laptop).** Pilot corpus, 433
 algorithms per repository: the share reported by at least two voter groups rises from 38 % at L0 to 50 % at L4
 (k >= 4 from 15 to 26 %); of the groups with two voters reporting a key size, 95 % agree at L2 (42 groups) and 72 % at
 L4 (76), curve 61 -> 57 % (18 -> 51), digest agreement exists from L3 (2 groups) and is 67 % at L4 (39); of the

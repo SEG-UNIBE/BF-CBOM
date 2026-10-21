@@ -160,9 +160,8 @@ target "worker-cdxgen" {
 }
 
 target "misc-pyqun" {
-  inherits   = ["_common"]
+  inherits   = ["_from-base"]
   dockerfile = "docker/Dockerfile.misc-pyqun"
-  platforms  = MULTI_ARCH
   tags       = ["${REGISTRY}-misc-pyqun:${VERSION}"]
 }
 

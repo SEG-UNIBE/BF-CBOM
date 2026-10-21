@@ -525,7 +525,7 @@ def _tables_step(
     if raqun is None:
         raqun = rq.available()
     if raqun and not rq.available():
-        typer.secho("RaQuN not importable (install the `raqun` extra and the PyQuN package); skipped", fg="yellow")
+        typer.secho("RaQuN not importable (uv sync --extra raqun); skipped", fg="yellow")
     elif raqun:
         matchlevel_rows += _raqun_step(
             run,

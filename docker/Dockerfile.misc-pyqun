@@ -1,43 +1,27 @@
 # syntax=docker/dockerfile:1.7
-# Same interpreter as Dockerfile.base (common/ requires Python >= 3.12)
-FROM python:3.12-slim-trixie@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1
+# docker/Dockerfile.misc-pyqun
+# The UI's "Find Similar Components" worker: PyQuN's RaQuN over MiniLM embeddings (misc/pyqun/main.py); PyQuN and
+# sentence-transformers come from uv.lock (the `raqun` and `similarity` extras).
+ARG BASE_IMAGE=base
+ARG BASE_TAG=latest
+FROM ${BASE_IMAGE}:${BASE_TAG}
+USER appuser
 
-RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
- && rm -rf /var/lib/apt/lists/*
-
-# Pinned PyQuN commit (bump deliberately)
-ARG PYQUN_REF=b11785329edbfc5ba994e92171152d0344bef9ee
-RUN git clone https://github.com/RomanBoegli/PyQuN.git /opt/RaQuN_Lab \
- && git -C /opt/RaQuN_Lab checkout --detach ${PYQUN_REF}
-
-WORKDIR /opt/RaQuN_Lab
-
-RUN python3 -m venv /opt/RaQuN_Lab/.venv
-ENV VIRTUAL_ENV=/opt/RaQuN_Lab/.venv
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-ENV PYTHONPATH="/opt:${PYTHONPATH}"
-RUN find /opt/RaQuN_Lab -type d -exec touch {}/__init__.py \;
-RUN touch /opt/RaQuN_Lab/__init__.py
-
-# Deps pinned in misc/pyqun/requirements.txt (regenerate from requirements.in with uv pip compile)
-COPY misc/pyqun/requirements.txt /tmp/requirements.txt
-RUN --mount=type=cache,target=/root/.cache/pip \
-    python3 -m pip install --timeout 120 -r /tmp/requirements.txt
+COPY --chown=appuser:appuser pyproject.toml uv.lock ./
+COPY --chown=appuser:appuser common/ ./common/
+RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=1000,gid=1000 \
+    uv sync --frozen --no-dev --extra raqun --extra similarity
 
 # The embedding model, baked in at a pinned Hugging Face revision (bump deliberately); every start is then offline
 ARG MINILM_REVISION=1110a243fdf4706b3f48f1d95db1a4f5529b4d41
-RUN python3 -c "from sentence_transformers import SentenceTransformer; \
+RUN uv run --frozen --no-dev python -c "from sentence_transformers import SentenceTransformer; \
     SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2', revision='${MINILM_REVISION}')"
 ENV MINILM_REVISION=${MINILM_REVISION} HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
 
 # our code last: editing it never invalidates the torch layer above
-COPY common/ ./common/
-COPY misc/pyqun/main.py /opt/RaQuN_Lab/main.py
-COPY misc/pyqun/Stopwatch.py /opt/RaQuN_Lab/utils/Stopwatch.py
-# COPY misc/pyqun/*.json /opt/RaQuN_Lab/
-
-CMD ["python", "main.py"]
-# ENTRYPOINT ["tini","-g","--","uv","run","--no-dev","workers/skeleton/main.py"]
+COPY --chown=appuser:appuser misc/pyqun/main.py ./misc/pyqun/main.py
+ENV PYTHONPATH=/app
+ENTRYPOINT ["tini", "-g", "--", "uv", "run", "--frozen", "--no-dev", "misc/pyqun/main.py"]
 
 # BF-CBOM commit this image was built from (compose/bake pass it; last, so it never invalidates the layers above)
 ARG BF_CBOM_COMMIT=unknown

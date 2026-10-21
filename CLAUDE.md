@@ -29,8 +29,9 @@ normalisation, analysis outputs),
   bug; fix our code. Bumping: an image digest from `docker buildx imagetools inspect <image:tag> --format
   '{{json .Manifest.Digest}}'`, a git ref (`*_REF` ARG) from `git ls-remote <url> HEAD`, `CODEQL_VERSION` together
   with its packs (versions in `github/codeql` at tag `codeql-cli/v<version>`, `<lang>/ql/src/qlpack.yml`), pinned
-  requirements (`workers/cryptobomforge/`, `misc/pyqun/`) by editing `requirements.in` and rerunning the
-  `uv pip compile` line atop `requirements.txt`; rebuild and test after every bump.
+  requirements (`workers/cryptobomforge/`) by editing `requirements.in` and rerunning the `uv pip compile` line
+  atop `requirements.txt`, PyQuN by its tag in `pyproject.toml` (`[tool.uv.sources]`, then `uv lock`); rebuild and
+  test after every bump.
 - **The vocabulary is frozen** (refinement 14): `analysis/data/algorithms.yaml` and `analysis/adapters/*.yaml` change
   only with a version bump and a reason in `analysis/data/CHANGELOG.md` (`tests/test_vocab_frozen.py`). The pilot
   corpus is the development set; ICPC and the E1 corpus are held out.
@@ -131,20 +132,15 @@ normalisation, analysis outputs),
   - `levels.py`: the L0-L4 ladder on a fixed unit (refinement 14): `level_matches` clusters a repo's records level
     by level; the exact matcher, the ladder and the tools-per-item distribution share it.
   - `matchers/`: n-way matchers on the records, `exact.py` and `raqun.py`, compared by `compare.py` (Phase 3).
-    **Open (2026-10-18): RaQuN runs nowhere yet.** `raqun.py` imports `RaQuN_Lab` in the process that runs the
-    analysis (the runner image, or the host venv for a copied export); both install the project with `uv sync`,
-    which cannot install PyQuN from git without a `pyproject.toml` in the fork, so `available()` is false and the
-    report skips matcher (c). The `misc-pyqun` image is the UI's similarity worker only (clone + `touch
-    __init__.py`, no `analysis/` code). Options: (1) package the fork and pin it in the `raqun` extra, installed by
-    the runner Dockerfile (clean, also replaces the misc-pyqun hack); (2) stopgap: clone PyQuN at the pinned
-    commit in the runner Dockerfile and put it on `PYTHONPATH`, a second copy of the UI hack. Decide before the
-    E2 runs; RaQuN per level also multiplies its runtime by six (`--no-raqun` skips it; running it at the scoring
-    level only is not built). For (1), the fork needs a `pyproject.toml` (hatchling, mapping the flat repo root to
-    the package `RaQuN_Lab` the code imports; numpy, scikit-learn, scipy, psutil), then `pyqun @ git+<fork>@<sha>`
-    in the `raqun` extra. The fork should also take over two fixes BF-CBOM works around or suffers from: the
-    Stopwatch that `misc/pyqun/Stopwatch.py` replaces (per-thread CPU times via psutil break in a worker), and
-    `MatchCandidates.sort`, which drops the result of `sorted(...)`, so greedy matching merges candidates in set
-    order, not by similarity (one reason RaQuN's groups differ run to run).
+    RaQuN (2026-10-21): PyQuN v1.0.1 (MIT) from the user's fork (`RaQuN_Lab`), the `raqun` extra pinned by its tag in
+    `[tool.uv.sources]` (commit in `uv.lock`), installed by the runner image and CI; the misc-pyqun image (the UI's
+    similarity worker, no `analysis/` code) is built from `base` like every worker, with the `raqun` and
+    `similarity` (sentence-transformers) extras. Release 1.0.0 fixed
+    PyQuN's Stopwatch (our copy went), `MatchCandidates.sort` (it dropped the result of `sorted(...)`, so greedy
+    matching took the candidates in set order, not by similarity), the shared default objects and the iteration
+    order, so the groups are deterministic; matcher (c) numbers from before 2026-10-21 came from the unsorted
+    candidates and are rerun, not compared. RaQuN per level costs five matchings per repository (`--no-raqun`
+    skips it; running it at the scoring level only is not built).
   - `score.py`, `stability.py`, `costs.py`: RQ4 scores, run-to-run stability, LLM costs from
     `analysis/data/llm_prices.yaml`.
   - `mutation.py`: E4, each tool's detection of the inserted calls (Phase 4); every agreement analysis (RQ1, ladder,
@@ -271,10 +267,8 @@ where they declare support, but no analysis, figure or tuning effort goes into t
   2026-10-17, but those predate reading its Go locations (2026-10-20), and it found the inserted RSA keygen at its
   line in all three Go mutants of e4-mutation-smoke. micro-go >= 6/11 keeps it a voter, else `role: observer`
   (`common/tools.yaml`; the paper's Review 5 comment).
-- **Waiting for the user:** how RaQuN gets into the runner (see "Analysis", `matchers/`): a `pyproject.toml` in the
-  PyQuN fork, then pin it in the `raqun` extra and the misc-pyqun image, or the stopgap;
-  human review of the micro ground truth, the hand-check
-  verdicts, the `languages` lists and the mutation snippet catalogs (all AI-made).
+- **Waiting for the user:** human review of the micro ground truth, the hand-check verdicts, the `languages` lists
+  and the mutation snippet catalogs (all AI-made).
 - **External:** the SCANOSS research key, the Cryptoscope artifact, the two-rater review of the matcher validation
   sample (a review of `vocab.csv` with Cohen's κ is an option, not decided).
 - **Small open analysis items:** CryptobomForge's IBM-draft windows are CodeQL's `contextRegion` (finding ±2 lines),
@@ -356,8 +350,11 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
     (RQ3: matcher × level); inside a group, located records are chained into call-site groups (same file, lines
     within `--window`); `--closure` adds implied memberships (attached too).
   - (c) **RaQuN** (`matchers/raqun.py`): PyQuN's n-way matching with a structured similarity (Jaccard over
-    `<dimension>=<value>` attributes), location-free, at most one asset per tool per group, run at every level like
-    (b) with the values admitted at that level. Optional until PyQuN is packaged. The UI's "Find Similar Components" (`misc/pyqun`, BERT over a bag of strings) is a different thing and
+    `<dimension>=<value>` attributes: the identity at the level and the standard's dimensions, never our `group`),
+    on the exact matcher's records (mapped, with an L4 identity; decided 2026-10-21), location-free, at most one
+    asset per tool per group, run at every level like (b) with the values admitted at that level, configured as in
+    the RaQuN paper (k = n, the tools in the repository; Jaccard >= 0.75; decided 2026-10-21, no further
+    configurations: matching is a small part of the paper). Installed with the `raqun` extra. The UI's "Find Similar Components" (`misc/pyqun`, BERT over a bag of strings) is a different thing and
     stays a comparison only.
   - (d) further matchers: the interface (records in, match groups with per-dimension agreement out,
     `matchers/base.py`) must not assume (a)-(c) are the only ones.

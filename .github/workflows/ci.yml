@@ -18,7 +18,7 @@ jobs:
         with:
           version: "0.12.5"
       - name: Install (locked)
-        run: uv sync --frozen
+        run: uv sync --frozen --extra raqun
       - name: Ruff lint
         run: uv run ruff check .
       - name: Ruff format

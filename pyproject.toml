@@ -46,9 +46,6 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "W605"]
 
-[tool.ruff.lint.per-file-ignores]
-"misc/pyqun/main.py" = ["E402"]  # sys.path must be patched before the RaQuN_Lab imports
-
 [tool.ruff.lint.isort]
 known-first-party = ["common", "coordinator", "workers", "misc", "analysis"]
 combine-as-imports = true
@@ -58,12 +55,17 @@ quote-style = "double"
 indent-style = "space"
 
 [project.optional-dependencies]
-# RaQuN as an analysis matcher (analysis/matchers/raqun.py): the PyQuN package (the user's fork, pinned by commit once
-# it ships a pyproject.toml; CLAUDE.md "Analysis", `matchers/`) plus its runtime dependencies.
-raqun = ["scikit-learn>=1.5", "scipy>=1.13", "psutil>=6"]
+# RaQuN (analysis/matchers/raqun.py in the runner, and the UI's similarity worker misc/pyqun): the PyQuN package from
+# the user's fork, pinned by its tag in [tool.uv.sources] (uv.lock records the commit).
+raqun = ["pyqun"]
+# The UI's "Find Similar Components" (misc/pyqun): MiniLM embeddings; only the misc-pyqun image installs it (torch).
+similarity = ["sentence-transformers>=6.2.0"]
 
 [tool.uv]
 package = true
+
+[tool.uv.sources]
+pyqun = { git = "https://github.com/RomanBoegli/PyQuN", tag = "v1.0.1" }
 
 [dependency-groups]
 dev = [

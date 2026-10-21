@@ -816,6 +816,8 @@ services:
       context: .
       dockerfile: ./docker/Dockerfile.misc-pyqun
       args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
         BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
     depends_on:
       coordinator:

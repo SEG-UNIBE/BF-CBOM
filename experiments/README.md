@@ -326,14 +326,16 @@ of this too (`report --fetch`).
 `exports/` can be analysed without Docker: `RESULTS_DIR=exports uv run misc/cli/cli.py analysis report <exp> --fetch`
 (the `.venv` has every dependency). The VM runs the experiments; the laptop re-runs the analysis with other options.
 
-**RaQuN** (matcher (c), `analysis/matchers/raqun.py`) runs next to the exact matcher when the PyQuN package is
-importable (`uv sync --extra raqun` plus the package from the user's fork; `--raqun/--no-raqun` forces it): tools are
-models, a tool's distinct canonical assets are elements with `<dimension>=<value>` attributes, RaQuN's Jaccard on
-them is the per-field agreement; `groups-raqun`/`members-raqun`/`agreement-raqun-run<k>.csv` have the same columns
-as the exact tables (at the scoring level), `matchers-run<k>.csv` compares the two partitions per repository and
-level (co-membership pair Jaccard, share of groups that sit inside one group of the other matcher), and RaQuN's
-rows in `matchlevels-run<k>.csv` put it next to the exact matcher level by level (its attributes are the identity
-and the values admitted at that level).
+**RaQuN** (matcher (c), `analysis/matchers/raqun.py`) runs next to the exact matcher, always in the runner image
+(the `raqun` extra, PyQuN from the user's fork) and on the host after `uv sync --extra raqun` (`--raqun/--no-raqun`
+forces it): tools are models, a tool's distinct canonical assets are elements, built from the exact matcher's
+records (mapped, with an L4 identity), with `<dimension>=<value>` attributes (the identity at the level and the
+standard's dimensions, not our `group`), RaQuN's Jaccard on them is the per-field agreement;
+`groups-raqun`/`members-raqun`/`agreement-raqun-run<k>.csv` have the same columns as the exact tables (at the
+scoring level), `matchers-run<k>.csv` compares the two partitions per repository and level (co-membership pair
+Jaccard, share of groups that sit inside one group of the other matcher), and RaQuN's rows in
+`matchlevels-run<k>.csv` put it next to the exact matcher level by level (its attributes are the identity and the
+values admitted at that level).
 
 **`score <exp>`** scores and ranks the tools without ground truth (RQ4, `analysis/score.py`) on the exact
 matcher's groups. Voters are voter groups (tools sharing an engine count once; `--merge-llm` merges the LLM workers).
@@ -405,7 +407,7 @@ The commands write to the experiment's folder on the volume:
 ├── groups-exact-run1.csv                 # tables: exact matcher, one row per group (repo scope per algorithm, site scope per call site)
 ├── members-exact-run1.csv                # tables: one row per (group, record)
 ├── agreement-exact-run1.csv              # tables: one row per (group, dimension): voters reporting / agreeing, majority value
-├── groups-raqun-run1.csv                 # tables: RaQuN's groups (with members-/agreement-raqun-run1.csv), when PyQuN is installed
+├── groups-raqun-run1.csv                 # tables: RaQuN's groups (with members-/agreement-raqun-run1.csv), unless --no-raqun
 ├── matchers-run1.csv                     # tables: exact vs RaQuN per repository (co-membership pair Jaccard)
 ├── matchlevels-run1.csv                  # tables: RQ3, per matcher and level: items by voter groups, agreement per dimension
 ├── score-run1.csv                        # score (RQ4): per tool, dimension, level: items, confirmation [CI], exclusivity, rank, Dawid-Skene

@@ -42,8 +42,8 @@ as 13,996).
   tool's records into one canonical unit, so 800 occurrences or 800 components of one algorithm count once. The
   ladder, the exact matcher's repo-level groups and the scores count items, (item, value) pairs and (item, site)
   pairs (a site = file and line; the call-site groups chain located records within the window); RaQuN's elements are
-  a tool's distinct attribute sets per repository (`matchers/raqun.py`: records with the same canonical values are
-  one element, so AES-128 and AES-256 are two). Packaging shows only where a table describes the tool's own document:
+  a tool's distinct attribute sets per repository, over the exact matcher's records (`matchers/raqun.py`: records
+  with the same canonical values are one element, so AES-128 and AES-256 are two). Packaging shows only where a table describes the tool's own document:
   RQ2's asset counts as written, RQ1's meaningful shares, the normalisation section's names and values (shares of
   components, as a reader of the CBOM finds them), and, by design, `units-run<k>.csv`, which measures it.
 - **Kinds of place.** Tools also differ in what a place is, and every record says which kind it names

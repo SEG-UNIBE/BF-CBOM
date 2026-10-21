@@ -181,6 +181,7 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     from typer.testing import CliRunner
 
     from analysis import levels as lv
+    from analysis.matchers import raqun
     from analysis.normalize import CONFORMANCE_COLUMNS, COVERAGE_COLUMNS
     from misc.cli import analysis_cmd
 
@@ -210,10 +211,15 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     algos = _read_csv(out / "items-run1.csv")
     assert list(algos[0]) == lv.ITEM_COLUMNS and all(int(a["k_L0"]) <= int(a["k_L4"]) for a in algos)
     levels = _read_csv(out / "matchlevels-run1.csv")
-    assert [r["level"] for r in levels] == list(lv.LEVELS) and all(r["matcher"] == "exact" for r in levels)
-    assert int(levels[0]["items"]) == int(levels[-1]["items"])  # the unit is fixed across levels
-    k2plus = [int(r["k2"]) + int(r["k3"]) + int(r["k4plus"]) for r in levels]
+    exact = [r for r in levels if r["matcher"] == "exact"]
+    assert [r["level"] for r in exact] == list(lv.LEVELS)
+    assert int(exact[0]["items"]) == int(exact[-1]["items"])  # the unit is fixed across levels
+    k2plus = [int(r["k2"]) + int(r["k3"]) + int(r["k4plus"]) for r in exact]
     assert k2plus == sorted(k2plus)  # cumulative: agreement never drops at a higher level
+    if raqun.available():  # the `raqun` extra (CI, the runner image): matcher (c) at every level, next to exact
+        assert [r["level"] for r in levels if r["matcher"] == "raqun"] == list(lv.LEVELS)
+        assert {r["level"] for r in _read_csv(out / "matchers-run1.csv")} == set(lv.LEVELS)
+        assert _read_csv(out / "groups-raqun-run1.csv")
     assert {a["tool"] for a in algos} == {"cbomkit", "cipherradar"} and algos[0]["language"] == "Java"
     info = json.loads((out / "tables-run1.json").read_text())
     assert info["rows"]["items-run1.csv"] == len(algos) and info["vocabulary"]["algorithms"]
