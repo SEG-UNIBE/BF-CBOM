@@ -581,7 +581,7 @@ def test_a_list_in_a_field_is_ambiguous_not_unknown():
 
 
 def test_coverage_and_units_count_assets_records_and_items():
-    from analysis.tables import unit_rows
+    from analysis.tables import unit_repo_rows, unit_rows
 
     occ = [{"location": "src/a.py", "line": k} for k in range(1, 6)]  # one asset found at five lines
     one_per_place = [_comp("AES", occ=[{"location": "src/b.py", "line": k}]) for k in (1, 2)]  # one per finding
@@ -597,3 +597,11 @@ def test_coverage_and_units_count_assets_records_and_items():
     assert (u["multi_occurrence_share"], u["unlocated_share"]) == (round(1 / 3, 3), round(2 / 3, 3))
     (v,) = unit_rows([normalize_cbom(_bom(*one_per_place), "cipherradar")])
     assert (v["assets"], v["records"], v["items"], v["assets_per_item"]) == (2, 2, 1, 2.0)  # two components, one item
+    m = normalize_cbom(_bom(*one_per_place), "cbomkit")  # the same tool on a second repository
+    per_repo = unit_repo_rows([n, m], ["o/a", "o/b"], {"o/a": "Python"})
+    assert [(r["repo"], r["language"], r["assets"], r["records"], r["items"]) for r in per_repo] == [
+        ("o/a", "Python", 3, 7, 2),
+        ("o/b", None, 2, 2, 1),
+    ]
+    (w,) = unit_rows([n, m])
+    assert (w["cboms"], w["assets"], w["records"], w["items"]) == (2, 5, 9, 3)  # the repositories' rows summed

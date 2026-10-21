@@ -484,6 +484,8 @@ def _tables_step(
     # one run of the original variants, like every table the summary's normalisation section shows
     cboms = [n for _, _, n in normalized]
     write(f"units-run{run}.csv", tbl.unit_rows(cboms, voter_of, location_kinds), tbl.UNIT_COLUMNS)
+    repos = [tbl.full_name(p.parents[2].name) for _, p, _ in normalized]
+    write(f"units-repo-run{run}.csv", tbl.unit_repo_rows(cboms, repos, languages, voter_of), tbl.UNIT_REPO_COLUMNS)
     per_run = Report()
     for n in cboms:
         per_run.add(n)

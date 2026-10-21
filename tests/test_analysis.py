@@ -205,6 +205,8 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert (out / "conformance-run1.csv").read_text(encoding="utf-8").startswith(",".join(CONFORMANCE_COLUMNS))
     units = {u["tool"]: u for u in _read_csv(out / "units-run1.csv")}
     assert units["cbomkit"]["assets"] == _read_csv(out / "coverage-run1.csv")[0]["assets"]  # the same CBOMs
+    per_repo = _read_csv(out / "units-repo-run1.csv")
+    assert sum(int(r["items"]) for r in per_repo if r["tool"] == "cbomkit") == int(units["cbomkit"]["items"])
     algos = _read_csv(out / "items-run1.csv")
     assert list(algos[0]) == lv.ITEM_COLUMNS and all(int(a["k_L0"]) <= int(a["k_L4"]) for a in algos)
     levels = _read_csv(out / "matchlevels-run1.csv")
@@ -223,6 +225,7 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     for section in (*sections, "## Files"):
         assert section in summary
     assert "| cbomkit | pass 11 |" in summary and "| pqcheck | – |" in summary
+    assert "Per repository (`units-repo-run<k>.csv`)" in summary
     assert summary.index("## Voter groups") < summary.index("## Agreement ladder")
     assert "| cbomkit | 11 / 11 · 11 |" in summary
 

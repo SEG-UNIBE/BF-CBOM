@@ -4,7 +4,7 @@
 # tag, pinned by sha256. Java 23+ tool with bundled tree-sitter natives (compiled from the sources vendored in the
 # release), run on a Temurin 25 JRE in our base image. New release: set CIPHERSIFT_VERSION and CIPHERSIFT_SHA256
 # (curl -sL https://github.com/SEG-UNIBE/ciphersift/archive/refs/tags/v<x>.tar.gz | shasum -a 256), rebuild,
-# rerun e0-micro.
+# rerun it on e0-stability (ARGS="--rerun ciphersift").
 ARG BASE_IMAGE=base
 ARG BASE_TAG=latest
 

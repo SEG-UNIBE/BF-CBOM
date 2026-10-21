@@ -92,6 +92,7 @@ UNIT_COLUMNS = [
     "tool", "role", "cboms", "assets", "records", "items", "records_per_asset_median", "records_per_asset_max",
     "multi_occurrence_share", "assets_per_item", "unlocated_share", *[f"loc_{k}" for k in LOCATION_KINDS],
 ]  # fmt: skip
+UNIT_REPO_COLUMNS = ["tool", "role", "repo", "language", "assets", "records", "items"]
 MICRO_COLUMNS = [
     "project", "language", "tool", "run", "tailored", "status", "verdict", "n_items",
     "strict", "lenient", "repo", "recall_strict", "recall_lenient", "recall_repo",
@@ -458,13 +459,12 @@ def unit_rows(
     for i, n in enumerate(cboms):
         t = acc.setdefault(n.tool, {"cboms": 0, "per_asset": [], "items": 0, "unlocated": 0, "kinds": Counter()})
         t["cboms"] += 1
-        assets = [rs for rs in assets_of(n) if rs[0].values.get("asset_type") == "algorithm"]
+        assets, units = _packaging(n)
         kinds = location_kinds[i] if location_kinds else {}
         t["kinds"].update(kinds.get(r.record_id) or "unread" for rs in assets for r in rs)
         t["per_asset"] += [len(rs) for rs in assets]
         t["unlocated"] += sum(not any(r.file for r in rs) for rs in assets)
-        units = {identity(r, UNIT_LEVEL) for rs in assets for r in rs if r.resolution in (None, "mapped")}
-        t["items"] += len(units - {None})
+        t["items"] += len(units)
     rows = []
     for tool, t in sorted(acc.items()):
         per, n_assets = t["per_asset"], len(t["per_asset"])
@@ -485,6 +485,38 @@ def unit_rows(
             }
         )
     return rows
+
+
+def unit_repo_rows(
+    cboms: list[NormalizedCbom],
+    repos: list[str],
+    languages: dict[str, str] | None = None,
+    voter_of: dict[str, str] | None = None,
+) -> list[dict]:
+    """unit_rows' assets, records and items per repository, one row per CBOM (`repos[i]` is the repository of
+    `cboms[i]`): the items are what the matchers work on, one repository at a time."""
+    rows = []
+    for n, repo in zip(cboms, repos, strict=True):
+        assets, units = _packaging(n)
+        rows.append(
+            {
+                "tool": n.tool,
+                "role": "voter" if votes(voter_of, n.tool) else "observer",
+                "repo": repo,
+                "language": (languages or {}).get(repo),
+                "assets": len(assets),
+                "records": sum(len(rs) for rs in assets),
+                "items": len(units),
+            }
+        )
+    return sorted(rows, key=lambda r: (r["tool"], r["repo"]))
+
+
+def _packaging(n: NormalizedCbom) -> tuple[list[list[NormRecord]], set[str]]:
+    """A CBOM's algorithm assets, each as its records, and its items (the L4 identities of its mapped records)."""
+    assets = [rs for rs in assets_of(n) if rs[0].values.get("asset_type") == "algorithm"]
+    units = {identity(r, UNIT_LEVEL) for rs in assets for r in rs if r.resolution in (None, "mapped")}
+    return assets, units - {None}
 
 
 def micro_verdict(status: str, score: TruthScore | None) -> str:

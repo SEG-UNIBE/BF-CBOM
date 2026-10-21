@@ -398,20 +398,20 @@ Reproducible, resumable batch runs for the research agenda described in `CLAUDE.
 - `runner`: an on-demand container running `bf-cbom experiment ...`. Results land in the `results-data` volume as `<exp>/<owner>__<repo>@<sha12>/<variant>/<tool>/run<k>.json` plus a `run<k>.meta.json` with status, duration, timing, tool version, image, the BF-CBOM commit the image was built from, the container's peak RAM and (LLM workers) the token usage; `_experiment.yaml`, `_run-log.json` (sessions, host RAM, peak RAM) and `_ANALYSIS/` sit on top of each experiment folder.
 
 ```bash
-make experiment EXP=experiments/e0-smoke.yaml   # pin, mirror, enqueue, collect (resumable)
-make experiment-status NAME=e0-smoke
-make experiment-export NAME=e0-smoke            # -> exports/e0-smoke.zip (runs the analysis report first), the only path to the host
-make experiment-list                            # experiments stored on the volume
-make experiment-delete NAME=e0-smoke            # remove one from the volume (asks first; ARGS=--yes skips)
-make corpus ARGS="--per-language 100"           # stratified GitHub corpus with pinned commits
-make experiment EXP=experiments/e0-micro.yaml   # every tool on the hand-written micro projects (corpus/micro)
-make analysis ARGS="report e0-micro"            # everything below in one pass + _ANALYSIS/_SUMMARY.md (Markdown tables)
-make analysis ARGS="normalize e0-micro"         # every CBOM -> normalised records, one adapter spec per tool (analysis/adapters/)
-make analysis ARGS="schema e0-micro"            # RQ1: CycloneDX validity, meaningful shares, traceability (--fetch on a laptop)
-make analysis ARGS="levels e0-micro"            # how much agreement normalisation creates (levels L0 raw to L4 tool specs)
-make analysis ARGS="micro e0-micro"             # recall (call site and repo level) and precision per tool against corpus/micro/ground_truth.yaml
-make analysis ARGS="tables e0-micro"            # flat CSV tables (runs, records, exact-matcher groups, micro) for pandas/R
-make analysis ARGS="score e0-micro"             # RQ4: confirmation, exclusivity, Dawid-Skene, leave-one-out, CIs; stability
+make experiment EXP=experiments/e4-mutation-smoke.yaml   # pin, mirror, enqueue, collect (resumable)
+make experiment-status NAME=e4-mutation-smoke
+make experiment-export NAME=e4-mutation-smoke            # -> exports/e4-mutation-smoke.zip (runs the analysis report first), the only path to the host
+make experiment-list                                     # experiments stored on the volume
+make experiment-delete NAME=e4-mutation-smoke            # remove one from the volume (asks first; ARGS=--yes skips)
+make corpus ARGS="--per-language 100"                    # stratified GitHub corpus with pinned commits
+make experiment EXP=experiments/e0-stability.yaml        # every tool 3x on the hand-written micro projects (corpus/micro) and ten pilot repos
+make analysis ARGS="report e0-stability"                 # everything below in one pass + _ANALYSIS/_SUMMARY.md (Markdown tables)
+make analysis ARGS="normalize e0-stability"              # every CBOM -> normalised records, one adapter spec per tool (analysis/adapters/)
+make analysis ARGS="schema e0-stability"                 # RQ1: CycloneDX validity, meaningful shares, traceability (--fetch on a laptop)
+make analysis ARGS="levels e0-stability"                 # how much agreement normalisation creates (levels L0 raw to L4 tool specs)
+make analysis ARGS="micro e0-stability"                  # recall (call site and repo level) and precision per tool against corpus/micro/ground_truth.yaml
+make analysis ARGS="tables e0-stability"                 # flat CSV tables (runs, records, exact-matcher groups, micro) for pandas/R
+make analysis ARGS="score e0-stability"                  # RQ4: confirmation, exclusivity, Dawid-Skene, leave-one-out, CIs; stability
 ```
 
 #### Parallelism and Memory

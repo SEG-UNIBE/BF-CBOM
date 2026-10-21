@@ -4,12 +4,12 @@ Batch runs for the journal extension (see `CLAUDE.md`, Phase 1). Specs live here
 read-only into the `runner` container; everything they produce stays in Docker volumes.
 
 ```
-make experiment EXP=experiments/e0-smoke.yaml      # pin commits, mirror to gitserver, run, persist
-make experiment-status NAME=e0-smoke               # Redis progress + what is on disk
-make experiment-export NAME=e0-smoke               # exports/e0-smoke.zip (only way data reaches the host)
-make experiment-list                               # experiments stored on the volume
-make experiment-delete NAME=e0-smoke               # remove one from the volume (asks first)
-make corpus ARGS="--per-language 100"              # stratified corpus -> results volume corpus/corpus.yaml
+make experiment EXP=experiments/e4-mutation-smoke.yaml   # pin commits, mirror to gitserver, run, persist
+make experiment-status NAME=e4-mutation-smoke            # Redis progress + what is on disk
+make experiment-export NAME=e4-mutation-smoke            # exports/e4-mutation-smoke.zip (only way data reaches the host)
+make experiment-list                                     # experiments stored on the volume
+make experiment-delete NAME=e4-mutation-smoke            # remove one from the volume (asks first)
+make corpus ARGS="--per-language 100"                    # stratified corpus -> results volume corpus/corpus.yaml
 ```
 
 When a run ends it prints an overview (`misc/cli/overview.py`): runs stored out of expected, per tool the counts per
@@ -22,18 +22,15 @@ experiment.
 
 | Spec | Tools | Repos | Purpose |
 |---|---|---|---|
-| `e0-smoke.yaml` | cdxgen, cryptobomforge | 2 | first pipeline test: pin, mirror to the git server, run, persist |
-| `e0-cbomkit-smoke.yaml` | cbomkit | 1 | CBOMkit (server image) through the local git server over TLS |
-| `e0-llm-smoke.yaml` | deepseek | 1 | the code-reading LLM worker on its own (needs `DEEPSEEK_API_KEY`) |
-| `e0-phase2-smoke.yaml` | deepseek, cryptoscan | 2 | the Phase 2 workers together |
-| `e0-micro.yaml` | all thirteen generators | 5 micro projects (`corpus/micro`) | inclusion check against the hand-written ground truth; analyse with `make analysis ARGS="report e0-micro"` (or only `"micro e0-micro"`) |
-| `e1-pilot-corpus.yaml` | all thirteen generators | the 12 pilot projects in Java, Python and Go (`corpus/pilot-2026-10-08.yaml`) | first real workload: location-aware agreement on the pilot's pinned projects; large repos (Kafka, Keycloak) push CBOMkit towards its timeout |
-| `e1-icpc-corpus.yaml` | all thirteen generators | 23 projects of the ICPC 2026 paper (`corpus/icpc-2026.yaml`, HEAD of 2026-10-18) | held-out counterpart of the pilot corpus: none of these repos was used to tune the vocabulary, the specs or CipherSift; six are marked `expect_crypto: low` (negative cases) |
-| `e0-stability.yaml` | all thirteen generators, 3 repetitions | 5 micro projects + the 10 fastest pilot repos | E0: run-to-run variance (`stability.csv`), consensus sets for the scores; 585 jobs |
-| `e4-mutation-smoke.yaml` | every non-LLM generator | pyjwt, jjwt, golang-jwt (pilot), 3 mutants each | the mutation harness end to end: the RSA-2048 keygen inserted in each style; CBOMkit and CryptoScan should find the direct one at its line (`mutation.csv`) |
+| `e0-stability.yaml` | every tool but the ChatGPT and Claude workers (16), 3 repetitions | 5 micro projects (`corpus/micro`) + the 10 fastest pilot repos | E0: run-to-run variance (`stability.csv`), consensus sets for the scores, and the micro check against the hand-written ground truth (`make analysis ARGS="micro e0-stability"`); 720 jobs |
+| `e1-pilot-corpus.yaml` | the same 16 | the 12 pilot projects in Java, Python and Go (`corpus/pilot-2026-10-08.yaml`) | first real workload: location-aware agreement on the pilot's pinned projects; large repos (Kafka, Keycloak) push CBOMkit towards its timeout |
+| `e1-icpc-corpus.yaml` | the same 16 | 23 projects of the ICPC 2026 paper (`corpus/icpc-2026.yaml`, HEAD of 2026-10-18) | held-out counterpart of the pilot corpus: none of these repos was used to tune the vocabulary, the specs or CipherSift; six are marked `expect_crypto: low` (negative cases) |
+| `e4-mutation-smoke.yaml` | every non-LLM tool (15) | pyjwt, jjwt, golang-jwt (pilot), 3 mutants each | the mutation harness end to end: the RSA-2048 keygen inserted in each style; CBOMkit and CryptoScan should find the direct one at its line (`mutation.csv`) |
 
-The smoke tests are quick checks after changing a single worker. E1 on the full corpus (Java, Python and Go) and E4
-on its mutation subset (see `CLAUDE.md`, Phases 4 and 5) have no specs yet; E1 needs the corpus from `make corpus` first, pruned with
+After a change to one worker, `make experiment EXP=experiments/e4-mutation-smoke.yaml ARGS="--rerun <tool>"` redoes
+its runs on three small repos, one per paper language (an LLM worker: on e0-stability). E1 on the full corpus (Java,
+Python and Go) and E4 on its mutation subset (see `CLAUDE.md`, Phases 4 and 5) have no specs yet; E1 needs the corpus
+from `make corpus` first, pruned with
 `make corpus-prune ARGS="--in /data/results/corpus/corpus.yaml --from e0-stability"` to drop repos a tool
 timed out on.
 
@@ -258,13 +255,13 @@ stability, micro) reads the `original` variants only; mutants are normalised too
 mutated repository is never counted once per mutant.
 
 ```
-make analysis ARGS="report e0-micro"     # all of the below in one pass, plus _ANALYSIS/_SUMMARY.md (Markdown tables)
-make analysis ARGS="normalize e0-micro"  # every CBOM -> normalised records (run<k>.norm.json next to it)
-make analysis ARGS="schema e0-micro"     # RQ1: schema validity, meaningful shares, traceability (--fetch on a laptop)
-make analysis ARGS="levels e0-micro"     # how much agreement normalisation creates: L0 (raw) to L4 (tool specs)
-make analysis ARGS="micro e0-micro"      # score each tool against the micro projects' ground truth, two levels
-make analysis ARGS="tables e0-micro"     # flat CSV tables (runs, records, exact-matcher groups, micro) for pandas/R
-make analysis ARGS="score e0-micro"      # RQ4: confirmation, exclusivity, Dawid-Skene, leave-one-out, CIs; stability
+make analysis ARGS="report e0-stability"     # all of the below in one pass, plus _ANALYSIS/_SUMMARY.md (Markdown tables)
+make analysis ARGS="normalize e0-stability"  # every CBOM -> normalised records (run<k>.norm.json next to it)
+make analysis ARGS="schema e0-stability"     # RQ1: schema validity, meaningful shares, traceability (--fetch on a laptop)
+make analysis ARGS="levels e0-stability"     # how much agreement normalisation creates: L0 (raw) to L4 (tool specs)
+make analysis ARGS="micro e0-stability"      # score each tool against the micro projects' ground truth, two levels
+make analysis ARGS="tables e0-stability"     # flat CSV tables (runs, records, exact-matcher groups, micro) for pandas/R
+make analysis ARGS="score e0-stability"      # RQ4: confirmation, exclusivity, Dawid-Skene, leave-one-out, CIs; stability
 ```
 
 **`report <exp>`** normalises every CBOM once and writes everything the commands below write, then
@@ -288,6 +285,7 @@ spec, as described in [Normalisation](#normalisation). It writes:
 | `_ANALYSIS/vocab.csv` | one row per (tool, source, raw value): status (`mapped`, `partial`, `unmapped`, `ambiguous`, `known`, or the entry's `kind`: `api`, `non-crypto`), what it mapped to, leftover tokens, via, interpretive, kind, count; the reviewable mapping table |
 | `_ANALYSIS/coverage-run<k>.csv` | one row per (tool, dimension), run k, original variants (the same CBOMs as `units-run<k>.csv`): algorithm assets (CBOM components) with a value the tool reported vs only one we derived, as counts and shares of the assets (fill-rate heatmaps); every row also carries the tool's `assets` and the assets per resolution (`mapped`, `ambiguous`, `api`, `non-crypto`, `undefined`) |
 | `_ANALYSIS/units-run<k>.csv` | one row per tool, run k, original variants: how it packages its findings: `assets` (algorithm components), `records` (their occurrences), `items` (distinct L4 identities of its mapped records per repository, summed), records_per_asset_median / _max, multi_occurrence_share (assets at more than one place), assets_per_item (above 1: one component per finding), unlocated_share (assets without a file), role (`analysis/README.md` "Packaging per tool"), loc_line / loc_window / loc_import / loc_file / loc_none / loc_unread (algorithm records by the kind of place they name, `analysis/README.md` "Units") |
+| `_ANALYSIS/units-repo-run<k>.csv` | one row per (tool, repository), run k, original variants: `assets`, `records` and `items` of that CBOM as in `units-run<k>.csv` (whose counts are these rows summed), with `role` and `language`; the summary shows them as a repository x tool matrix |
 | `_ANALYSIS/conformance-run<k>.csv` | one row per (tool, scope, issue kind), run k, original variants: `asset` scope counts assets with a value read from standard fields that break the declared version's schema (field, enum, type, deprecated), `document` scope counts CBOMs (dialect, version); tools without issues have no row |
 
 **`schema <exp>`** answers RQ1 (`analysis/schema.py`): every CBOM that declares a CycloneDX version with a vendored
@@ -400,6 +398,7 @@ The commands write to the experiment's folder on the volume:
 ├── micro-items-run1.csv                  # tables: one row per (micro project, tool, expected item)
 ├── records-run1.csv                      # tables: one row per normalised record
 ├── units-run1.csv                        # tables: per tool assets, records, items and how they relate (packaging)
+├── units-repo-run1.csv                   # tables: per (tool, repo) assets, records, items
 ├── tables-run1.json                      # tables: settings used, row counts, versions, the voter map (group, role, engine per tool)
 ├── normalize.json                        # normalize: diagnostics per tool over every run (sources, spec issues, conflicts)
 ├── schema-run1.csv                       # schema (RQ1): one row per CBOM: declared version, valid, errors, error kinds
@@ -473,6 +472,6 @@ the record, every CBOM and its meta file. The export runs `analysis report` firs
 `_ANALYSIS/_SUMMARY.md` in the zip match the stored runs (`ARGS=--no-report` skips it):
 
 ```
-make experiment-export NAME=e0-micro   # -> exports/e0-micro.zip on the host, open e0-micro/_ANALYSIS/_SUMMARY.md
+make experiment-export NAME=e0-stability   # -> exports/e0-stability.zip on the host, open e0-stability/_ANALYSIS/_SUMMARY.md
 ```
 

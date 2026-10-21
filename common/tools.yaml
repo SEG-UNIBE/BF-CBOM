@@ -17,7 +17,8 @@
 #   analysed like every tool, and the panel confirms their findings, but they never confirm another tool, never count
 #   in k, exclusivity or Dawid-Skene and are never ranked; `--observers-vote` makes them voters, the sensitivity check).
 # Pilot verdicts (2026-10-08, docs/pilot-2026-10-08/README.md): pass/borderline/fail per language.
-# `micro_<date>`: lenient call-site recall on e0-micro (`make analysis ARGS="micro e0-micro"`; the inclusion bar is 6/11);
+# `micro_<date>`: lenient call-site recall on the micro projects (measured on e0-micro, now in e0-stability:
+#   `make analysis ARGS="micro e0-stability"`; the inclusion bar is 6/11);
 #   scored from the normalised records since 2026-10-18.
 # `memory_gb`: the worker's compose memory limit (docker-compose.yml, kept equal by a test); the batch
 #   runner sums it over the tools it feeds at once to stay within EXPERIMENT_MEMORY_BUDGET_GB (waves).

@@ -259,8 +259,8 @@ where they declare support, but no analysis, figure or tuning effort goes into t
   `experiments/e4-mutation-smoke.yaml` waits for the VM. Removal mutants come after E1 (they need its voters).
 - **Waiting for the VM:** `make up-prod`, then each experiment as a whole (the user's preference, 2026-10-20):
   `make experiment EXP=experiments/e1-pilot-corpus.yaml ARGS="--overwrite-old" EXPERIMENT_MEMORY_BUDGET_GB=0`, the
-  same for e1-icpc-corpus and e0-stability (DeepSeek needs credit first; `make experiment-delete NAME=e0-micro`,
-  superseded by e0-stability); `make experiment EXP=experiments/e4-mutation-smoke.yaml EXPERIMENT_MEMORY_BUDGET_GB=0`;
+  same for e1-icpc-corpus and e0-stability (DeepSeek needs credit first; `make experiment-delete` for e0-micro
+  and the former smoke experiments, whose specs went 2026-10-21: e0-stability and e4-mutation-smoke cover them); `make experiment EXP=experiments/e4-mutation-smoke.yaml EXPERIMENT_MEMORY_BUDGET_GB=0`;
   then build the E1 corpus (Java, Python and Go) with `GITHUB_TOKEN` and prune it, check replicas.
 - **Waiting for the user:** how RaQuN gets into the runner (see "Analysis", `matchers/`): a `pyproject.toml` in the
   PyQuN fork, then pin it in the `raqun` extra and the misc-pyqun image, or the stopgap;
@@ -366,7 +366,7 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
 - **Tables** (`tables.py`), flat long-format CSVs in three layers, so new matchers only add files: **runs**
   (`runs.csv`, one row per stored run with status, timing, memory, provenance, LLM usage and `cost_usd`), **records**
   (`records-run<k>.csv`), **matches** (`groups-`, `members-`, `agreement-<matcher>-run<k>.csv`, `matchers-run<k>.csv`).
-  Plus `micro-run<k>.csv`, `micro-items-run<k>.csv`, `items-run<k>.csv`, `units-run<k>.csv`, `levels-run<k>.csv`, `coverage-run<k>.csv`,
+  Plus `micro-run<k>.csv`, `micro-items-run<k>.csv`, `items-run<k>.csv`, `units-run<k>.csv` (per repository `units-repo-run<k>.csv`), `levels-run<k>.csv`, `coverage-run<k>.csv`,
   `conformance-run<k>.csv`, the RQ1, score and stability tables. Join keys: (snapshot, variant, run, record_id) and
   (snapshot, variant, run, group_id); group ids restart per snapshot and variant. Full list: `experiments/README.md`.
 - **Report** (`analysis/report/README.md`): plot recipes on the CSVs (UpSet of tools per asset, fill-rate heatmaps,

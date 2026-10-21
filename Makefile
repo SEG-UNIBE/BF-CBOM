@@ -96,7 +96,7 @@ down:
 	docker compose down
 
 # ---- Batch experiments (results stay in the results-data volume; see experiments/README.md) ----
-# make experiment EXP=experiments/e0-smoke.yaml
+# make experiment EXP=experiments/e4-mutation-smoke.yaml
 # EXPERIMENT_IMAGE_IDS: the worker images on this host by content (recorded per session in <exp>/_run-log.json).
 # EXPERIMENT_REPLICAS="cryptoscan=3,xgrep=2": replicas started with `docker compose up -d --scale worker-<tool>=N`;
 # the memory budget then counts each replica (README "Parallelism and memory").
@@ -105,26 +105,26 @@ experiment: ensure-env
 	EXPERIMENT_IMAGE_IDS="$$(docker images --no-trunc --format '{{.Repository}}:{{.Tag}}={{.ID}}' --filter 'reference=bf-cbom/*:$(VERSION)' | paste -sd ',' -)" \
 	docker compose run --rm -e EXPERIMENT_IMAGE_IDS -e EXPERIMENT_REPLICAS runner experiment run /app/$(EXP) $(ARGS)
 
-# make experiment-status NAME=e0-smoke   /   make experiment-list
+# make experiment-status NAME=e4-mutation-smoke   /   make experiment-list
 experiment-status:
 	docker compose run --rm runner experiment status $(NAME)
 
 experiment-list:
 	docker compose run --rm runner experiment list
 
-# make experiment-collect NAME=e0-smoke  -> collect results of jobs already queued (after `ARGS=--no-wait`)
+# make experiment-collect NAME=e4-mutation-smoke  -> collect results of jobs already queued (after `ARGS=--no-wait`)
 experiment-collect:
 	docker compose run --rm runner experiment collect $(NAME) $(ARGS)
 
-# make experiment-cancel NAME=e0-smoke  -> remove its queued jobs from the worker queues
+# make experiment-cancel NAME=e4-mutation-smoke  -> remove its queued jobs from the worker queues
 experiment-cancel:
 	docker compose run --rm runner experiment cancel $(NAME)
 
-# make experiment-delete NAME=e0-smoke  -> removes <name> from the results-data volume (asks first; ARGS=--yes skips)
+# make experiment-delete NAME=e4-mutation-smoke  -> removes <name> from the results-data volume (asks first; ARGS=--yes skips)
 experiment-delete:
 	docker compose run --rm runner experiment delete $(NAME) $(ARGS)
 
-# make experiment-export NAME=e0-smoke  -> exports/<name>.zip (the only path from the volume to the host);
+# make experiment-export NAME=e4-mutation-smoke  -> exports/<name>.zip (the only path from the volume to the host);
 # runs `analysis report` first (ARGS=--no-report skips it)
 experiment-export:
 	mkdir -p exports
@@ -142,7 +142,7 @@ corpus-export:
 	mkdir -p exports
 	docker compose run --rm -v "$(CURDIR)/exports:/export" runner sh -c 'cp /data/results/corpus/*.yaml /export/'
 
-# make analysis ARGS="report e0-micro"  /  ARGS="micro e0-micro"  -> results volume: <exp>/_ANALYSIS/
+# make analysis ARGS="report e0-stability"  /  ARGS="micro e0-stability"  -> results volume: <exp>/_ANALYSIS/
 analysis:
 	docker compose run --rm --no-deps runner analysis $(ARGS)
 

@@ -37,6 +37,7 @@ FILES = {
     "locations",
     "levels-run{k}.csv": "share of each tool's items another voter group confirms, per level L0-L4",
     "units-run{k}.csv": "per tool: assets, records, items and how they relate (records per asset, assets per item)",
+    "units-repo-run{k}.csv": "per (tool, repo): assets, records, items",
     "coverage-run{k}.csv": "per tool and dimension: algorithm assets with a value (reported vs derived), and what "
     "their names are (resolution)",
     "conformance-run{k}.csv": "spec issues per tool and kind (assets: field, enum, type, deprecated; documents)",
@@ -562,9 +563,37 @@ def _places(units: list[dict]) -> list[str]:
     return lines
 
 
-def _normalisation(units: list[dict], cov: list[dict], conf: list[dict]) -> list[str]:
-    """How each tool packages its findings (units-run<k>.csv), then what its assets' names are and which values they
-    carry (coverage-run<k>.csv, conformance-run<k>.csv); one run of the original variants throughout."""
+def _units_per_repo(unit_repos: list[dict]) -> list[str]:
+    """Each tool's assets / records / items per repository (units-repo-run<k>.csv), with the sums of the units table."""
+    if not unit_repos:
+        return []
+    roles = {r["tool"]: r.get("role") for r in unit_repos}
+    tools = sorted(roles)
+    repos = sorted({(r["repo"], (r.get("language") or "").lower()) for r in unit_repos},
+                   key=lambda x: (_lang_key(x[1] or "?"), x[0]))  # fmt: skip
+    counts = ("assets", "records", "items")
+    by_pair = {(r["repo"], r["tool"]): r for r in unit_repos}
+
+    def cell(r: dict | None) -> str:
+        return " / ".join(_n(_int(r[k])) for k in counts) if r else ""
+
+    matrix = [[repo, language] + [cell(by_pair.get((repo, t))) for t in tools] for repo, language in repos]
+    totals = {t: {k: sum(_int(r[k]) for r in unit_repos if r["tool"] == t) for k in counts} for t in tools}
+    matrix.append(["all", ""] + [cell(totals[t]) for t in tools])
+    lines = [
+        "Per repository (`units-repo-run<k>.csv`): `assets / records / items` of each tool's CBOM; empty = no ok run "
+        "(the RQ2 table above says why). The matchers, the ladder and the scores compare the items one repository "
+        "at a time.",
+        "",
+    ]
+    header = ["repo", "language", *[_tool({"tool": t, "role": roles[t]}) for t in tools]]
+    return lines + md_table(header, matrix, "ll" + "r" * len(tools)) + [""]
+
+
+def _normalisation(units: list[dict], cov: list[dict], conf: list[dict], unit_repos: list[dict]) -> list[str]:
+    """How each tool packages its findings (units-run<k>.csv, per repository units-repo-run<k>.csv), then what its
+    assets' names are and which values they carry (coverage-run<k>.csv, conformance-run<k>.csv); one run of the
+    original variants throughout."""
     if not units and not cov:
         return []
     lines = ["## Normalisation", ""]
@@ -586,9 +615,10 @@ def _normalisation(units: list[dict], cov: list[dict], conf: list[dict]) -> list
         lines += [
             "**Units per tool** (this run, original variants; `units-run<k>.csv`). How a tool splits what it finds "
             'into assets and records is its output format (`analysis/README.md`, "Units" and "Packaging per '
-            'tool"): `assets` = its algorithm components, `records` = their occurrences, one per place in the code, '
-            "`items` = the distinct algorithms (L4 identities) its mapped records name per repository, summed over "
-            "the repositories. A tool that lists an algorithm once with all its places has several records per asset "
+            'tool"): `assets` = its algorithm components, `records` = their occurrences, one per place a component '
+            "lists (a place listed under several components counts once for each), `items` = the distinct algorithms "
+            "(L4 identities) its mapped records name per repository, summed over the repositories. A tool that lists "
+            "an algorithm once with all its places has several records per asset "
             "and about one asset per item; a tool that writes one component per finding has one record per asset and "
             "many assets per item, so its asset count says little about what it found. Compare tools by items. "
             "`several places` = assets listed at more than one place; `no location` = assets without a file.",
@@ -597,6 +627,7 @@ def _normalisation(units: list[dict], cov: list[dict], conf: list[dict]) -> list
         header = ["tool", "CBOMs", "assets", "records", "items", "records per asset (median / max)", "several places",
                   "assets per item", "no location"]  # fmt: skip
         lines += md_table(header, table) + [""]
+        lines += _units_per_repo(unit_repos)
         lines += _places(units)
     if cov:
         by_tool: dict[str, dict[str, dict]] = defaultdict(dict)
@@ -1293,7 +1324,12 @@ def render(analysis_dir: Path, *, run: int = 1) -> str:
     lines += _reported(rows("runs.csv"), run)
     lines += _negatives(rows("runs.csv"), run)
     lines += _micro(rows("micro-run{k}.csv"), rows("micro-items-run{k}.csv"))
-    lines += _normalisation(rows("units-run{k}.csv"), rows("coverage-run{k}.csv"), rows("conformance-run{k}.csv"))
+    lines += _normalisation(
+        rows("units-run{k}.csv"),
+        rows("coverage-run{k}.csv"),
+        rows("conformance-run{k}.csv"),
+        rows("units-repo-run{k}.csv"),
+    )
     lines += _rq1(rows("schema-run{k}.csv"), rows("meaningful-run{k}.csv"), rows("traceability-run{k}.csv"))
     lines += _voters(info)
     lines += _ladder(rows("levels-run{k}.csv"))
