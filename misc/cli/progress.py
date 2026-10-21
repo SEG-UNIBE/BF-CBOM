@@ -74,7 +74,7 @@ def session() -> Iterator[None]:
     _live = Progress(  # the item's name takes what the other columns leave and is cut first on a narrow terminal
         SpinnerColumn(finished_text="[green]✓"),
         TextColumn("{task.description}", markup=False, table_column=fixed),
-        BarColumn(bar_width=20),
+        BarColumn(bar_width=20, finished_style="green"),
         _CountColumn(table_column=fixed),
         TimeElapsedColumn(table_column=fixed),
         TextColumn("{task.fields[item]}", style="dim", markup=False, table_column=Column(no_wrap=True, ratio=1)),
