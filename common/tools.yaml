@@ -31,7 +31,7 @@ tools:
   cbomkit:
     micro_2026-10-17: {java: 11/11, python: 5/11, go: 8/11}
     engine: sonar-cryptography      # IBM/PQCA sonar-cryptography plugin; the action jar and the server image share it
-    memory_gb: 8
+    memory_gb: 16
     approach: syntax tree + resolution of provider strings (JCA, BouncyCastle, pyca/cryptography, Go std)
     cbom_by: tool
     languages: [java, python, go]   # 2.1.10 had no Go analyser (0/11 on micro-go); 2.3.0 has the action jar's engine

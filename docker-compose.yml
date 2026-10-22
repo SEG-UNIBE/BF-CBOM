@@ -207,7 +207,8 @@ services:
       - REDIS_PORT=6379
       - WORKER_TIMEOUT_SEC=2700  # keycloak 469-551 s, kafka 363 s (2.3.0); pilot used 45 min
       - CBOMKIT_HEALTH_WAIT_SEC=20
-      - JAVA_OPTS=-Xms1g -Xmx6g -XX:+ExitOnOutOfMemoryError
+      # Leave 4 GiB of the container limit for native JVM memory and the worker/backend processes.
+      - JAVA_OPTS=-Xms1g -Xmx12g -XX:+ExitOnOutOfMemoryError
     env_file: docker/env/worker-cbomkit.env
     volumes:
       - git-certs:/certs:ro  # trust the local git server's certificate (CBOMkit forces https)
@@ -215,7 +216,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 8g
+          memory: 16g
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     profiles: [prod, all]
