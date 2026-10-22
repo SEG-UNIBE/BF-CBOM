@@ -238,4 +238,5 @@ ruff.toml
 .idea/
 notes.md
 
-experiments/results/**
+experiments/results/*
+!experiments/results/.gitkeep
