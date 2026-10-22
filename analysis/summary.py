@@ -22,6 +22,8 @@ import yaml
 
 from common.experiment import load_run_log, spec_path
 
+from .rqs import BAR_EXAM, BAR_EXAM_NOTE, BAR_EXAM_TABLES, RQ1, RQ2, RQ3, RQ4, RQS, STABILITY, STABILITY_NOTE
+
 SUMMARY_FILE = "_SUMMARY.md"
 LANGUAGE_ORDER = ["java", "python", "go", "javascript", "typescript", "c", "cpp"]
 LEVEL_ORDER = ("L0", "L1", "L2", "L3", "L4")
@@ -44,7 +46,7 @@ FILES = {
     "conformance-run{k}.csv": "spec issues per tool and kind (assets: field, enum, type, deprecated; documents)",
     "schema-run{k}.csv": "RQ1: one row per CBOM: declared format and version, schema validity, error count and kinds",
     "meaningful-run{k}.csv": "RQ1: per tool, asset type and dimension, assets with a value from standard fields / any",
-    "traceability-run{k}.csv": "RQ1: per (snapshot, tool, asset type), records with a file, with a file and line, "
+    "traceability-run{k}.csv": "RQ2: per (snapshot, tool, asset type), records with a file, with a file and line, "
     "existing at the commit, in range, strong",
     "vocab.csv": "what every raw value mapped to, per tool and source (the reviewable mapping table)",
     "groups-exact-run{k}.csv": "exact matcher: one row per group (repo scope per item, site scope per call site)",
@@ -57,11 +59,20 @@ FILES = {
     "members-raqun-run{k}.csv": "RaQuN: one row per (group, record)",
     "agreement-raqun-run{k}.csv": "RaQuN: one row per (group, dimension)",
     "matchers-run{k}.csv": "RQ3: per repository, exact vs RaQuN: common records, groups, co-membership pair Jaccard",
-    "score-run{k}.csv": "RQ4: per tool, dimension and level: items, confirmation (CI), exclusivity, rank, Dawid-Skene",
-    "loo-run{k}.csv": "RQ4: ranking without each voter group and its Kendall tau against the full ranking",
-    "grouping-run{k}.csv": "RQ4: ranking with every tool its own voter group and with the LLM workers merged, and "
+    "score-run{k}.csv": "RQ3b: per tool, dimension and level: items, confirmation (CI), exclusivity, rank, Dawid-Skene",
+    "loo-run{k}.csv": "RQ3b: ranking without each voter group and its Kendall tau against the full ranking",
+    "grouping-run{k}.csv": "RQ3b: ranking with every tool its own voter group and with the LLM workers merged, and "
     "its Kendall tau against the declared voter groups",
     "stability.csv": "per (tool, snapshot) with repeated runs: Jaccard across runs, record-count CV, consensus set",
+    "mutants.csv": "RQ4: one row per mutant (mutants.json): the planted call or decoy, its file, lines, host and patch",
+    "mutation.csv": "RQ4: per (mutant, tool): found at the site / span / file / repo, by group, parameters, "
+    "`false_positive` on a decoy, extra and lost units and sites",
+    "mutation-rates.csv": "RQ4: per tool, language, style and dimension: detection rate (mean of per-repository "
+    "rates, CI)",
+    "mutation-scores.csv": "RQ4: per tool, language and style: recall on the planted calls (site, group), precision "
+    "over calls and decoys, F1, CIs over repositories",
+    "bridge-run{k}.csv": "RQ4 -> RQ3: per language, each tool's confirmation rate at L4 against its F1; Spearman "
+    "over the cells and Kendall tau between the rankings",
 }
 
 
@@ -202,7 +213,8 @@ def _reading() -> list[str]:
         "The terms the tables below use:",
         "",
         "- **Run**: one tool on one repository once; with several repetitions each pair runs several times. A "
-        "**variant** is the repository as pinned (`original`) or a mutant of it with one inserted crypto call (E4). "
+        "**variant** is the repository as pinned (`original`) or a mutant of it with one planted crypto call or "
+        "decoy (RQ4). "
         "Unless a table says otherwise it shows run 1 of the original variants.",
         "- **Asset**: one component of a tool's CBOM, as the tool wrote it. **Record**: one place an asset lists "
         "(an asset listed at three places gives three records). How a tool packages its findings decides these "
@@ -227,6 +239,15 @@ def _reading() -> list[str]:
         "`x (y)`, `rate [low, high]`) are explained under their table, with an example read from the table.",
         "",
     ]
+
+
+def _questions() -> list[str]:
+    """The research questions (analysis/rqs.py), so the summary carries its own frame."""
+    lines = ["## Research questions", "", "The sections below answer, in this order:", ""]
+    for rq in RQS:
+        tables = ", ".join(f"`{t.replace('{k}', '<k>')}`" for t in rq.tables)
+        lines.append(f"- **{rq.id}, {rq.title.lower()}:** {rq.question} ({tables})")
+    return lines + ["", BAR_EXAM_NOTE + " " + STABILITY_NOTE, ""]
 
 
 def _eg(text: str) -> list[str]:
@@ -477,7 +498,7 @@ def _reported(rows: list[dict], run: int) -> list[str]:
             + [_pct(with_file / crypto) if crypto else "", _pct(with_line / crypto) if crypto else ""]
             + [sum(c == 0 for c in counts), f"{statistics.median(counts):.0f}"]
         )
-    lines = ["## What the tools report (RQ2)", ""]
+    lines = ["### What the tools report, as written", ""]
     lines += [
         f"What each tool wrote into its CBOMs, counted as written, before any normalisation (run {run}, original "
         "variants, ok runs only). One row per tool, summed over the repositories.",
@@ -492,7 +513,7 @@ def _reported(rows: list[dict], run: int) -> list[str]:
         "- `empty`: ok runs that reported no crypto asset; `median`: crypto assets per repository.",
         "",
         "Asset counts follow each tool's packaging, so they compare output formats, not findings: what each tool "
-        'found is counted in items in the normalisation section ("Units per tool").',
+        'found is counted in items under RQ2 ("Units per tool").',
         "",
     ]
     header = ["tool", "repos ok", "components", "crypto assets", *[h for _, h in ASSET_KINDS], "file", "file+line",
@@ -571,7 +592,7 @@ def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
 
     scored = [(t, lg, cells[(t, lg)]) for t in tools for lg in langs if (t, lg) in cells
               and cells[(t, lg)]["verdict"] in ("pass", "fail")]  # fmt: skip
-    lines = ["## Micro projects", ""]
+    lines = [f"## {BAR_EXAM}", ""]
     lines += [
         f"Each micro project (`experiments/corpus/micro`, one per language) is a small program generated from the "
         f"snippet catalog (`mutation/micro.py`): {n_items} known crypto calls, each in a function of its own, "
@@ -791,13 +812,20 @@ def _units_per_repo(unit_repos: list[dict]) -> list[str]:
     return lines + [""]
 
 
-def _normalisation(units: list[dict], cov: list[dict], conf: list[dict], unit_repos: list[dict]) -> list[str]:
-    """How each tool packages its findings (units-run<k>.csv, per repository units-repo-run<k>.csv), then what its
-    assets' names are and which values they carry (coverage-run<k>.csv, conformance-run<k>.csv); one run of the
-    original variants throughout."""
-    if not units and not cov:
+def _rq2(
+    reported: list[str], units: list[dict], cov: list[dict], unit_repos: list[dict], trace: list[dict]
+) -> list[str]:
+    """RQ2: what the tools wrote (as written), how each packages its findings (units-run<k>.csv, per repository
+    units-repo-run<k>.csv), what its assets' names are and which values they carry (coverage-run<k>.csv), and whether
+    its locations lead to real code (traceability-run<k>.csv); one run of the original variants throughout."""
+    if not reported and not units and not cov and not trace:
         return []
-    lines = ["## Normalisation", ""]
+    intro = (
+        RQ2.question + " First what the tools wrote, as written; then the units after normalisation, the names and "
+        "values their assets carry, and whether their locations hold."
+    )
+    lines = [RQ2.heading(), "", intro, ""]
+    lines += reported
     if units:
         table = [
             [
@@ -814,10 +842,9 @@ def _normalisation(units: list[dict], cov: list[dict], conf: list[dict], unit_re
             for u in units
         ]
         lines += [
-            "How the tools' findings become comparable: first how each tool packages them, then what its names and "
-            "values are.",
+            "### Units per tool",
             "",
-            "**Units per tool** (`units-run<k>.csv`): one row per tool, summed over the repositories.",
+            "How each tool packages its findings: one row per tool (`units-run<k>.csv`), summed over the repositories.",
             "",
             "- `CBOMs`: ok runs read; `assets`: its algorithm components.",
             "- `records`: their places, one per place a component lists (a place listed under several components "
@@ -840,10 +867,6 @@ def _normalisation(units: list[dict], cov: list[dict], conf: list[dict], unit_re
         by_tool: dict[str, dict[str, dict]] = defaultdict(dict)
         for r in cov:
             by_tool[r["tool"]][r["dimension"]] = r
-        issues: dict[str, list[str]] = defaultdict(list)
-        for r in conf:
-            unit = " CBOMs" if r["scope"] == "document" else ""
-            issues[r["tool"]].append(f"{r['kind']} {_n(r['count'])}{unit}")
         roles = {u["tool"]: u.get("role") for u in units}
         table = []
         for tool in sorted(by_tool):
@@ -854,10 +877,11 @@ def _normalisation(units: list[dict], cov: list[dict], conf: list[dict], unit_re
                 [_tool({"tool": tool, "role": roles.get(tool)}), assets]
                 + [_pct(_int(first[k]) / assets if assets else None) for k in RESOLUTION_SHOWN]
                 + [_pct(dims.get(d, {}).get("reported_share")) for d in COVERAGE_SHOWN]
-                + [", ".join(issues.get(tool, [])) or "none"]
             )
         lines += [
-            "**Names and values** (`coverage-run<k>.csv`, `conformance-run<k>.csv`): one row per tool; every share "
+            "### Names and values",
+            "",
+            "One row per tool (`coverage-run<k>.csv`); every share "
             "is of its algorithm `assets`, as a reader of its CBOM finds them (a tool that writes one component per "
             "finding weighs an often-found algorithm more; the ladder and the scores compare per item instead).",
             "",
@@ -866,22 +890,41 @@ def _normalisation(units: list[dict], cov: list[dict], conf: list[dict], unit_re
             "cryptography, `undefined` = a name nobody understands (never guessed).",
             "- `key size` ... `digest`: the share with that value given by the tool, in any field, property, name or "
             "code context (values we derive are not counted).",
-            "- `spec issues`: standard-field values the CycloneDX version the CBOM declares does not allow, by kind "
-            "(`field`, `enum`, `type`, `deprecated`: assets; `dialect`, `version`: CBOMs).",
             "",
         ]
-        header = ["tool", "assets", *RESOLUTION_SHOWN, *[d.replace("_", " ") for d in COVERAGE_SHOWN], "spec issues"]
-        lines += md_table(header, table, "lr" + "r" * (len(RESOLUTION_SHOWN) + len(COVERAGE_SHOWN)) + "l") + [""]
+        header = ["tool", "assets", *RESOLUTION_SHOWN, *[d.replace("_", " ") for d in COVERAGE_SHOWN]]
+        lines += md_table(header, table, "lr" + "r" * (len(RESOLUTION_SHOWN) + len(COVERAGE_SHOWN))) + [""]
     if any(u.get("role") == "observer" for u in units):
         lines += [OBSERVER_NOTE, ""]
-    return lines
+    return lines + _traceability(trace)
 
 
-def _rq1(schema: list[dict], meaningful: list[dict], trace: list[dict]) -> list[str]:
-    """Conformance, meaningfulness and traceability per tool (analysis/schema.py)."""
+def _spec_issues(conf: list[dict], tools: list[str]) -> list[str]:
+    """Standard-field values the declared CycloneDX version does not allow (conformance-run<k>.csv); `none` for a
+    tool without any is a finding too, so the table always shows every tool."""
+    if not tools and not conf:
+        return []
+    issues: dict[str, list[str]] = defaultdict(list)
+    for r in conf:
+        unit = " CBOMs" if r["scope"] == "document" else ""
+        issues[r["tool"]].append(f"{r['kind']} {_n(r['count'])}{unit}")
+    lines = [
+        "### Spec issues",
+        "",
+        "A finer view than whole-document validity: standard-field values the CycloneDX version the CBOM declares "
+        "does not allow, by kind (`field`, `enum`, `type`, `deprecated` count assets; `dialect`, `version` count "
+        "CBOMs); `none` = every standard-field value is allowed. One row per tool:",
+        "",
+    ]
+    table = [[tool, ", ".join(issues.get(tool, [])) or "none"] for tool in sorted(set(tools) | set(issues))]
+    return lines + md_table(["tool", "spec issues"], table, "ll") + [""]
+
+
+def _rq1(schema: list[dict], meaningful: list[dict], conf: list[dict]) -> list[str]:
+    """Conformance, spec issues and meaningfulness per tool (analysis/schema.py)."""
     if not schema and not meaningful:
         return []
-    lines = ["## RQ1: conformance, meaningful, traceable", ""]
+    lines = [RQ1.heading(), "", RQ1.question, ""]
     if schema:
         by_tool: dict[str, list[dict]] = defaultdict(list)
         for r in schema:
@@ -914,8 +957,9 @@ def _rq1(schema: list[dict], meaningful: list[dict], trace: list[dict]) -> list[
                 ]
             )
         lines += [
-            "Do the CBOMs follow the standard (conformance), do they fill the standard's fields (meaningful), and do "
-            "their locations lead to real code (traceable)?",
+            "Do the CBOMs follow the standard (conformance), are their standard-field values ones the declared "
+            "version allows (spec issues), and do they fill the standard's fields (meaningful)? Whether their "
+            "locations lead to real code is RQ2 (traceable).",
             "",
             "### Conformance",
             "",
@@ -932,6 +976,7 @@ def _rq1(schema: list[dict], meaningful: list[dict], trace: list[dict]) -> list[
         ]
         header = ["tool", "CBOM by", "CBOMs", "declares", "checked", "valid", "invalid", "no schema", "top error kinds"]
         lines += md_table(header, table, "lllrrrrrl") + [""]
+        lines += _spec_issues(conf, sorted(by_tool))
     if meaningful:
         lines += [
             "### Meaningful",
@@ -980,60 +1025,67 @@ def _rq1(schema: list[dict], meaningful: list[dict], trace: list[dict]) -> list[
             lines += _asset_type_heading(at) + md_table(header, table) + [""]
         if example:
             lines += _eg(example)[1:] + [""]
-    if trace:
-        with_source = [r for r in trace if r.get("source")]
-        types = _asset_types(r.get("asset_type") or "unknown" for r in trace)
-        lines += [
-            "### Traceable",
-            "",
-            "Can a reader follow a record to the code it describes? One table per CycloneDX asset type (keys and "
-            "secrets in configuration files, `related-crypto-material`, apart, so they do not dilute the algorithms; "
-            "library records left out), one row per tool:",
-            "",
-            "- `records`: its records of that type; `file`, `file+line`: the share that names a file, and a file and "
-            "a line.",
-            "- `weak`: of the records with a file and a line, the share whose file exists at the pinned commit and "
-            "has that line.",
-            "- `strong`: of the same records, the share where the line or one of the two lines above or below it "
-            "holds a cryptographic word (an algorithm, family, curve, identifier or API spelling of the vocabulary), "
-            "refinement 4.",
-            "",
-            "Weak and strong are empty where the snapshot files were not available."
-            + (
-                ""
-                if with_source
-                else " No snapshot files were available (run the report on the VM, or `analysis report --fetch` on "
-                "the laptop to fetch each pinned commit into `~/.cache/bf-cbom/snapshots`)."
-            ),
-            "",
-        ]
-        for at in types:
-            rs_type = [r for r in trace if (r.get("asset_type") or "unknown") == at]
-            by_tool_t: dict[str, list[dict]] = defaultdict(list)
-            for r in rs_type:
-                by_tool_t[r["tool"]].append(r)
-            table = []
-            for tool in sorted(by_tool_t):
-                rs = by_tool_t[tool]
-                records = sum(_int(r["records"]) for r in rs)
-                with_file = sum(_int(r["located_file"]) for r in rs)
-                with_line = sum(_int(r["located_line"]) for r in rs)
-                checked = [r for r in rs if r.get("source")]
-                line_checked = sum(_int(r["located_line"]) for r in checked)
-                weak = sum(_int(r["line_in_range"]) for r in checked)
-                strong = sum(_int(r["strong"]) for r in checked)
-                table.append(
-                    [
-                        tool,
-                        records,
-                        _pct(with_file / records) if records else "",
-                        _pct(with_line / records) if records else "",
-                        _pct(weak / line_checked) if line_checked else "",
-                        _pct(strong / line_checked) if line_checked else "",
-                    ]
-                )
-            header = ["tool", "records", "file", "file+line", "weak", "strong"]
-            lines += _asset_type_heading(at) + md_table(header, table) + [""]
+    return lines
+
+
+def _traceability(trace: list[dict]) -> list[str]:
+    """RQ2: can a reader follow a record to the code it describes? (traceability-run<k>.csv)"""
+    if not trace:
+        return []
+    lines: list[str] = []
+    with_source = [r for r in trace if r.get("source")]
+    types = _asset_types(r.get("asset_type") or "unknown" for r in trace)
+    lines += [
+        "### Traceable",
+        "",
+        "Can a reader follow a record to the code it describes? One table per CycloneDX asset type (keys and "
+        "secrets in configuration files, `related-crypto-material`, apart, so they do not dilute the algorithms; "
+        "library records left out), one row per tool:",
+        "",
+        "- `records`: its records of that type; `file`, `file+line`: the share that names a file, and a file and "
+        "a line.",
+        "- `weak`: of the records with a file and a line, the share whose file exists at the pinned commit and "
+        "has that line.",
+        "- `strong`: of the same records, the share where the line or one of the two lines above or below it "
+        "holds a cryptographic word (an algorithm, family, curve, identifier or API spelling of the vocabulary), "
+        "refinement 4.",
+        "",
+        "Weak and strong are empty where the snapshot files were not available."
+        + (
+            ""
+            if with_source
+            else " No snapshot files were available (run the report on the VM, or `analysis report --fetch` on "
+            "the laptop to fetch each pinned commit into `~/.cache/bf-cbom/snapshots`)."
+        ),
+        "",
+    ]
+    for at in types:
+        rs_type = [r for r in trace if (r.get("asset_type") or "unknown") == at]
+        by_tool_t: dict[str, list[dict]] = defaultdict(list)
+        for r in rs_type:
+            by_tool_t[r["tool"]].append(r)
+        table = []
+        for tool in sorted(by_tool_t):
+            rs = by_tool_t[tool]
+            records = sum(_int(r["records"]) for r in rs)
+            with_file = sum(_int(r["located_file"]) for r in rs)
+            with_line = sum(_int(r["located_line"]) for r in rs)
+            checked = [r for r in rs if r.get("source")]
+            line_checked = sum(_int(r["located_line"]) for r in checked)
+            weak = sum(_int(r["line_in_range"]) for r in checked)
+            strong = sum(_int(r["strong"]) for r in checked)
+            table.append(
+                [
+                    tool,
+                    records,
+                    _pct(with_file / records) if records else "",
+                    _pct(with_line / records) if records else "",
+                    _pct(weak / line_checked) if line_checked else "",
+                    _pct(strong / line_checked) if line_checked else "",
+                ]
+            )
+        header = ["tool", "records", "file", "file+line", "weak", "strong"]
+        lines += _asset_type_heading(at) + md_table(header, table) + [""]
     return lines
 
 
@@ -1089,7 +1141,7 @@ def _matching(levels: list[dict], groups: list[dict], matchers: list[dict]) -> l
     distribution at the scoring level, and the matchers compared per level."""
     if not levels and not groups:
         return []
-    lines = ["## Matching (RQ3)", ""]
+    lines = ["### RQ3b: agreement at L4 (matching)", ""]
     lines += [
         "A matcher puts the records of different tools that describe the same algorithm in one repository into one "
         "group. Two matchers are compared: `exact` (records whose names count as the same at the level, the ladder's "
@@ -1151,11 +1203,11 @@ def _matching(levels: list[dict], groups: list[dict], matchers: list[dict]) -> l
 
 
 def _scores(rows: list[dict], loo: list[dict], grouping: list[dict] | None = None) -> list[str]:
-    """RQ4: the ranking per dimension (analysis/score.py)."""
+    """RQ3b: the per-tool rates per dimension (analysis/score.py); the rankings are sensitivity rows."""
     if not rows:
         return []
     level = rows[0].get("level") or "?"
-    lines = ["## Scores without ground truth (RQ4)", ""]
+    lines = ["### RQ3b: per-tool rates (no ranking without ground truth)", ""]
     lines += [
         "Without a reference CBOM, a tool is scored by how much of what it reports other, independent tools report "
         f"too (the exact matcher's groups at {level}). One table per dimension (`algorithm`, then the parameters and "
@@ -1173,7 +1225,10 @@ def _scores(rows: list[dict], loo: list[dict], grouping: list[dict] | None = Non
         "(`–`: too little to rank; then no interval either).",
         "- `pooled`: the same share over all the tool's items at once (large repositories weigh more).",
         "- `exclusivity`: the share of its items no other voter group reports at all (pooled). Agreement cannot "
-        "tell whether these are findings the others miss or false positives (E4 can).",
+        "tell whether these are findings the others miss or false positives (RQ4 can).",
+        "- `coverage`: of the repository's majority items (those at least half of the voter groups that ran there "
+        "report), the share the tool reports, averaged over the repositories: a recall proxy next to `rate`'s "
+        "precision proxy (empty for `location`, where call sites are compared by window, not by equality).",
         "- `DS support`, `DS sens. / spec.` (algorithm only): Dawid-Skene, a second model of the same agreement. "
         "From the pattern of who reports what, it estimates for each voter how often it reports an item that is "
         "there (sensitivity) and stays silent on one that is not (specificity), and for each item how likely it is "
@@ -1201,6 +1256,7 @@ def _scores(rows: list[dict], loo: list[dict], grouping: list[dict] | None = Non
                 f"{_pct(r['rate'])}{ci}",
                 _pct(r["rate_pooled"]),
                 _pct(r["exclusivity"]),
+                _pct(r["coverage"]) if r.get("coverage") not in (None, "") else "",
             ]
             if dim == "algorithm":
                 row += [_pct(r["ds_support"]), f"{_pct(r['ds_sensitivity'])} / {_pct(r['ds_specificity'])}"]
@@ -1213,10 +1269,11 @@ def _scores(rows: list[dict], loo: list[dict], grouping: list[dict] | None = Non
                     f"share is {_pct(r['rate_pooled'])}, and no other voter group reports {_pct(r['exclusivity'])} "
                     "of them at all."
                 )
-        header = ["rank", "tool", "voter group", "repos", "items", "rate [95 % CI]", "pooled", "exclusivity"]
+        header = ["rank", "tool", "voter group", "repos", "items", "rate [95 % CI]", "pooled", "exclusivity",
+                  "coverage"]  # fmt: skip
         if dim == "algorithm":
             header += ["DS support", "DS sens. / spec."]
-        lines += [f"**{dim}**", ""] + md_table(header, table, "rllrrrrr" + "rr" * (dim == "algorithm"))
+        lines += [f"**{dim}**", ""] + md_table(header, table, "rllrrrrrr" + "rr" * (dim == "algorithm"))
         if example and not shown:
             lines += _eg(example)
             shown = True
@@ -1300,7 +1357,7 @@ def _stability(rows: list[dict]) -> list[str]:
                 sum(len((r.get("unstable") or "").split(";")) if r.get("unstable") else 0 for r in rs),
             ]
         )
-    lines = ["## Run-to-run stability", ""]
+    lines = [f"## {STABILITY}", "", STABILITY_NOTE, ""]
     lines += [
         "Does a tool report the same when it runs again on the same code? One row per tool, over the repositories "
         "it ran on more than once (`stability.csv`):",
@@ -1323,24 +1380,33 @@ def _stability(rows: list[dict]) -> list[str]:
 MUTANT_PATCHES = 12  # patches shown in the summary (all are in mutants.csv and mutants.json)
 
 
-def _mutation(mutants: list[dict], rows: list[dict], rates: list[dict]) -> list[str]:
+def _mutation(
+    mutants: list[dict], rows: list[dict], rates: list[dict], scores: list[dict] | None = None,
+    bridge: list[dict] | None = None,
+) -> list[str]:  # fmt: skip
     if not mutants:
         return []
-    styles = list(dict.fromkeys(m["style"] for m in mutants))
+    calls = [m for m in mutants if m.get("kind") != "decoy"]
+    decoys = [m for m in mutants if m.get("kind") == "decoy"]
+    rows = [r for r in rows if r.get("kind") != "decoy"]  # the detection table judges the planted calls
+    styles = list(dict.fromkeys(m["style"] for m in calls))
     by_lang: dict[str, int] = defaultdict(int)
     for m in mutants:
         by_lang[m["language"]] += 1
     per_lang = ", ".join(
         f"{lang} {_n(n)}" for lang, n in sorted(by_lang.items(), key=lambda kv: _lang_key(kv[0] or ""))
     )
-    lines = ["## E4: insertion mutants", ""]
+    lines = [RQ4.heading(), "", RQ4.question, ""]
     lines += [
-        f"A mutant is a copy of a repository with one known crypto call inserted, so here there is ground truth: "
-        f"{_n(len(mutants))} mutants in {_n(len({m['repo'] for m in mutants}))} repositories ({per_lang}). Each "
-        "inserts one snippet of the catalog (`mutation/catalog/`) into a first-party function that has a caller, in "
-        "one style: `direct` names the algorithm in the call, `indirect` passes its name through a variable, "
-        "`wrapper` puts the call into a helper (`mutants.csv`). Does the tool report the inserted call? Only "
-        "records that its run on the original does not have count. One row per language and tool:",
+        f"A mutant is a copy of a repository with one known piece of code inserted, so here there is ground truth: "
+        f"{_n(len(mutants))} mutants in {_n(len({m['repo'] for m in mutants}))} repositories ({per_lang}): "
+        f"{_n(len(calls))} *planted calls* (one snippet of the catalog, `mutation/catalog/`, inserted into a "
+        "first-party function that has a caller, in one style: `direct` names the algorithm in the call, `indirect` "
+        "passes its name through a variable, `wrapper` puts the call into a helper) and "
+        f"{_n(len(decoys))} *planted decoys* (code that names or resembles cryptography without using it: a comment "
+        "or a log message naming algorithms, a CRC32 checksum, a Base64 encoding; `mutants.csv`). Does the tool "
+        "report the inserted call, and does it stay quiet on the decoy? Only records that its run on the original "
+        "does not have count. First the planted calls, one row per language and tool:",
         "",
         "- `site, <style>`: mutants of that style where a new record of the expected algorithm appears at the line "
         "naming it (±2 lines).",
@@ -1389,11 +1455,183 @@ def _mutation(mutants: list[dict], rows: list[dict], rates: list[dict]) -> list[
     if failed:
         lines += ["", f"Not judged ({_n(len(failed))} mutant × tool): the run on the mutant or on the original is "
                   "missing or not ok (`status` in `mutation.csv`)."]  # fmt: skip
+    lines += _mutation_scores(scores or [], role)
+    lines += _bridge(bridge or [])
     lines += ["", f"### Mutant patches (first {min(MUTANT_PATCHES, len(mutants))} of {_n(len(mutants))})", ""]
     for m in mutants[:MUTANT_PATCHES]:
         lines += [f"`{m['variant']}` in `{m['repo']}`, `{m['file']}:{m['call_line']}` ({m['host']}):", ""]
         lines += ["```diff", m.get("patch") or "", "```", ""]
     return lines
+
+
+def _mutation_scores(scores: list[dict], role: dict) -> list[str]:
+    """Recall, precision and F1 on the planted items (mutation-scores.csv), style `all`."""
+    rows = [s for s in scores if s.get("style") == "all"]
+    if not rows:
+        return []
+    lines = ["", "### Recall, precision and F1 on the planted items", ""]
+    lines += [
+        "The planted calls are the positives, the planted decoys the negatives, both known exactly, so recall, "
+        "precision and F1 are real here, with the caveats that the calls are plain uses of the catalog's APIs and the "
+        "negatives are the four decoy kinds (`mutation-scores.csv`, pooled over the judged mutants of the language):",
+        "",
+        "- `calls`, `decoys`: judged planted calls and decoys (an ok run on the mutant and on the original).",
+        "- `recall site`: the share of the calls with a new record of the expected algorithm at the inserted call "
+        "(±2 lines), all styles together, with the 95 % bootstrap interval over repositories; `recall group`: the "
+        "same leniently (a record of the algorithm's group).",
+        "- `hit`: decoys with any new crypto record on their inserted lines; `precision` = calls found / (calls "
+        "found + decoys hit); `F1` the harmonic mean of recall site and precision, with its interval. Both are empty "
+        "when no decoys were planted.",
+        "- An interval only where the support rule of the scores holds (3 repositories, 10 calls).",
+        "",
+    ]
+    if not any(_int(s.get("decoys")) for s in rows):
+        lines += ["No decoys were planted in this experiment (`decoys: 0`, or mutants from before 2026-10-22), so "
+                  "precision and F1 are empty: recall only.", ""]  # fmt: skip
+
+    def ci(v, lo, hi) -> str:
+        if v is None:
+            return ""
+        text = _pct(v)
+        return f"{text} [{_pct(lo)}, {_pct(hi)}]" if lo is not None and hi is not None else text
+
+    def f1(v, lo, hi) -> str:
+        if v is None or v == "":
+            return ""
+        text = f"{_float(v):.2f}"
+        return f"{text} [{_float(lo):.2f}, {_float(hi):.2f}]" if lo not in (None, "") and hi not in (None, "") else text
+
+    table = []
+    for s in sorted(rows, key=lambda s: (_lang_key(s["language"] or ""), s["tool"])):
+        table.append(
+            [
+                s["language"],
+                _tool({"tool": s["tool"], "role": role.get(s["tool"])}),
+                s["calls"],
+                ci(_float(s["recall_site"]), _float(s.get("recall_low")), _float(s.get("recall_high"))),
+                _pct(s["recall_group"]),
+                s["decoys"],
+                s["decoys_hit"],
+                _pct(s["precision"]) if s.get("precision") not in (None, "") else "",
+                f1(s.get("f1"), s.get("f1_low"), s.get("f1_high")),
+            ]
+        )
+    header = ["language", "tool", "calls", "recall site [95 % CI]", "recall group", "decoys", "hit", "precision",
+              "F1 [95 % CI]"]  # fmt: skip
+    lines += md_table(header, table, "ll" + "r" * (len(header) - 2))
+    eg = next((row for row in table if row[8]), None) or next((row for row in table if row[3]), None)
+    if eg:
+        what = (
+            f"F1 `{eg[8]}`: {eg[1]} found {eg[3].split(' ')[0]} of its {eg[2]} planted calls at the call and reported "
+            f"{eg[6]} of the {eg[5]} planted decoys, so its precision over the planted items is {eg[7] or 'undefined'}."
+            if eg[8]
+            else f"{eg[1]} found {eg[3].split(' ')[0]} of its {eg[2]} planted calls in {eg[0]} at the inserted call."
+        )
+        lines += _eg(what)
+    return lines
+
+
+def _bridge(bridge: list[dict]) -> list[str]:
+    """RQ4 -> RQ3 (bridge-run<k>.csv): confirmation rate against F1, per language and over all cells."""
+    summary = [r for r in bridge if r.get("tool") == "all"]
+    if not summary:
+        return []
+    lines = ["", "### Does agreement predict effectiveness? (the bridge to RQ3)", ""]
+    lines += [
+        "Per language, each tool's confirmation rate on this experiment's original repositories (RQ3: the share of "
+        "its algorithm items at L4 that another voter group confirms) is set against its F1 on the planted items "
+        "(`bridge-run<k>.csv`, one cell per tool and language): Spearman's rank correlation over the cells and "
+        "Kendall's tau between the two rankings (1 = the same order, 0 = unrelated, −1 = reversed; empty with fewer "
+        "than three cells). `all` pools the cells of every language.",
+        "",
+    ]
+
+    def coef(v) -> str:
+        return _num(v) if v not in (None, "") else ""
+
+    table = [[r["language"], r["n"], coef(r.get("spearman")), coef(r.get("kendall_tau"))] for r in summary]
+    lines += md_table(["language", "cells", "Spearman", "Kendall τ"], table, "lrrr")
+    eg = next((row for row in table if row[2]), None)
+    if eg:
+        lines += _eg(
+            f"Spearman `{eg[2]}` for {eg[0]}: over its {eg[1]} tools, the order by confirmation rate and the order by "
+            "F1 agree to that degree (1 would be the same ranking)."
+        )
+    return lines
+
+
+def _identity_of(mapped: str) -> str | None:
+    """The L4 identity a vocab row maps to: its `algorithm=`, else its `family=` (none for a functions-only row)."""
+    parts = dict(p.split("=", 1) for p in (mapped or "").split(";") if "=" in p)
+    return parts.get("algorithm") or parts.get("family") or None
+
+
+def _spellings(vocab: list[dict]) -> list[str]:
+    """RQ3a: how many distinct spellings each tool uses per identity (vocab.csv), and the identities spelled the most
+    ways across tools: the representational heterogeneity in names that L1-L4 of the ladder fold."""
+    by_tool: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
+    for r in vocab:
+        if r.get("status") != "mapped":
+            continue
+        ident = _identity_of(r.get("mapped") or "")
+        if ident:
+            by_tool[r["tool"]][ident].add(r["raw"])
+    if not by_tool:
+        return []
+    lines = [
+        "",
+        "#### Spellings per identity",
+        "",
+        "The same algorithm written in different ways (`vocab.csv`: every raw value a tool wrote, with the identity it "
+        "mapped to). One row per tool: `identities` = distinct algorithms or families its mapped values name, "
+        "`spellings` = distinct raw values behind them, `per identity` = their ratio (1.00: one spelling per "
+        "algorithm), and the identity it spells the most ways, with the spellings.",
+        "",
+    ]
+    table = []
+    for tool in sorted(by_tool):
+        idents = by_tool[tool]
+        spellings = sum(len(s) for s in idents.values())
+        ident, raws = max(idents.items(), key=lambda kv: (len(kv[1]), kv[0]))
+        shown = ", ".join(sorted(raws)[:4]) + ("…" if len(raws) > 4 else "")
+        table.append(
+            [tool, len(idents), spellings, f"{spellings / len(idents):.2f}", f"{ident} ({len(raws)}: {shown})"]
+        )
+    header = ["tool", "identities", "spellings", "per identity", "most spelled identity (spellings)"]
+    lines += md_table(header, table, "lrrrl")
+    across: dict[str, set[str]] = defaultdict(set)
+    tools_of: dict[str, set[str]] = defaultdict(set)
+    for tool, idents in by_tool.items():
+        for ident, raws in idents.items():
+            across[ident] |= raws
+            tools_of[ident].add(tool)
+    top = sorted(across.items(), key=lambda kv: (-len(kv[1]), kv[0]))[:5]
+    most = "; ".join(f"`{i}` {len(s)} spellings by {len(tools_of[i])} tools" for i, s in top)
+    lines += ["", f"Across tools, the identities spelled the most ways: {most}.", ""]
+    first = table[0]
+    lines += _eg(
+        f"`{first[4]}` for {first[0]}: among its {first[1]} identities, {first[4].split(' (')[0]} is the one it writes "
+        "in the most ways; every such spelling is one name the ladder has to fold before two reports count as the "
+        "same algorithm."
+    )
+    return lines + [""]
+
+
+def _rq3(info: dict, levels: list[dict], vocab: list[dict], matchlevels: list[dict], groups: list[dict],
+         matchers: list[dict], scores: list[dict], loo: list[dict], grouping: list[dict]) -> list[str]:  # fmt: skip
+    """RQ3: the voter groups, then RQ3a (the ladder, both matchers; the spellings) and RQ3b (matching, the per-tool
+    rates)."""
+    body = (_voters(info) + _ladder(levels) + _spellings(vocab) + _matching(matchlevels, groups, matchers)
+            + _scores(scores, loo, grouping))  # fmt: skip
+    if not body:
+        return []
+    intro = (
+        RQ3.question + " RQ3a: the deltas L0 -> L4 on fixed items (the ladder, shown for both matchers); the gap is "
+        "representational heterogeneity, what remains at L4 is substantive. RQ3b: the agreement at L4; RaQuN carries "
+        "the headline on whole findings, the exact matcher decomposes it per dimension and supplies the call sites "
+        "and the per-tool rates."
+    )
+    return [RQ3.heading(), "", intro, ""] + body
 
 
 def _voters(info: dict) -> list[str]:
@@ -1408,7 +1646,7 @@ def _voters(info: dict) -> list[str]:
     shared = {g: ts for g, ts in sorted(groups.items()) if len(ts) > 1}
     single = sorted(ts[0] for ts in groups.values() if len(ts) == 1)
     observers = sorted(t for t, v in voters.items() if v.get("role") == "observer")
-    lines = ["## Voter groups", ""]
+    lines = ["### Voter groups", ""]
     lines += [
         "Who confirms whom in every table below. A tool's finding counts as confirmed only when a tool of *another* "
         "voter group reports it too (the ladder, "
@@ -1454,7 +1692,7 @@ def _ladder(all_rows: list[dict]) -> list[str]:
             + [_pct(by.get((t, lv), {}).get("share")) for lv in levels]
             + [first.get("items", "")]
         )
-    lines = ["## Agreement ladder", ""]
+    lines = ["### RQ3a: the L0-L4 deltas (the agreement ladder)", ""]
     lines += [
         "How much of the tools' agreement is created by normalisation? One row per tool: of its `items` (algorithms "
         "per repository, location ignored), the share another voter group also reports when names count as the same "
@@ -1648,11 +1886,25 @@ def _llm(rows: list[dict], scores: list[dict] | None = None) -> list[str]:
 
 def _files(info: dict, run: int) -> list[str]:
     counts = info.get("rows") or {}
-    lines = ["## Files", "", "The files in this folder behind the tables above, with their row counts:", ""]
-    for pattern, meaning in FILES.items():
-        name = pattern.format(k=run)
-        if name in counts:
-            lines.append(f"- `{name}` ({_n(counts[name])} rows): {meaning}")
+    lines = ["## Files", "", "The files in this folder behind the tables above, with their row counts, by the "
+             "question they answer:", ""]  # fmt: skip
+    groups = [(BAR_EXAM, BAR_EXAM_TABLES), *((f"{rq.id} {rq.title}", rq.tables) for rq in RQS),
+              (STABILITY, ("stability.csv",))]  # fmt: skip
+    listed: set[str] = set()
+    for title, patterns in groups:
+        names = [p.format(k=run) for p in patterns if p.format(k=run) in counts]
+        if not names:
+            continue
+        lines += [f"**{title}**", ""]
+        lines += [f"- `{n}` ({_n(counts[n])} rows): {FILES.get(p, '')}" for p, n in zip(patterns, names, strict=False)
+                  if n in counts]  # fmt: skip
+        lines.append("")
+        listed |= set(names)
+    rest = [
+        (p.format(k=run), m) for p, m in FILES.items() if p.format(k=run) in counts and p.format(k=run) not in listed
+    ]
+    if rest:
+        lines += ["**Other**", ""] + [f"- `{n}` ({_n(counts[n])} rows): {m}" for n, m in rest] + [""]
     lines += [
         "- `normalize.json`: coverage per tool in full (sources, conflicts, top unmapped values)",
         "- `../_run-log.json`: one entry per runner session (times, host RAM and CPUs, budget, waves, peak RAM)",
@@ -1681,24 +1933,33 @@ def render(analysis_dir: Path, *, run: int = 1) -> str:
         return read_csv(analysis_dir / name.format(k=run))
 
     lines = _header(spec or {}, info, run)
+    lines += _questions()
     lines += _experiment(rows("runs.csv"), load_run_log(analysis_dir.parent))
     lines += _runs(rows("runs.csv"))
-    lines += _reported(rows("runs.csv"), run)
     lines += _negatives(rows("runs.csv"), run)
     lines += _micro(rows("micro-run{k}.csv"), rows("micro-items-run{k}.csv"))
-    lines += _normalisation(
+    lines += _rq1(rows("schema-run{k}.csv"), rows("meaningful-run{k}.csv"), rows("conformance-run{k}.csv"))
+    lines += _rq2(
+        _reported(rows("runs.csv"), run),
         rows("units-run{k}.csv"),
         rows("coverage-run{k}.csv"),
-        rows("conformance-run{k}.csv"),
         rows("units-repo-run{k}.csv"),
+        rows("traceability-run{k}.csv"),
     )
-    lines += _rq1(rows("schema-run{k}.csv"), rows("meaningful-run{k}.csv"), rows("traceability-run{k}.csv"))
-    lines += _voters(info)
-    lines += _ladder(rows("levels-run{k}.csv"))
-    lines += _matching(rows("matchlevels-run{k}.csv"), rows("groups-exact-run{k}.csv"), rows("matchers-run{k}.csv"))
-    lines += _scores(rows("score-run{k}.csv"), rows("loo-run{k}.csv"), rows("grouping-run{k}.csv"))
+    lines += _rq3(
+        info,
+        rows("levels-run{k}.csv"),
+        rows("vocab.csv"),
+        rows("matchlevels-run{k}.csv"),
+        rows("groups-exact-run{k}.csv"),
+        rows("matchers-run{k}.csv"),
+        rows("score-run{k}.csv"),
+        rows("loo-run{k}.csv"),
+        rows("grouping-run{k}.csv"),
+    )
+    lines += _mutation(rows("mutants.csv"), rows("mutation.csv"), rows("mutation-rates.csv"),
+                       rows("mutation-scores.csv"), rows("bridge-run{k}.csv"))  # fmt: skip
     lines += _stability(rows("stability.csv"))
-    lines += _mutation(rows("mutants.csv"), rows("mutation.csv"), rows("mutation-rates.csv"))
     lines += _llm(rows("runs.csv"), rows("score-run{k}.csv"))
     lines += _files(info, run)
     return "\n".join(lines).rstrip() + "\n"

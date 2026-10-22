@@ -87,6 +87,19 @@ def test_spec_rejects_invalid(data):
         ex.spec_from_dict(data)
 
 
+def test_spec_tool_languages_is_a_hand_edit_recorded_with_the_spec():
+    base = {"name": "e", "tools": ["x", "y"], "repos": [{"full_name": "a/b"}]}
+    assert ex.spec_from_dict(base).tool_languages == {} and "tool_languages" not in ex.spec_to_dict(
+        ex.spec_from_dict(base)
+    )
+    spec = ex.spec_from_dict({**base, "tool_languages": {"x": ["go"]}})
+    assert spec.tool_languages == {"x": ["go"]} and ex.spec_to_dict(spec)["tool_languages"] == {"x": ["go"]}
+    assert ex.spec_from_dict(ex.spec_to_dict(spec)).tool_languages == {"x": ["go"]}
+    for bad in ({"z": ["go"]}, {"x": "go"}, {"x": []}, ["x"]):
+        with pytest.raises(ex.ExperimentError, match="tool_languages"):
+            ex.spec_from_dict({**base, "tool_languages": bad})
+
+
 # ----- paths and branches -----
 
 
@@ -337,6 +350,16 @@ def test_tools_yaml_memory_matches_compose_limits():
         checked += 1
     assert checked >= 10
     assert tool_memory_gb("no-such-tool", registry) == 1.0
+
+
+def test_mark_unsupported_honours_the_specs_tool_languages(tmp_path: Path):
+    base = {"name": "narrow", "tools": ["cbomkit"], "repos": [{"full_name": "o/r"}]}
+    snap = ex.Snapshot(full_name="o/r", source_url="u", branch="main", commit="a" * 40, variant="original",
+                       variant_commit="a" * 40, scan_url="s", scan_branch="b", language="Go")  # fmt: skip
+    registry = {"cbomkit": {"languages": ["java", "python", "go"]}}
+    assert ex.mark_unsupported(ex.spec_from_dict(base), [snap], tmp_path / "all", registry=registry) == []
+    narrowed = ex.spec_from_dict({**base, "tool_languages": {"cbomkit": ["java", "python"]}})
+    assert ex.mark_unsupported(narrowed, [snap], tmp_path / "narrow", registry=registry) == [("cbomkit", "o/r")]
 
 
 def test_mark_unsupported_records_meta_and_plan_skips_it(tmp_path: Path):

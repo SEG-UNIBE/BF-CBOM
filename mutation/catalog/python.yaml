@@ -7,7 +7,7 @@
 # The micro project experiments/corpus/micro/python is generated from this catalog (mutation/micro.py; AI-made, on the
 # human-review list before paper use). Imports are statements; `$name` refers to a name they bind. Locals carry a
 # prefix so that clashes (renamed) stay rare.
-version: "2026-10-20.1"
+version: "2026-10-22.1"
 language: python
 
 snippets:
@@ -204,3 +204,30 @@ snippets:
       $tls_version = $ssl.TLSVersion.TLSv1_3 @related
       $tls_context = $ssl.SSLContext($ssl.PROTOCOL_TLS_CLIENT) @call
       $tls_context.minimum_version = $tls_version
+
+# Decoys (decided 2026-10-22): code that names or resembles cryptography without using it, one `direct` body each and
+# no expected record. The micro projects get one function per decoy; the mutation harness plants them next to the
+# calls (`decoys` in a spec's mutation block), so a tool that reports one has a false positive on a known negative.
+decoys:
+  - id: comment
+    what: a comment naming algorithms
+    direct: |
+      # TODO: replace the MD5 and DES fallbacks with SHA-256 and AES
+      $total = sum(range(10))
+      print($total)
+  - id: log-message
+    what: a log message naming algorithms
+    direct: |
+      print("RSA and ECDSA keys are rotated nightly")
+  - id: crc32
+    what: a non-cryptographic checksum (CRC32)
+    imports: ["import zlib"]
+    direct: |
+      $checksum = $zlib.crc32(b"data")
+      print($checksum)
+  - id: base64
+    what: an encoding (Base64)
+    imports: ["import base64"]
+    direct: |
+      $encoded = $base64.b64encode(b"data")
+      print($encoded)

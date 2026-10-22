@@ -1,4 +1,5 @@
-"""RQ1: do the CBOMs conform to CycloneDX, are they meaningful, are they traceable? (CLAUDE.md Phase 3, `schema.py`)
+"""RQ1: do the CBOMs conform to CycloneDX, are they meaningful; RQ2: are they traceable? (CLAUDE.md Phase 3,
+`schema.py`)
 
 - **Conformance:** every CBOM that declares a CycloneDX version with a vendored schema (1.6, 1.7) is validated as a
   whole document with `jsonschema` against the official schema (`analysis/data/cyclonedx/`, offline through a

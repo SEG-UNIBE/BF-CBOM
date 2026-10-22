@@ -96,3 +96,11 @@ def test_deleting_an_inspection_takes_its_queued_jobs_out_of_the_worker_queues()
     assert delete_inspection(r, "i") == 2
     assert [json.loads(x)["job_id"] for x in r.lrange("jobs:t", 0, -1)] == ["c"]
     assert r.hgetall(JOB_ROUTING_KEY) == {"c": "other"}
+
+
+def test_tool_supports_narrows_to_a_specs_tool_languages():
+    reg = {"cbomkit": {"languages": ["java", "python", "go"]}, "xgrep": {}}
+    assert tool_supports("cbomkit", "Python", reg) and not tool_supports("cbomkit", "Python", reg, only=["go"])
+    assert tool_supports("cbomkit", "Go", reg, only=["Go"]) and tool_supports("cbomkit", None, reg, only=["go"])
+    assert tool_supports("xgrep", "Go", reg, only=["go"]) and not tool_supports("xgrep", "Java", reg, only=["go"])
+    assert not tool_supports("cbomkit", "Rust", reg, only=["rust"])  # the declared support still bounds it

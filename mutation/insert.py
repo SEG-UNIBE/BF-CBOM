@@ -95,13 +95,16 @@ def mutate(
         raise InsertError(f"{snippet.id} has no {style} form")
     if style == "wrapper" and not host.wrapper_ok:
         raise SkipHost("no room for a helper next to the host")
-    plan = source.resolve_imports((*form.imports, *catalog.wrap_imports), host, context=context)
-    outer = [t for t in (catalog.wrap, catalog.scope) if t]
+    wrap = None if snippet.decoy else catalog.wrap  # nothing in a decoy throws: no try/catch around it
+    plan = source.resolve_imports(
+        (*form.imports, *(() if snippet.decoy else catalog.wrap_imports)), host, context=context
+    )
+    outer = [t for t in (wrap, catalog.scope) if t]
     names = _names_for(source, [template, *outer], plan, source.local_taken(host, plan))
     unit = host.unit
     body = render(template, names, unit=unit)
-    if catalog.wrap:
-        body = wrap_lines(catalog.wrap, body, names, unit=unit)
+    if wrap:
+        body = wrap_lines(wrap, body, names, unit=unit)
     inserts = list(plan.inserts)
     related_offsets: list[tuple[str, int]] = []
     if style == "wrapper":

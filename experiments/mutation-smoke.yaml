@@ -1,4 +1,4 @@
-# E4 smoke: the mutation harness end to end (CLAUDE.md "Verification still to do"). One small pilot repository per
+# Mutation smoke: the mutation harness end to end (CLAUDE.md "Verification still to do"). One small pilot repository per
 # paper language (the development set, not held out) gets three insertion mutants of the RSA-2048 key generation, one
 # per style (direct, wrapper, indirect); all 15 tools scan the originals and the mutants once. Expected: at least
 # CBOMkit and CryptoScan report the direct insertion at the recorded file and line in all three repositories
@@ -6,11 +6,12 @@
 #   make experiment EXP=experiments/mutation-smoke.yaml EXPERIMENT_MEMORY_BUDGET_GB=0
 #   make experiment-export NAME=mutation-smoke
 name: mutation-smoke
-description: "mutation harness smoke test (E4): RSA-2048 keygen inserted in three styles into pyjwt, jjwt and golang-jwt"
+description: "mutation harness smoke test: RSA-2048 keygen in three styles and three decoys into pyjwt, jjwt and golang-jwt"
 tools: [cbomkit, cbomkit-jar, cdxgen, cryptobomforge, cryptoscan, pqcheck, qdarpan, securin-xbom, cipherradar, xgrep, ciphersift, scanoss, qelens, cryptarium, qscan]
 repetitions: 1
 mutation:
   per_repo: 3
+  decoys: equal   # as many planted decoys as calls (comment, log message, CRC32, Base64)
   styles: [direct, wrapper, indirect]
   snippets: [rsa-2048-keygen]
   seed: 1

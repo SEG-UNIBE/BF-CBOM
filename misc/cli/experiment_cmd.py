@@ -913,7 +913,8 @@ def corpus_prune(
     out: Path = PRUNE_OUT_OPT,
     statuses: str = PRUNE_STATUSES_OPT,
 ):
-    """Drop the repos where a tool timed out in an earlier experiment (E0; CLAUDE.md refinement 11), with reasons."""
+    """Drop the repos where a tool timed out in an earlier experiment (the stability run; CLAUDE.md refinement 11),
+    with reasons."""
     exp_dir = experiment_dir(from_experiment)
     if not is_experiment(exp_dir):
         _err(f"no experiment '{from_experiment}' under {RESULTS_DIR}")

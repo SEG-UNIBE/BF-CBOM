@@ -189,7 +189,7 @@ ASSET_TYPE_COLUMNS = {  # cryptoProperties.assetType as declared -> runs.csv col
 def _located(component: dict) -> tuple[bool, bool]:
     """(names a file, names a file and a line) as the tool wrote it: CycloneDX `evidence.occurrences[].location`
     (+ `line`), or `cryptoProperties.detectionContext[].filePath` (+ `lineNumbers`) in IBM's draft. A file alone is
-    a weaker claim than a file and a line, so the two are counted apart (RQ2 `located`, RQ1 traceability)."""
+    a weaker claim than a file and a line, so the two are counted apart (RQ2: `located` and traceability)."""
     occurrences = [o for o in (component.get("evidence") or {}).get("occurrences") or [] if isinstance(o, dict)]
     contexts = [
         c for c in (component.get("cryptoProperties") or {}).get("detectionContext") or [] if isinstance(c, dict)

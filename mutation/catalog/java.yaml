@@ -9,7 +9,7 @@
 # marks the line naming the algorithm, `@related` the line holding it in a variable (both stripped). Four spaces are
 # one indentation level (re-indented to the file's own). `wrapper` is derived from `direct` (mutation/insert.py).
 # Changing a snippet bumps `version`: every mutant records the version it was made from (mutants.json).
-version: "2026-10-20.1"
+version: "2026-10-22.1"
 language: java
 wrap: |
   try {
@@ -251,3 +251,35 @@ snippets:
       String $tlsVersion = "TLSv1.3"; @related
       $SSLContext $tlsContext = $SSLContext.getInstance($tlsVersion); @call
       $tlsContext.init(null, null, null);
+
+# Decoys (decided 2026-10-22): code that names or resembles cryptography without using it, one `direct` body each and
+# no expected record; inserted without the try/catch `wrap` (nothing in them throws). The micro project gets one
+# method per decoy; the mutation harness plants them next to the calls (`decoys` in a spec's mutation block), so a
+# tool that reports one has a false positive on a known negative.
+decoys:
+  - id: comment
+    what: a comment naming algorithms
+    direct: |
+      // TODO: replace the MD5 and DES fallbacks with SHA-256 and AES
+      int $total = 0;
+      for (int $i = 0; $i < 10; $i++) {
+          $total += $i;
+      }
+      System.out.println($total);
+  - id: log-message
+    what: a log message naming algorithms
+    direct: |
+      System.out.println("RSA and ECDSA keys are rotated nightly");
+  - id: crc32
+    what: a non-cryptographic checksum (CRC32)
+    imports: [java.util.zip.CRC32]
+    direct: |
+      $CRC32 $crc = new $CRC32();
+      $crc.update("data".getBytes());
+      System.out.println($crc.getValue());
+  - id: base64
+    what: an encoding (Base64)
+    imports: [java.util.Base64]
+    direct: |
+      String $encoded = $Base64.getEncoder().encodeToString("data".getBytes());
+      System.out.println($encoded);

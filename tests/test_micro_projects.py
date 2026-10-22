@@ -12,7 +12,7 @@ import yaml
 from analysis.groundtruth import load_ground_truth, score_records
 from analysis.normalize import NormRecord
 from mutation.catalog import load_catalog
-from mutation.micro import DECOYS, FORM, LANGUAGES, MICRO_DIR, SKIPPED, generated
+from mutation.micro import FORM, LANGUAGES, MICRO_DIR, SKIPPED, generated
 
 
 def test_checked_in_files_are_what_the_generator_writes():
@@ -32,7 +32,7 @@ def test_every_item_owns_its_lines_and_the_decoys_use_no_cryptography(language):
     truth = load_ground_truth()[f"micro-{language}"]
     catalog = load_catalog(language)
     assert {a.id for a in truth.assets} == {s.id for s in catalog.snippets} - SKIPPED
-    assert set(truth.decoys) == {d.id for d in DECOYS[language]}
+    assert set(truth.decoys) == {d.id for d in catalog.decoys}
     owner: dict[int, str] = {}
     for key, lines in [*((a.id, a.lines) for a in truth.assets), *truth.decoys.items()]:
         for n in lines:

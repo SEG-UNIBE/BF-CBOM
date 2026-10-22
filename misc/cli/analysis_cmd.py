@@ -274,7 +274,7 @@ def _store(exp_dir: Path, *, fetch: bool = False) -> SnapshotStore:
 
 def _original(item: Normalized) -> bool:
     """A run on an original snapshot. Mutants (variants) feed the mutation step only: in the agreement analyses a
-    mutated repository would count once per mutant (E3 is computed on the originals)."""
+    mutated repository would count once per mutant (the agreement analyses are computed on the originals)."""
     return item[1].parents[1].name == ORIGINAL_VARIANT
 
 
@@ -384,7 +384,7 @@ def _schema_step(exp_dir: Path, run: int, normalized: list[Normalized], write: W
     write(f"schema-run{run}.csv", schema_rows, sch.SCHEMA_COLUMNS)
     meaningful = sch.meaningful_rows(progress.track(normalized, "RQ1: meaningful", item=_label), cbom_by)
     write(f"meaningful-run{run}.csv", meaningful, sch.MEANINGFUL_COLUMNS)
-    trace = sch.traceability_rows(progress.track(normalized, "RQ1: traceable", item=_label), store, languages=languages)
+    trace = sch.traceability_rows(progress.track(normalized, "RQ2: traceable", item=_label), store, languages=languages)
     write(f"traceability-run{run}.csv", trace, sch.TRACE_COLUMNS)
     if trace and not any(r.get("source") for r in trace):
         typer.secho(
@@ -504,7 +504,7 @@ def _tables_step(
             location_kinds=kinds,
         )
     write(f"records-run{run}.csv", norm_rows, tbl.RECORDS_COLUMNS)
-    # one run of the original variants, like every table the summary's normalisation section shows
+    # one run of the original variants, like every table of the summary's RQ2 section
     cboms = [n for _, _, n in normalized]
     write(f"units-run{run}.csv", tbl.unit_rows(cboms, voter_of, location_kinds), tbl.UNIT_COLUMNS)
     repos = [tbl.full_name(p.parents[2].name) for _, p, _ in normalized]
@@ -611,11 +611,13 @@ def _raqun_step(run, per_snapshot, exact_by_level, write: Writer, *, level, vote
 
 
 def _mutation_step(
-    exp_dir: Path, all_runs: list[Normalized], write: Writer, *, window: int, merge_llm: bool, observers_vote: bool,
-    samples: int,
+    exp_dir: Path, all_runs: list[Normalized], write: Writer, *, run: int, window: int, merge_llm: bool,
+    observers_vote: bool, samples: int, obs: sc.Observations | None = None,
 ) -> None:  # fmt: skip
-    """E4 (analysis/mutation.py), for an experiment with mutants (mutants.json): mutants.csv, mutation.csv (one row
-    per mutant and tool, majority over the repetitions) and mutation-rates.csv."""
+    """RQ4 (analysis/mutation.py), for an experiment with mutants (mutants.json): mutants.csv, mutation.csv (one row
+    per mutant and tool, majority over the repetitions), mutation-rates.csv, mutation-scores.csv (recall, precision,
+    F1 on the planted calls and decoys) and, with the scores' observations, bridge-run<k>.csv (RQ3b's confirmation
+    rate per language against F1)."""
     manifest = load_mutants(exp_dir)
     if not manifest.get("repos"):
         return
@@ -628,7 +630,7 @@ def _mutation_step(
         key = (cbom_path.parents[2].name, cbom_path.parents[1].name, meta.get("worker") or cbom_path.parent.name)
         statuses[key][int(meta.get("run_index") or 1)] = str(meta.get("status") or "?")
     languages = _languages(exp_dir)
-    with progress.step("E4: mutant detection"):
+    with progress.step("RQ4: planted calls and decoys"):
         rows = mu.detection_rows(
             manifest,
             records,
@@ -639,9 +641,23 @@ def _mutation_step(
             voter_of=_voter_of(merge_llm, observers_vote),
         )
         rates = mu.rate_rows(rows, samples=samples)
+        scores = mu.score_rows(rows, samples=samples)
     write("mutants.csv", mu.mutant_rows(manifest, languages=languages), mu.MUTANTS_COLUMNS)
     write("mutation.csv", rows, mu.MUTATION_COLUMNS)
     write("mutation-rates.csv", rates, mu.RATE_COLUMNS)
+    write("mutation-scores.csv", scores, mu.SCORE_COLUMNS)
+    if obs is not None:
+        keys_by_language: dict[str, list[str]] = defaultdict(list)
+        for _, cbom_path, _n in all_runs:
+            snapshot, variant = cbom_path.parents[2].name, cbom_path.parents[1].name
+            if variant == ORIGINAL_VARIANT:
+                keys_by_language[languages.get(tbl.full_name(snapshot)) or ""].append(f"{snapshot}/{variant}")
+        confirmation: dict[tuple[str, str], float] = {}
+        for language, keys in keys_by_language.items():
+            for tool, per_repo in sc.repo_rates(obs, "algorithm", sorted(set(keys))).items():
+                if per_repo:
+                    confirmation[(tool, language)] = sum(per_repo) / len(per_repo)
+        write(f"bridge-run{run}.csv", mu.bridge_rows(confirmation, scores), mu.BRIDGE_COLUMNS)
 
 
 def _stability_step(all_runs: list[Normalized], write: Writer, *, level: str) -> dict[tuple[str, str, str], set[str]]:
@@ -669,8 +685,9 @@ def _score_step(
     include_tailored: bool,
     samples: int,
     consensus: dict[tuple[str, str, str], set[str]] | None = None,
-) -> None:
-    """score-run<k>.csv, loo-run<k>.csv and grouping-run<k>.csv (analysis/score.py) from the exact matcher's groups.
+) -> sc.Observations:
+    """score-run<k>.csv, loo-run<k>.csv and grouping-run<k>.csv (analysis/score.py) from the exact matcher's groups;
+    returns the observations under the declared voter groups (the bridge of the mutation step reads them).
     grouping-run<k>.csv ranks the tools again with every tool its own voter group, with the LLM workers merged and
     with the tools of one pattern engine family merged (the sensitivity checks of the declared voter groups;
     observers stay observers)."""
@@ -696,12 +713,12 @@ def _score_step(
             obs.restrict(f"{snapshot}/{variant}", tool, set(keys))  # keep the items in the tool's consensus set
         return obs
 
-    with progress.step(f"RQ4: scores, {samples} bootstraps"):
+    with progress.step(f"RQ3b: per-tool rates, {samples} bootstraps"):
         obs = observe(voter_of)
         rows, loo = sc.score_rows(obs, samples=samples)
     write(f"score-run{run}.csv", rows, sc.SCORE_COLUMNS)
     write(f"loo-run{run}.csv", loo, sc.LOO_COLUMNS)
-    with progress.step("RQ4: other voter groupings"):
+    with progress.step("RQ3b: other voter groupings"):
         groupings = {"declared": obs, "per-tool": observe(VoterMap({t: t for t in voter_of}, voter_of.observers))}
         if not merge_llm:
             groupings["llm-merged"] = observe(_voter_of(True, observers_vote))
@@ -710,6 +727,7 @@ def _score_step(
         )
         grouping = sc.grouping_rows(groupings)
     write(f"grouping-run{run}.csv", grouping, sc.GROUPING_COLUMNS)
+    return obs
 
 
 @analysis_app.command("score")
@@ -725,7 +743,7 @@ def score_cmd(
     samples: int = SAMPLES_OPT,
     consensus: bool = CONSENSUS_OPT,
 ):
-    """RQ4: score and rank the tools without ground truth (confirmation rate, exclusivity, Dawid-Skene support,
+    """RQ3b: the per-tool rates without ground truth (confirmation rate, exclusivity, Dawid-Skene support,
     leave-one-voter-out, bootstrap CIs) on the exact matcher's groups; stability.csv over repeated runs."""
     exp_dir = _experiment(name)
     counts: dict[str, int] = {}
@@ -918,7 +936,7 @@ def run_report(
         store=store,
     )
     sets = _stability_step(originals, write, level=level)
-    _score_step(
+    obs = _score_step(
         exp_dir,
         run,
         normalized,
@@ -931,8 +949,8 @@ def run_report(
         samples=samples,
         consensus=sets if consensus else None,
     )
-    _mutation_step(exp_dir, done, write, window=window, merge_llm=merge_llm, observers_vote=observers_vote,
-                   samples=samples)  # fmt: skip
+    _mutation_step(exp_dir, done, write, run=run, window=window, merge_llm=merge_llm,
+                   observers_vote=observers_vote, samples=samples, obs=obs)  # fmt: skip
     settings = {
         "run": run,
         "window": window,
@@ -970,8 +988,9 @@ def report(
 ):
     """Everything in one pass: normalised CBOMs, every CSV table (runs, records, RQ1 schema/meaningful/traceability,
     the exact matcher's groups/members/agreement, scores and leave-one-out, stability, micro at two levels,
-    items per tool and level, ladder, coverage, conformance; with mutants the E4 tables mutants.csv,
-    mutation.csv and mutation-rates.csv, the agreement tables on the originals only) and _ANALYSIS/_SUMMARY.md with
+    items per tool and level, ladder, coverage, conformance; with mutants the RQ4 tables mutants.csv,
+    mutation.csv, mutation-rates.csv, mutation-scores.csv and bridge-run<k>.csv,
+    the agreement tables on the originals only) and _ANALYSIS/_SUMMARY.md with
     Markdown tables."""
     exp_dir = _experiment(name)
     path = run_report(

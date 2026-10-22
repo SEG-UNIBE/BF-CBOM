@@ -1,7 +1,7 @@
 # Engine / rule-set families of the CBOM generators (BF-CBOM 2.0, Phase 2 "engine independence").
 #
 # Tools sharing their detection logic (an engine, or a rule set) have one `voter_group` and count as one voter in
-# the agreement-based scoring (RQ4; default: the tool itself; evidence per group in analysis/README.md "Voter
+# the agreement-based rates (RQ3; default: the tool itself; evidence per group in analysis/README.md "Voter
 # groups"). `merge_group` names a coarser voter the sensitivity analysis can merge them into (`--merge-llm`: the LLM
 # workers, which share prompts and file selection, decided 2026-10-18); `engine_family` marks tools that share only a
 # pattern engine but run independently written rules (decided 2026-10-20 after the rule-overlap check): separate
@@ -10,10 +10,13 @@
 # worker assembles it, the LLM workers), whose validity measures us, not the tool (refinement 3); the format is read
 # from each document (bomFormat, specVersion). `languages` is the tool's declared
 # scope: a repo in another language is "not supported", never "failed" (pilot recommendation).
+#   A spec narrows a tool further by hand (`tool_languages:` in experiments/<spec>.yaml, e.g. after reading the
+#   bar-micro report); nothing here is derived from the bar exam.
 # `status`: integrated (worker exists) | candidate (passed the pilot's inclusion bar, worker pending)
 #          | blocked (needs access, see CLAUDE.md) | excluded (failed the bar; kept for RQ1/RQ2 only)
 #          | prepared (worker ready, but kept out of AVAILABLE_WORKERS and the specs until its source is public).
-# `role`: voter (default) | observer (decided 2026-10-19: tools that failed the pilot's inclusion bar are run and
+# `role`: voter (default) | observer (transitional until the bar-micro rerun; decided 2026-10-19: tools that
+#   failed the colleague's pilot bar are run and
 #   analysed like every tool, and the panel confirms their findings, but they never confirm another tool, never count
 #   in k, exclusivity or Dawid-Skene and are never ranked; `--observers-vote` makes them voters, the sensitivity check).
 # Pilot verdicts (2026-10-08, docs/pilot-2026-10-08/README.md): pass/borderline/fail per language.

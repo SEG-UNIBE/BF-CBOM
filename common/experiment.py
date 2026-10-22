@@ -99,21 +99,28 @@ MUTATION_STYLES = ("direct", "wrapper", "indirect")  # mutation/catalog.py:STYLE
 
 @dataclass
 class MutationSpec:
-    """A spec's `mutation:` block: every repo gets `per_repo` insertion mutants as variants (mutation/mutants.py)."""
+    """A spec's `mutation:` block: every repo gets `per_repo` planted calls and `decoys` planted decoys as variants
+    (mutation/mutants.py; `equal`: as many decoys as calls)."""
 
     per_repo: int = 10
     styles: list[str] = field(default_factory=lambda: list(MUTATION_STYLES))
     snippets: list[str] | None = None  # None: the whole catalog of the repo's language
     seed: int = 1
+    decoys: int | str = "equal"
+
+    @property
+    def n_decoys(self) -> int:
+        return self.per_repo if self.decoys == "equal" else int(self.decoys)
 
     def to_dict(self) -> dict:
-        return {"per_repo": self.per_repo, "styles": list(self.styles), "snippets": self.snippets, "seed": self.seed}
+        return {"per_repo": self.per_repo, "styles": list(self.styles), "snippets": self.snippets, "seed": self.seed,
+                "decoys": self.decoys}  # fmt: skip
 
 
 def _as_mutation_spec(item) -> MutationSpec:
     if not isinstance(item, dict):
-        raise ExperimentError("'mutation' must be a mapping (per_repo, styles, snippets, seed)")
-    unknown = set(item) - {"per_repo", "styles", "snippets", "seed"}
+        raise ExperimentError("'mutation' must be a mapping (per_repo, styles, snippets, seed, decoys)")
+    unknown = set(item) - {"per_repo", "styles", "snippets", "seed", "decoys"}
     if unknown:
         raise ExperimentError(f"unknown 'mutation' keys: {sorted(unknown)}")
     styles = [str(s) for s in item.get("styles") or MUTATION_STYLES]
@@ -129,7 +136,13 @@ def _as_mutation_spec(item) -> MutationSpec:
     per_repo = int(item.get("per_repo", 10))
     if per_repo < 1:
         raise ExperimentError("mutation 'per_repo' must be >= 1")
-    return MutationSpec(per_repo=per_repo, styles=styles, snippets=snippets, seed=int(item.get("seed", 1)))
+    decoys = item.get("decoys", "equal")
+    if decoys != "equal":
+        if isinstance(decoys, bool) or not isinstance(decoys, int) or decoys < 0:
+            raise ExperimentError("mutation 'decoys' must be 'equal' or an integer >= 0")
+    return MutationSpec(
+        per_repo=per_repo, styles=styles, snippets=snippets, seed=int(item.get("seed", 1)), decoys=decoys
+    )
 
 
 @dataclass
@@ -140,12 +153,16 @@ class ExperimentSpec:
     repetitions: int = 1
     description: str = ""
     mutation: MutationSpec | None = None
+    tool_languages: dict[str, list[str]] = field(default_factory=dict)  # tool -> the languages it runs in here
 
     @property
     def expected_jobs(self) -> int:
         """Planned runs; with a `mutation:` block an upper bound (a repo with few hosts gets fewer mutants, the exact
         count is in mutants.json: `expected_jobs`)."""
-        per_repo = (lambda r: 1 + self.mutation.per_repo) if self.mutation else (lambda r: len(r.variants))
+        if self.mutation:
+            per_repo = lambda r: 1 + self.mutation.per_repo + self.mutation.n_decoys  # noqa: E731
+        else:
+            per_repo = lambda r: len(r.variants)  # noqa: E731
         return sum(per_repo(r) for r in self.repos) * len(self.tools) * self.repetitions
 
 
@@ -227,6 +244,7 @@ def spec_from_dict(data: dict, *, base_dir: Path | None = None) -> ExperimentSpe
             raise ExperimentError(
                 f"'variants' cannot be combined with 'mutation' (the mutants are generated): {listed}"
             )
+    tool_languages = _as_tool_languages(data.get("tool_languages"), tools)
     return ExperimentSpec(
         name=name,
         tools=tools,
@@ -234,7 +252,26 @@ def spec_from_dict(data: dict, *, base_dir: Path | None = None) -> ExperimentSpe
         repetitions=repetitions,
         description=str(data.get("description") or ""),
         mutation=mutation,
+        tool_languages=tool_languages,
     )
+
+
+def _as_tool_languages(item, tools: list[str]) -> dict[str, list[str]]:
+    """A spec's optional `tool_languages:` {tool: [languages]}: the languages a listed tool runs in within this
+    experiment, a hand edit (after reading the bar-micro report, say); tools not named run wherever
+    common/tools.yaml declares support. No code derives it from anything."""
+    if item is None:
+        return {}
+    if not isinstance(item, dict):
+        raise ExperimentError("'tool_languages' must be a mapping of tool -> list of languages")
+    out: dict[str, list[str]] = {}
+    for tool, languages in item.items():
+        if str(tool) not in tools:
+            raise ExperimentError(f"'tool_languages' names {tool!r}, which is not in 'tools'")
+        if not isinstance(languages, list) or not languages or not all(isinstance(x, str) for x in languages):
+            raise ExperimentError(f"'tool_languages' for {tool!r} must be a non-empty list of languages")
+        out[str(tool)] = [str(x) for x in languages]
+    return out
 
 
 # ----- paths -----
@@ -709,7 +746,8 @@ UNSUPPORTED = "unsupported"
 def mark_unsupported(
     spec: ExperimentSpec, snapshots: list[Snapshot], exp_dir: Path, *, registry: dict[str, dict] | None = None
 ) -> list[tuple[str, str]]:
-    """Record (tool, repo) pairs outside the tool's language scope (common/tools.yaml `languages`).
+    """Record (tool, repo) pairs outside the tool's language scope (common/tools.yaml `languages`, narrowed further
+    by the spec's `tool_languages` for that tool, if given).
 
     Writes a `run<k>.meta.json` with status `unsupported` and no CBOM for every repetition that has no stored
     run yet, so `plan_jobs` skips them (also with --retry-failed) and `summarize` counts them. Returns the
@@ -719,7 +757,7 @@ def mark_unsupported(
     recorded: list[tuple[str, str]] = []
     for snap in snapshots:
         for tool in spec.tools:
-            if tool_supports(tool, snap.language, registry):
+            if tool_supports(tool, snap.language, registry, only=spec.tool_languages.get(tool)):
                 continue
             written = 0
             for k in range(1, spec.repetitions + 1):
@@ -799,6 +837,7 @@ def spec_to_dict(spec: ExperimentSpec) -> dict:
         "description": spec.description,
         "tools": list(spec.tools),
         "repetitions": spec.repetitions,
+        **({"tool_languages": {t: list(ls) for t, ls in spec.tool_languages.items()}} if spec.tool_languages else {}),
         "repos": [{k: v for k, v in asdict(r).items() if v not in (None, [], "")} for r in spec.repos],
         **({"mutation": spec.mutation.to_dict()} if spec.mutation is not None else {}),
     }

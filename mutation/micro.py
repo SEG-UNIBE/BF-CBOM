@@ -2,8 +2,9 @@
 
 `python -m mutation.micro` writes the checked-in project files and `experiments/corpus/micro/ground_truth.yaml`.
 `tests/test_micro_projects.py` fails when they drift from what this module generates. One function per expected item
-(a catalog snippet with its `expected` record) and per decoy (code that names or resembles cryptography without using
-it), with neutral names (`step01` ...) so that no signature or call names an algorithm, and `main` calling them all.
+(a catalog snippet with its `expected` record) and per decoy (the catalog's `decoys:`, code that names or resembles
+cryptography without using it; the mutation harness plants the same ones), with neutral names (`step01` ...) so that
+no signature or call names an algorithm, and `main` calling them all.
 An item's lines are its function's body (decided 2026-10-22: a tool finds the use wherever in it it points), so the
 items never share a line and no record can land on a neighbour's.
 """
@@ -21,7 +22,7 @@ from .catalog import Catalog, Snippet, load_catalog, placeholders, render
 ROOT = Path(__file__).resolve().parents[1]
 MICRO_DIR = ROOT / "experiments" / "corpus" / "micro"
 TRUTH_FILE = MICRO_DIR / "ground_truth.yaml"
-TRUTH_VERSION = "2026-10-22.1"
+TRUTH_VERSION = "2026-10-22.2"
 LANGUAGES = ("java", "python", "go")
 STYLE = {"ecdsa-p256-sign": "indirect"}  # every other item is `direct`; one call takes its algorithm from a variable
 SKIPPED = {"tls13-context"}  # a protocol: the micro scorer scores algorithm records
@@ -41,55 +42,10 @@ TRUTH_HEADER = """\
 # keygen item (`keygen: true`) a key record (related-crypto-material) of that group counts too. `accepted`: groups
 # whose records on a line are neither a hit nor a false site: a sub-use of the item (the snippet's `also` identities
 # and its digest) on its lines, and the items' groups on the import lines of their APIs. `related`: the line that holds
-# the algorithm in a variable (the indirect style). `decoys`: code
-# that names or resembles cryptography without using it; any crypto record there is a false positive. The inclusion
+# the algorithm in a variable (the indirect style). `decoys`: the catalog's decoys, code that names or resembles
+# cryptography without using it; any crypto record there is a false positive. The inclusion
 # bar: half of the items, lenient. AI-made like the catalogs; on the human-review list before paper use.
 """
-
-
-@dataclass(frozen=True)
-class Decoy:
-    id: str
-    what: str
-    imports: tuple[str, ...]
-    body: str  # a template without placeholders: four spaces are one indentation level
-
-
-DECOYS = {
-    "python": (
-        Decoy("comment", "a comment naming algorithms", (),
-              "# TODO: replace the MD5 and DES fallbacks with SHA-256 and AES\ntotal = sum(range(10))\nreturn total"),
-        Decoy("log-message", "a log message naming algorithms", (),
-              'print("RSA and ECDSA keys are rotated nightly")'),
-        Decoy("crc32", "a non-cryptographic checksum (CRC32)", ("import zlib",),
-              'checksum = zlib.crc32(b"data")\nreturn checksum'),
-        Decoy("base64", "an encoding (Base64)", ("import base64",),
-              'encoded = base64.b64encode(b"data")\nreturn encoded'),
-    ),
-    "java": (
-        Decoy("comment", "a comment naming algorithms", (),
-              "// TODO: replace the MD5 and DES fallbacks with SHA-256 and AES\nint total = 0;\n"
-              "for (int i = 0; i < 10; i++) {\n    total += i;\n}\nSystem.out.println(total);"),
-        Decoy("log-message", "a log message naming algorithms", (),
-              'System.out.println("RSA and ECDSA keys are rotated nightly");'),
-        Decoy("crc32", "a non-cryptographic checksum (CRC32)", ("java.util.zip.CRC32",),
-              'CRC32 crc = new CRC32();\ncrc.update("data".getBytes());\nSystem.out.println(crc.getValue());'),
-        Decoy("base64", "an encoding (Base64)", ("java.util.Base64",),
-              'String encoded = Base64.getEncoder().encodeToString("data".getBytes());\n'
-              "System.out.println(encoded);"),
-    ),
-    "go": (
-        Decoy("comment", "a comment naming algorithms", ("fmt",),
-              "// TODO: replace the MD5 and DES fallbacks with SHA-256 and AES\ntotal := 0\n"
-              "for i := 0; i < 10; i++ {\n    total += i\n}\nfmt.Println(total)"),
-        Decoy("log-message", "a log message naming algorithms", ("fmt",),
-              'fmt.Println("RSA and ECDSA keys are rotated nightly")'),
-        Decoy("crc32", "a non-cryptographic checksum (CRC32)", ("fmt", "hash/crc32"),
-              'checksum := crc32.ChecksumIEEE([]byte("data"))\nfmt.Println(checksum)'),
-        Decoy("base64", "an encoding (Base64)", ("encoding/base64", "fmt"),
-              'encoded := base64.StdEncoding.EncodeToString([]byte("data"))\nfmt.Println(encoded)'),
-    ),
-}  # fmt: skip
 
 
 @dataclass
@@ -100,7 +56,7 @@ class Step:
     imports: tuple[str, ...]
     body: list[str]
     snippet: Snippet | None = None
-    decoy: Decoy | None = None
+    decoy: Snippet | None = None  # a catalog decoy (`Snippet.decoy`)
     call: int | None = None  # index into `body` of the line naming the algorithm
     related: list[int] = field(default_factory=list)
     first: int = 0  # 1-based line of the body's first line in the file, set when the file is assembled
@@ -116,10 +72,14 @@ class Project:
 def _steps(language: str, catalog: Catalog) -> list[Step]:
     unit = "\t" if language == "go" else "    "
 
-    def decoy(d: Decoy) -> Step:
-        return Step("", d.imports, render(d.body, {}, unit=unit).lines, decoy=d)
+    def decoy(d: Snippet) -> Step:
+        form = d.forms[0]
+        template = form.templates["direct"]
+        return Step(
+            "", form.imports, render(template, {p: p for p in placeholders(template)}, unit=unit).lines, decoy=d
+        )
 
-    decoys = list(DECOYS[language])
+    decoys = list(catalog.decoys)
     steps: list[Step] = []
     for i, snippet in enumerate((s for s in catalog.snippets if s.id not in SKIPPED), start=1):
         form = snippet.forms[FORM]

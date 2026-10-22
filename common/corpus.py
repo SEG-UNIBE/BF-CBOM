@@ -8,7 +8,7 @@ Exclusions (CLAUDE.md refinement 11): name patterns (CBOM tooling, benchmarks), 
 `experiments/corpus/exclusions.yaml` (the generators' own repos and test suites, with a reason each), and the repos
 a tool was tuned on (`tailored_on` in common/tools.yaml, refinement 13). The crypto pre-filter greps first-party
 source only (no test, vendor, example or documentation paths). Every exclusion is recorded with its reason.
-`prune_corpus` drops repos where a tool timed out in an earlier experiment (E0), with the reason.
+`prune_corpus` drops repos where a tool timed out in an earlier experiment (the stability run), with the reason.
 
 Repo size cap: the git server serves full clones from a container limited to GITSERVER_MEMORY (Makefile), so the
 corpus never samples repos above CORPUS_MAX_REPO_SIZE_MB (default GITSERVER_MEMORY / SIZE_CAP_RATIO; GitHub's `size`
@@ -325,8 +325,8 @@ def build_corpus(
 
 
 def prune_corpus(corpus: dict, exp_dir: Path, *, statuses: tuple[str, ...] = ("timeout",)) -> dict:
-    """The corpus without the repos where some tool's run in `exp_dir` ended in one of `statuses` (E0 timeouts,
-    refinement 11); the dropped repos are listed under `pruned` with the tools and statuses."""
+    """The corpus without the repos where some tool's run in `exp_dir` ended in one of `statuses` (the stability
+    run's timeouts, refinement 11); the dropped repos are listed under `pruned` with the tools and statuses."""
     hits: dict[str, set[str]] = {}
     for meta_path in sorted(Path(exp_dir).glob("*/*/*/run*.meta.json")):
         meta = json.loads(meta_path.read_text(encoding="utf-8"))

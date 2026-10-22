@@ -1,14 +1,16 @@
-"""E4 detection (analysis/mutation.py) on synthetic records, the rates, and the report on a micro-java mutant."""
+"""RQ4 detection (analysis/mutation.py) on synthetic records, the rates, and the report on a micro-java mutant."""
 
 import copy
 import csv
 import json
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from analysis import mutation as mu
 from analysis.normalize.record import NormRecord
+from analysis.score import spearman
 from common.experiment import MutationSpec, RepoSpec, ensure_mirror, publish_fixture, repo_dir_name, save_mutants
 from mutation.mutants import ensure_mutants
 
@@ -60,6 +62,70 @@ def test_span_site_and_group_are_told_apart():
     assert elsewhere["found_repo"] and not elsewhere["found_file"]
     unlocated = mu.evaluate(MUTANT, {1: [_rec("SHA-256", None, None)]}, {1: [ORIGINAL[1]]})
     assert unlocated["found_repo"] and not unlocated["found_site"]  # a location-less tool: judged at repo level
+
+
+DECOY = {
+    "id": "ins-comment-direct-abcdef",
+    "snippet": "comment",
+    "style": "direct",
+    "file": "a/App.java",
+    "call_line": 20,
+    "spans": [{"kind": "snippet", "start": 20, "end": 22}],
+    "shifts": [[19, 3]],
+    "expected": {},
+    "also": [],
+    "decoy": True,
+}
+
+
+def test_a_decoy_is_a_false_positive_only_when_a_new_crypto_record_lands_on_it():
+    moved = _rec("SHA-256", "a/App.java", 33)  # the original's line 30 after the three inserted lines
+    quiet = mu.evaluate(DECOY, {1: [moved]}, {1: [_rec("SHA-256", "a/App.java", 30)]})
+    assert quiet["false_positive"] is False and quiet["found_site"] is None and quiet["unit"] is None
+    assert quiet["found_repo"] is None and quiet["key_size"] is None and not quiet["masked"]
+    hit = mu.evaluate(DECOY, {1: [_rec("MD5", "a/App.java", 21)]}, {1: []})
+    assert hit["false_positive"] is True and hit["extra_units"] == ["MD5"]
+    assert (
+        mu.evaluate(DECOY, {1: [_rec("MD5", "a/App.java", 21, asset_type="library")]}, {1: []})["false_positive"]
+        is False
+    )
+    assert mu.evaluate(DECOY, {1: [_rec("MD5", "a/App.java", 40)]}, {1: []})["false_positive"] is False  # elsewhere
+    assert mu.evaluate(MUTANT, {1: []}, {1: []})["false_positive"] is None  # a planted call is never one
+
+
+def test_scores_pool_calls_and_decoys_and_the_bridge_correlates_them_with_confirmation():
+    def row(repo, kind, style, tool, **v):
+        return {"repo": repo, "language": "java", "tool": tool, "voter_group": tool, "role": "voter",
+                "status": "ok", "kind": kind, "style": style, **v}  # fmt: skip
+
+    rows = []
+    for tool, found, hits in (("good", (1, 1, 1, 1), (0, 0, 0, 0)), ("noisy", (1, 1, 1, 0), (1, 1, 0, 0)),
+                              ("blind", (0, 0, 0, 0), (0, 0, 0, 0))):  # fmt: skip
+        for i, f in enumerate(found):
+            style = "direct" if i % 2 else "indirect"
+            rows.append(row(f"r{i}", "call", style, tool, found_site=bool(f), found_group=bool(f)))
+        for i, h in enumerate(hits):
+            rows.append(row(f"r{i}", "decoy", "direct", tool, false_positive=bool(h)))
+    scores = {(s["tool"], s["style"]): s for s in mu.score_rows(rows, samples=20)}
+    good, noisy, blind = scores[("good", "all")], scores[("noisy", "all")], scores[("blind", "all")]
+    assert (good["calls"], good["found_site"], good["decoys"], good["decoys_hit"]) == (4, 4, 4, 0)
+    assert (good["recall_site"], good["precision"], good["f1"]) == (1.0, 1.0, 1.0)
+    assert (noisy["recall_site"], noisy["precision"]) == (0.75, 0.6)
+    assert noisy["f1"] == pytest.approx(2 * 0.6 * 0.75 / 1.35, abs=1e-4)
+    assert blind["recall_site"] == 0.0 and blind["precision"] is None and blind["f1"] == 0.0
+    assert scores[("good", "direct")]["decoys"] == 4  # the decoys are style-less: they count for every style
+    assert not good["supported"] and good["f1_low"] is None  # 4 repositories, 4 calls: below the support rule
+    without = mu.score_rows([r for r in rows if r["kind"] == "call"], samples=20)
+    assert all(s["precision"] is None and s["f1"] is None for s in without)  # no decoys: recall only
+    bridge = mu.bridge_rows(
+        {("good", "java"): 0.9, ("noisy", "java"): 0.7, ("blind", "java"): 0.2}, list(scores.values())
+    )
+    summary = {r["language"]: r for r in bridge if r["tool"] == "all"}
+    assert (summary["java"]["n"], summary["java"]["spearman"], summary["java"]["kendall_tau"]) == (3, 1.0, 1.0)
+    assert summary["all"]["n"] == 3 and len([r for r in bridge if r["tool"] != "all"]) == 6
+    assert spearman({"a": 1, "b": 2, "c": 3}, {"a": 3, "b": 2, "c": 1}) == -1.0
+    assert spearman({"a": 1, "b": 1, "c": 3}, {"a": 1, "b": 2, "c": 3}) == pytest.approx(0.866, abs=1e-3)  # a tie
+    assert spearman({"a": 1, "b": 2}, {"a": 1, "b": 2}) is None
 
 
 def test_parameters_are_judged_on_the_inserted_lines():
@@ -121,8 +187,9 @@ def test_report_judges_mutants_and_keeps_them_out_of_the_agreement_tables(tmp_pa
     ensure_mirror(repo, commit, mirror_dir=mirror)
     params = MutationSpec(per_repo=1, styles=["direct"], snippets=["sha-1"])
     manifest: dict = {}
-    (mid,) = ensure_mutants(repo, commit, params, manifest, mirror_dir=mirror, log=lambda m: None)
-    m = manifest["repos"][repo.full_name]["mutants"][0]
+    mid, did = ensure_mutants(repo, commit, params, manifest, mirror_dir=mirror, log=lambda m: None)
+    m, md = manifest["repos"][repo.full_name]["mutants"]  # the planted call, then the planted decoy
+    assert not m["decoy"] and md["decoy"] and md["expected"] == {}
     exp = tmp_path / "e4"
     exp.mkdir()
     (exp / "_experiment.yaml").write_text(
@@ -138,15 +205,25 @@ def test_report_judges_mutants_and_keeps_them_out_of_the_agreement_tables(tmp_pa
         "evidence": {"occurrences": [{"location": m["file"], "line": m["call_line"], "offset": 30}]},
         "cryptoProperties": {"assetType": "algorithm", "algorithmProperties": {"primitive": "hash"}},
     })  # fmt: skip
-    cboms = {("original", "cbomkit"): original, (mid, "cbomkit"): found,
-             ("original", "cbomkit-jar"): original, (mid, "cbomkit-jar"): shifted}  # fmt: skip
+    quiet = _shifted(original, md["file"], md["shifts"])  # the decoy mutant: the original's findings, moved
+    fooled = copy.deepcopy(quiet)
+    fooled["components"].append({
+        "type": "cryptographic-asset", "bom-ref": "md5-decoy", "name": "MD5",
+        "evidence": {"occurrences": [{"location": md["file"], "line": md["call_line"], "offset": 3}]},
+        "cryptoProperties": {"assetType": "algorithm", "algorithmProperties": {"primitive": "hash"}},
+    })  # fmt: skip
+    cboms = {
+        ("original", "cbomkit"): original, (mid, "cbomkit"): found, (did, "cbomkit"): quiet,
+        ("original", "cbomkit-jar"): original, (mid, "cbomkit-jar"): shifted, (did, "cbomkit-jar"): fooled,
+    }  # fmt: skip
+    commits = {mid: m["commit"], did: md["commit"]}
     snapshot = repo_dir_name(repo.full_name, commit)
     for (variant, tool), cbom in cboms.items():
         d = exp / snapshot / variant / tool
         d.mkdir(parents=True)
         (d / "run1.json").write_text(json.dumps(cbom))
         meta = {"worker": tool, "run_index": 1, "variant": variant, "status": "ok", "base_commit": commit,
-                "variant_commit": m["commit"] if variant == mid else commit, "duration_sec": 1.0}  # fmt: skip
+                "variant_commit": commits.get(variant, commit), "duration_sec": 1.0}  # fmt: skip
         (d / "run1.meta.json").write_text(json.dumps(meta))
     monkeypatch.setattr(analysis_cmd, "experiment_dir", lambda name: tmp_path / name)
     result = CliRunner().invoke(analysis_cmd.analysis_app, ["report", "e4"])
@@ -157,14 +234,29 @@ def test_report_judges_mutants_and_keeps_them_out_of_the_agreement_tables(tmp_pa
         with (out / name).open(encoding="utf-8", newline="") as fh:
             return list(csv.DictReader(fh))
 
-    judged = {r["tool"]: r for r in rows("mutation.csv")}
+    judged = {r["tool"]: r for r in rows("mutation.csv") if r["variant"] == mid}
     assert judged["cbomkit"]["found_site"] == "true" and judged["cbomkit"]["found_repo"] == "true"
     assert judged["cbomkit-jar"]["found_site"] == "false" and judged["cbomkit-jar"]["found_repo"] == "false"
     assert judged["cbomkit"]["extra_units"] == "" and judged["cbomkit"]["lost_sites"] == "0"
-    assert {r["variant"] for r in rows("records-run1.csv")} == {"original"}  # E3 tables: originals only
+    assert judged["cbomkit"]["kind"] == "call" and judged["cbomkit"]["false_positive"] == ""
+    decoy = {r["tool"]: r for r in rows("mutation.csv") if r["variant"] == did}
+    assert decoy["cbomkit"]["kind"] == "decoy" and decoy["cbomkit"]["false_positive"] == "false"
+    assert decoy["cbomkit-jar"]["false_positive"] == "true" and decoy["cbomkit-jar"]["found_site"] == ""
+    scores = {r["tool"]: r for r in rows("mutation-scores.csv") if r["style"] == "all"}
+    assert (scores["cbomkit"]["calls"], scores["cbomkit"]["found_site"], scores["cbomkit"]["decoys"]) == ("1", "1", "1")
+    assert (scores["cbomkit"]["precision"], scores["cbomkit"]["f1"]) == ("1.0", "1.0")
+    assert (scores["cbomkit-jar"]["decoys_hit"], scores["cbomkit-jar"]["precision"], scores["cbomkit-jar"]["f1"]) == (
+        "1",
+        "0.0",
+        "0.0",
+    )
+    bridge = {(r["language"], r["tool"]): r for r in rows("bridge-run1.csv")}
+    assert ("Java", "cbomkit") in bridge and bridge[("Java", "all")]["n"] == "2"  # two cells: no coefficient
+    assert {r["variant"] for r in rows("records-run1.csv")} == {"original"}  # the agreement tables: originals only
     assert {r["variant"] for r in rows("items-run1.csv")} == {"original"}
-    assert [r["variant"] for r in rows("mutants.csv")] == [mid]
-    assert len({r["variant"] for r in rows("runs.csv")}) == 2  # runs.csv lists every stored run
+    assert [(r["variant"], r["kind"]) for r in rows("mutants.csv")] == [(mid, "call"), (did, "decoy")]
+    assert len({r["variant"] for r in rows("runs.csv")}) == 3  # runs.csv lists every stored run
     assert (exp / snapshot / mid / "cbomkit" / "run1.norm.json").exists()  # mutants are normalised too
     summary = (out / "_SUMMARY.md").read_text()
-    assert "## E4: insertion mutants" in summary and "```diff" in summary and f"`{mid}`" in summary
+    assert "## RQ4 Effectiveness" in summary and "```diff" in summary and f"`{mid}`" in summary
+    assert "### Recall, precision and F1 on the planted items" in summary and "the bridge to RQ3" in summary

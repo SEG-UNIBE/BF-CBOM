@@ -7,8 +7,9 @@ where missing (e.g. a fresh VM), rebuilt from the recorded inserts with the same
 file with the experiment folder, and the regenerated mutants are the same ones (same seed, commit and catalog
 version). A new repo gets `per_repo` insertion mutants: (snippet, style) pairs drawn round-robin over the styles from
 a seeded shuffle, each into a host from a file not used yet where possible, among the snippets whose library the
-project already declares (dependency files are never edited, decided 2026-10-20). Every mutant is one commit on the
-pinned commit: one file changed, whole lines inserted.
+project already declares (dependency files are never edited, decided 2026-10-20), then `decoys` decoy mutants (the
+catalog's known negatives, `direct` only, round-robin over the kinds; `equal`: as many as calls, decided 2026-10-22).
+Every mutant is one commit on the pinned commit: one file changed, whole lines inserted.
 """
 
 from __future__ import annotations
@@ -164,6 +165,7 @@ def _entry(m: Mutation, mid: str, catalog: Catalog, mode: str, sha: str, patch: 
         "qualified": m.qualified,
         "expected": dict(snippet.expected),
         "also": list(snippet.also),
+        "decoy": snippet.decoy,
         "commit": sha,
         "patch": patch,
     }
@@ -201,15 +203,31 @@ def generate(bare: Path, repo: RepoSpec, commit: str, params: MutationSpec, *, l
         if made is None:
             entry["notes"].append(f"{len(entry['mutants'])} of {params.per_repo} mutants: no further pair fits a host")
             break
-        mid = mutant_id(commit, catalog.version, made.snippet, made.style, made.path, made.host.line)
-        mode = mutator.tree.blobs[made.path].mode
-        sha = write_branch(bare, commit, made.path, mode, made.text, mid)
-        patch = _git(bare, "diff", commit, sha) + "\n"
-        entry["mutants"].append(_entry(made, mid, catalog, mode, sha, patch))
+        _commit(bare, commit, mutator, catalog, made, entry, log)
         used_snippets[made.snippet] += 1
         used_files.add(made.path)
-        log(f"    mutant {mid}: {made.path}:{made.call_line} in {made.host.name}()")
+    calls = len(entry["mutants"])
+    wanted_decoys = calls if params.decoys == "equal" else int(params.decoys)
+    kinds = [d.id for d in catalog.decoys]
+    rng.shuffle(kinds)
+    for i in range(wanted_decoys if kinds else 0):
+        made = mutator.try_pair(kinds[i % len(kinds)], "direct", used_files, rng)
+        if made is None:
+            entry["notes"].append(f"{len(entry['mutants']) - calls} of {wanted_decoys} decoys: no host fits")
+            break
+        _commit(bare, commit, mutator, catalog, made, entry, log)
+        used_files.add(made.path)
     return entry
+
+
+def _commit(bare: Path, commit: str, mutator: RepoMutator, catalog: Catalog, made: Mutation, entry: dict, log) -> None:
+    mid = mutant_id(commit, catalog.version, made.snippet, made.style, made.path, made.host.line)
+    mode = mutator.tree.blobs[made.path].mode
+    sha = write_branch(bare, commit, made.path, mode, made.text, mid)
+    patch = _git(bare, "diff", commit, sha) + "\n"
+    entry["mutants"].append(_entry(made, mid, catalog, mode, sha, patch))
+    what = "decoy" if catalog.get(made.snippet).decoy else "mutant"
+    log(f"    {what} {mid}: {made.path}:{made.call_line} in {made.host.name}()")
 
 
 def rebuild(bare: Path, base: str, mutant: dict) -> str:

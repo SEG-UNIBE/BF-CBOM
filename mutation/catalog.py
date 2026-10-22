@@ -4,6 +4,8 @@ A snippet has one or more forms (Go's PBKDF2: `crypto/pbkdf2` or `golang.org/x/c
 imports, what the project must already declare (`requires`) and the `direct` and `indirect` templates. The `wrapper`
 style is derived from `direct` (mutation/insert.py). Templates are rendered by `render`: `$name` placeholders are
 resolved through a mapping, the trailing markers `@call` / `@related` are stripped and their line indices returned.
+A catalog's `decoys:` (code that names or resembles cryptography without using it) load as snippets with `decoy`
+set, no expected record and one `direct` form; they are kept apart in `Catalog.decoys` and share `by_id`.
 """
 
 from __future__ import annotations
@@ -44,6 +46,8 @@ class Snippet:
     helper: str
     forms: tuple[Form, ...]
     also: tuple[str, ...] = ()  # identities the snippet necessarily contains besides `expected`
+    decoy: bool = False  # a known negative: no expected record, a tool that reports it has a false positive
+    what: str = ""  # a decoy's description
 
     @property
     def unit(self) -> str | None:
@@ -62,6 +66,7 @@ class Catalog:
     wrap: str | None = None  # Java: every body goes into this (try/catch), in the host and in a wrapper helper
     wrap_imports: tuple[str, ...] = ()
     scope: str | None = None  # Go: a body inserted into a host goes into this block (its locals stay its own)
+    decoys: tuple[Snippet, ...] = ()
     path: str = ""
     by_id: dict = field(default_factory=dict, compare=False, repr=False)
 
@@ -106,7 +111,28 @@ def load_catalog(language: str, directory: Path = CATALOG_DIR) -> Catalog:
                 also=tuple(str(a) for a in item.get("also") or ()),
             )
         )
-    ids = [s.id for s in snippets]
+    decoys = []
+    for item in data.get("decoys") or []:
+        did = str(item["id"])
+        if not item.get("direct"):
+            raise CatalogError(f"{path.name}:{did}: a decoy needs a `direct` body")
+        form = Form(
+            imports=tuple(str(i) for i in item.get("imports") or ()),
+            requires={},
+            templates={"direct": item["direct"], "indirect": None},
+        )
+        decoys.append(
+            Snippet(
+                id=did,
+                language=language,
+                expected={},
+                helper="",
+                forms=(form,),
+                decoy=True,
+                what=str(item.get("what") or ""),
+            )  # fmt: skip
+        )
+    ids = [s.id for s in (*snippets, *decoys)]
     if len(ids) != len(set(ids)):
         raise CatalogError(f"{path}: duplicate snippet ids")
     return Catalog(
@@ -116,8 +142,9 @@ def load_catalog(language: str, directory: Path = CATALOG_DIR) -> Catalog:
         wrap=data.get("wrap"),
         wrap_imports=tuple(str(i) for i in data.get("wrap_imports") or ()),
         scope=data.get("scope"),
+        decoys=tuple(decoys),
         path=str(path),
-        by_id={s.id: s for s in snippets},
+        by_id={s.id: s for s in (*snippets, *decoys)},
     )
 
 

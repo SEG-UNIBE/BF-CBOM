@@ -152,6 +152,8 @@ ground truth caused them, not the tools.
 - **Not comparable:** the micro numbers up to 2026-10-21 (`micro_2026-10-17` in `common/tools.yaml`) are on the old
   projects. e0-micro reruns.
 
+**Decoys moved into the catalogs (2026-10-22, later the same day).** The four decoy kinds are now `decoys:` entries of `mutation/catalog/<language>.yaml`, the one source for the micro projects and for the mutation harness, which plants them next to the calls (`decoys: equal` in a spec's mutation block) as known negatives for RQ4's precision. Their bodies took placeholders for locals and lost the `return` statements (a decoy inserted before a host's first statement must not end the host); the Java and Go micro files are unchanged, the Python one and the ground truth were regenerated (ground truth 2026-10-22.2, catalogs 2026-10-22.1).
+
 ## Normaliser on e1-pilot-corpus (2026-10-16)
 116 ok CBOMs of 11 tools, about 41k records, 2 s.
 - Algorithm records with a tool-reported family: 87-100 % per tool (CryptobomForge 7 %: mostly `UNKNOWN`).

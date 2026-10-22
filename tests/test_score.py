@@ -127,6 +127,20 @@ def test_dawid_skene_recovers_a_reliable_and_an_unreliable_voter():
     assert post_real > 0.9 and post_fake < 0.3 and 0 < ds["iterations"] <= 50
 
 
+def test_majority_coverage_is_the_share_of_the_majority_items_a_tool_reports():
+    voter_of = {"a": "a", "b": "b", "c": "c"}
+    obs = sc.Observations(level="L4", voter_of=voter_of)
+    obs.snapshots, obs.tools, obs.ran = {"s", "t"}, {"a", "b", "c"}, {"s": {"a", "b", "c"}, "t": {"a", "b"}}
+    obs.sets[("s", "algorithm")] = [{"a": {"AES"}, "b": {"AES"}}, {"a": {"RSA"}}, {"b": {"MD5"}, "c": {"MD5"}}]
+    obs.sets[("t", "algorithm")] = [{"a": {"AES"}}]  # a majority of the two voters that ran: AES has one of two
+    cov = sc.majority_coverage(obs, "algorithm")
+    assert cov["a"] == [(1, 2), (1, 1)] and cov["b"] == [(2, 2), (0, 1)] and cov["c"] == [(1, 2)]  # c ran in s only
+    assert sc.majority_coverage(obs, "location") == {"a": [], "b": [], "c": []}
+    rows, _ = sc.score_rows(obs, samples=0)
+    a = next(r for r in rows if r["dimension"] == "algorithm" and r["tool"] == "a")
+    assert (a["majority_items"], a["majority_covered"], a["coverage"]) == (3, 2, 0.75)  # mean of 1/2 and 1/1
+
+
 def test_score_rows_cover_every_dimension_with_items():
     rows, loo = sc.score_rows(_observations(), samples=20)
     dims = {r["dimension"] for r in rows}

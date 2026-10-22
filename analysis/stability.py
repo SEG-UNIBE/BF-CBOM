@@ -1,4 +1,4 @@
-"""Run-to-run stability of a tool (E0, CLAUDE.md Phase 5) and consensus sets for repeated runs.
+"""Run-to-run stability of a tool (the stability run, CLAUDE.md Phase 5) and consensus sets for repeated runs.
 
 For every (tool, snapshot, variant) with at least two stored ok runs: the Jaccard similarity of the item sets
 (identity at a ladder level, `analysis/levels.py`) between runs, the coefficient of variation of the record count,

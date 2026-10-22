@@ -241,16 +241,41 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     summary = (out / "_SUMMARY.md").read_text(encoding="utf-8")
     assert summary.startswith("# exp-tables: analysis summary (run 1)")
     assert info["voters"]["cipherradar"] == {"voter_group": "cipherradar", "role": "voter", "engine": "opengrep-rules"}
-    sections = ("## Runs", "## What the tools report", "## Micro projects", "## RQ1", "## Voter groups",
-                "## Agreement ladder", "## Matching (RQ3)", "## Scores")  # fmt: skip
+    sections = ("## Research questions", "## Runs", "## Bar exam: the micro projects", "## RQ1 Conformance",
+                "### Spec issues", "## RQ2 Volume", "### What the tools report, as written",
+                "### Units per tool", "### Traceable", "## RQ3 Agreement", "### Voter groups",
+                "### RQ3a: the L0-L4 deltas", "#### Spellings per identity", "### RQ3b: agreement at L4",
+                "### RQ3b: per-tool rates")  # fmt: skip
     for section in (*sections, "## Files"):
-        assert section in summary
+        assert section in summary, section
+    positions = [summary.index(s) for s in sections]
+    assert positions == sorted(positions)  # the sections come in the order of the questions
     assert "| cbomkit | pass 11 |" in summary and "| pqcheck | – |" in summary
     assert "Per repository (`units-repo-run<k>.csv`)" in summary
-    meaningful, algorithm = summary.index("### Meaningful"), summary.index("#### Asset type `algorithm`")
-    assert meaningful < algorithm < summary.index("### Traceable")
-    assert summary.index("## Voter groups") < summary.index("## Agreement ladder")
+    meaningful = summary.index("### Meaningful")
+    assert meaningful < summary.index("#### Asset type `algorithm`", meaningful) < summary.index("### Traceable")
+    assert "**RQ3 Agreement**" in summary[summary.index("## Files") :]  # files by question
     assert "| cbomkit | 11 / 11 · 11 |" in summary
+
+
+def test_spellings_per_identity_count_distinct_raw_values_per_tool():
+    from analysis.summary import _spellings
+
+    def row(tool, raw, mapped, status="mapped"):
+        return {"tool": tool, "raw": raw, "mapped": mapped, "status": status}
+
+    rows = [
+        row("a", "sha256", "algorithm=SHA-256;family=SHA-2"),
+        row("a", "SHA-256", "algorithm=SHA-256;family=SHA-2"),
+        row("a", "RSA", "family=RSA"),
+        row("b", "SHA256", "algorithm=SHA-256;family=SHA-2"),
+        row("b", "foo", "", status="unmapped"),
+        row("b", "['digest']", "functions=digest"),  # no identity: not a spelling of an algorithm
+    ]
+    text = "\n".join(_spellings(rows))
+    assert "| a | 2 | 3 | 1.50 | SHA-256 (2: SHA-256, sha256) |" in text
+    assert "| b | 1 | 1 | 1.00 | SHA-256 (1: SHA256) |" in text
+    assert "`SHA-256` 3 spellings by 2 tools" in text and _spellings([]) == []
 
 
 def test_export_runs_the_report_and_zips_the_summary(tmp_path, monkeypatch):

@@ -8,10 +8,10 @@
 # keygen item (`keygen: true`) a key record (related-crypto-material) of that group counts too. `accepted`: groups
 # whose records on a line are neither a hit nor a false site: a sub-use of the item (the snippet's `also` identities
 # and its digest) on its lines, and the items' groups on the import lines of their APIs. `related`: the line that holds
-# the algorithm in a variable (the indirect style). `decoys`: code
-# that names or resembles cryptography without using it; any crypto record there is a false positive. The inclusion
+# the algorithm in a variable (the indirect style). `decoys`: the catalog's decoys, code that names or resembles
+# cryptography without using it; any crypto record there is a false positive. The inclusion
 # bar: half of the items, lenient. AI-made like the catalogs; on the human-review list before paper use.
-version: 2026-10-22.1
+version: 2026-10-22.2
 assets:
 - {id: rsa-2048-keygen, group: RSA, keygen: true}
 - {id: ec-p256-keygen, group: EC, keygen: true}
@@ -33,7 +33,7 @@ projects:
     path: experiments/corpus/micro/java
     language: java
     file: src/main/java/app/CryptoDemo.java
-    catalog: 2026-10-20.1
+    catalog: 2026-10-22.1
     lines:
       rsa-2048-keygen: [21, 22, 23]
       ec-p256-keygen: [27, 28, 29]
@@ -116,7 +116,7 @@ projects:
     path: experiments/corpus/micro/python
     language: python
     file: app/crypto_demo.py
-    catalog: 2026-10-20.1
+    catalog: 2026-10-22.1
     lines:
       rsa-2048-keygen: [16, 17]
       ec-p256-keygen: [21, 22]
@@ -195,7 +195,7 @@ projects:
     path: experiments/corpus/micro/go
     language: go
     file: main.go
-    catalog: 2026-10-20.1
+    catalog: 2026-10-22.1
     lines:
       rsa-2048-keygen: [23, 24, 25, 26, 27]
       ec-p256-keygen: [31, 32, 33, 34, 35]

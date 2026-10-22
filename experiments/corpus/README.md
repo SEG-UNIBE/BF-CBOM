@@ -26,6 +26,21 @@ also reports strict and repository-level recall, precision, F1 and decoy hits. T
 are stated in the ground truth's header. The catalogs and decoys are AI-made and **not yet human-reviewed**;
 review them before paper use.
 
+**The four decoys** (`decoys:` in each catalog; one function each in the micro projects, and the mutation harness
+plants the same ones as mutants, `decoys` in a spec's `mutation:` block) are known negatives, each aimed at one way a
+tool can be fooled:
+
+| decoy | what it is | the trap |
+|---|---|---|
+| `comment` | a comment naming algorithms (`TODO: replace the MD5 and DES fallbacks with SHA-256 and AES`) above plain arithmetic | a tool that matches algorithm names without reading code reports MD5, DES, SHA-256 and AES |
+| `log-message` | a print or log statement whose string names algorithms (`"RSA and ECDSA keys are rotated nightly"`) | the same names inside a string literal, which some pattern tools scan and some skip |
+| `crc32` | a CRC32 checksum (`zlib.crc32`, `java.util.zip.CRC32`, `hash/crc32`) | a hash-like API that is no cryptography; a tool that takes every checksum or `hash` package for a crypto asset reports it |
+| `base64` | a Base64 encoding (`base64.b64encode`, `java.util.Base64`, `encoding/base64`) | an encoding that sits next to keys and ciphertext in real code but is no cipher; a tool that lists encoders with ciphers reports it |
+
+Any crypto record on a decoy's lines is a false positive with ground truth (the micro check's `decoys` column; a
+mutant's `false_positive` in `mutation.csv`). A non-cryptographic PRNG (`math/rand`, `random`) is deliberately not a
+decoy: the vocabulary counts PRNGs as findings, so a report there would not be a clean false positive.
+
 The earlier five-language, 11-item fixtures came from the pilot of 2026-10-08 and are not comparable with the new
 micro results. Their frozen ground truth remains in `tests/fixtures/pilot/ground_truth-2026-10-08.yaml` for tests
 against the historical CBOMs.

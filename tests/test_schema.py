@@ -1,4 +1,4 @@
-"""RQ1 (analysis/schema.py): whole-document validation, the meaningful shares and the traceability check."""
+"""RQ1 (analysis/schema.py): whole-document validation and the meaningful shares; RQ2: the traceability check."""
 
 import json
 import subprocess

@@ -1,4 +1,5 @@
-"""E4 (RQ4 validation): did a tool pick up the crypto call a mutant inserted (mutation/, mutants.json)?
+"""RQ4, planted calls and decoys: did a tool pick up the crypto call a mutant inserted, and did it stay quiet on a
+planted decoy (mutation/, mutants.json)?
 
 Each (mutant, tool) is compared with the same tool on the original snapshot. A mutant record counts only if it is new:
 not one of the original's findings moved by the inserted lines (`shifts`, same unit, file and moved line). With
@@ -17,7 +18,7 @@ the change (an LLM's memorised repository) is not credited.
   sides; read next to the tool's run-to-run instability on the original (stability.csv).
 Rates (`mutation-rates.csv`): per tool, language, style and dimension the mean of the per-repository detection rates
 (refinement 1), the pooled rate, and a bootstrap CI over repositories when the support suffices (score.py's
-thresholds). Comparing these with the E3 ranking is Phase 5.
+thresholds). The bridge to RQ3b's rates is `bridge_rows`.
 """
 
 from __future__ import annotations
@@ -39,15 +40,22 @@ DIMENSIONS = DETECTIONS + PARAMETERS
 BOOTSTRAP_SEED = 20261020
 
 MUTANTS_COLUMNS = [
-    "repo", "snapshot", "commit", "language", "variant", "variant_commit", "snippet", "style", "catalog_version",
-    "unit", "family", "expected", "also", "file", "call_line", "related_lines", "spans", "host", "host_line",
+    "repo", "snapshot", "commit", "language", "variant", "variant_commit", "snippet", "style", "kind",
+    "catalog_version", "unit", "family", "expected", "also", "file", "call_line", "related_lines", "spans", "host",
+    "host_line",
     "host_callers", "host_entry", "imports_added", "qualified", "patch",
 ]  # fmt: skip
 MUTATION_COLUMNS = [
-    "repo", "snapshot", "language", "variant", "snippet", "style", "tool", "voter_group", "role", "status",
-    "runs_mutant", "runs_original", "unit", "masked", *DETECTIONS, *PARAMETERS, "extra_units", "lost_units",
-    "extra_sites", "lost_sites", "new_records",
+    "repo", "snapshot", "language", "variant", "snippet", "style", "kind", "tool", "voter_group", "role", "status",
+    "runs_mutant", "runs_original", "unit", "masked", *DETECTIONS, "false_positive", *PARAMETERS, "extra_units",
+    "lost_units", "extra_sites", "lost_sites", "new_records",
 ]  # fmt: skip
+SCORE_COLUMNS = [
+    "tool", "voter_group", "role", "language", "style", "repos", "calls", "found_site", "found_group", "decoys",
+    "decoys_hit", "recall_site", "recall_low", "recall_high", "recall_group", "precision", "f1", "f1_low", "f1_high",
+    "supported",
+]  # fmt: skip
+BRIDGE_COLUMNS = ["language", "tool", "confirmation", "f1", "n", "spearman", "kendall_tau"]
 RATE_COLUMNS = [
     "tool", "voter_group", "role", "language", "style", "dimension", "repos", "mutants", "detected", "rate",
     "pooled", "ci_low", "ci_high", "supported",
@@ -132,6 +140,7 @@ def evaluate(
     """Detection and side effects of one tool on one mutant: `*_runs` map a run index to that run's records (only
     ok runs). Returns the MUTATION_COLUMNS values from `masked` on."""
     vocab = vocab or load_vocabulary()
+    decoy = bool(mutant.get("decoy"))
     want = expected_key(mutant)
     exp = mutant.get("expected") or {}
     group = vocab.group_of(exp.get("family")) if exp.get("family") else None
@@ -167,13 +176,21 @@ def evaluate(
                 continue
             values = {r.values.get(dim) for r in on_span if r.values.get(dim) is not None}
             run[dim] = (str(exp[dim]) in {str(v) for v in values}) if values else None
+        if decoy:  # a known negative: any new crypto record on its inserted lines is a false positive
+            run.update({k: None for k in (*DETECTIONS[1:], *PARAMETERS)})
+            run["false_positive"] = any(
+                r.file == path and r.values.get("asset_type") != "library" and any(_near(r, lo, hi) for lo, hi in spans)
+                for r in new
+            )
+        else:
+            run["false_positive"] = None
         per_run.append(run)
         mutant_unit_sets.append({k for r in recs if (k := _key(r, vocab))})
         mutant_site_sets.append(_sites(recs, vocab))
     masked = bool(want and want in original_units)
     out = {"unit": want, "masked": masked, "new_records": round(new_total / max(len(per_run), 1), 1)}
     out["found_repo"] = None if masked or not want else _vote([bool(r["units"]) for r in per_run])
-    for dim in ("found_file", "found_span", "found_site", "found_group", *PARAMETERS):
+    for dim in ("found_file", "found_span", "found_site", "found_group", "false_positive", *PARAMETERS):
         out[dim] = _vote([r[dim] for r in per_run])
     mutant_units = _majority(mutant_unit_sets)
     allowed = _allowed_units(mutant, vocab)
@@ -209,6 +226,7 @@ def mutant_rows(manifest: dict, *, languages: dict[str, str] | None = None) -> l
                     "variant_commit": m["commit"],
                     "snippet": m["snippet"],
                     "style": m["style"],
+                    "kind": "decoy" if m.get("decoy") else "call",
                     "catalog_version": m.get("catalog_version"),
                     "unit": expected_key(m),
                     "family": exp.get("family"),
@@ -257,6 +275,7 @@ def detection_rows(
                     "variant": m["id"],
                     "snippet": m["snippet"],
                     "style": m["style"],
+                    "kind": "decoy" if m.get("decoy") else "call",
                     "tool": tool,
                     "voter_group": voter_of.get(tool, tool),
                     "role": role(voter_of, tool),
@@ -333,6 +352,139 @@ def rate_rows(rows: list[dict], *, samples: int = 200, seed: int = BOOTSTRAP_SEE
                 "ci_low": round(ci[0], 4) if ci else None,
                 "ci_high": round(ci[1], 4) if ci else None,
                 "supported": ok,
+            }
+        )
+    return out
+
+
+def _f1(tp: int, fp: int, fn: int) -> float | None:
+    """F1 of pooled counts; None without negatives to judge (no decoys)."""
+    if tp + fn == 0:
+        return None
+    recall = tp / (tp + fn)
+    precision = tp / (tp + fp) if tp + fp else None
+    return 0.0 if not recall or not precision else round(2 * precision * recall / (precision + recall), 4)
+
+
+def _bootstrap_scores(
+    calls: dict[str, list[bool]], decoys: dict[str, list[bool]], samples: int, seed: int
+) -> tuple[tuple[float, float], tuple[float, float] | None]:
+    """(recall CI, F1 CI) over repositories resampled with replacement; the F1 CI is None without decoys."""
+    repos = sorted(set(calls) | set(decoys))
+    rng = random.Random(seed)
+    recalls, f1s = [], []
+    for _ in range(samples):
+        draw = [repos[rng.randrange(len(repos))] for _ in repos]
+        tp = sum(sum(calls.get(r, [])) for r in draw)
+        n = sum(len(calls.get(r, [])) for r in draw)
+        fp = sum(sum(decoys.get(r, [])) for r in draw)
+        m = sum(len(decoys.get(r, [])) for r in draw)
+        if n:
+            recalls.append(tp / n)
+        f1 = _f1(tp, fp, n - tp) if n and m else None
+        if f1 is not None:
+            f1s.append(f1)
+
+    def ci(values: list[float]) -> tuple[float, float] | None:
+        if not values:
+            return None
+        values = sorted(values)
+        return values[int(0.025 * (len(values) - 1))], values[int(0.975 * (len(values) - 1))]
+
+    return ci(recalls) or (0.0, 0.0), ci(f1s)
+
+
+def score_rows(rows: list[dict], *, samples: int = 200, seed: int = BOOTSTRAP_SEED) -> list[dict]:
+    """mutation-scores.csv: per (tool, language, style or `all`) the pooled recall on the planted calls (at the
+    site: strict; by group: lenient), the precision over the planted items (calls found / (calls found + decoys
+    hit); the decoys, style-less, count for every style) and F1, with bootstrap CIs over repositories. Precision and
+    F1 are empty without decoys. `supported` as in score.py (repositories and calls)."""
+    calls: dict[tuple, dict[str, list[bool]]] = defaultdict(lambda: defaultdict(list))
+    grouped: dict[tuple, dict[str, list[bool]]] = defaultdict(lambda: defaultdict(list))
+    decoys: dict[tuple, dict[str, list[bool]]] = defaultdict(lambda: defaultdict(list))
+    meta: dict[str, dict] = {}
+    for r in rows:
+        if r.get("status") != "ok":
+            continue
+        meta[r["tool"]] = {"voter_group": r["voter_group"], "role": r["role"]}
+        key = (r["tool"], r["language"])
+        if r.get("kind") == "decoy":
+            if r.get("false_positive") is not None:
+                decoys[key][r["repo"]].append(bool(r["false_positive"]))
+        elif r.get("found_site") is not None:
+            for style in (r["style"], "all"):
+                calls[(*key, style)][r["repo"]].append(bool(r["found_site"]))
+                grouped[(*key, style)][r["repo"]].append(bool(r["found_group"]))
+    out = []
+    for (tool, language, style), per_repo in sorted(calls.items(), key=lambda kv: tuple(str(x) for x in kv[0])):
+        negatives = decoys.get((tool, language), {})
+        n = sum(len(v) for v in per_repo.values())
+        tp = sum(sum(v) for v in per_repo.values())
+        by_group = sum(sum(v) for v in grouped[(tool, language, style)].values())
+        m = sum(len(v) for v in negatives.values())
+        fp = sum(sum(v) for v in negatives.values())
+        ok = supported(len(per_repo), n, min_repos=MIN_REPOS, min_items=MIN_ITEMS)
+        recall_ci, f1_ci = _bootstrap_scores(per_repo, negatives, samples, seed) if ok else ((None, None), None)
+        precision = round(tp / (tp + fp), 4) if m and tp + fp else None
+        out.append(
+            {
+                "tool": tool,
+                **meta[tool],
+                "language": language,
+                "style": style,
+                "repos": len(per_repo),
+                "calls": n,
+                "found_site": tp,
+                "found_group": by_group,
+                "decoys": m,
+                "decoys_hit": fp,
+                "recall_site": round(tp / n, 4),
+                "recall_low": None if recall_ci[0] is None else round(recall_ci[0], 4),
+                "recall_high": None if recall_ci[1] is None else round(recall_ci[1], 4),
+                "recall_group": round(by_group / n, 4),
+                "precision": precision,
+                "f1": _f1(tp, fp, n - tp) if m else None,
+                "f1_low": None if not f1_ci else round(f1_ci[0], 4),
+                "f1_high": None if not f1_ci else round(f1_ci[1], 4),
+                "supported": ok,
+            }
+        )
+    return out
+
+
+def bridge_rows(confirmation: dict[tuple[str, str], float], scores: list[dict]) -> list[dict]:
+    """bridge-run<k>.csv (RQ4's bridge to RQ3, refinement 9): per language and over all cells, a tool's confirmation
+    rate (RQ3b, the exact matcher at L4 on the experiment's original repositories of that language) against its F1 on
+    the planted items (style `all`): the cells, then per language and `all` the Spearman correlation over the cells
+    and Kendall's tau between the two rankings (`tool` = `all`; empty with fewer than three cells)."""
+    from .score import kendall_tau, spearman
+
+    cells = []
+    for s in scores:
+        if s["style"] != "all" or s.get("f1") is None:
+            continue
+        conf = confirmation.get((s["tool"], s["language"]))
+        if conf is None:
+            continue
+        cells.append({"language": s["language"], "tool": s["tool"], "confirmation": round(conf, 4), "f1": s["f1"]})
+    out: list[dict] = []
+    by_lang: dict[str, list[dict]] = defaultdict(list)
+    for c in cells:
+        by_lang[c["language"]].append(c)
+    for language, group in [*sorted(by_lang.items()), ("all", cells)]:
+        out += [{**c, "n": None, "spearman": None, "kendall_tau": None} for c in group]
+        a = {f"{c['tool']}@{c['language']}": c["confirmation"] for c in group}
+        b = {f"{c['tool']}@{c['language']}": c["f1"] for c in group}
+        rank = lambda m: [k for k, _ in sorted(m.items(), key=lambda kv: (-kv[1], kv[0]))]  # noqa: E731
+        out.append(
+            {
+                "language": language,
+                "tool": "all",
+                "confirmation": None,
+                "f1": None,
+                "n": len(group),
+                "spearman": spearman(a, b),
+                "kendall_tau": kendall_tau(rank(a), rank(b)) if len(group) >= 3 else None,
             }
         )
     return out

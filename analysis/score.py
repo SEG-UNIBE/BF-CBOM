@@ -1,4 +1,5 @@
-"""Scoring without ground truth (RQ4, CLAUDE.md Phase 3 `score.py`), on the exact matcher's groups.
+"""The per-tool rates without ground truth (RQ3b, CLAUDE.md Phase 3 `score.py`; no ranking claim), on the exact
+matcher's groups.
 
 Voters are voter groups (`common/tools.yaml`; tools sharing an engine count once, `--merge-llm` merges the LLM
 workers). Per tool, dimension and ladder level:
@@ -48,7 +49,8 @@ MIN_REPOS = 3  # a tool is ranked only with items in at least this many reposito
 MIN_ITEMS = 10  # ... and at least this many items in total
 SCORE_COLUMNS = [
     "dimension", "level", "tool", "voter_group", "role", "repos", "items", "confirmed", "rate", "rate_pooled", "ci_low",
-    "ci_high", "exclusive", "exclusivity", "rank", "ds_support", "ds_sensitivity", "ds_specificity",
+    "ci_high", "exclusive", "exclusivity", "majority_items", "majority_covered", "coverage", "rank", "ds_support",
+    "ds_sensitivity", "ds_specificity",
 ]  # fmt: skip
 LOO_COLUMNS = ["dimension", "level", "left_out", "kendall_tau", "ranking"]
 GROUPING_COLUMNS = ["dimension", "level", "grouping", "voter_groups", "ranked", "kendall_tau", "ranking"]
@@ -231,6 +233,39 @@ def repo_rates(obs: Observations, dim: str, snapshots: list[str] | None = None) 
     return out
 
 
+def majority_coverage(
+    obs: Observations, dim: str, snapshots: list[str] | None = None
+) -> dict[str, list[tuple[int, int]]]:
+    """{tool: per snapshot it ran on, (its items among the snapshot's majority items, the majority items)}: the
+    majority items are those reported by at least half of the voter groups that ran there (observers report but
+    do not count towards the majority). A recall proxy next to confirmation's precision proxy. Empty for
+    `location` (call sites are compared by window, not by equality) and for snapshots without a majority item."""
+    out: dict[str, list[tuple[int, int]]] = {t: [] for t in obs.tools}
+    if dim == "location":
+        return out
+    snapshots = sorted(obs.snapshots) if snapshots is None else snapshots
+    for snapshot in snapshots:
+        ran = obs.ran.get(snapshot, set())
+        voters = {obs.voter(t) for t in ran if obs.votes(t)}
+        if not voters:
+            continue
+        by_item: dict = defaultdict(set)
+        reported: dict[str, set] = defaultdict(set)
+        for aset in obs.sets.get((snapshot, dim), []):
+            for tool, its in aset.items():
+                reported[tool] |= its
+                if obs.votes(tool):
+                    for it in its:
+                        by_item[it].add(obs.voter(tool))
+        majority = {it for it, vs in by_item.items() if 2 * len(vs) >= len(voters)}
+        if not majority:
+            continue
+        for tool in obs.tools:
+            if tool in ran:
+                out[tool].append((len(majority & reported.get(tool, set())), len(majority)))
+    return out
+
+
 def macro(rates: list[float]) -> float | None:
     return statistics.mean(rates) if rates else None
 
@@ -270,6 +305,35 @@ def kendall_tau(a: list[str], b: list[str]) -> float | None:
             discordant += s < 0
     pairs = len(common) * (len(common) - 1) / 2
     return round((concordant - discordant) / pairs, 3)
+
+
+def spearman(a: dict[str, float], b: dict[str, float]) -> float | None:
+    """Spearman's rank correlation over the keys both maps hold (average ranks on ties; None below three)."""
+    keys = sorted(k for k in a if k in b)
+    if len(keys) < 3:
+        return None
+
+    def ranks(values: dict[str, float]) -> dict[str, float]:
+        ordered = sorted(keys, key=lambda k: values[k])
+        out: dict[str, float] = {}
+        i = 0
+        while i < len(ordered):
+            j = i
+            while j + 1 < len(ordered) and values[ordered[j + 1]] == values[ordered[i]]:
+                j += 1
+            for k in ordered[i : j + 1]:
+                out[k] = (i + j) / 2 + 1
+            i = j + 1
+        return out
+
+    ra, rb = ranks(a), ranks(b)
+    ma, mb = statistics.mean(ra.values()), statistics.mean(rb.values())
+    cov = sum((ra[k] - ma) * (rb[k] - mb) for k in keys)
+    va = sum((ra[k] - ma) ** 2 for k in keys)
+    vb = sum((rb[k] - mb) ** 2 for k in keys)
+    if not va or not vb:
+        return None
+    return round(cov / (va * vb) ** 0.5, 3)
 
 
 def _voting(obs: Observations, per_tool: dict) -> dict:
@@ -433,6 +497,7 @@ def score_rows(
         if not any(n for n, _, _ in pooled.values()):
             continue
         rates = repo_rates(obs, dim)
+        coverage = majority_coverage(obs, dim)
         order = ranking(_voting(obs, rates), pooled, min_repos=min_repos, min_items=min_items)
         cis = bootstrap_ci(obs, dim, samples=samples, seed=seed) if samples else {}
         for tool in sorted(pooled):
@@ -442,6 +507,7 @@ def score_rows(
             voter = obs.voter(tool)
             ok = supported(len(rates[tool]), n, min_repos=min_repos, min_items=min_items)
             ci = cis.get(tool, (None, None)) if ok else (None, None)
+            cov = coverage.get(tool, [])
             row = {
                 "dimension": dim,
                 "level": obs.level,
@@ -457,6 +523,9 @@ def score_rows(
                 "ci_high": ci[1],
                 "exclusive": e,
                 "exclusivity": round(e / n, 3),
+                "majority_items": sum(total for _, total in cov),
+                "majority_covered": sum(c for c, _ in cov),
+                "coverage": round(statistics.mean(c / total for c, total in cov), 3) if cov else None,
                 "rank": order.index(tool) + 1 if tool in order else None,
                 "ds_support": None,
                 "ds_sensitivity": None,

@@ -24,7 +24,7 @@ as 13,996).
 
 | Unit | What it is | Identified by | Counted in |
 |---|---|---|---|
-| **asset** | one crypto asset component of a CBOM, as the tool wrote it | `component_index` in the CBOM | RQ2 (what the tools report), RQ1 meaningful, the normalisation section (`units-run<k>.csv`, `coverage-run<k>.csv`, `conformance-run<k>.csv`), `normalize.json` |
+| **asset** | one crypto asset component of a CBOM, as the tool wrote it | `component_index` in the CBOM | RQ2 (what the tools report), RQ1 meaningful, the RQ2 section (`units-run<k>.csv`, `coverage-run<k>.csv`, `conformance-run<k>.csv`), `normalize.json` |
 | **record** | one occurrence of an asset: an asset found at five lines gives five records, an asset without occurrences one record without a location | `record_id` = `<tool>:<component>:<occurrence>`, its location `site_id` = `<tool>:<file>:<line>` | `records-run<k>.csv`, `units-run<k>.csv`, RQ1 traceability, the matchers' clusters and call-site groups (`members-*.csv`) |
 | **item** | one algorithm in one repository (snapshot and variant): one distinct L4 identity, however many assets and records of a tool carry it; a tool reports the item when one of its `mapped` records has that identity | algorithm: (snapshot, unit); parameter: (snapshot, unit, value); location: (snapshot, unit, file:line) | the ladder (`levels-`, `items-run<k>.csv`), the scores, stability, the tools-per-item distribution, E4 |
 
@@ -44,7 +44,7 @@ as 13,996).
   pairs (a site = file and line; the call-site groups chain located records within the window); RaQuN's elements are
   a tool's distinct attribute sets per repository, over the exact matcher's records (`matchers/raqun.py`: records
   with the same canonical values are one element, so AES-128 and AES-256 are two). Packaging shows only where a table describes the tool's own document:
-  RQ2's asset counts as written, RQ1's meaningful shares, the normalisation section's names and values (shares of
+  RQ2's asset counts as written, RQ1's meaningful shares, RQ2's names and values (shares of
   components, as a reader of the CBOM finds them), and, by design, `units-run<k>.csv`, which measures it.
 - **Kinds of place.** Tools also differ in what a place is, and every record says which kind it names
   (`location_kind` in `records-run<k>.csv`, per tool in `units-run<k>.csv` and the summary's "Places per tool";
@@ -54,7 +54,7 @@ as 13,996).
   analysis do not hold (the VM's mirror has them; `--fetch` for a copied export). A tool that reports the import
   line places the same use elsewhere than one that reports the call, which the ±2-line window absorbs only in part.
 - **Two more words.** A *unit* is an L4 identity: the identity of an item (the `unit` column of
-  `items-run<k>.csv`) and the expected value of an E4 mutant (`expected.unit`). A *site* is a record's file and line
+  `items-run<k>.csv`) and the expected value of an RQ4 mutant (`expected.unit`). A *site* is a record's file and line
   (call-site level, refinement 1). The micro ground truth's entries are *expected items* at site level, a known
   crypto call in a function of its own (`micro-items-run<k>.csv`; `experiments/corpus/micro/ground_truth.yaml`, generated from
   the snippet catalog, keeps the pilot's key `assets`).
@@ -172,7 +172,7 @@ the shared engine; the check showed that it rested on the engine alone, so they 
 "Other voter groupings", Kendall's tau against the declared ranking): `per-tool` (every tool its own voter, so
 CBOMkit and cbomkit-jar confirm each other), `llm-merged` (the LLM workers as one voter) and `engine-merged` (the
 tools of one pattern engine family as one voter: `engine_family` in `tools.yaml`, the former `grep-rules`); next to
-it leave-one-voter-out. **Planned with E4:** whether two tools miss the same inserted items more often than chance
+it leave-one-voter-out. **Planned with the mutation run (RQ4):** whether two tools miss the same inserted items more often than chance
 (conditional dependence given the truth, the assumption behind independent voters and Dawid-Skene); tools with
 strongly correlated misses share a blind spot and would be one voter. Agreement on unlabelled data cannot decide
 this, since two tools also agree when both are right.
@@ -187,7 +187,7 @@ this, since two tools also agree when both are right.
 | `non-crypto` | a finding outside cryptography reported as an asset | securin-xbom's `...sqli.jpa-sqli` | no |
 | `undefined` | a name nobody can read | `0`, `UNKNOWN`, `Sig` | no |
 
-The shares of each tool's algorithm assets are RQ2 results (the summary's normalisation section,
+The shares of each tool's algorithm assets are RQ2 results (the summary's RQ2 section,
 `coverage-run<k>.csv`; per record in `records-run<k>.csv`). Only `mapped` records enter the ladder and the scores.
 
 ## The ladder, by example
@@ -262,12 +262,15 @@ values `other` and `unknown`; protocols fold to the `protocolProperties.type` en
 OpenPGP, OTR). A test keeps `data/cbom-norm.schema.json` equal to the vendored 1.7 schema, and the RQ1 tables are
 per asset type with that type's own field set.
 
-## Mutants (E4)
+## Mutants (RQ4)
 
 A mutant's CBOMs are normalised like every other, with the same specs and vocabulary; nothing in the normaliser knows
 about mutants. `analysis/mutation.py` compares each tool's records on a mutant with its records on the original and
 asks whether a new record of the snippet's expected unit (its L4 identity, as at the top of the ladder) appeared at the
 inserted call, on the inserted lines, in the file or in the repository. The expected units are written in the
 vocabulary (`tests/test_mutation.py` checks them), so detection rests on the same normalisation as the agreement
-numbers; a lenient column (`found_group`, the coarse group at the site) shows how much a stricter reading costs. The
+numbers; a lenient column (`found_group`, the coarse group at the site) shows how much a stricter reading costs. A
+planted decoy (a comment or a log message naming algorithms, a CRC32 checksum, a Base64 encoding; what each one tests:
+`experiments/corpus/README.md`) is judged the other way round: any new crypto record on its inserted lines is a
+`false_positive`, so `mutation-scores.csv` can give a precision and an F1 next to the recall. The
 agreement analyses never see the mutants (they read the original variants only).

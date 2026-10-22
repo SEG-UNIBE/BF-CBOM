@@ -8,7 +8,7 @@
 # Go's APIs take no algorithm strings: `indirect` holds a parameter or a function value in a variable instead.
 # The micro project experiments/corpus/micro/go is generated from this catalog (mutation/micro.py; AI-made, on the human-review
 # list before paper use).
-version: "2026-10-20.1"
+version: "2026-10-22.1"
 language: go
 scope: |
   {
@@ -325,3 +325,35 @@ snippets:
       var $minVersion uint16 = $tls.VersionTLS13 @related
       $config := &$tls.Config{MinVersion: $minVersion} @call
       _ = $config
+
+# Decoys (decided 2026-10-22): code that names or resembles cryptography without using it, one `direct` body each and
+# no expected record. The micro project gets one function per decoy; the mutation harness plants them next to the
+# calls (`decoys` in a spec's mutation block), so a tool that reports one has a false positive on a known negative.
+decoys:
+  - id: comment
+    what: a comment naming algorithms
+    imports: [fmt]
+    direct: |
+      // TODO: replace the MD5 and DES fallbacks with SHA-256 and AES
+      $total := 0
+      for $i := 0; $i < 10; $i++ {
+          $total += $i
+      }
+      $fmt.Println($total)
+  - id: log-message
+    what: a log message naming algorithms
+    imports: [fmt]
+    direct: |
+      $fmt.Println("RSA and ECDSA keys are rotated nightly")
+  - id: crc32
+    what: a non-cryptographic checksum (CRC32)
+    imports: [fmt, hash/crc32]
+    direct: |
+      $checksum := $crc32.ChecksumIEEE([]byte("data"))
+      $fmt.Println($checksum)
+  - id: base64
+    what: an encoding (Base64)
+    imports: [encoding/base64, fmt]
+    direct: |
+      $encoded := $base64.StdEncoding.EncodeToString([]byte("data"))
+      $fmt.Println($encoded)

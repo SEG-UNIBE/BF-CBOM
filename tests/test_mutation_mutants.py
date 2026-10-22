@@ -43,9 +43,12 @@ def test_mutants_are_deterministic_single_file_commits(tmp_path, language):
         ids = ensure_mutants(repo, commit, params, manifest, mirror_dir=mirror, log=lambda m: None)
         entry = manifest["repos"][repo.full_name]
         made.append((ids, [m["commit"] for m in entry["mutants"]]))
-    assert made[0] == made[1] and len(made[0][0]) == 4
-    styles = [m["style"] for m in entry["mutants"]]
-    assert styles == ["direct", "wrapper", "indirect", "direct"]  # round-robin over the styles
+    assert made[0] == made[1] and len(made[0][0]) == 8  # 4 planted calls and, `decoys: equal`, 4 planted decoys
+    calls = [m for m in entry["mutants"] if not m["decoy"]]
+    decoys = [m for m in entry["mutants"] if m["decoy"]]
+    assert [m["style"] for m in calls] == ["direct", "wrapper", "indirect", "direct"]  # round-robin over the styles
+    assert sorted(m["snippet"] for m in decoys) == ["base64", "comment", "crc32", "log-message"]
+    assert all(m["style"] == "direct" and m["expected"] == {} and m["also"] == [] for m in decoys)
     bare = mirror_path(repo.full_name, mirror)
     for m in entry["mutants"]:
         assert m["id"].startswith(f"ins-{m['snippet']}-{m['style']}-")
@@ -90,7 +93,7 @@ def test_pyca_snippets_only_where_cryptography_is_declared(tmp_path):
     mirror = tmp_path / "mirror"
     repo, commit = _publish(src, "acme/plain", "Python", mirror)
     manifest: dict = {}
-    ensure_mutants(repo, commit, MutationSpec(per_repo=25), manifest, mirror_dir=mirror, log=lambda m: None)
+    ensure_mutants(repo, commit, MutationSpec(per_repo=25, decoys=0), manifest, mirror_dir=mirror, log=lambda m: None)
     entry = manifest["repos"]["acme/plain"]
     stdlib = {"sha-1", "sha-256", "md5", "sha3-256", "hmac-sha256", "pbkdf2-hmac-sha256", "tls13-context"}
     assert {m["snippet"] for m in entry["mutants"]} == stdlib  # no RSA/EC/AES: `cryptography` is not declared
@@ -118,7 +121,12 @@ def test_spec_mutation_block_parses_round_trips_and_excludes_listed_variants():
     base = {"name": "e4", "tools": ["t1"], "repos": [{"full_name": "a/b", "language": "Java"}]}
     spec = spec_from_dict({**base, "mutation": {"per_repo": 3, "styles": ["direct"], "snippets": ["sha-1"]}})
     assert spec.mutation == MutationSpec(per_repo=3, styles=["direct"], snippets=["sha-1"], seed=1)
-    assert spec.expected_jobs == 4  # original + 3 mutants, one tool, one repetition
+    assert spec.expected_jobs == 7  # original + 3 planted calls + 3 planted decoys, one tool, one repetition
+    assert spec_from_dict({**base, "mutation": {"decoys": 2}}).mutation.decoys == 2
+    assert spec_from_dict({**base, "mutation": {"per_repo": 4, "decoys": 0}}).expected_jobs == 5
+    for bad in (-1, "many", True):
+        with pytest.raises(ExperimentError, match="decoys"):
+            spec_from_dict({**base, "mutation": {"decoys": bad}})
     assert spec_from_dict(spec_to_dict(spec)).mutation == spec.mutation
     assert spec_from_dict({**base, "mutation": {"snippets": "all"}}).mutation == MutationSpec()
     with pytest.raises(ExperimentError, match="cannot be combined"):

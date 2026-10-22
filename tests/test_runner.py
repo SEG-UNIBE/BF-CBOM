@@ -223,19 +223,20 @@ def test_mutation_block_runs_originals_and_mutants_and_regenerates_them_identica
     exp = world["results"] / "mutation-fake"
     manifest = ex.load_mutants(exp)
     mutants = manifest["repos"]["o/mutable"]["mutants"]
-    assert [m["style"] for m in mutants] == ["direct", "indirect"] and len(world["workers"].seen) == 6
+    assert [m["style"] for m in mutants] == ["direct", "indirect", "direct", "direct"]  # 2 calls, then 2 decoys
+    assert [m["decoy"] for m in mutants] == [False, False, True, True] and len(world["workers"].seen) == 10
     snapshot = next(exp.glob("o__mutable@*"))
     assert sorted(p.name for p in snapshot.iterdir()) == sorted(["original", *(m["id"] for m in mutants)])
     meta = json.loads((snapshot / mutants[0]["id"] / "t1" / "run1.meta.json").read_text())
     assert meta["variant"] == mutants[0]["id"] and meta["variant_commit"] == mutants[0]["commit"]
-    assert ex.expected_jobs(ex.load_spec(spec), exp) == 6 and "mutation" in yaml.safe_load(
+    assert ex.expected_jobs(ex.load_spec(spec), exp) == 10 and "mutation" in yaml.safe_load(
         ex.spec_path(exp).read_text()
     )
 
     again = _run(["run", str(spec), "--idle-timeout", "20", "--overwrite-old"])
     assert again.exit_code == 0, again.output
     assert ex.load_mutants(exp)["repos"] == manifest["repos"]  # regenerated from scratch: deterministic
-    assert len(world["workers"].seen) == 12
+    assert len(world["workers"].seen) == 20
 
 
 def test_parse_replicas():

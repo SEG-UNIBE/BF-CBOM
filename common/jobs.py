@@ -48,9 +48,16 @@ def normalize_language(language: str | None) -> str:
     return _LANGUAGE_ALIASES.get(key, key)
 
 
-def tool_supports(tool: str, language: str | None, registry: dict[str, dict] | None = None) -> bool:
-    """False only when the registry lists languages for `tool` and the repo language is known and not among them."""
+def tool_supports(
+    tool: str, language: str | None, registry: dict[str, dict] | None = None, *, only: list[str] | None = None
+) -> bool:
+    """False only when the registry lists languages for `tool` and the repo language is known and not among them,
+    or when `only` (a spec's `tool_languages` entry: the languages the tool runs in within that experiment, a hand
+    edit) is given and the known repo language is not among those."""
     entry = (registry if registry is not None else load_tools()).get(tool) or {}
+    lang = normalize_language(language)
+    if only is not None and lang and lang not in {normalize_language(str(x)) for x in only}:
+        return False
     languages = entry.get("languages")
     lang = normalize_language(language)
     if not languages or not lang:

@@ -45,9 +45,9 @@ def _mutants(language: str):
     """Every (snippet, form, style, host) of `language` rendered into the small hosts."""
     catalog = load_catalog(language)
     for text in HOSTS[language]:
-        for snippet in catalog.snippets:
+        for snippet in (*catalog.snippets, *catalog.decoys):
             for form in range(len(snippet.forms)):
-                for style in STYLES:
+                for style in ("direct",) if snippet.decoy else STYLES:
                     f = source_file(language, PATHS[language], text)
                     for host in f.hosts(f.called()):
                         m = mutate(f, host, catalog, snippet, form, style, context=_context(language, f))
@@ -87,6 +87,17 @@ def test_catalog_snippets_are_complete_and_expect_vocabulary_identities(language
                 if style == "indirect":
                     assert any(ln.rstrip().endswith("@related") for ln in markers), (s.id, style)
                 assert "body" not in placeholders(template)
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_catalog_decoys_are_known_negatives(language):
+    catalog = load_catalog(language)
+    assert [d.id for d in catalog.decoys] == ["comment", "log-message", "crc32", "base64"]
+    crypto_imports = {i for s in catalog.snippets for f in s.forms for i in f.imports}
+    for d in catalog.decoys:
+        assert d.decoy and d.expected == {} and d.what and d.supports("direct") and not d.supports("indirect")
+        assert catalog.get(d.id) is d and not (set(d.forms[0].imports) & crypto_imports), d.id
+        assert not any(MARKER.search(ln) for ln in d.forms[0].templates["direct"].splitlines())  # nothing to find
 
 
 def test_pyca_snippets_require_cryptography_and_stdlib_ones_nothing():

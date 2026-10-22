@@ -36,7 +36,7 @@ def step04():
 def step05():
     # TODO: replace the MD5 and DES fallbacks with SHA-256 and AES
     total = sum(range(10))
-    return total
+    print(total)
 
 
 def step06():
@@ -85,7 +85,7 @@ def step14():
 
 def step15():
     checksum = zlib.crc32(b"data")
-    return checksum
+    print(checksum)
 
 
 def step16():
@@ -98,7 +98,7 @@ def step17():
 
 def step18():
     encoded = base64.b64encode(b"data")
-    return encoded
+    print(encoded)
 
 
 def main():

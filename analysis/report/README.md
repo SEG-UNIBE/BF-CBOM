@@ -19,7 +19,7 @@ OBSERVERS = {"qelens", "cryptarium", "qscan"}   # or: tools.yaml entries with ro
 scores = pd.read_csv(f"{A}/score-run1.csv").query("role == 'voter'")
 ```
 
-**Tools per item, UpSet plot (RQ2).** Which voter groups report which items per repository.
+**Tools per item, UpSet plot (RQ3b).** Which voter groups report which items per repository.
 ```python
 groups = pd.read_csv(f"{A}/groups-exact-run1.csv").query("scope == 'repo'")
 # one row per (repo group, voter group); `voters` is a ';'-joined list in groups-exact
@@ -57,7 +57,7 @@ k = ml.set_index(["matcher", "level"])[["k1", "k2", "k3", "k4plus"]].div(ml["ite
 agree = ml.set_index(["matcher", "level"]).filter(like="_agree")                                   # heatmap
 ```
 
-**Ranking with confidence intervals (RQ4).**
+**Per-tool rates with confidence intervals (RQ3b; the ranking by F1 is RQ4's, `mutation-scores.csv`).**
 ```python
 sc = pd.read_csv(f"{A}/score-run1.csv").query("dimension == 'algorithm' and role == 'voter'")
 ranked = sc.dropna(subset=["rank", "ci_low", "ci_high"]).sort_values("rate")
@@ -80,6 +80,6 @@ per_item = pd.concat([cost, items], axis=1).dropna().assign(
 )
 ```
 
-**Run-to-run stability (E0).** `stability.csv`: `jaccard_mean` per tool as a box plot over repositories.
+**Run-to-run stability.** `stability.csv`: `jaccard_mean` per tool as a box plot over repositories.
 
 **Matchers compared (RQ3).** `matchers-run1.csv`: `pair_jaccard` per repository, exact vs RaQuN.
