@@ -38,7 +38,7 @@ services:
         limits:
           # GITSERVER_MEMORY (Makefile): git pack-objects for a full clone of a large repo runs in this cgroup;
           # 256m was OOM-killed on keycloak and ansible (CBOMkit's JGit clone, 2026-10-19)
-          memory: ${GITSERVER_MEMORY:-4g}
+          memory: ${GITSERVER_MEMORY:-6g}
     cap_drop: [ALL]
     cap_add: [CHOWN, SETUID, SETGID, NET_BIND_SERVICE, DAC_OVERRIDE]
     security_opt: [no-new-privileges:true]
@@ -74,7 +74,7 @@ services:
       # later waves. Set per machine in the Makefile / environment; 0 = no limit (one wave).
       - EXPERIMENT_MEMORY_BUDGET_GB=${EXPERIMENT_MEMORY_BUDGET_GB:-14}
       # The git server's memory cap (recorded per session) and the corpus size cap derived from it (common/corpus.py)
-      - GITSERVER_MEMORY=${GITSERVER_MEMORY:-4g}
+      - GITSERVER_MEMORY=${GITSERVER_MEMORY:-6g}
       - CORPUS_MAX_REPO_SIZE_MB=${CORPUS_MAX_REPO_SIZE_MB:-}
     env_file: docker/env/coordinator.env  # GITHUB_TOKEN for the corpus builder
     volumes:
