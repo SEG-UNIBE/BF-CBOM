@@ -168,6 +168,9 @@ The images need roughly 30 GB of disk space. Plan for at least 100 GB free if yo
 
 ### Building the Images Yourself
 
+For work on the `dev` branch or a custom generator, use the [development quick start](#development-quick-start).
+It builds your local checkout; published release images do not contain your branch changes.
+
 If you want to build the images locally instead (e.g., to change a worker), continue with one of the two options described below.
 Either way, the build takes about 5–15 minutes for the first time (depending on hardware and internet speed).
 
@@ -323,6 +326,42 @@ docker builder prune -f --keep-storage 10GB
 
 ## Developer Notes
 
+### Development Quick Start
+
+With Git, GNU Make and Docker running, start from a checkout of `dev`:
+
+```bash
+git clone --branch dev https://github.com/SEG-UNIBE/BF-CBOM.git
+cd BF-CBOM
+make ensure-env
+# Fill in docker/env/*.env for any credentials your tools require.
+make up-prod
+```
+
+Use `make up-prod` on the `dev` branch too: `prod` selects the generator services, not the Git branch.
+`make up-dev` starts only the development/example workers and cannot run the supplied experiments.
+The startup command builds the images, starts the services, then opens the live board. Check that the workers
+needed by your experiment are up; Ctrl+C closes the board while the services keep running.
+
+Start with the micro projects, then inspect and export the results:
+
+```bash
+make experiment EXP=experiments/e0-micro.yaml
+make experiment-status NAME=e0-micro
+make experiment-export NAME=e0-micro
+# Report and results: exports/e0-micro.zip, including e0-micro/_ANALYSIS/_SUMMARY.md
+```
+
+The run waits for results; `make board` or `make experiment-status NAME=e0-micro` can also be used in a second
+terminal while it runs. Repeating the run command resumes missing work. After changing worker code, rebuild
+with `make up-prod`, then use `ARGS="--rerun <tool>"` on the experiment command to replace that tool's results.
+For a new tool, create a separate spec under `experiments/` with a unique `name` and only that tool in `tools`
+(copy the micro spec's `repos`). `--rerun` selects results to redo; it does not restrict the spec to one tool.
+
+Experiment commands run in Docker; Python and `uv` on the host are optional. Specs under `experiments/` are
+mounted into the runner, while worker and analysis code require rebuilding. `make down` stops the stack and
+keeps its data volumes. See the [experiment guide](experiments/README.md) for memory budgets and larger runs.
+
 BF-CBOM follows a deliberately modular design as illustrated in the figure below.
 At its core, the `Coordinator` orchestrates all inspection activities through a message-driven architecture.
 Redis serves dual roles as both a persistence layer for intermediate results and a queue system enabling asynchronous, scalable communication between components.
@@ -332,12 +371,17 @@ This design creates decoupled interactions that make the framework flexible for 
 
 ### Adding Additional Workers
 
-1. Duplicate `workers/skeleton` to `workers/<mytool>` and implement `handle_instruction`.
-2. Create `docker/env/<mytool>.env` for credentials and configuration specific to the worker.
-3. Start from `docker/Dockerfile.worker-skeleton` (or craft a bespoke Dockerfile if required).
-4. Register the worker service in `docker-compose.yml`, pointing at the new `env_file`.
+1. Duplicate `workers/skeleton` to `workers/<mytool>` and implement `_produce`, keeping `build_handle_instruction` and `run_worker` for the shared job protocol and timeout handling. The skeleton returns an empty placeholder; a real worker must scan the requested snapshot (`clone_repo(..., commit=instr.repo_info.commit)`, as in `workers/pqcheck/main.py`).
+2. Add `docker/env/worker-<mytool>.env.template`, then run `make ensure-env` and put local credentials in the generated `.env` file.
+3. Copy `docker/Dockerfile.worker-skeleton` to `docker/Dockerfile.worker-<mytool>` and update the worker paths, environment name and entrypoint. Install the tool or its client as needed.
+4. Register `worker-<mytool>` in `docker-compose.yml`, using an existing generator service as a template: image/build arguments, Redis settings, `env_file`, memory limit and `profiles: [prod, all]`.
 5. Append the worker name to the `AVAILABLE_WORKERS` list in the `Makefile` so shared targets pick it up.
-6. Add a bake target in `docker-bake.hcl` and an entry in `common/tools.yaml` (engine family, language scope), which the analysis uses to group tools that share an engine.
+6. Add an entry in `common/tools.yaml` with the tool's languages, detection engine, role and `memory_gb` matching its Compose limit. Add an adapter spec under `analysis/adapters/` for offline analysis; follow the [adapter policy](analysis/README.md#what-an-adapter-spec-may-contain) and vocabulary versioning rules.
+7. Add the tool to your experiment spec and rebuild with `make up-prod`. If its image is intended for release, also register its target and group membership in `docker-bake.hcl`.
+
+Closed-source tools use the same worker protocol. Their binaries or API clients can remain in the collaborator's
+private checkout, with credentials in the local `.env` file. A local integration does not require publishing its
+image or artifacts through the public release workflow.
 
 ### Clean Rebuild
 
