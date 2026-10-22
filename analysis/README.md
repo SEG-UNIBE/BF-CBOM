@@ -56,8 +56,8 @@ as 13,996).
 - **Two more words.** A *unit* is an L4 identity: the identity of an item (the `unit` column of
   `items-run<k>.csv`) and the expected value of an E4 mutant (`expected.unit`). A *site* is a record's file and line
   (call-site level, refinement 1). The micro ground truth's entries are *expected items* at site level, a known
-  crypto call at known lines (`micro-items-run<k>.csv`; `corpus/micro/ground_truth.yaml` keeps the pilot's key
-  `assets`).
+  crypto call in a function of its own (`micro-items-run<k>.csv`; `corpus/micro/ground_truth.yaml`, generated from
+  the snippet catalog, keeps the pilot's key `assets`).
 - **Where "algorithm" stays.** Only as the CycloneDX asset type (an *algorithm asset*), as the `algorithm`
   dimension (next to key size, mode, padding, curve, digest and location) and as the record field `algorithm`. What
   is counted or compared is always an item.

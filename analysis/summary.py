@@ -570,12 +570,14 @@ def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
               and cells[(t, lg)]["verdict"] in ("pass", "fail")]  # fmt: skip
     lines = ["## Micro projects", ""]
     lines += [
-        f"Each micro project (`corpus/micro`, one per language) is a small hand-written program with {n_items} known "
-        "crypto calls at known lines: the ground truth. A tool is a voter only if it finds enough of them.",
+        f"Each micro project (`corpus/micro`, one per language) is a small program generated from the snippet "
+        f"catalog (`mutation/micro.py`): {n_items} known crypto calls, each in a function of its own, plus decoys "
+        "(code that names or resembles cryptography without using it). That is the ground truth "
+        "(`corpus/micro/ground_truth.yaml`). A tool is a voter only if it finds enough of the calls.",
         "",
         f"**Inclusion check**: one row per tool, one column per language. A tool passes when it reports at least "
-        f"{bar} of the {n_items} calls at their lines (lenient call-site recall, below); the cell gives the verdict "
-        "and that number. `–` = outside the tool's languages, `error` = the run failed or timed out."
+        f"{bar} of the {n_items} calls in their functions (lenient call-site recall, below); the cell gives the "
+        "verdict and that number. `–` = outside the tool's languages, `error` = the run failed or timed out."
         + (
             " `*` = the tool was tuned on this project (`tailored_on` in tools.yaml, refinement 13), so its number "
             "there is inflated by construction."
@@ -588,29 +590,29 @@ def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
     if scored:
         t, lg, r = scored[0]
         lines += _eg(
-            f"`{verdict_cell(r)}` for {t} in {lg}: {t} reported {r['lenient']} of the {n_items} calls of micro-{lg} at "
-            f"their lines, so it {'passes' if r['verdict'] == 'pass' else 'fails'} the bar of {bar}."
+            f"`{verdict_cell(r)}` for {t} in {lg}: {t} reported {r['lenient']} of the {n_items} calls of micro-{lg} in "
+            f"their functions, so it {'passes' if r['verdict'] == 'pass' else 'fails'} the bar of {bar}."
         )
     lines += [
         "",
         f"**Recall at two levels**: the same projects in detail, each cell out of {n_items}, written "
         "`strict / lenient · repo`:",
         "",
-        "- `strict`: calls found at one of their ground-truth lines (a reported span counts at every line it covers) "
-        "with a matching algorithm family; a family the call's name contains also matches (SHA-2 for HMAC-SHA512).",
-        "- `lenient`: also a record at the line whose family is unknown.",
-        "- `repo`: calls whose own family (HMAC for HMAC-SHA512) the tool reports anywhere in the project, location "
-        "ignored; calls sharing a family (two RSA, two EC, two AES) are found together. It can be lower than the call "
-        "sites: it needs a known family, and the call's own one.",
+        "- `strict`: calls with a record of their group (RSA, EC, AES, SHA-2, ...) on one of their lines, the body of "
+        "their function (a reported span counts at every line it covers); for a key generation a key record of the "
+        "group counts too.",
+        "- `lenient`: also a record of unknown family there.",
+        "- `repo`: calls whose group the tool reports anywhere in the project, location ignored; calls sharing a group "
+        "(two RSA, three AES) are found together. It can be lower than the call sites: it needs a known family.",
         "",
     ]
     lines += md_table(["tool", *langs], [[t] + [recall_cell(cells.get((t, lg))) for lg in langs] for t in tools])
     if scored:
         t, lg, r = next((x for x in scored if len({x[2]["strict"], x[2]["lenient"], x[2]["repo"]}) > 1), scored[0])
         lines += _eg(
-            f"`{recall_cell(r)}` for {t} in {lg}: {r['strict']} calls found at their lines with a matching family, "
-            f"{r['lenient']} when a record of unknown family at the line counts too, and {r['repo']} by their family "
-            "anywhere in the project."
+            f"`{recall_cell(r)}` for {t} in {lg}: {r['strict']} calls found in their functions with their group, "
+            f"{r['lenient']} when a record of unknown family there counts too, and {r['repo']} by their group anywhere "
+            "in the project."
         )
     if expected:
         found: dict[tuple[str, str], list[int]] = defaultdict(lambda: [0, 0])
@@ -642,7 +644,39 @@ def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
             item, lg, cell = first
             f, n = cell.split("/")
             lines += _eg(f"`{cell}` for {item} in {lg}: {f} of the {n} tools scored on micro-{lg} found it.")
+    lines += _decoys(rows, langs, tools)
     return lines + [""]
+
+
+def _decoys(rows: list[dict], langs: list[str], tools: list[str]) -> list[str]:
+    """False positives with ground truth: the micro projects' decoys a tool reported crypto on (micro-run<k>.csv)."""
+    if not any(_int(r.get("decoys")) for r in rows):
+        return []
+    cells = {(r["tool"], r["language"]): r for r in rows}
+
+    def cell(r: dict | None) -> str:
+        if r is None or r["verdict"] not in ("pass", "fail"):
+            return "–" if r is not None and r["verdict"] == "unsupported" else ""
+        hit = [d for d in (r.get("decoys_hit") or "").split(";") if d]
+        return f"{len(hit)}/{r['decoys']}" + (f": {', '.join(hit)}" if hit else "")
+
+    table = [[t] + [cell(cells.get((t, lg))) for lg in langs] for t in tools]
+    lines = [
+        "",
+        "**Decoys**: false positives with ground truth. Each project holds decoys in functions of their own: a comment "
+        "and a log message naming algorithms, a CRC32 checksum and a Base64 encoding. None of them uses "
+        "cryptography, so any crypto record a tool reports on their lines is a false positive. One row per tool, one "
+        "column per language: `hit/decoys`, then the decoys hit.",
+        "",
+    ]
+    lines += md_table(["tool", *langs], table)
+    eg = next(((t, lg, c) for t, *cs in table for lg, c in zip(langs, cs, strict=True) if c and ":" in c), None)
+    if eg:
+        t, lg, c = eg
+        n, rest = c.split(": ", 1)
+        lines += _eg(f"`{c}` for {t} in {lg}: {t} reported crypto on {n.split('/')[0]} of the {n.split('/')[1]} "
+                     f"decoys of micro-{lg} ({rest}).")  # fmt: skip
+    return lines
 
 
 LOCATION_KINDS = ("line", "window", "import", "file", "none", "unread")  # analysis/schema.py:location_kind

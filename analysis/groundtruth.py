@@ -1,12 +1,14 @@
-"""Scoring a tool against the micro projects' ground truth (corpus/micro/ground_truth.yaml).
+"""Scoring a tool against the micro projects' ground truth (corpus/micro/ground_truth.yaml, generated from the
+snippet catalogs by mutation/micro.py; its header states the rules).
 
-This implements the pilot's inclusion bar ("finds >= 50 % of the 11 assets with a usable location")
-and gives recall/precision per tool on the hand-written micro projects, at two levels (CLAUDE.md, refinement 1):
-- call sites: strict (right line, family compatible with the asset) and lenient (right line, family unknown or
-  compatible); the inclusion bar uses lenient;
-- repository: the asset's own family (`expected.family`) reported anywhere in the project, location ignored, so
-  tools without locations get a number too. Assets sharing a family (two RSA, two EC, two AES) are found together
-  at this level.
+This implements the inclusion bar (a tool finds at least half of the items, lenient) and gives recall and precision
+per tool on the micro projects, at two levels (CLAUDE.md, refinement 1):
+- call sites: strict (a record of the item's group on its lines; for a keygen item also a key record) and lenient
+  (also a record of unknown family there); the inclusion bar uses lenient;
+- repository: the item's group reported anywhere in the project, location ignored, so tools without locations get a
+  number too. Items sharing a group (two RSA, three AES) are found together at this level.
+Decoys (code that names or resembles cryptography without using it) count apart: every crypto record on their lines
+is a false positive.
 
 `score_records` scores the normalised records (analysis/normalize/) and is what `analysis micro` uses.
 """
@@ -29,18 +31,17 @@ INCLUSION_BAR = 0.5
 @dataclass(frozen=True)
 class TruthAsset:
     id: str
-    name: str
-    families: frozenset[str]
+    group: str  # the item's own group (algorithms.yaml `groups`)
+    families: frozenset[str]  # the groups a record at its lines may have to count (default: the group alone)
     lines: tuple[int, ...]
-    expected: dict
-    insertion_style: str = "direct"  # `constant`: the algorithm name is passed through a constant (Phase 4 style)
+    expected: dict  # the canonical record: unit (L4 identity), family, parameters
+    insertion_style: str = "direct"  # `indirect`: the algorithm passes through a variable (the catalog's style)
+    keygen: bool = False  # a key generation: a key record (related-crypto-material) of its group counts too
 
     @property
     def family(self) -> frozenset[str]:
-        """The asset's own family for the repository level: `expected.family` (HMAC for HMAC-SHA512), not the
-        call-site set `families`, which also holds the families a composite name mentions (HMAC, SHA-2)."""
-        own = self.expected.get("family")
-        return frozenset({str(own)}) if own else self.families
+        """The asset's own group for the repository level."""
+        return frozenset({self.group})
 
 
 @dataclass(frozen=True)
@@ -51,6 +52,7 @@ class TruthProject:
     assets: tuple[TruthAsset, ...]
     related: dict[int, str]
     accepted: dict[int, frozenset[str]]
+    decoys: dict[str, tuple[int, ...]] = field(default_factory=dict)  # decoy id -> its lines
 
     def families_at(self, line: int) -> frozenset[str]:
         fams: set[str] = set()
@@ -90,6 +92,8 @@ class TruthScore:
     false_sites: list[dict] = field(default_factory=list)
     hits_repo: list[str] | None = None  # repository level (location ignored); None: not computed
     repo_extra: list[str] = field(default_factory=list)  # families reported anywhere that the project does not have
+    n_decoys: int = 0
+    decoys_hit: list[str] = field(default_factory=list)  # decoys with a crypto record on their lines
 
     @property
     def recall_strict(self) -> float:
@@ -144,28 +148,22 @@ class TruthScore:
             "precision": round(self.precision, 3),
             "passes_bar": self.passes_bar,
             "false_sites": list(self.false_sites),
+            "decoys": self.n_decoys,
+            "decoys_hit": list(self.decoys_hit),
         }
 
 
 @lru_cache(maxsize=4)
 def load_ground_truth(path: str | Path | None = None) -> dict[str, TruthProject]:
     data = yaml.safe_load(Path(path or DEFAULT_TRUTH).read_text(encoding="utf-8")) or {}
-    assets = {
-        str(a["id"]): (
-            str(a["id"]),
-            str(a.get("name") or a["id"]),
-            frozenset(a.get("families") or []),
-            a.get("expected") or {},
-            str(a.get("insertion_style") or "direct"),
-        )
-        for a in data.get("assets") or []
-    }
+    assets = {str(a["id"]): a for a in data.get("assets") or []}
     projects: dict[str, TruthProject] = {}
     for name, p in (data.get("projects") or {}).items():
         lines = p.get("lines") or {}
         unknown = set(lines) - set(assets)
         if unknown:
             raise ValueError(f"ground truth project {name} references unknown assets {sorted(unknown)}")
+        expected = p.get("expected") or {}
         projects[str(name)] = TruthProject(
             name=str(name),
             language=str(p.get("language") or ""),
@@ -173,16 +171,18 @@ def load_ground_truth(path: str | Path | None = None) -> dict[str, TruthProject]
             assets=tuple(
                 TruthAsset(
                     id=aid,
-                    name=assets[aid][1],
-                    families=assets[aid][2],
+                    group=str(assets[aid]["group"]),
+                    families=frozenset(assets[aid].get("families") or [assets[aid]["group"]]),
                     lines=tuple(int(x) for x in ls),
-                    expected=assets[aid][3],
-                    insertion_style=assets[aid][4],
+                    expected=dict(expected.get(aid) or {}),
+                    insertion_style=str(assets[aid].get("insertion_style") or "direct"),
+                    keygen=bool(assets[aid].get("keygen")),
                 )
                 for aid, ls in lines.items()
             ),
             related={int(k): str(v) for k, v in (p.get("related") or {}).items()},
             accepted={int(k): frozenset(v) for k, v in (p.get("accepted") or {}).items()},
+            decoys={str(k): tuple(int(x) for x in d["lines"]) for k, d in (p.get("decoys") or {}).items()},
         )
     return projects
 
@@ -196,6 +196,7 @@ def project_for_repo(full_name: str, truth: dict[str, TruthProject] | None = Non
 # ----- normalised records: call sites and repository level -----
 
 SCORED_ASSET_TYPES = ("algorithm", None)  # as the call-site extraction: algorithms and assets without a type
+KEY_TYPE = "related-crypto-material"  # a keygen item's key records count too
 
 
 @dataclass(frozen=True)
@@ -234,21 +235,23 @@ def record_spots(records) -> list[Spot]:
 
 def score_records(records, project: TruthProject, tool: str, *, asset_types=SCORED_ASSET_TYPES) -> TruthScore:
     """Score one tool's normalised records at both levels (module docstring). Call sites: the asset's own lines,
-    strict = a compatible family there, lenient = also an unknown family there; a window counts at every line it
-    spans. `asset_types=None` keeps every crypto record except
-    library entries (dependency inventory)."""
-    if asset_types is None:
-        own = [r for r in records if r.tool == tool and r.values.get("asset_type") != "library"]
-    else:
-        own = [r for r in records if r.tool == tool and r.values.get("asset_type") in asset_types]
-    score = TruthScore(tool=tool, project=project.name, n_assets=len(project.assets))
+    strict = a compatible family there (for a keygen asset also a key record of its group), lenient = also an unknown
+    family there; a window counts at every line it spans. `asset_types=None` keeps every crypto record except
+    library entries (dependency inventory). Decoys: any crypto record on a decoy's lines, whatever its type."""
+    crypto = [r for r in records if r.tool == tool and r.values.get("asset_type") != "library"]
+    own = crypto if asset_types is None else [r for r in crypto if r.values.get("asset_type") in asset_types]
+    keys = [r for r in crypto if r.values.get("asset_type") == KEY_TYPE]
+    score = TruthScore(tool=tool, project=project.name, n_assets=len(project.assets), n_decoys=len(project.decoys))
     score._asset_ids = [a.id for a in project.assets]
     spots = record_spots(own)
     score.sites = len(spots)
     in_file = [s for s in spots if s.file == project.file]
     score.sites_in_file = len(in_file)
+    key_spots = [s for s in record_spots(keys) if s.file == project.file]
     for asset in project.assets:
         at = [s for s in in_file if s.covers(asset.lines)]
+        if asset.keygen:
+            at += [s for s in key_spots if s.covers(asset.lines) and s.families & asset.families]
         if any(s.families & asset.families for s in at):
             score.hits_strict.append(asset.id)
             score.hits_lenient.append(asset.id)
@@ -263,57 +266,45 @@ def score_records(records, project: TruthProject, tool: str, *, asset_types=SCOR
                 false_site["line_end"] = s.line_end
             score.false_sites.append(false_site)
     reported = {r.group for r in own if r.group}
-    score.hits_repo = [a.id for a in project.assets if a.family & reported]
+    reported_keys = {r.group for r in keys if r.group}
+    score.hits_repo = [a.id for a in project.assets if a.family & (reported | (reported_keys if a.keygen else set()))]
     score.repo_extra = sorted(reported - project.known_families)
+    crypto_spots = [s for s in record_spots(crypto) if s.file == project.file]
+    score.decoys_hit = [d for d, lines in project.decoys.items() if any(s.covers(lines) for s in crypto_spots)]
     return score
 
 
 # ----- normalised records vs the expected canonical record (per dimension) -----
 
-# ground-truth key -> record dimension; `family` in the ground truth is the coarse group, `variant` the family/algorithm
-_EXPECTED_DIMS = {"family": "group", "keysize": "key_size", "mode": "mode", "padding": "padding", "digest": "digest",
-                  "curve": "curve", "iterations": "iterations"}  # fmt: skip
-
 
 def expected_agreement(records, project: TruthProject, vocab=None) -> dict[str, dict[str, tuple]]:
-    """Field by field: per ground-truth asset, (expected, reported) for every dimension `expected` names.
+    """Field by field: per ground-truth asset, (expected, reported) for every dimension its `expected` record names
+    (`unit` against the record's L4 identity, the others against the record's values, both canonical).
 
-    The reported record is the algorithm record at one of the asset's lines (in the project's file) whose group
-    matches the expected family; with several, the one agreeing on most dimensions. `variant` (SHA-256, ECDSA,
-    PBKDF2) is compared with the record's algorithm or family. Expected values are canonicalised with the same
-    vocabulary as the records (P-256 -> secp256r1). Assets without a record get `reported` None everywhere.
+    The reported record is the algorithm record at one of the asset's lines (in the project's file) of the asset's
+    group; with several, the one agreeing on most dimensions. Assets without a record get `reported` None everywhere.
     """
-    from .normalize.vocab import load_vocabulary  # local import: keeps groundtruth usable without the normaliser
+    from .levels import UNIT_LEVEL, identity  # local import: keeps groundtruth usable without the normaliser
+    from .normalize.vocab import load_vocabulary
 
     vocab = vocab or load_vocabulary()
+
+    def reported(r, dim: str):
+        if r is None:
+            return None
+        return identity(r, UNIT_LEVEL, vocab) if dim == "unit" else r.get(dim)
+
     out: dict[str, dict[str, tuple]] = {}
     for asset in project.assets:
-        expected = {}
-        for key, value in asset.expected.items():
-            if key in _EXPECTED_DIMS:
-                dim = _EXPECTED_DIMS[key]
-                expected[dim] = value if dim in ("group", "key_size", "iterations") else vocab.canonical(dim, value)
-            elif key == "variant":
-                expected["variant"] = vocab.canonical("algorithm", value) or vocab.canonical("family", value) or value
+        expected = {d: v for d, v in asset.expected.items() if v is not None}
         candidates = [
             r
             for r in records
-            if r.file == project.file and r.line in asset.lines and r.values.get("asset_type") in ("algorithm", None)
+            if r.file == project.file
+            and r.line in asset.lines
+            and r.values.get("asset_type") in ("algorithm", None)
+            and r.group == asset.group
         ]
-
-        best = max(
-            (r for r in candidates if r.group == expected.get("group")),
-            key=lambda r, exp=expected: sum(_reported(r, d, exp) == v for d, v in exp.items()),
-            default=None,
-        )
-        out[asset.id] = {d: (v, _reported(best, d, expected)) for d, v in expected.items()}
+        best = max(candidates, key=lambda r: sum(reported(r, d) == v for d, v in expected.items()), default=None)
+        out[asset.id] = {d: (v, reported(best, d)) for d, v in expected.items()}
     return out
-
-
-def _reported(r, dim: str, expected: dict):
-    if r is None:
-        return None
-    if dim == "variant":  # matches when either the algorithm or the family names the expected variant
-        want = expected.get("variant")
-        return want if want in (r.get("algorithm"), r.get("family")) else (r.get("algorithm") or r.get("family"))
-    return r.get(dim)

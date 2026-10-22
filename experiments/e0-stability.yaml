@@ -17,12 +17,6 @@ repos:
   - full_name: bfcbom/micro-go
     path: ../corpus/micro/go
     language: Go
-  - full_name: bfcbom/micro-javascript
-    path: ../corpus/micro/javascript
-    language: JavaScript
-  - full_name: bfcbom/micro-c
-    path: ../corpus/micro/c
-    language: C
   - full_name: panva/jose
     language: TypeScript
     branch: main

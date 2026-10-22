@@ -113,8 +113,10 @@ normalisation, analysis outputs),
   worker job (recorded as `oom`, redone by `--retry-failed`), never redis or the git server. The corpus sampler
   would then also stratify by number of developers (GitHub contributors) next to language, stars, last push and
   size (size cap: `GITSERVER_MEMORY`, below).
-- **Corpus and fixtures** (`corpus/`, mounted read-only into the runner): `micro/<language>/` hand-written micro
-  projects with `micro/ground_truth.yaml` (11 expected items each, five languages); `pilot-2026-10-08.yaml` (12 pinned real
+- **Corpus and fixtures** (`corpus/`, mounted read-only into the runner): `micro/<language>/` the micro projects of
+  Java, Python and Go with `micro/ground_truth.yaml`, both generated from the snippet catalog (`mutation/micro.py`,
+  checked in, a test keeps them equal; 14 expected calls, each in a function of its own, and 4 decoys per project; its
+  header states the hit rule, decided 2026-10-22); `pilot-2026-10-08.yaml` (12 pinned real
   projects in Java, Python and Go, the development set; all 16 pilot projects in `pilot-2026-10-08-all.yaml`, read
   by CipherSift's `tailored_on`); `icpc-2026.yaml` (the 23 ICPC paper repos at HEAD of 2026-10-18, held out);
   `exclusions.yaml` (repos the corpus builder never samples, with reasons). `make corpus` builds a stratified GitHub
@@ -266,13 +268,15 @@ where they declare support, but no analysis, figure or tuning effort goes into t
   NAME=<x>` for the former smoke experiments e0-smoke, e0-cbomkit-smoke, e0-llm-smoke and e0-phase2-smoke, whose
   specs went 2026-10-21); `make experiment EXP=experiments/e4-mutation-smoke.yaml EXPERIMENT_MEMORY_BUDGET_GB=0`;
   then build the E1 corpus (Java, Python and Go) with `GITHUB_TOKEN` and prune it, check replicas.
-- **cdxgen's role waits for e0-micro** (decided 2026-10-21): micro-go >= 6/11 keeps it a voter, else `role:
+- **cdxgen's role waits for e0-micro** (decided 2026-10-21): micro-go at the bar (half the items, now 7/14) keeps it
+  a voter, else `role:
   observer` (`common/tools.yaml`; the paper's Review 5 comment). The VM's e0-micro of 2026-10-21 gave 5/11 because
   micro-go had no `go.sum` (our fixture; `docs/findings.md` "cdxgen on micro-go"), the rerun of 2026-10-22 0/11
   because the worker could not create Go's module cache (fixed the same day, "cdxgen in Go"); a throwaway run
-  with the fix gives 6/11 (exactly the bar), so the next rerun of e0-micro decides.
-- **Waiting for the user:** human review of the micro ground truth, the hand-check verdicts, the `languages` lists
-  and the mutation snippet catalogs (all AI-made).
+  with the fix gives 6/11 (exactly the bar), so the next rerun of e0-micro, on the generated micro projects of
+  2026-10-22 (`docs/findings.md` "Micro ground truth v2"), decides.
+- **Waiting for the user:** human review of the snippet catalogs (the micro projects and their ground truth are
+  generated from them) and the micro decoys, the hand-check verdicts and the `languages` lists (all AI-made).
 - **External:** the SCANOSS research key, the Cryptoscope artifact, the two-rater review of the matcher validation
   sample (a review of `vocab.csv` with Cohen's κ is an option, not decided).
 - **Small open analysis items:** CryptobomForge's IBM-draft windows are CodeQL's `contextRegion` (finding ±2 lines),
@@ -386,7 +390,8 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
   `dataviz` skill.
 
 ## Phase 4: mutation harness (`mutation/`, RQ4 validation; insertion built 2026-10-20)
-- **Snippet catalog** (`mutation/catalog/{java,python,go}.yaml`, versioned): the same 15 ids per language (RSA-2048
+- **Snippet catalog** (`mutation/catalog/{java,python,go}.yaml`, versioned; also the source of the micro projects,
+  `mutation/micro.py`): the same 15 ids per language (RSA-2048
   keygen, EC P-256 keygen, ECDSA / Ed25519 signing, AES-128/256-GCM, AES-256-CBC, 3DES-CBC (Python: SHA3-256),
   RSA-OAEP, SHA-1/256, MD5, HMAC-SHA256, PBKDF2, TLS 1.3 context). Each has its expected canonical record (`unit` =
   the L4 identity), the identities it also contains, its imports and the `direct` and `indirect` templates (the
@@ -421,7 +426,7 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
   insertion and removal results are reported apart, never pooled (refinement 7).
 
 ## Phase 5: experiments
-- **E0 (the voter bar, stability):** every tool once on the five micro projects (`experiments/e0-micro.yaml`): the
+- **E0 (the voter bar, stability):** every tool once on the three micro projects (`experiments/e0-micro.yaml`): the
   inclusion check that decides each tool's `role`; and every tool 3× on the micro projects and ten small pilot repos
   (`experiments/e0-stability.yaml`), for determinism and run-to-run variance; needed before any agreement claim; its timings decide replicas and pruning.
 - **E1 (RQ1, RQ2):** all tools on the full corpus: validity, meaningfulness and traceability rates; assets per tool and

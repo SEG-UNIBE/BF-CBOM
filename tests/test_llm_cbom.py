@@ -412,8 +412,6 @@ def test_select_files_covers_all_micro_languages():
         ("Java", "java", "CryptoDemo.java"),
         ("Python", "python", "crypto_demo.py"),
         ("Go", "go", "main.go"),
-        ("JavaScript", "javascript", "crypto_demo.js"),
-        ("C", "c", "crypto_demo.c"),
     ):
         sel = select_files(root / sub, lang)
         assert [p.name for p in sel.files] == [expected], lang

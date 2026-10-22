@@ -97,6 +97,7 @@ MICRO_COLUMNS = [
     "project", "language", "tool", "run", "tailored", "status", "verdict", "n_items",
     "strict", "lenient", "repo", "recall_strict", "recall_lenient", "recall_repo",
     "sites_in_file", "sites_correct", "precision", "passes_bar", "missed", "repo_missed", "repo_extra",
+    "decoys", "decoys_hit",
 ]  # fmt: skip
 MICRO_ITEM_COLUMNS = [
     "project", "language", "tool", "run", "item", "families", "insertion_style",
@@ -540,6 +541,7 @@ def micro_rows(entries: list[MicroEntry], *, run: int) -> list[dict]:
             "status": e.status,
             "verdict": micro_verdict(e.status, s),
             "n_items": len(e.project.assets),
+            "decoys": len(e.project.decoys),
         }
         if s is not None:
             recall_repo = s.recall_repo
@@ -558,6 +560,7 @@ def micro_rows(entries: list[MicroEntry], *, run: int) -> list[dict]:
                     "missed": s.missed,
                     "repo_missed": s.repo_missed,
                     "repo_extra": s.repo_extra,
+                    "decoys_hit": s.decoys_hit,
                 }
             )
         rows.append(row)

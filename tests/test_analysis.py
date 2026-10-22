@@ -14,8 +14,22 @@ from analysis.groundtruth import load_ground_truth, project_for_repo
 FIXTURES = Path(__file__).parent / "fixtures" / "pilot"
 
 
+OLD_TRUTH = FIXTURES / "ground_truth-2026-10-08.yaml"  # the micro projects the pilot CBOMs above were made on
+
+
 def _cbom(name: str) -> dict:
     return json.loads((FIXTURES / f"{name}.json").read_text(encoding="utf-8"))
+
+
+@pytest.fixture
+def old_truth(monkeypatch):
+    """The CLI's default ground truth replaced by the frozen one of 2026-10-08, for the pilot CBOMs."""
+    import analysis.groundtruth as gt
+
+    monkeypatch.setattr(gt, "DEFAULT_TRUTH", OLD_TRUTH)
+    gt.load_ground_truth.cache_clear()
+    yield
+    gt.load_ground_truth.cache_clear()
 
 
 # ----- ground truth -----
@@ -23,9 +37,9 @@ def _cbom(name: str) -> dict:
 
 def test_ground_truth_loads_and_maps_repo_names():
     truth = load_ground_truth()
-    assert set(truth) == {"micro-java", "micro-python", "micro-go", "micro-javascript", "micro-c"}
+    assert set(truth) == {"micro-java", "micro-python", "micro-go"}
     for p in truth.values():
-        assert len(p.assets) == 11
+        assert len(p.assets) == 14 and len(p.decoys) == 4
     assert project_for_repo("bfcbom/micro-java").file == "src/main/java/app/CryptoDemo.java"
     assert project_for_repo("x/other") is None
 
@@ -34,19 +48,20 @@ def test_ground_truth_loads_and_maps_repo_names():
     "fixture, tool, project, strict, lenient, repo",
     [
         ("cbomkit_micro-java", "cbomkit", "micro-java", 11, 11, 11),
-        ("cbomkit_micro-python", "cbomkit", "micro-python", 5, 5, 9),  # misses MD5 and HMAC anywhere
+        ("cbomkit_micro-python", "cbomkit", "micro-python", 6, 6, 9),  # misses MD5 and HMAC anywhere
         ("pqcheck_micro-python", "pqcheck", "micro-python", 8, 8, 11),
         ("cipherradar_micro-java", "cipherradar", "micro-java", 11, 11, 11),
         ("cbomkit_micro-go", "cbomkit", "micro-go", 8, 8, 11),
     ],
 )
 def test_score_records_matches_call_sites_and_adds_repo_level(fixture, tool, project, strict, lenient, repo):
-    """Call-site numbers as the pilot found them (CBOMkit micro-python: 6/11 in the pilot counted a key-material
-    asset) plus the repo level, which is at least the call-site level (assets sharing a family are found together)."""
+    """Call-site numbers as the pilot found them (CBOMkit micro-python 6/11: its EC key record at the EC key
+    generation counts, the keygen rule) plus the repo level, which is at least the call-site level (assets sharing a
+    family are found together)."""
     from analysis.groundtruth import score_records
     from analysis.normalize import normalize_cbom
 
-    truth = load_ground_truth()[project]
+    truth = load_ground_truth(OLD_TRUTH)[project]
     score = score_records(normalize_cbom(_cbom(fixture), tool, language=truth.language).records, truth, tool)
     assert (len(score.hits_strict), len(score.hits_lenient), len(score.hits_repo)) == (strict, lenient, repo)
     assert score.false_sites == [] and score.precision == 1.0 and score.repo_extra == []
@@ -74,7 +89,7 @@ def test_score_records_windows_location_free_records_and_extra_families():
     score = score_records(records, truth, "t")
     assert score.hits_strict == ["rsa-2048-keygen"] and score.sites == 1 and score.precision == 1.0
     assert set(score.hits_repo) == {"rsa-2048-keygen", "rsa-oaep-sha256", "md5", "sha-256"}
-    assert score.repo_extra == ["ChaCha"] and "hmac-sha512" in score.repo_missed
+    assert score.repo_extra == ["ChaCha"] and "hmac-sha256" in score.repo_missed
 
 
 # ----- CSV tables -----
@@ -177,7 +192,7 @@ def test_tables_command_writes_joinable_tables(tmp_path, monkeypatch):
     assert info["settings"]["level"] == "L3" and info["settings"]["window"] == 2
 
 
-def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch):
+def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch, old_truth):
     from typer.testing import CliRunner
 
     from analysis import levels as lv

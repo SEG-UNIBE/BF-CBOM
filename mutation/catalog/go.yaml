@@ -6,7 +6,8 @@
 # Go rejects unused variables and imports, so every snippet uses what it declares; the host's results are unknown, so
 # errors panic. Inside a host the snippet sits in its own block (`scope`), so its locals never clash with the host's.
 # Go's APIs take no algorithm strings: `indirect` holds a parameter or a function value in a variable instead.
-# The calls mirror corpus/micro/go (AI-made like it; on the human-review list before paper use).
+# The micro project corpus/micro/go is generated from this catalog (mutation/micro.py; AI-made, on the human-review
+# list before paper use).
 version: "2026-10-20.1"
 language: go
 scope: |

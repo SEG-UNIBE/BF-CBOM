@@ -304,7 +304,8 @@ def test_cryptobom_forge_empty_document_is_read_as_the_tools_own_zero():
 
 def test_cbomkit_micro_java_against_the_ground_truth():
     recs = normalize_cbom(_load("fixtures/pilot/cbomkit_micro-java.json"), "cbomkit", language="java").records
-    agreement = expected_agreement(recs, load_ground_truth()["micro-java"])
+    truth = load_ground_truth(TESTS / "fixtures" / "pilot" / "ground_truth-2026-10-08.yaml")  # the projects it ran on
+    agreement = expected_agreement(recs, truth["micro-java"])
     misses = {(a, d): pair for a, dims in agreement.items() for d, pair in dims.items() if pair[0] != pair[1]}
     assert misses == {
         ("aes-gcm-encrypt", "key_size"): (256, 128),  # CBOMkit's invented key size (pilot finding)

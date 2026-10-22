@@ -37,15 +37,15 @@ experiment.
 
 | Spec | Tools | Repos | Purpose |
 |---|---|---|---|
-| `e0-micro.yaml` | every tool but the ChatGPT and Claude workers (16), once | the 5 micro projects (`corpus/micro`) | the voter bar: the micro check against the hand-written ground truth (`make analysis ARGS="micro e0-micro"`), which decides `role` in `common/tools.yaml` (at least 6 of 11 at their lines in one paper language); 80 jobs |
-| `e0-stability.yaml` | the same 16, 3 repetitions | 5 micro projects + the 10 fastest pilot repos | E0: run-to-run variance (`stability.csv`) and consensus sets for the scores; 720 jobs |
+| `e0-micro.yaml` | every non-LLM tool (15), once | the 3 micro projects (`corpus/micro`: Java, Python, Go) | the voter bar: the micro check against the generated ground truth (`make analysis ARGS="micro e0-micro"`), which decides `role` in `common/tools.yaml` (at least 7 of 14 in their functions in one paper language); 45 jobs |
+| `e0-stability.yaml` | the same 15, 3 repetitions | 3 micro projects + the 10 fastest pilot repos | E0: run-to-run variance (`stability.csv`) and consensus sets for the scores; 585 jobs |
 | `e1-pilot-corpus.yaml` | the same 16 | the 12 pilot projects in Java, Python and Go (`corpus/pilot-2026-10-08.yaml`) | first real workload: location-aware agreement on the pilot's pinned projects; large repos (Kafka, Keycloak) push CBOMkit towards its timeout |
 | `e1-icpc-corpus.yaml` | the same 16 | 23 projects of the ICPC 2026 paper (`corpus/icpc-2026.yaml`, HEAD of 2026-10-18) | held-out counterpart of the pilot corpus: none of these repos was used to tune the vocabulary, the specs or CipherSift; six are marked `expect_crypto: low` (negative cases) |
 | `e4-mutation-smoke.yaml` | every non-LLM tool (15) | pyjwt, jjwt, golang-jwt (pilot), 3 mutants each | the mutation harness end to end: the RSA-2048 keygen inserted in each style; CBOMkit and CryptoScan should find the direct one at its line (`mutation.csv`) |
 
 After a change to one worker, `make experiment EXP=experiments/e4-mutation-smoke.yaml ARGS="--rerun <tool>"` redoes
 its runs on three small repos, one per paper language (an LLM worker: on e0-stability); its micro check, the same on
-`e0-micro.yaml` (5 jobs). E1 on the full corpus (Java,
+`e0-micro.yaml` (3 jobs). E1 on the full corpus (Java,
 Python and Go) and E4 on its mutation subset (see `CLAUDE.md`, Phases 4 and 5) have no specs yet; E1 needs the corpus
 from `make corpus` first, pruned with
 `make corpus-prune ARGS="--in /data/results/corpus/corpus.yaml --from e0-stability"` to drop repos a tool
@@ -376,18 +376,21 @@ takes part; it is the basis for UpSet plots and the tools-per-item distribution.
 voter), `--observers-vote`, `--include-tailored`, `--closure` (refinement 2).
 
 **`micro <exp>`** scores every tool on the micro projects (`corpus/micro`, repos named `<owner>/micro-<language>`)
-against `corpus/micro/ground_truth.yaml`, 11 expected items per project (a known crypto call at known lines; the
-file calls them `assets`), from the normalised records
+against `corpus/micro/ground_truth.yaml`, 14 expected items per project (a catalog snippet in a function of its own;
+the file calls them `assets`) plus 4 decoys (code that names or resembles cryptography without using it). Projects and
+ground truth are generated from the snippet catalog by `uv run python -m mutation.micro` (never edited by hand; a test
+fails when they drift; the ground truth's header states the rules). Scored from the normalised records
 (`analysis/groundtruth.py:score_records`) at two levels (CLAUDE.md, refinement 1). It prints one row per project and
 tool, including tools that did not run there (unsupported, failed):
 
 | Column | Meaning |
 |---|---|
-| strict | call site: expected items found at one of their ground-truth lines with a compatible algorithm family, out of 11 (a family the item's name contains counts: SHA-2 for HMAC-SHA512) |
-| lenient | call site: expected items found at the right line, family compatible or unknown |
-| repo | repository level: expected items whose own family (HMAC for HMAC-SHA512) the tool reports anywhere in the project, location ignored; items sharing a family are found together. Needs a known family, so it can be lower than lenient |
-| precision | correct locations out of all the tool reported in the micro source file; one is correct on an expected item's line or a line the ground truth marks as related or accepted |
-| bar | `pass` when lenient recall is at least 50 % (the pilot's inclusion bar) |
+| strict | call site: expected items with a record of their group on one of their lines (the body of their function), out of 14; for a key generation a key record of the group counts too |
+| lenient | call site: also a record of unknown family there |
+| repo | repository level: expected items whose group the tool reports anywhere in the project, location ignored; items sharing a group are found together. Needs a known family, so it can be lower than lenient |
+| precision | correct locations out of all the tool reported in the micro source file; one is correct on an expected item's line or a line the ground truth marks as related or accepted (a sub-use such as a digest, an import of the item's API) |
+| decoys | the decoys with a crypto record on their lines: false positives with ground truth |
+| bar | `pass` when lenient recall is at least 50 % (the inclusion bar) |
 | missed | ids of the expected items the tool did not find (lenient) |
 
 A location window (CryptobomForge's IBM-draft `detectionContext`, the finding ±2 lines) counts at every line it spans.
