@@ -4,10 +4,10 @@
 # it in every language it is `disqualified` (until the decision to leave such tools out: `role: observer` in
 # common/tools.yaml). The directories are published to the git server as deterministic fixture
 # commits (`path:`), so every worker scans them like any repo.
-#   make experiment EXP=experiments/e0-micro.yaml ARGS="--overwrite-old" EXPERIMENT_MEMORY_BUDGET_GB=0
-#   make analysis ARGS="micro e0-micro"      # entry bar, recall, precision, F1 per tool and language; passed/disqualified
+#   make experiment EXP=experiments/bar-micro.yaml ARGS="--overwrite-old" EXPERIMENT_MEMORY_BUDGET_GB=0
+#   make analysis ARGS="micro bar-micro"      # entry bar, recall, precision, F1 per tool and language; passed/disqualified
 # After a change to one worker: ARGS="--rerun <tool>" (3 jobs).
-name: e0-micro
+name: bar-micro
 description: "the voter bar: every tool once on the three micro projects with known ground truth"
 tools: [cbomkit, cdxgen, cryptobomforge, cryptoscan, pqcheck, qdarpan, securin-xbom, cipherradar, xgrep, cbomkit-jar, ciphersift, scanoss, qelens, cryptarium, qscan]
 repetitions: 1

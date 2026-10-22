@@ -11,11 +11,11 @@ experiments/
 ```
 
 ```
-make experiment EXP=experiments/e4-mutation-smoke.yaml   # pin commits, mirror to gitserver, run, persist
-make experiment-status NAME=e4-mutation-smoke            # Redis progress + what is on disk
-make experiment-export NAME=e4-mutation-smoke            # experiments/results/e4-mutation-smoke.zip (only way data reaches the host)
+make experiment EXP=experiments/mutation-smoke.yaml   # pin commits, mirror to gitserver, run, persist
+make experiment-status NAME=mutation-smoke            # Redis progress + what is on disk
+make experiment-export NAME=mutation-smoke            # experiments/results/mutation-smoke.zip (only way data reaches the host)
 make experiment-list                                     # experiments stored on the volume
-make experiment-delete NAME=e4-mutation-smoke            # remove one from the volume (asks first)
+make experiment-delete NAME=mutation-smoke            # remove one from the volume (asks first)
 make corpus ARGS="--per-language 100"                    # stratified corpus -> results volume corpus/corpus.yaml
 make board                                               # live board of the stack: experiments, workers, queues
 make board ARGS=--once                                   # one snapshot of it, then exit
@@ -42,39 +42,43 @@ experiment.
 
 ## Specs in this folder
 
+The name says the kind of spec, then what it runs on: `bar-` (the bar exam on ground truth), `stability-` (repeated
+runs), `corpus-` (real repositories as they are), `mutation-` (real repositories with their mutants). Renamed from
+`e0-`, `e1-` and `e4-` on 2026-10-22, so that no experiment number reads as a research question.
+
 | Spec | Tools | Repos | Purpose |
 |---|---|---|---|
-| `e0-micro.yaml` | all 15 tools, once | the 3 micro projects (`experiments/corpus/micro`: Java, Python, Go) | the voter bar: the micro check against the generated ground truth (`make analysis ARGS="micro e0-micro"`), which informs the role decision in `common/tools.yaml` (at least 7 of 14 in their functions in one paper language); 45 jobs |
-| `e0-stability.yaml` | the same 15, 3 repetitions | 3 micro projects + the 10 fastest pilot repos | E0: run-to-run variance (`stability.csv`) and consensus sets for the scores; 585 jobs |
-| `e1-pilot-corpus.yaml` | the same 15 | the 12 pilot projects in Java, Python and Go (`experiments/corpus/pilot-2026-10-08.yaml`) | first real workload: location-aware agreement on the pilot's pinned projects; large repos (Kafka, Keycloak) push CBOMkit towards its timeout |
-| `e1-pilot-60.yaml` | the same 15, once | 60 manually selected projects, 20 each in Java, Python and Go (`experiments/corpus/pilot-2026-10-22.yaml`) | second pilot, pinned to default-branch HEADs on 2026-10-22; 900 tool/repository pairs |
-| `e1-icpc-corpus.yaml` | the same 15 | 23 projects of the ICPC 2026 paper (`experiments/corpus/icpc-2026.yaml`, HEAD of 2026-10-18) | held-out counterpart of the pilot corpus: none of these repos was used to tune the vocabulary, the specs or CipherSift; six are marked `expect_crypto: low` (negative cases) |
-| `e4-mutation-smoke.yaml` | all 15 tools | pyjwt, jjwt, golang-jwt (pilot), 3 mutants each | the mutation harness end to end: the RSA-2048 keygen inserted in each style; CBOMkit and CryptoScan should find the direct one at its line (`mutation.csv`) |
+| `bar-micro.yaml` | all 15 tools, once | the 3 micro projects (`experiments/corpus/micro`: Java, Python, Go) | the voter bar: the micro check against the generated ground truth (`make analysis ARGS="micro bar-micro"`), which informs the role decision in `common/tools.yaml` (at least 7 of 14 in their functions in one paper language); 45 jobs |
+| `stability-pilot.yaml` | the same 15, 3 repetitions | 3 micro projects + the 10 fastest pilot repos | run-to-run variance (`stability.csv`) and consensus sets for the scores; 585 jobs |
+| `corpus-pilot-small.yaml` | the same 15 | the 12 pilot projects in Java, Python and Go (`experiments/corpus/pilot-2026-10-08.yaml`) | first real workload: location-aware agreement on the pilot's pinned projects; large repos (Kafka, Keycloak) push CBOMkit towards its timeout |
+| `corpus-pilot-medium.yaml` | the same 15, once | 60 manually selected projects, 20 each in Java, Python and Go (`experiments/corpus/pilot-2026-10-22.yaml`) | second pilot, pinned to default-branch HEADs on 2026-10-22; 900 tool/repository pairs |
+| `corpus-icpc.yaml` | the same 15 | 23 projects of the ICPC 2026 paper (`experiments/corpus/icpc-2026.yaml`, HEAD of 2026-10-18) | held-out counterpart of the pilot corpus: none of these repos was used to tune the vocabulary, the specs or CipherSift; six are marked `expect_crypto: low` (negative cases) |
+| `mutation-smoke.yaml` | all 15 tools | pyjwt, jjwt, golang-jwt (pilot), 3 mutants each | the mutation harness end to end: the RSA-2048 keygen inserted in each style; CBOMkit and CryptoScan should find the direct one at its line (`mutation.csv`) |
 
 LLM providers are outside the current experiment scope; their implementation remains available for possible later use.
 The 15 tools include three observers: tools whose findings are analysed but do not confirm other tools' findings
 or receive a rank (see [Observers](../analysis/README.md#observers)). The micro check reports entry-bar verdicts
 but does not edit roles in `common/tools.yaml` or the specs.
-Job totals include tool/repository pairs recorded as `unsupported` without scanning. E0 stability still includes
+Job totals include tool/repository pairs recorded as `unsupported` without scanning. `stability-pilot` still includes
 four historical pilot repositories outside the paper languages (TypeScript, JavaScript and C).
 
 **Second pilot (60 repositories).** On the 64 GB VM, after `make up-prod`:
 
 ```sh
-make experiment EXP=experiments/e1-pilot-60.yaml EXPERIMENT_MEMORY_BUDGET_GB=0
-make experiment-status NAME=e1-pilot-60
-make experiment-export NAME=e1-pilot-60   # generates the report and experiments/results/e1-pilot-60.zip
+make experiment EXP=experiments/corpus-pilot-medium.yaml EXPERIMENT_MEMORY_BUDGET_GB=0
+make experiment-status NAME=corpus-pilot-medium
+make experiment-export NAME=corpus-pilot-medium   # generates the report and experiments/results/corpus-pilot-medium.zip
 ```
 
 The corpus records the full repository names and commits. It is a manual selection, separate from the
 stratified corpus built by `make corpus`. Rerunning the command resumes this experiment at the pinned commits.
 
-After a change to one worker, `make experiment EXP=experiments/e4-mutation-smoke.yaml ARGS="--rerun <tool>"` redoes
+After a change to one worker, `make experiment EXP=experiments/mutation-smoke.yaml ARGS="--rerun <tool>"` redoes
 its runs on three small repos and their mutants, one repo per paper language; its micro check, the same on
-`e0-micro.yaml` (3 jobs). E1 on the full corpus (Java,
-Python and Go) and E4 on its mutation subset (see `CLAUDE.md`, Phases 4 and 5) have no specs yet; E1 needs the corpus
-from `make corpus` first, pruned with
-`make corpus-prune ARGS="--in /data/results/corpus/corpus.yaml --from e0-stability"` to drop repos a tool
+`bar-micro.yaml` (3 jobs). The corpus run on the full corpus (Java, Python and Go) and the mutation run on its
+subset (see `CLAUDE.md`, Phases 4 and 5) have no specs yet; the corpus spec needs the corpus from `make corpus`
+first, pruned with
+`make corpus-prune ARGS="--in /data/results/corpus/corpus.yaml --from stability-pilot"` to drop repos a tool
 timed out on.
 
 ## Spec format
@@ -164,7 +168,7 @@ with a warning, so the budget is not a hard cap. For the paper's runs on the 64 
 everything in parallel):
 
 ```
-make experiment EXP=experiments/e1-pilot-corpus.yaml EXPERIMENT_MEMORY_BUDGET_GB=0   # per call
+make experiment EXP=experiments/corpus-pilot-small.yaml EXPERIMENT_MEMORY_BUDGET_GB=0   # per call
 ```
 
 or change the default in the Makefile once per machine. The wave plan is printed before anything is
@@ -300,13 +304,13 @@ stability, micro) reads the `original` variants only; mutants are normalised too
 mutated repository is never counted once per mutant.
 
 ```
-make analysis ARGS="report e0-stability"     # all of the below in one pass, plus _ANALYSIS/_SUMMARY.md (Markdown tables)
-make analysis ARGS="normalize e0-stability"  # every CBOM -> normalised records (run<k>.norm.json next to it)
-make analysis ARGS="schema e0-stability"     # RQ1: schema validity, meaningful shares, traceability (--fetch on a laptop)
-make analysis ARGS="levels e0-stability"     # how much agreement normalisation creates: L0 (raw) to L4 (tool specs)
-make analysis ARGS="micro e0-micro"          # score each tool against the micro projects' ground truth, two levels
-make analysis ARGS="tables e0-stability"     # flat CSV tables (runs, records, exact-matcher groups, micro) for pandas/R
-make analysis ARGS="score e0-stability"      # RQ4: confirmation, exclusivity, Dawid-Skene, leave-one-out, CIs; stability
+make analysis ARGS="report stability-pilot"     # all of the below in one pass, plus _ANALYSIS/_SUMMARY.md (Markdown tables)
+make analysis ARGS="normalize stability-pilot"  # every CBOM -> normalised records (run<k>.norm.json next to it)
+make analysis ARGS="schema stability-pilot"     # RQ1: schema validity, meaningful shares, traceability (--fetch on a laptop)
+make analysis ARGS="levels stability-pilot"     # how much agreement normalisation creates: L0 (raw) to L4 (tool specs)
+make analysis ARGS="micro bar-micro"          # score each tool against the micro projects' ground truth, two levels
+make analysis ARGS="tables stability-pilot"     # flat CSV tables (runs, records, exact-matcher groups, micro) for pandas/R
+make analysis ARGS="score stability-pilot"      # RQ4: confirmation, exclusivity, Dawid-Skene, leave-one-out, CIs; stability
 ```
 
 **`report <exp>`** normalises every CBOM once and writes the CSV tables for the analyses below, then
@@ -533,6 +537,6 @@ the record, every CBOM and its meta file. The export runs `analysis report` firs
 `_ANALYSIS/_SUMMARY.md` in the zip match the stored runs (`ARGS=--no-report` skips it):
 
 ```
-make experiment-export NAME=e0-stability   # -> experiments/results/e0-stability.zip on the host, open e0-stability/_ANALYSIS/_SUMMARY.md
+make experiment-export NAME=stability-pilot   # -> experiments/results/stability-pilot.zip on the host, open stability-pilot/_ANALYSIS/_SUMMARY.md
 ```
 

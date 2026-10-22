@@ -126,7 +126,7 @@ normalisation, analysis outputs),
   header states the hit rule, decided 2026-10-22); `pilot-2026-10-08.yaml` (12 pinned real
   projects in Java, Python and Go, the development set; all 16 pilot projects in `pilot-2026-10-08-all.yaml`, read
   by CipherSift's `tailored_on`); `pilot-2026-10-22.yaml` (second pilot: 60 manually selected repos, 20 per paper
-  language, default-branch HEADs pinned on 2026-10-22; `experiments/e1-pilot-60.yaml`);
+  language, default-branch HEADs pinned on 2026-10-22; `experiments/corpus-pilot-medium.yaml`);
   `icpc-2026.yaml` (the 23 ICPC paper repos at HEAD of 2026-10-18, held out);
   `exclusions.yaml` (repos the corpus builder never samples, with reasons). `make corpus` builds a stratified GitHub
   corpus of Java, Python and Go repos (`common/corpus.py`; needs `GITHUB_TOKEN` in `docker/env/coordinator.env`).
@@ -186,7 +186,7 @@ but they never confirm another tool, count in no k, exclusivity or Dawid-Skene a
 numbers are identical with and without them; `--observers-vote` makes them voters (sensitivity check). Whether they
 appear in the paper's figures is decided later. Since 2026-10-22 the micro check calls a tool below the entry bar in
 every language `disqualified`; leaving the disqualified tools out of the further experiments altogether is likely
-(the user's decision, pending the e0-micro rerun); until then they run as observers.
+(the user's decision, pending the bar-micro rerun); until then they run as observers.
 
 | Worker | Voter group | Languages | Invocation and caveats |
 |---|---|---|---|
@@ -234,8 +234,8 @@ where they declare support, but no analysis, figure or tuning effort goes into t
 ## Status (updated 2026-10-22)
 - **Current experiment scope:** 15 CBOM generator tools in all current specs. LLM providers are excluded for now;
   the provider workers and their analysis support remain implemented for possible later use.
-- **Export review of 2026-10-19** (`docs/findings.md` "Export review"): the first VM runs of e0-stability,
-  e1-pilot-corpus and e1-icpc-corpus were checked for plausibility. Fixed since: the git server's 256 MiB limit killed
+- **Export review of 2026-10-19** (`docs/findings.md` "Export review"): the first VM runs of stability-pilot,
+  corpus-pilot-small and corpus-icpc were checked for plausibility. Fixed since: the git server's 256 MiB limit killed
   CBOMkit's full clones of keycloak and ansible (`GITSERVER_MEMORY`, 4g); cdxgen was OOM-killed at 8 GiB on four Java
   repos while stored `ok` (16 GiB; an ok run with OOM kills counts as `oom` and is redone by `--retry-failed`);
   DeepSeek runs with failed requests (the account ran out of credit) were stored `ok` and the 100-chunk cap truncated
@@ -274,19 +274,21 @@ where they declare support, but no analysis, figure or tuning effort goes into t
   `--overwrite-old` and `experiment delete` now leave nothing of a former run (the folder with its record, run log
   and `mutants.json`, and the experiment's Redis entries); the spec pins the commits.
 - **Phase 4 built (2026-10-20):** insertion mutants for Java, Python and Go (`mutation/`, below); the smoke spec
-  `experiments/e4-mutation-smoke.yaml` waits for the VM. Removal mutants come after E1 (they need its voters).
+  `experiments/mutation-smoke.yaml` waits for the VM. Removal mutants come after E1 (they need its voters).
 - **Waiting for the VM:** `make up-prod`, then each experiment as a whole (the user's preference, 2026-10-20):
-  `make experiment EXP=experiments/e1-pilot-corpus.yaml ARGS="--overwrite-old" EXPERIMENT_MEMORY_BUDGET_GB=0`, the
-  same for e1-icpc-corpus, e0-stability and e0-micro (LLM providers are outside the current scope; `make experiment-delete
+  `make experiment EXP=experiments/corpus-pilot-small.yaml ARGS="--overwrite-old" EXPERIMENT_MEMORY_BUDGET_GB=0`, the
+  same for corpus-icpc, stability-pilot and bar-micro (LLM providers are outside the current scope; `make experiment-delete
   NAME=<x>` for the former smoke experiments e0-smoke, e0-cbomkit-smoke, e0-llm-smoke and e0-phase2-smoke, whose
-  specs went 2026-10-21); `make experiment EXP=experiments/e4-mutation-smoke.yaml EXPERIMENT_MEMORY_BUDGET_GB=0`;
+  specs went 2026-10-21, and for the runs under the old spec names e0-micro, e0-stability, e1-pilot-corpus,
+  e1-icpc-corpus, e1-pilot-60 and e4-mutation-smoke: renamed 2026-10-22, the name now says the kind, `bar-`,
+  `stability-`, `corpus-`, `mutation-`); `make experiment EXP=experiments/mutation-smoke.yaml EXPERIMENT_MEMORY_BUDGET_GB=0`;
   then build the E1 corpus (Java, Python and Go) with `GITHUB_TOKEN` and prune it, check replicas.
-- **cdxgen's role waits for e0-micro** (decided 2026-10-21): micro-go at the bar (half the items, now 7/14) keeps it
+- **cdxgen's role waits for bar-micro** (decided 2026-10-21): micro-go at the bar (half the items, now 7/14) keeps it
   a voter, else `role:
-  observer` (`common/tools.yaml`; the paper's Review 5 comment). The VM's e0-micro of 2026-10-21 gave 5/11 because
+  observer` (`common/tools.yaml`; the paper's Review 5 comment). The VM's bar-micro of 2026-10-21 gave 5/11 because
   micro-go had no `go.sum` (our fixture; `docs/findings.md` "cdxgen on micro-go"), the rerun of 2026-10-22 0/11
   because the worker could not create Go's module cache (fixed the same day, "cdxgen in Go"); a throwaway run
-  with the fix gives 6/11 (exactly the bar), so the next rerun of e0-micro, on the generated micro projects of
+  with the fix gives 6/11 (exactly the bar), so the next rerun of bar-micro, on the generated micro projects of
   2026-10-22 (`docs/findings.md` "Micro ground truth v2"), decides.
 - **Waiting for the user:** human review of the snippet catalogs (the micro projects and their ground truth are
   generated from them) and the micro decoys, the hand-check verdicts and the `languages` lists (all AI-made).
@@ -439,10 +441,10 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
   insertion and removal results are reported apart, never pooled (refinement 7).
 
 ## Phase 5: experiments
-- **E0 (the voter bar, stability):** every tool once on the three micro projects (`experiments/e0-micro.yaml`): the
+- **E0 (the voter bar, stability):** every tool once on the three micro projects (`experiments/bar-micro.yaml`): the
   entry bar (7 of 14 calls in one language) that decides each tool's verdict, `passed` or `disqualified`, with recall,
   precision and F1; and every tool 3× on the micro projects and ten small pilot repos
-  (`experiments/e0-stability.yaml`), for determinism and run-to-run variance; needed before any agreement claim; its timings decide replicas and pruning.
+  (`experiments/stability-pilot.yaml`), for determinism and run-to-run variance; needed before any agreement claim; its timings decide replicas and pruning.
 - **E1 (RQ1, RQ2):** all tools on the full corpus: validity, meaningfulness and traceability rates; assets per tool and
   fill rates per dimension; the tools-per-asset distribution (exact matcher, so RQ2 does not depend on RaQuN).
 - **E2 (RQ3):** matchability per dimension, exact vs RaQuN. Matcher validation: a stratified sample of ~300 match
@@ -464,7 +466,7 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
 - One command, `bf-cbom experiment reproduce`, reruns the analysis from the raw results.
 
 ## Verification still to do
-- **Mutation smoke test** (`experiments/e4-mutation-smoke.yaml`, on the VM): the RSA-2048 keygen in three styles into
+- **Mutation smoke test** (`experiments/mutation-smoke.yaml`, on the VM): the RSA-2048 keygen in three styles into
   pyjwt, jjwt and golang-jwt; at least CBOMkit and CryptoScan report the direct insertion at the recorded file and
   line; later a removal mutant drops the asset.
 - **End to end:** E0 on 5 repos from the spec to the tables with `bf-cbom experiment reproduce`.

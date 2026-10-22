@@ -1,6 +1,6 @@
 # Second pilot: 60 user-selected repositories, 20 each in Java, Python and Go.
 # Pinned to each repository's default-branch HEAD on 2026-10-22 with git ls-remote --symref.
-# Selection is manual, not a stratified sample. Used by experiments/e1-pilot-60.yaml.
+# Selection is manual, not a stratified sample. Used by experiments/corpus-pilot-medium.yaml.
 # Short-name mappings include jsch -> mwiede/jsch, charm -> JHUISI/charm,
 # certificates -> smallstep/certificates, limen -> thecodearcher/limen,
 # newt -> fosrl/newt and webauthn -> go-webauthn/webauthn.

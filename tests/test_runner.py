@@ -211,7 +211,7 @@ def test_mutation_block_runs_originals_and_mutants_and_regenerates_them_identica
     spec.write_text(
         yaml.safe_dump(
             {
-                "name": "e4-fake",
+                "name": "mutation-fake",
                 "tools": TOOLS,
                 "repos": [{"full_name": "o/mutable", "git_url": str(src), "language": "Python"}],
                 "mutation": {"per_repo": 2, "styles": ["direct", "indirect"], "snippets": ["sha-256", "md5"]},
@@ -220,7 +220,7 @@ def test_mutation_block_runs_originals_and_mutants_and_regenerates_them_identica
     )
     out = _run(["run", str(spec), "--idle-timeout", "20"])
     assert out.exit_code == 0, out.output
-    exp = world["results"] / "e4-fake"
+    exp = world["results"] / "mutation-fake"
     manifest = ex.load_mutants(exp)
     mutants = manifest["repos"]["o/mutable"]["mutants"]
     assert [m["style"] for m in mutants] == ["direct", "indirect"] and len(world["workers"].seen) == 6

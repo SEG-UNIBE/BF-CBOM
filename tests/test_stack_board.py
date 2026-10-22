@@ -35,14 +35,14 @@ def _world():
     _beat(r, "pyqun", "idle")
     _beat(r, "extra", "idle")  # a worker outside BOARD_SERVICES still shows
     r.rpush("jobs:cbomkit", "a", "b", "c")
-    r.hset(JOB_ROUTING_KEY, "j1", "exp:e1-pilot-corpus")
-    r.hset("exp:e1-pilot-corpus", mapping={"status": "running", "expected_jobs": "720", "skipped_jobs": "20",
+    r.hset(JOB_ROUTING_KEY, "j1", "exp:corpus-pilot-small")
+    r.hset("exp:corpus-pilot-small", mapping={"status": "running", "expected_jobs": "720", "skipped_jobs": "20",
            "stored_jobs": "392", "failed_jobs": "3", "wave": "1/1", "started_at": _iso(NOW - 3600),
            "tool_jobs": json.dumps({"cbomkit": 10, "cdxgen": 5}),
            "waves": json.dumps([["cbomkit", "cdxgen"]])})  # fmt: skip
-    r.hset("exp:e1-pilot-corpus:tools", mapping={"cbomkit:n": 4, "cbomkit:sec": 2400.0, "cdxgen:n": 4,
+    r.hset("exp:corpus-pilot-small:tools", mapping={"cbomkit:n": 4, "cbomkit:sec": 2400.0, "cdxgen:n": 4,
            "cdxgen:sec": 400.0})  # fmt: skip
-    r.hset("exp:e1-pilot-corpus:pending", "j1", "{}")
+    r.hset("exp:corpus-pilot-small:pending", "j1", "{}")
     r.hset("exp:old", mapping={"status": "completed", "finished_at": _iso(NOW - 86400)})
     return r
 
@@ -58,15 +58,15 @@ def test_board_shows_workers_queues_and_experiments_with_their_remaining_time():
     snap = stack_cmd.snapshot(r, SERVICES, probe=lambda url: True, now=NOW)
     workers = {w["name"]: w for w in snap.workers}
     assert list(workers) == ["cbomkit", "cdxgen", "deepseek", "pyqun", "extra"]
-    assert workers["cbomkit"]["origin"] == "e1-pilot-corpus" and workers["cbomkit"]["queued"] == 3
+    assert workers["cbomkit"]["origin"] == "corpus-pilot-small" and workers["cbomkit"]["queued"] == 3
     assert workers["deepseek"]["beat"] is None
     (exp,) = snap.experiments  # exp:old finished a day ago, exp:<name>:pending is no status hash
-    assert (exp["name"], exp["done"], exp["total"], exp["failed"]) == ("e1-pilot-corpus", 412, 720, 3)
+    assert (exp["name"], exp["done"], exp["total"], exp["failed"]) == ("corpus-pilot-small", 412, 720, 3)
 
     text = _text(snap)
-    assert "apache/kafka@771b957 run1 · e1-pilot-corpus" in text and "0:02:05" in text  # the job and how long
+    assert "apache/kafka@771b957 run1 · corpus-pilot-small" in text and "0:02:05" in text  # the job and how long
     assert "14.6/16.0" in text and "ok 0:00:41 jwtk/jjwt@1a2b3c4" in text and "timeout 0:30:00" in text
-    (line,) = [line.rstrip() for line in text.splitlines() if line.startswith("e1-pilot-corpus")]
+    (line,) = [line.rstrip() for line in text.splitlines() if line.startswith("corpus-pilot-small")]
     # cbomkit: 6 left x 10 min, less the 2:05 its job has run; cdxgen: 1 x 100 s; the slowest ends the batch
     assert "412/720" in line and "1/1" in line and "1:00:00" in line and line.endswith("0:57:55")
     assert "1 busy · 3 idle · 1 down" in text and "redis ✓" in text and stack_cmd.FOOTER in text
@@ -88,7 +88,7 @@ def test_forecast_takes_the_slowest_tool_per_wave_and_adds_the_waves():
 
 
 def test_experiment_columns_keep_their_width_while_a_run_moves():
-    early = {"name": "e1-pilot-corpus", "status": "running", "done": 7, "total": 720, "failed": 0, "wave": "1/12",
+    early = {"name": "corpus-pilot-small", "status": "running", "done": 7, "total": 720, "failed": 0, "wave": "1/12",
              "started": NOW - 31, "forecast": (None, True)}  # fmt: skip
     late = {**early, "status": "stalled", "done": 712, "failed": 345, "wave": "10/12", "started": NOW - 45 * 3600,
             "forecast": (11 * 3600.0, True)}  # fmt: skip
@@ -126,7 +126,7 @@ def test_board_once_prints_one_snapshot(monkeypatch):
     monkeypatch.setenv("BOARD_SERVICES", ",".join(SERVICES))
     result = CliRunner().invoke(app, ["stack", "board", "--once"])
     assert result.exit_code == 0, result.output
-    assert "Workers" in result.output and "e1-pilot-corpus" in result.output and "deepseek" in result.output
+    assert "Workers" in result.output and "corpus-pilot-small" in result.output and "deepseek" in result.output
 
 
 def test_heartbeat_carries_job_memory_and_last_result():

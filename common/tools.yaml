@@ -17,8 +17,8 @@
 #   analysed like every tool, and the panel confirms their findings, but they never confirm another tool, never count
 #   in k, exclusivity or Dawid-Skene and are never ranked; `--observers-vote` makes them voters, the sensitivity check).
 # Pilot verdicts (2026-10-08, docs/pilot-2026-10-08/README.md): pass/borderline/fail per language.
-# `micro_<date>`: lenient call-site recall on the micro projects (measured on e0-micro:
-#   `make analysis ARGS="micro e0-micro"`; the entry bar is half the items in one paper language: 6/11 on the
+# `micro_<date>`: lenient call-site recall on the micro projects (measured on bar-micro:
+#   `make analysis ARGS="micro bar-micro"`; the entry bar is half the items in one paper language: 6/11 on the
 #   hand-written projects up to 2026-10-21, 7/14 on the generated ones since 2026-10-22; below it in every language
 #   a tool is `disqualified`);
 #   scored from the normalised records since 2026-10-18.
@@ -52,7 +52,7 @@ tools:
     pilot: {java: pass, python: pass, go: pass}
   cdxgen:
     # role pending (2026-10-21): below the bar on these numbers, but its Go locations are read only since 2026-10-20
-    # (it found the inserted RSA keygen at its line in all three Go mutants of e4-mutation-smoke); the next e0-micro
+    # (it found the inserted RSA keygen at its line in all three Go mutants of mutation-smoke); the next bar-micro
     # decides: at least 7/14 in one language on the generated projects keeps it a voter, else `role: observer`
     micro_2026-10-17: {java: 0/11, python: 0/11, go: 0/11, javascript: 4/11}
     engine: cdxgen

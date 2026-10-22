@@ -12,7 +12,7 @@ sampled corpora live on the results volume.
 | `exclusions.yaml` | reviewed repos and name patterns the corpus builder never samples (the generators' own repos and test suites, CBOM benchmarks, BF-CBOM itself), each with its reason; `tailored_on` repos of `common/tools.yaml` are excluded as well (refinements 11 and 13) |
 | `pilot-2026-10-08.yaml` | the 12 real projects of the pilot experiment in Java, Python and Go (of its 16; the TypeScript, C and JavaScript ones were removed 2026-10-20) pinned to the commits scanned then; use with `corpus: corpus/pilot-2026-10-08.yaml` |
 | `pilot-2026-10-08-all.yaml` | all 16 pilot projects as scanned then: the record of the pilot and of what CipherSift was tuned on (`tailored_on` in `common/tools.yaml` reads it); no experiment uses it |
-| `pilot-2026-10-22.yaml` | second pilot: 60 manually selected repositories, 20 each in Java, Python and Go, pinned to default-branch HEADs on 2026-10-22; used by `experiments/e1-pilot-60.yaml` |
+| `pilot-2026-10-22.yaml` | second pilot: 60 manually selected repositories, 20 each in Java, Python and Go, pinned to default-branch HEADs on 2026-10-22; used by `experiments/corpus-pilot-medium.yaml` |
 | `icpc-2026.yaml` | the 23 ICPC paper repositories pinned at their HEAD of 2026-10-18, held out from tuning; six are marked `expect_crypto: low` |
 | `corpus.yaml` (not in git) | the stratified corpus built by `make corpus`, by default 100 repos per language for Java, Python and Go; lives at `/data/results/corpus/corpus.yaml` in the runner (`make corpus-export` copies the corpus YAML files into `experiments/results/` on the host) |
 

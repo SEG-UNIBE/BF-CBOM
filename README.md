@@ -346,13 +346,13 @@ needed by your experiment are up; Ctrl+C closes the board while the services kee
 Start with the micro projects, then inspect and export the results:
 
 ```bash
-make experiment EXP=experiments/e0-micro.yaml
-make experiment-status NAME=e0-micro
-make experiment-export NAME=e0-micro
-# Report and results: experiments/results/e0-micro.zip, including e0-micro/_ANALYSIS/_SUMMARY.md
+make experiment EXP=experiments/bar-micro.yaml
+make experiment-status NAME=bar-micro
+make experiment-export NAME=bar-micro
+# Report and results: experiments/results/bar-micro.zip, including bar-micro/_ANALYSIS/_SUMMARY.md
 ```
 
-The run waits for results; `make board` or `make experiment-status NAME=e0-micro` can also be used in a second
+The run waits for results; `make board` or `make experiment-status NAME=bar-micro` can also be used in a second
 terminal while it runs. Repeating the run command resumes missing work. After changing worker code, rebuild
 with `make up-prod`, then use `ARGS="--rerun <tool>"` on the experiment command to replace that tool's results.
 For a new tool, create a separate spec under `experiments/` with a unique `name` and only that tool in `tools`
@@ -451,22 +451,22 @@ Reproducible, resumable batch runs for the research agenda described in `CLAUDE.
 - `runner`: an on-demand container running `bf-cbom experiment ...`. Results land in the `results-data` volume as `<exp>/<owner>__<repo>@<sha12>/<variant>/<tool>/run<k>.json` plus a `run<k>.meta.json` with status, duration, timing, tool version, image, the BF-CBOM commit the image was built from, the container's peak RAM and (LLM workers) the token usage; `_experiment.yaml`, `_run-log.json` (sessions, host RAM, peak RAM) and `_ANALYSIS/` sit on top of each experiment folder.
 
 ```bash
-make experiment EXP=experiments/e4-mutation-smoke.yaml   # pin, mirror, enqueue, collect (resumable)
-make experiment-status NAME=e4-mutation-smoke
+make experiment EXP=experiments/mutation-smoke.yaml   # pin, mirror, enqueue, collect (resumable)
+make experiment-status NAME=mutation-smoke
 make board                                               # live board: running experiments, every worker's job, RAM, queue and last result
-make experiment-export NAME=e4-mutation-smoke            # -> experiments/results/e4-mutation-smoke.zip (runs the analysis report first), the only path to the host
+make experiment-export NAME=mutation-smoke            # -> experiments/results/mutation-smoke.zip (runs the analysis report first), the only path to the host
 make experiment-list                                     # experiments stored on the volume
-make experiment-delete NAME=e4-mutation-smoke            # remove one from the volume (asks first; ARGS=--yes skips)
+make experiment-delete NAME=mutation-smoke            # remove one from the volume (asks first; ARGS=--yes skips)
 make corpus ARGS="--per-language 100"                    # stratified GitHub corpus with pinned commits
-make experiment EXP=experiments/e0-micro.yaml            # 15 tools on 3 generated micro projects: the voter bar
-make experiment EXP=experiments/e0-stability.yaml        # every tool 3x on the micro projects and ten pilot repos
-make analysis ARGS="report e0-stability"                 # everything below in one pass + _ANALYSIS/_SUMMARY.md (Markdown tables)
-make analysis ARGS="normalize e0-stability"              # every CBOM -> normalised records, one adapter spec per tool (analysis/adapters/)
-make analysis ARGS="schema e0-stability"                 # RQ1: CycloneDX validity, meaningful shares, traceability (--fetch on a laptop)
-make analysis ARGS="levels e0-stability"                 # how much agreement normalisation creates (levels L0 raw to L4 tool specs)
-make analysis ARGS="micro e0-micro"                      # recall, precision, F1, decoy hits and entry-bar verdicts
-make analysis ARGS="tables e0-stability"                 # flat CSV tables (runs, records, exact-matcher groups, micro) for pandas/R
-make analysis ARGS="score e0-stability"                  # RQ4: confirmation, exclusivity, Dawid-Skene, leave-one-out, CIs; stability
+make experiment EXP=experiments/bar-micro.yaml            # 15 tools on 3 generated micro projects: the voter bar
+make experiment EXP=experiments/stability-pilot.yaml        # every tool 3x on the micro projects and ten pilot repos
+make analysis ARGS="report stability-pilot"                 # everything below in one pass + _ANALYSIS/_SUMMARY.md (Markdown tables)
+make analysis ARGS="normalize stability-pilot"              # every CBOM -> normalised records, one adapter spec per tool (analysis/adapters/)
+make analysis ARGS="schema stability-pilot"                 # RQ1: CycloneDX validity, meaningful shares, traceability (--fetch on a laptop)
+make analysis ARGS="levels stability-pilot"                 # how much agreement normalisation creates (levels L0 raw to L4 tool specs)
+make analysis ARGS="micro bar-micro"                      # recall, precision, F1, decoy hits and entry-bar verdicts
+make analysis ARGS="tables stability-pilot"                 # flat CSV tables (runs, records, exact-matcher groups, micro) for pandas/R
+make analysis ARGS="score stability-pilot"                  # RQ4: confirmation, exclusivity, Dawid-Skene, leave-one-out, CIs; stability
 ```
 
 #### Parallelism and Memory
@@ -480,7 +480,7 @@ For the paper's runs, the laptop prepares code and analyses copied exports; the 
 - **Memory budget (waves).** `EXPERIMENT_MEMORY_BUDGET_GB` in the `Makefile` (default 14, meant for a Docker VM of about 20 GiB) groups tools into waves by their summed limits. The runner packs the tools largest first, runs one wave to completion, then starts the next; the plan is printed before anything is enqueued. A tool whose limit exceeds the budget runs alone with a warning (currently cdxgen at the default budget), so the budget is not a hard memory cap. On a machine with enough RAM set it to 0 (one wave, everything in parallel), either per call or once in the `Makefile`:
 
   ```bash
-  make experiment EXP=experiments/e1-pilot-corpus.yaml EXPERIMENT_MEMORY_BUDGET_GB=0
+  make experiment EXP=experiments/corpus-pilot-small.yaml EXPERIMENT_MEMORY_BUDGET_GB=0
   ```
 
   The per-tool numbers come from `memory_gb` in `common/tools.yaml`, which a test keeps equal to the compose limits; adjust both when changing a limit. With `--scale`, set `EXPERIMENT_REPLICAS` so the budget counts each replica. Stored experiments can be browsed in the UI's Experiments page (read-only: summary, runs table, CSV downloads).

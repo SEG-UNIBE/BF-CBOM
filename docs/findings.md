@@ -4,6 +4,9 @@ Results gathered while building BF-CBOM 2.0, moved out of `CLAUDE.md` on 2026-10
 set (the pilot corpus `experiments/corpus/pilot-2026-10-08.yaml`, the micro projects `experiments/corpus/micro`) and from runs that will be
 rerun before the paper's experiments; the date says which code produced a number. The micro projects are tiny and
 AI-written: their numbers are an inclusion check, not a ranking.
+Spec names in dated sections are the names at the time: on 2026-10-22 e0-micro became bar-micro, e0-stability
+stability-pilot, e1-pilot-corpus corpus-pilot-small, e1-pilot-60 corpus-pilot-medium, e1-icpc-corpus corpus-icpc and
+e4-mutation-smoke mutation-smoke.
 
 ## Pilot of 2026-10-08
 A colleague's one-day pilot: 15 generators on 16 pinned projects plus the micro projects, an inclusion bar and

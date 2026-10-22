@@ -1,10 +1,10 @@
 # Second pilot: 60 pinned projects (20 Java, 20 Python, 20 Go), all 15 CBOM generator tools, once.
 # 900 tool/repository pairs; unsupported language combinations are recorded without scanning.
 # Run on the 64 GB VM after make up-prod:
-#   make experiment EXP=experiments/e1-pilot-60.yaml EXPERIMENT_MEMORY_BUDGET_GB=0
-#   make analysis ARGS="report e1-pilot-60"
-#   make experiment-export NAME=e1-pilot-60
-name: e1-pilot-60
+#   make experiment EXP=experiments/corpus-pilot-medium.yaml EXPERIMENT_MEMORY_BUDGET_GB=0
+#   make analysis ARGS="report corpus-pilot-medium"
+#   make experiment-export NAME=corpus-pilot-medium
+name: corpus-pilot-medium
 description: second pilot with 60 manually selected projects, 20 each in Java, Python and Go
 tools: [cbomkit, cdxgen, cryptobomforge, cryptoscan, pqcheck, qdarpan, securin-xbom, cipherradar, xgrep, cbomkit-jar, ciphersift, scanoss, qelens, cryptarium, qscan]
 repetitions: 1
