@@ -21,6 +21,9 @@ TIMEOUT_SEC = int(os.getenv("WORKER_TIMEOUT_SEC", "120"))  # default 120s for re
 # Go (golem) type-checks through go/packages: an import resolves only when the repo's go.sum pins it, and golem's
 # `go list` then downloads the module itself, also with --no-install-deps (needs network). cdxgen's `cbom` command
 # finds no Go asset (it never runs golem) and --profile research adds none (checked 2026-10-22, docs/findings.md).
+# The image's GOPATH (/opt/app-root/go) cannot be created under cap_drop ALL (root without DAC_OVERRIDE, /opt not
+# writable), so `go list` failed and every Go module with a dependency yielded no asset until 2026-10-22: each job
+# gets its own GOPATH in its work dir (`go_env`), writable (-modcacherw) so the cleanup can delete it.
 _PROJECT_TYPE = {"python": "python", "go": "go"}
 
 # Configure logging
@@ -31,6 +34,11 @@ logger = logging.getLogger(NAME)
 def project_type_for(main_language: str | None) -> str | None:
     """The -t value for a repo's main language, or None (all project types, cdxgen's default)."""
     return _PROJECT_TYPE.get((main_language or "").strip().lower())
+
+
+def go_env(work_root: Path) -> dict[str, str]:
+    """The job's own Go module cache: under the job's work dir, read-write so it is deleted with it."""
+    return {"GOPATH": str(work_root / "go"), "GOFLAGS": "-modcacherw"}
 
 
 def build_command(
@@ -68,14 +76,22 @@ class CdxgenClient:
             raise RuntimeError(f"failed_prepare_workdir: {e}") from e
 
     def _run_cdxgen(
-        self, repo_dir: Path, out_file: Path, trace: Trace, *, evidence: bool = True, project_type: str | None = None
+        self,
+        repo_dir: Path,
+        out_file: Path,
+        trace: Trace,
+        *,
+        evidence: bool = True,
+        project_type: str | None = None,
+        extra_env: dict[str, str] | None = None,
     ) -> None:
         cmd = build_command(repo_dir, out_file, evidence=evidence, project_type=project_type, binary=self.binary)
         logger.info("Running cdxgen: %s", " ".join(cmd))
         trace.add(f"cdxgen cmd: {' '.join(cmd)}")
+        if extra_env:
+            trace.add("cdxgen env: " + " ".join(f"{k}={v}" for k, v in extra_env.items()))
         try:
-            env = os.environ.copy()
-            # Enable debug if user provided; otherwise leave unset
+            env = {**os.environ, **(extra_env or {})}
             proc = subprocess.run(
                 cmd,
                 cwd=str(repo_dir),
@@ -140,13 +156,14 @@ class CdxgenClient:
         repo_dir = work_root / "repo"
         out_file = work_root / "bom.json"
         self._ensure_clean_dir(work_root)
+        env = go_env(work_root)
         try:
             cloned_path = clone_repo(git_url, branch=branch, target_dir=str(repo_dir), commit=commit)
             if not cloned_path:
                 trace.add("git clone failed")
                 raise RuntimeError("git_clone_failed")
             try:
-                self._run_cdxgen(Path(cloned_path), out_file, trace, project_type=project_type)
+                self._run_cdxgen(Path(cloned_path), out_file, trace, project_type=project_type, extra_env=env)
             except RuntimeError as exc:
                 if not str(exc).startswith("cdxgen_no_output rc=0"):
                     raise
@@ -155,7 +172,9 @@ class CdxgenClient:
                 # recorded in the result notes (no occurrences in this output).
                 logger.warning("cdxgen wrote no output with --evidence; retrying without it")
                 trace.add("fallback: --evidence produced no output, reran without --evidence")
-                self._run_cdxgen(Path(cloned_path), out_file, trace, evidence=False, project_type=project_type)
+                self._run_cdxgen(
+                    Path(cloned_path), out_file, trace, evidence=False, project_type=project_type, extra_env=env
+                )
             return out_file.read_text(encoding="utf-8")
         finally:
             # Best-effort cleanup

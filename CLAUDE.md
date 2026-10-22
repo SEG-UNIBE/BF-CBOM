@@ -178,7 +178,7 @@ appear in the paper's figures is decided later.
 |---|---|---|---|
 | `cbomkit` | cbomkit | Java, Python, Go | CBOMkit server image, cloned through the git server over TLS; Python covers pyca only; modules need a build file and `src/`; large repos need ~45 min and a 16 GB heap |
 | `cbomkit-jar` | cbomkit | Java, Python, Go | cbomkit-action, source only, the same engine (packaging differences are measured); the indexing risk (build file without `src/`) is noted, `CBOMKIT_ENSURE_SRC=1` stays off |
-| `cdxgen` | cdxgen | Java, Python, JS, Go | `--include-crypto --evidence`, `-t python` / `-t go` for those repos (the `cbom` command finds nothing in Go, `--profile research` adds nothing; checked 2026-10-22); algorithms carry locations only for JS/TS (occurrences) and Go (property `cdx:golem:crypto:sourceLocation`, one per asset); Go analysis type-checks, so a module's imports resolve only with its `go.sum` and network; Java code yields none (atom has no crypto sinks); 16 GiB (OOM-killed at 8 on Chat2DB, bisq, bisq2, kafka) |
+| `cdxgen` | cdxgen | Java, Python, JS, Go | `--include-crypto --evidence`, `-t python` / `-t go` for those repos (the `cbom` command finds nothing in Go, `--profile research` adds nothing; checked 2026-10-22); algorithms carry locations only for JS/TS (occurrences) and Go (property `cdx:golem:crypto:sourceLocation`, one per asset); Go analysis type-checks, so a module's imports resolve only with its `go.sum`, network and a writable module cache (a GOPATH per job: under `cap_drop` root cannot create the image's; until 2026-10-22 every Go repo with a dependency gave nothing); Java code yields none (atom has no crypto sinks); 16 GiB (OOM-killed at 8 on Chat2DB, bisq, bisq2, kafka) |
 | `cryptobomforge` | cryptobomforge | Python, C | CodeQL's crypto inventory queries, C with `--build-mode none`; writes IBM's draft `1.4-cbom-1.0`, not CycloneDX, also when CodeQL finds nothing (every stored CBOM is the tool's; the worker's placeholder for that case went 2026-10-20) |
 | `deepseek`, `chatgpt`, `claude` | one each, `merge_group: llm` | all five | `common/llm_cbom.py` (below), CycloneDX 1.7 assembled by us; `chatgpt` / `claude` need `make up-prod EXTRA_PROFILES=llm` and a key in `docker/env/worker-<provider>.env`; a request that fails after the provider's retries fails the job (no partial CBOMs), `LLM_MAX_CHUNKS` 1000, `LLM_CONCURRENCY` 4 |
 | `cryptoscan` | cryptoscan | eleven | always `--include-quantum-safe`; skips folders named demo, example, sample; 1.4.0 panics on specific files and the run fails (its `--exclude` cannot name one exact file, so no workaround; `docs/findings.md` "Interventions") |
@@ -261,14 +261,16 @@ where they declare support, but no analysis, figure or tuning effort goes into t
   `experiments/e4-mutation-smoke.yaml` waits for the VM. Removal mutants come after E1 (they need its voters).
 - **Waiting for the VM:** `make up-prod`, then each experiment as a whole (the user's preference, 2026-10-20):
   `make experiment EXP=experiments/e1-pilot-corpus.yaml ARGS="--overwrite-old" EXPERIMENT_MEMORY_BUDGET_GB=0`, the
-  same for e1-icpc-corpus, e0-stability and e0-micro (DeepSeek needs credit first; `make experiment-delete
+  same for e1-icpc-corpus, e0-stability and e0-micro (DeepSeek is out of every spec since 2026-10-22, no credit, so
+  no LLM runs for now; `make experiment-delete
   NAME=<x>` for the former smoke experiments e0-smoke, e0-cbomkit-smoke, e0-llm-smoke and e0-phase2-smoke, whose
   specs went 2026-10-21); `make experiment EXP=experiments/e4-mutation-smoke.yaml EXPERIMENT_MEMORY_BUDGET_GB=0`;
   then build the E1 corpus (Java, Python and Go) with `GITHUB_TOKEN` and prune it, check replicas.
 - **cdxgen's role waits for e0-micro** (decided 2026-10-21): micro-go >= 6/11 keeps it a voter, else `role:
   observer` (`common/tools.yaml`; the paper's Review 5 comment). The VM's e0-micro of 2026-10-21 gave 5/11 because
-  micro-go had no `go.sum` (our fixture; `docs/findings.md` "cdxgen on micro-go"); with it a throwaway run gives
-  6/11, so the rerun of e0-micro decides.
+  micro-go had no `go.sum` (our fixture; `docs/findings.md` "cdxgen on micro-go"), the rerun of 2026-10-22 0/11
+  because the worker could not create Go's module cache (fixed the same day, "cdxgen in Go"); a throwaway run
+  with the fix gives 6/11 (exactly the bar), so the next rerun of e0-micro decides.
 - **Waiting for the user:** human review of the micro ground truth, the hand-check verdicts, the `languages` lists
   and the mutation snippet catalogs (all AI-made).
 - **External:** the SCANOSS research key, the Cryptoscope artifact, the two-rater review of the matcher validation

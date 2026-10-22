@@ -18,3 +18,21 @@ def test_command_with_and_without_project_type():
     assert cmd[cmd.index("-o") + 1] == "/w/bom.json"
     plain = cw.build_command(Path("/w/repo"), Path("/w/bom.json"), evidence=False)
     assert "-t" not in plain and "--evidence" not in plain
+
+
+def test_each_job_gets_its_own_writable_go_module_cache(monkeypatch, tmp_path):
+    # the image's GOPATH cannot be created under cap_drop ALL: `go list` failed and golem found nothing in any Go
+    # module with a dependency (e0-micro, 2026-10-22)
+    seen = {}
+
+    def fake_run(cmd, *, env, **kwargs):
+        seen.update(env)
+        Path(cmd[cmd.index("-o") + 1]).write_text("{}")
+        return cw.subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(cw.subprocess, "run", fake_run)
+    trace = cw.Trace()
+    env = cw.go_env(tmp_path)
+    cw.CdxgenClient()._run_cdxgen(tmp_path / "repo", tmp_path / "bom.json", trace, project_type="go", extra_env=env)
+    assert seen["GOPATH"] == str(tmp_path / "go") and "-modcacherw" in seen["GOFLAGS"].split()
+    assert f"GOPATH={tmp_path / 'go'}" in trace.text()

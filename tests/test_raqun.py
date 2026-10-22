@@ -13,6 +13,7 @@ from analysis.matchers import ExactMatcher, MatchGroup
 from analysis.matchers.compare import compare
 from analysis.matchers.raqun import attributes
 from analysis.normalize import NormRecord
+from analysis.tables import matchlevel_row
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -92,6 +93,13 @@ def test_raqun_groups_structured_assets_across_tools():
     exact = ExactMatcher(level="L3").match(records)
     row = compare(exact, groups, "exact", "raqun")
     assert row["records_common"] == 8 and row["pair_jaccard"] is not None and row["b_in_one_a"] == 1.0
+    # both count items as L4 identities (matchlevels), not RaQuN's group keys at the level
+    units = {u for g in groups for u in g.extra["units"]}
+    assert units == {u for g in exact if g.scope == "repo" for u in g.extra["units"]}
+    for lv in ("L0", "L3"):
+        level_groups = RaqunMatcher(level=lv).match(records)
+        assert {u for g in level_groups for u in g.extra["units"]} == units
+        assert matchlevel_row("raqun", lv, 1, {"s": level_groups})["items"] == len(units)
 
 
 _SCRIPT = """

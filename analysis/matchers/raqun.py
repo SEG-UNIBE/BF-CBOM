@@ -25,6 +25,8 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 
+from common.tools_registry import votes
+
 from ..levels import UNIT_LEVEL, identity, parameter_at
 from ..normalize.record import NormRecord
 from ..normalize.vocab import Vocabulary, load_vocabulary
@@ -68,7 +70,7 @@ class RaqunMatcher:
         vocab: Vocabulary | None = None,
     ):
         self.level = level
-        self.voter_of = voter_of or {}
+        self.voter_of = voter_of if voter_of is not None else {}
         self.vocab = vocab or load_vocabulary()
 
     def match(self, records: list[NormRecord]) -> list[MatchGroup]:
@@ -154,11 +156,16 @@ class RaqunMatcher:
             key = sorted(keys, key=lambda k: (-keys[k], k))[0] if keys else "?"
             sets = [{str(a.value) for a in e.attributes} for e in elements]
             similarity = len(set.intersection(*sets)) / len(set.union(*sets)) if sets else 0.0
+            # the items it holds, as the exact matcher counts them (matchlevels: items are L4 identities at every level)
+            voting = [r for r in members if votes(self.voter_of, r.tool)] or members
+            units = sorted({u for r in voting if (u := identity(r, UNIT_LEVEL, self.vocab))})
             extra = {
                 "level": self.level,
                 "n_records": len(members),
                 "n_elements": len(elements),
                 "similarity": round(similarity, 3),
+                "units": units,
+                "n_units": len(units),
             }
             groups.append(MatchGroup(f"R{n:05d}", "repo", key, members, extra))
         return groups

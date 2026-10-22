@@ -39,7 +39,7 @@ class ExactMatcher:
         vocab: Vocabulary | None = None,
     ):
         self.level, self.window, self.closure = level, window, closure
-        self.voter_of = voter_of or {}
+        self.voter_of = voter_of if voter_of is not None else {}
         self.vocab = vocab or load_vocabulary()
 
     def _voter(self, tool: str) -> str:

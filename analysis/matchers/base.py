@@ -38,7 +38,7 @@ class MatchGroup:
 
     def voters(self, voter_of: dict[str, str] | None = None) -> list[str]:
         """The voter groups among the members (observers are none: `common.tools_registry.votes`)."""
-        voter_of = voter_of or {}
+        voter_of = voter_of if voter_of is not None else {}
         return sorted({voter_of.get(t, t) for t in self.tools if votes(voter_of, t)})
 
 
@@ -62,7 +62,7 @@ def agreement(
     `level` (default: the group's level, else L4: any source; `levels.parameter_at`), so a group at L2 compares
     standard-field values only. `location` (repo groups only) reads the matcher's `located_voters` /
     `colocated_voters`: voters that locate the asset at all, and the most that share one call site."""
-    voter_of = voter_of or {}
+    voter_of = voter_of if voter_of is not None else {}
     level = level or group.extra.get("level") or "L4"
     rows = []
     for dim in dims:

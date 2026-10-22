@@ -188,3 +188,19 @@ def test_observers_get_ladder_rows_but_confirm_nobody():
     assert (md5["role"], md5["k_L4"]) == ("observer", 0)  # only an observer reports it: no voter group
     assert voter_groups({"x": {"role": "observer"}, "y": {}}).observers == {"x"}
     assert voter_groups({"x": {"role": "observer"}}, observers_vote=True).observers == frozenset()
+
+
+def test_an_item_only_an_observer_reports_is_no_matchlevels_item():
+    # micro-java (e0-stability, 2026-10-22): qScan alone reported ECDH, the voters' generic EC records were attached
+    # to its cluster, and matchlevels counted ECDH as an item with k = 4
+    from analysis.matchers import ExactMatcher
+    from analysis.tables import matchlevel_row
+    from common.tools_registry import VoterMap
+
+    voter_of = VoterMap({}, observers={"o"})  # empty, yet it must keep its observers
+    voters = _records("a", "EC") + _records("b", "EC", "AES")
+    rows = []
+    for records in (voters, voters + _records("o", "ECDH", "AES")):
+        groups = ExactMatcher(level="L3", voter_of=voter_of).match(records)
+        rows.append(matchlevel_row("exact", "L3", 1, {("s", "original"): groups}, voter_of))
+    assert rows[0]["items"] == 2 and rows[1] == rows[0]

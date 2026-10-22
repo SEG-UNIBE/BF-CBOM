@@ -96,6 +96,23 @@ completely (six assets, one location each, all at their lines); the rest was che
   (golem's raw output also has SHA-256 at the OAEP and PBKDF2 lines and a CSPRNG, which the CBOM leaves out or lists
   without a location).
 
+### 2026-10-22, cdxgen in Go: the worker could not create Go's module cache
+The VM rerun of e0-micro (2026-10-22, with the `go.sum`) gave cdxgen 0/11 on micro-go, not 6. Its CBOM holds only the
+`golang.org/x/crypto` library read from `go.mod`. The Go exports agree: cdxgen found Go assets only in golang-jwt
+(29 in every run), the one Go repository without a third-party dependency; age, smallstep/crypto, vault and micro-go
+gave none in e0-stability, e1-pilot-corpus and e0-micro.
+- **Our setup error: the container could not write Go's module cache.** The cdxgen worker runs as root with
+  `cap_drop: [ALL]`, so root has no `DAC_OVERRIDE`, and the image's GOPATH `/opt/app-root/go` lies under a
+  non-writable `/opt`. `go list -deps` failed (`go: could not create module cache: mkdir /opt/app-root: permission
+  denied`) and golem type-checked nothing in a module with a dependency. The throwaway runs above had all
+  capabilities, which is why they gave 6/11. Reproduced with the 1.0.3 image: compose's capabilities 0 crypto assets
+  on micro-go, all capabilities 8, all capabilities without network 6 (the stdlib ones); Python and Java give the
+  same output either way.
+- **Fixed:** every job gets its own GOPATH in its work directory (`workers/cdxgen/main.py:go_env`, with
+  `-modcacherw` so the cleanup can delete it, in the run notes as `cdxgen env:`); with compose's capabilities
+  micro-go gives 8 crypto assets again, 6/11 at call sites with our scorer (the old worker: 0). Every cdxgen Go run before 2026-10-22 is rerun. Go modules are now
+  downloaded per run, so large Go repos (vault) take longer.
+
 ## Normaliser on e1-pilot-corpus (2026-10-16)
 116 ok CBOMs of 11 tools, about 41k records, 2 s.
 - Algorithm records with a tool-reported family: 87-100 % per tool (CryptobomForge 7 %: mostly `UNKNOWN`).

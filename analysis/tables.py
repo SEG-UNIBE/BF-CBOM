@@ -386,7 +386,7 @@ def matchlevel_row(
     matcher: str, level: str, run: int, groups_by_snapshot: dict, voter_of: dict[str, str] | None = None
 ) -> dict:
     """One row of matchlevels-run<k>.csv (RQ3, matcher x level): over the repo groups of every snapshot, how many
-    items (algorithms, by their L4 identity: `extra.units` of the exact matcher's groups, else the group key) have
+    items (algorithms, by their L4 identity: `extra.units` of the matchers' groups, else the group key) have
     1 / 2 / 3 / 4+ voter groups in their largest group at that level,
     and per dimension the share of the groups with at least two
     voters reporting a value (admitted at the level) in which every reporting voter carries the majority value;
@@ -400,9 +400,9 @@ def matchlevel_row(
             if g.scope != "repo":
                 continue
             voting = [r for r in g.members if votes(voter_of, r.tool)]  # observers are in no k and no count
-            if not voting:
-                continue
-            for unit in g.extra.get("units") or [g.key]:  # the exact matcher's units are the voters' already
+            if not any(r.record_id not in g.attached for r in voting):
+                continue  # only an observer reports it: the voters' generic records attached to it make no item
+            for unit in g.extra.get("units") or [g.key]:  # the matchers' units are the voters' already
                 best[(snapshot, unit)] = max(best.get((snapshot, unit), 0), len(g.voters(voter_of)))
             records += len(voting)
             for row in agreement(g, voter_of=voter_of, level=level):
