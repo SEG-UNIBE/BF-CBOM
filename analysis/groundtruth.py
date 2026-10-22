@@ -1,20 +1,23 @@
 """Scoring a tool against the micro projects' ground truth (corpus/micro/ground_truth.yaml, generated from the
 snippet catalogs by mutation/micro.py; its header states the rules).
 
-This implements the inclusion bar (a tool finds at least half of the items, lenient) and gives recall and precision
-per tool on the micro projects, at two levels (CLAUDE.md, refinement 1):
+This implements the entry bar (`ENTRY_BAR`: a tool finds at least half of a project's calls, lenient, in at least
+one language; below it in every language it was scored on, it is disqualified, `entry_verdict`) and gives recall,
+precision and F1 per tool on the micro projects, at two levels (CLAUDE.md, refinement 1):
 - call sites: strict (a record of the item's group on its lines; for a keygen item also a key record) and lenient
-  (also a record of unknown family there); the inclusion bar uses lenient;
+  (also a record of unknown family there); the entry bar uses lenient;
 - repository: the item's group reported anywhere in the project, location ignored, so tools without locations get a
   number too. Items sharing a group (two RSA, three AES) are found together at this level.
-Decoys (code that names or resembles cryptography without using it) count apart: every crypto record on their lines
-is a false positive.
+Precision is over the places the tool reports in the project's source file (correct: on a call's lines with its
+group or an unknown family, or on a line the ground truth accepts), so every report on a decoy (code that names or
+resembles cryptography without using it) or elsewhere lowers it; F1 combines it with the lenient recall.
 
 `score_records` scores the normalised records (analysis/normalize/) and is what `analysis micro` uses.
 """
 
 from __future__ import annotations
 
+import math
 import os
 from dataclasses import dataclass, field
 from functools import lru_cache
@@ -25,7 +28,8 @@ import yaml
 DEFAULT_TRUTH = Path(
     os.getenv("GROUND_TRUTH_PATH") or Path(__file__).resolve().parents[1] / "corpus" / "micro" / "ground_truth.yaml"
 )
-INCLUSION_BAR = 0.5
+ENTRY_BAR = 0.5  # a tool must find at least half of a project's calls (lenient) in at least one language
+PASSED, DISQUALIFIED, NOT_JUDGED = "passed", "disqualified", "not judged"  # entry_verdict
 
 
 @dataclass(frozen=True)
@@ -110,12 +114,25 @@ class TruthScore:
         return len(self.hits_repo) / self.n_assets if self.n_assets else 0.0
 
     @property
-    def precision(self) -> float:
-        return self.sites_correct / self.sites_in_file if self.sites_in_file else 0.0
+    def precision(self) -> float | None:
+        """Correct places out of the places the tool reported in the project's source file; None without any."""
+        return self.sites_correct / self.sites_in_file if self.sites_in_file else None
+
+    @property
+    def f1(self) -> float:
+        """Harmonic mean of the lenient recall (over the expected calls) and the precision (over the reported
+        places); 0 when the tool found no call."""
+        r, p = self.recall_lenient, self.precision
+        return 2 * p * r / (p + r) if r and p else 0.0
+
+    @property
+    def bar_items(self) -> int:
+        """The entry bar in calls: half of the project's, rounded up (7 of 14)."""
+        return math.ceil(ENTRY_BAR * self.n_assets)
 
     @property
     def passes_bar(self) -> bool:
-        return self.recall_lenient >= INCLUSION_BAR
+        return len(self.hits_lenient) >= self.bar_items
 
     @property
     def missed(self) -> list[str]:
@@ -145,12 +162,24 @@ class TruthScore:
             "sites": self.sites,
             "sites_in_file": self.sites_in_file,
             "sites_correct": self.sites_correct,
-            "precision": round(self.precision, 3),
+            "precision": None if self.precision is None else round(self.precision, 3),
+            "f1": round(self.f1, 3),
+            "bar_items": self.bar_items,
             "passes_bar": self.passes_bar,
             "false_sites": list(self.false_sites),
             "decoys": self.n_decoys,
             "decoys_hit": list(self.decoys_hit),
         }
+
+
+def entry_verdict(scores) -> str:
+    """A tool's verdict over its micro projects (one score per project, None where it has no scored run): passed when
+    it clears the entry bar in at least one language, disqualified when it was scored and clears it nowhere, not
+    judged without any scored run (it failed, timed out or does not support the languages)."""
+    scored = [s for s in scores if s is not None]
+    if not scored:
+        return NOT_JUDGED
+    return PASSED if any(s.passes_bar for s in scored) else DISQUALIFIED
 
 
 @lru_cache(maxsize=4)

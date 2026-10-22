@@ -21,7 +21,16 @@ import typer
 import yaml
 
 from analysis import levels as lv, mutation as mu, schema as sch, score as sc, summary as sm, tables as tbl
-from analysis.groundtruth import SCORED_ASSET_TYPES, load_ground_truth, project_for_repo, score_records
+from analysis.groundtruth import (
+    DISQUALIFIED,
+    NOT_JUDGED,
+    PASSED,
+    SCORED_ASSET_TYPES,
+    entry_verdict,
+    load_ground_truth,
+    project_for_repo,
+    score_records,
+)
 from analysis.matchers import ExactMatcher, raqun as rq
 from analysis.matchers.compare import MATCHERS_COLUMNS, compare
 from analysis.normalize import (
@@ -211,18 +220,28 @@ def micro(name: str = EXP_ARG, run: int = RUN_OPT, all_assets: bool = ALL_ASSETS
     if not entries:
         _err("no results for micro projects in this experiment (repos must be named <owner>/micro-<language>)")
     typer.echo(
-        f"{'project':<18}{'tool':<15}{'strict':>8}{'lenient':>9}{'repo':>7}{'precision':>11}{'decoys':>8}  bar  missed"
+        f"{'project':<18}{'tool':<15}{'strict':>8}{'lenient':>9}{'repo':>7}{'precision':>11}{'F1':>6}{'decoys':>8}"
+        "  bar  missed"
     )
     for e in entries:
         r = e.score
         if r is None:
             typer.echo(f"{e.project.name:<18}{e.tool:<15}  {tbl.micro_verdict(e.status, None)} ({e.status})")
             continue
+        precision = "–" if r.precision is None else f"{r.precision:.0%}"
         typer.echo(
             f"{r.project:<18}{r.tool:<15}{len(r.hits_strict):>5}/{r.n_assets:<2}{len(r.hits_lenient):>6}/{r.n_assets:<2}"
-            f"{len(r.hits_repo or []):>4}/{r.n_assets:<2}{r.sites_correct:>7}/{r.sites_in_file:<3}"
+            f"{len(r.hits_repo or []):>4}/{r.n_assets:<2}{precision:>11}{r.f1:>6.0%}"
             f"{len(r.decoys_hit):>5}/{r.n_decoys:<2} {'pass' if r.passes_bar else 'FAIL':<5}{','.join(r.missed)}"
         )
+    verdicts: dict[str, list[str]] = defaultdict(list)
+    for tool in dict.fromkeys(e.tool for e in entries):
+        verdicts[entry_verdict([e.score for e in entries if e.tool == tool])].append(tool)
+    bar = next((f"{e.score.bar_items} of {e.score.n_assets}" for e in entries if e.score), "half of the")
+    typer.echo(f"\nentry bar ({bar} calls, lenient, in at least one language):")
+    for verdict in (PASSED, DISQUALIFIED, NOT_JUDGED):
+        if verdicts.get(verdict):
+            typer.echo(f"  {verdict}: {', '.join(sorted(verdicts[verdict]))}")
     out_dir = analysis_dir(exp_dir)
     out_dir.mkdir(exist_ok=True)
     data = [

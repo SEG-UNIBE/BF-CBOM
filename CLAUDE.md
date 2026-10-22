@@ -149,8 +149,9 @@ normalisation, analysis outputs),
     `analysis/data/llm_prices.yaml`.
   - `mutation.py`: E4, each tool's detection of the inserted calls (Phase 4); every agreement analysis (RQ1, ladder,
     matchers, scores, stability) reads the original variants only, so a mutated repo is never counted twice.
-  - `groundtruth.py`: micro recall at call sites and at repo level, precision, inclusion bar, field-by-field
-    comparison with `expected`.
+  - `groundtruth.py`: micro recall at call sites and at repo level, precision (over the places a tool reports, decoys
+    included) and F1, the entry bar (`ENTRY_BAR`: half the calls, lenient, in one language) and each tool's verdict
+    (`passed`, `disqualified`, `not judged`: `entry_verdict`), field-by-field comparison with `expected`.
   - `tables.py` (flat CSV tables), `summary.py` (`_SUMMARY.md`, rendered from the CSVs only).
   - Commands: `report` (everything, one pass), `normalize`, `schema`, `levels`, `micro`, `tables`, `score`. The UI's
     Experiments page shows stored experiments read-only.
@@ -174,7 +175,9 @@ each tool's invocation and caveats are in the table below, the details in its `w
 pilot's inclusion bar (AI-made micro ground truth) are run and analysed like every tool and confirmed by the voters,
 but they never confirm another tool, count in no k, exclusivity or Dawid-Skene and are never ranked, so the voters'
 numbers are identical with and without them; `--observers-vote` makes them voters (sensitivity check). Whether they
-appear in the paper's figures is decided later.
+appear in the paper's figures is decided later. Since 2026-10-22 the micro check calls a tool below the entry bar in
+every language `disqualified`; leaving the disqualified tools out of the further experiments altogether is likely
+(the user's decision, pending the e0-micro rerun); until then they run as observers.
 
 | Worker | Voter group | Languages | Invocation and caveats |
 |---|---|---|---|
@@ -427,7 +430,8 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
 
 ## Phase 5: experiments
 - **E0 (the voter bar, stability):** every tool once on the three micro projects (`experiments/e0-micro.yaml`): the
-  inclusion check that decides each tool's `role`; and every tool 3× on the micro projects and ten small pilot repos
+  entry bar (7 of 14 calls in one language) that decides each tool's verdict, `passed` or `disqualified`, with recall,
+  precision and F1; and every tool 3× on the micro projects and ten small pilot repos
   (`experiments/e0-stability.yaml`), for determinism and run-to-run variance; needed before any agreement claim; its timings decide replicas and pruning.
 - **E1 (RQ1, RQ2):** all tools on the full corpus: validity, meaningfulness and traceability rates; assets per tool and
   fill rates per dimension; the tools-per-asset distribution (exact matcher, so RQ2 does not depend on RaQuN).
@@ -459,9 +463,8 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
 ## Method refinements (pitch review 2026-10-15; numbers are cited from code)
 1. **Unit of analysis.** Every RQ is reported at **repo level** (the items per repo; all tools take part) and at
    **call-site level** ((item, file, line ±k); only tools with locations). The micro check follows the same split
-   (`analysis/groundtruth.py:score_records`): call-site recall (the expected item at the right file and line ±2; the
-   inclusion bar) and repo-level recall (the expected item's own family, `expected.family`, anywhere in the
-   project), side by side, never pooled. The micro projects are not changed to suit a tool: plain constant algorithm
+   (`analysis/groundtruth.py:score_records`): call-site recall (the expected call found in its own function; the
+   entry bar) and repo-level recall (the call's group anywhere in the project), side by side, never pooled. The micro projects are not changed to suit a tool: plain constant algorithm
    strings are the common real-world pattern, and a tool's blindness to them is a finding.
 2. **Implied assets are not disagreement.** HMAC-SHA256 implies SHA-256, PBKDF2 implies HMAC; CBOMkit expands such
    hierarchies, others don't. `implies` in `algorithms.yaml` (generic rules from a record's digest plus an explicit

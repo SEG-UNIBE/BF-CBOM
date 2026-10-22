@@ -16,7 +16,7 @@ from __future__ import annotations
 import csv
 import json
 import statistics
-from collections import Counter
+from collections import Counter, defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
@@ -26,7 +26,7 @@ from common.experiment import iter_results, repo_full_name
 from common.tools_registry import votes
 
 from .costs import cost_usd, load_prices
-from .groundtruth import TruthProject, TruthScore
+from .groundtruth import TruthProject, TruthScore, entry_verdict
 from .levels import UNIT_LEVEL, identity
 from .matchers import MatchGroup, agreement
 from .normalize.record import RECORD_COLUMNS, NormalizedCbom, NormRecord
@@ -96,8 +96,8 @@ UNIT_REPO_COLUMNS = ["tool", "role", "repo", "language", "assets", "records", "i
 MICRO_COLUMNS = [
     "project", "language", "tool", "run", "tailored", "status", "verdict", "n_items",
     "strict", "lenient", "repo", "recall_strict", "recall_lenient", "recall_repo",
-    "sites_in_file", "sites_correct", "precision", "passes_bar", "missed", "repo_missed", "repo_extra",
-    "decoys", "decoys_hit",
+    "sites_in_file", "sites_correct", "precision", "f1", "bar_items", "passes_bar", "entry_bar", "missed",
+    "repo_missed", "repo_extra", "decoys", "decoys_hit",
 ]  # fmt: skip
 MICRO_ITEM_COLUMNS = [
     "project", "language", "tool", "run", "item", "families", "insertion_style",
@@ -521,7 +521,7 @@ def _packaging(n: NormalizedCbom) -> tuple[list[list[NormRecord]], set[str]]:
 
 
 def micro_verdict(status: str, score: TruthScore | None) -> str:
-    """pass/fail (inclusion bar: lenient call-site recall) for a scored run; otherwise why there is no grade:
+    """pass/fail (the entry bar: lenient call-site recall) for a scored run; otherwise why there is no grade:
     unsupported (outside the tool's languages), missing (not run), error (failed, timed out, cancelled, unreadable)."""
     if score is not None:
         return "pass" if score.passes_bar else "fail"
@@ -529,6 +529,11 @@ def micro_verdict(status: str, score: TruthScore | None) -> str:
 
 
 def micro_rows(entries: list[MicroEntry], *, run: int) -> list[dict]:
+    """One row per (micro project, tool); `entry_bar` is the tool's verdict over all its projects (passed,
+    disqualified, not judged: groundtruth.entry_verdict)."""
+    by_tool: dict[str, list] = defaultdict(list)
+    for e in entries:
+        by_tool[e.tool].append(e.score)
     rows = []
     for e in entries:
         s = e.score
@@ -542,6 +547,7 @@ def micro_rows(entries: list[MicroEntry], *, run: int) -> list[dict]:
             "verdict": micro_verdict(e.status, s),
             "n_items": len(e.project.assets),
             "decoys": len(e.project.decoys),
+            "entry_bar": entry_verdict(by_tool[e.tool]),
         }
         if s is not None:
             recall_repo = s.recall_repo
@@ -555,7 +561,9 @@ def micro_rows(entries: list[MicroEntry], *, run: int) -> list[dict]:
                     "recall_repo": None if recall_repo is None else round(recall_repo, 3),
                     "sites_in_file": s.sites_in_file,
                     "sites_correct": s.sites_correct,
-                    "precision": round(s.precision, 3),
+                    "precision": None if s.precision is None else round(s.precision, 3),
+                    "f1": round(s.f1, 3),
+                    "bar_items": s.bar_items,
                     "passes_bar": s.passes_bar,
                     "missed": s.missed,
                     "repo_missed": s.repo_missed,

@@ -1,10 +1,11 @@
 # The voter bar: every tool once on the micro projects (corpus/micro, Java, Python and Go: 14 known crypto calls and
 # 4 decoys each, generated from the snippet catalog by mutation/micro.py; corpus/micro/ground_truth.yaml). A tool is
-# a voter if it finds at least 7 of the 14 in their functions on one paper language's project; below it,
-# `role: observer` in common/tools.yaml. The directories are published to the git server as deterministic fixture
+# a voter if it finds at least 7 of the 14 in their functions on one paper language's project (the entry bar); below
+# it in every language it is `disqualified` (until the decision to leave such tools out: `role: observer` in
+# common/tools.yaml). The directories are published to the git server as deterministic fixture
 # commits (`path:`), so every worker scans them like any repo.
 #   make experiment EXP=experiments/e0-micro.yaml ARGS="--overwrite-old" EXPERIMENT_MEMORY_BUDGET_GB=0
-#   make analysis ARGS="micro e0-micro"      # the inclusion check per tool and language (also in report's _SUMMARY.md)
+#   make analysis ARGS="micro e0-micro"      # entry bar, recall, precision, F1 per tool and language; passed/disqualified
 # After a change to one worker: ARGS="--rerun <tool>" (3 jobs).
 name: e0-micro
 description: "the voter bar: every tool once on the three micro projects with known ground truth"

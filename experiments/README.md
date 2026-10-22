@@ -390,8 +390,14 @@ tool, including tools that did not run there (unsupported, failed):
 | repo | repository level: expected items whose group the tool reports anywhere in the project, location ignored; items sharing a group are found together. Needs a known family, so it can be lower than lenient |
 | precision | correct locations out of all the tool reported in the micro source file; one is correct on an expected item's line or a line the ground truth marks as related or accepted (a sub-use such as a digest, an import of the item's API) |
 | decoys | the decoys with a crypto record on their lines: false positives with ground truth |
-| bar | `pass` when lenient recall is at least 50 % (the inclusion bar) |
+| F1 | harmonic mean of the lenient recall (over the expected calls) and the precision (over the reported places); 0 when no call was found |
+| bar | `pass` when the tool found at least half of the calls, lenient (the entry bar, 7 of 14) |
 | missed | ids of the expected items the tool did not find (lenient) |
+
+After the rows the command lists each tool's verdict over all its projects: `passed` (the entry bar cleared in at
+least one language), `disqualified` (scored and below the bar wherever scored; the candidates to leave out of the
+further experiments) or `not judged` (no scored run). The same verdict is the `entry_bar` column of
+`micro-run<k>.csv` and of the summary's entry-bar table.
 
 A location window (CryptobomForge's IBM-draft `detectionContext`, the finding ±2 lines) counts at every line it spans.
 

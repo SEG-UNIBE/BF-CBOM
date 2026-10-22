@@ -86,3 +86,19 @@ def test_micro_go_builds():
 def test_micro_python_runs():
     pytest.importorskip("cryptography")
     runpy.run_path(str(MICRO_DIR / "python" / "app" / "crypto_demo.py"), run_name="__main__")
+
+
+def test_entry_bar_f1_and_the_tool_verdict():
+    from analysis.groundtruth import DISQUALIFIED, NOT_JUDGED, PASSED, TruthScore, entry_verdict
+
+    def score(found: int, correct: int, reported: int) -> TruthScore:
+        return TruthScore("t", "micro-x", 14, hits_lenient=[f"i{k}" for k in range(found)], sites_correct=correct,
+                          sites_in_file=reported)  # fmt: skip
+
+    six, seven = score(6, 6, 8), score(7, 7, 7)
+    assert seven.bar_items == 7 and seven.passes_bar and not six.passes_bar  # the bar: half of 14
+    assert seven.f1 == pytest.approx(2 * 0.5 * 1.0 / 1.5) and six.precision == 0.75
+    assert score(0, 0, 0).precision is None and score(0, 0, 0).f1 == 0.0  # nothing reported: no precision, F1 0
+    assert entry_verdict([six, seven]) == PASSED  # one language suffices
+    assert entry_verdict([six, None]) == DISQUALIFIED  # scored and below the bar wherever scored
+    assert entry_verdict([None, None]) == NOT_JUDGED  # no scored run (failed, unsupported)

@@ -218,7 +218,8 @@ def _reading() -> list[str]:
         'never confirms itself (section "Voter groups"). A tool\'s item is **confirmed** when a tool of another voter '
         "group reports it too. **k** = the number of voter groups that report an item (k=1: one group only, "
         "unconfirmed).",
-        "- **Observer** (`°` after its name): a tool below the micro projects' inclusion bar. Its items are checked "
+        "- **Observer** (`°` after its name): a tool below the micro projects' entry bar (disqualified). Its items are "
+        "checked "
         "against the voters like everyone's, but it confirms nobody and counts in no k, so the voters' numbers are "
         "the same with and without it.",
         "- **Cells**: `–` = the repository's language is outside the tool's languages (not run), `×` = the run "
@@ -545,6 +546,8 @@ def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
     n_items = max((_int(r.get("n_items")) for r in rows), default=11)
     bar = (n_items + 1) // 2
 
+    entry = {r["tool"]: r.get("entry_bar") or "" for r in rows}
+
     def rank(tool: str) -> tuple:
         rs = [cells[(tool, lg)] for lg in langs if (tool, lg) in cells]
         return (-sum(r["verdict"] == "pass" for r in rs), -sum(_int(r.get("lenient")) for r in rs), tool)
@@ -575,9 +578,12 @@ def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
         "(code that names or resembles cryptography without using it). That is the ground truth "
         "(`corpus/micro/ground_truth.yaml`). A tool is a voter only if it finds enough of the calls.",
         "",
-        f"**Inclusion check**: one row per tool, one column per language. A tool passes when it reports at least "
-        f"{bar} of the {n_items} calls in their functions (lenient call-site recall, below); the cell gives the "
-        "verdict and that number. `–` = outside the tool's languages, `error` = the run failed or timed out."
+        f"**Entry bar: {bar} of {n_items} calls** (half, lenient call-site recall, below) in at least one language. "
+        "One row per tool, one column per language: `pass` or `fail` with the calls the tool found in their "
+        "functions (`–` = outside the tool's languages, `error` = the run failed or timed out). Then the tool's "
+        "verdict, `entry bar`: `passed` when it clears the bar in at least one language, `disqualified` when it was "
+        "scored and clears it nowhere (the candidates to leave out of the further experiments; until that is "
+        "decided they run as observers, `role: observer`), `not judged` without any scored run."
         + (
             " `*` = the tool was tuned on this project (`tailored_on` in tools.yaml, refinement 13), so its number "
             "there is inflated by construction."
@@ -586,7 +592,9 @@ def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
         ),
         "",
     ]
-    lines += md_table(["tool", *langs], [[t] + [verdict_cell(cells.get((t, lg))) for lg in langs] for t in tools])
+    lines += md_table(["tool", *langs, "entry bar"],
+                      [[t] + [verdict_cell(cells.get((t, lg))) for lg in langs] + [entry[t]] for t in tools],
+                      "l" + "r" * len(langs) + "l")  # fmt: skip
     if scored:
         t, lg, r = scored[0]
         lines += _eg(
@@ -614,6 +622,7 @@ def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
             f"{r['lenient']} when a record of unknown family there counts too, and {r['repo']} by their group anywhere "
             "in the project."
         )
+    lines += _quality(cells, langs, tools)
     if expected:
         found: dict[tuple[str, str], list[int]] = defaultdict(lambda: [0, 0])
         style: dict[str, str] = {}
@@ -646,6 +655,38 @@ def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
             lines += _eg(f"`{cell}` for {item} in {lg}: {f} of the {n} tools scored on micro-{lg} found it.")
     lines += _decoys(rows, langs, tools)
     return lines + [""]
+
+
+def _quality(cells: dict, langs: list[str], tools: list[str]) -> list[str]:
+    """Recall, precision and F1 of every scored (tool, micro project) (micro-run<k>.csv)."""
+
+    def cell(r: dict | None) -> str:
+        if r is None or r["verdict"] not in ("pass", "fail"):
+            return "–" if r is not None and r["verdict"] == "unsupported" else ""
+        return f"{_pct(r['recall_lenient'])} / {_pct(r.get('precision')) or '–'} / {_pct(r.get('f1'))}"
+
+    table = [[t] + [cell(cells.get((t, lg))) for lg in langs] for t in tools]
+    lines = [
+        "",
+        "**Recall, precision and F1**: one row per tool, one column per language, `recall / precision / F1`. Recall: "
+        "the calls found (lenient) out of all calls. Precision: the correct places out of all places the tool "
+        "reported in the project's source file; a place is correct on a call's lines with its group or an unknown "
+        "family, or on a line the ground truth accepts (a sub-use such as a digest, an import of the call's API), so "
+        "a report on a decoy, on unrelated code or with the wrong family is a false one (`–`: the tool reported no "
+        "place). F1: the harmonic mean of the two, 0 when the tool found no call.",
+        "",
+    ]
+    lines += md_table(["tool", *langs], table)
+    eg = next(((t, lg, cells[(t, lg)]) for t in tools for lg in langs if (t, lg) in cells
+               and cells[(t, lg)]["verdict"] in ("pass", "fail") and cells[(t, lg)].get("precision") not in (None, "")
+               and _float(cells[(t, lg)]["precision"]) < 1), None)  # fmt: skip
+    if eg:
+        t, lg, r = eg
+        lines += _eg(
+            f"`{cell(r)}` for {t} in {lg}: it found {_pct(r['recall_lenient'])} of the calls, {_pct(r['precision'])} "
+            f"of the places it reported are correct, and the two combine to an F1 of {_pct(r['f1'])}."
+        )
+    return lines
 
 
 def _decoys(rows: list[dict], langs: list[str], tools: list[str]) -> list[str]:

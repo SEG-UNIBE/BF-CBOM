@@ -291,16 +291,21 @@ def test_summary_markdown_from_csv_rows():
     types = ["unknown", "related-crypto-material", "algorithm", "certificate"]
     assert sm._asset_types(types) == ["algorithm", "certificate", "related-crypto-material", "unknown"]
     base = {"n_items": "11"}
+    weak = {**base, "tool": "weak", "entry_bar": "disqualified"}
+    good = {**base, "tool": "good", "entry_bar": "passed"}
     rows = [
-        {**base, "language": "java", "tool": "weak", "verdict": "fail", "strict": "0", "lenient": "2", "repo": "7"},
-        {**base, "language": "go", "tool": "weak", "verdict": "error"},
-        {**base, "language": "java", "tool": "good", "verdict": "pass", "strict": "9", "lenient": "11", "repo": "11"},
-        {**base, "language": "go", "tool": "good", "verdict": "unsupported"},
-    ]
+        {**weak, "language": "java", "verdict": "fail", "strict": "0", "lenient": "2", "repo": "7",
+         "recall_lenient": "0.182", "precision": "0.5", "f1": "0.267"},
+        {**weak, "language": "go", "verdict": "error"},
+        {**good, "language": "java", "verdict": "pass", "strict": "9", "lenient": "11", "repo": "11",
+         "recall_lenient": "1.0", "precision": "1.0", "f1": "1.0"},
+        {**good, "language": "go", "verdict": "unsupported"},
+    ]  # fmt: skip
     lines = sm._micro(rows, [])
-    assert "| tool | java | go |" in lines  # paper languages first
-    assert lines.index("| good | pass 11 | – |") < lines.index("| weak | fail 2 | error |")  # passes first
+    assert "| tool | java | go | entry bar |" in lines  # paper languages first, then the tool's verdict
+    assert lines.index("| good | pass 11 | – | passed |") < lines.index("| weak | fail 2 | error | disqualified |")
     assert "| weak | 0 / 2 · 7 |  |" in lines
+    assert "| weak | 18% / 50% / 27% |  |" in lines and "| good | 100% / 100% / 100% | – |" in lines
 
 
 def test_reported_section_shows_raw_counts_and_the_repo_matrix():
