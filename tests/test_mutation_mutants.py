@@ -18,7 +18,7 @@ from common.experiment import (
 )
 from mutation.mutants import ensure_mutants
 
-MICRO = Path(__file__).resolve().parents[1] / "corpus" / "micro"
+MICRO = Path(__file__).resolve().parents[1] / "experiments" / "corpus" / "micro"
 
 
 def _publish(src: Path, full_name: str, language: str, mirror: Path) -> tuple[RepoSpec, str]:

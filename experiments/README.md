@@ -4,6 +4,13 @@ Batch runs for the journal extension (see `CLAUDE.md`, Phase 1). Specs live here
 read-only into the `runner` container; everything they produce stays in Docker volumes.
 
 ```
+experiments/
+├── *.yaml       # experiment specs
+├── corpus/      # pinned repository lists, exclusions and micro fixtures
+└── results/     # exported ZIPs and extracted results (ignored by Git)
+```
+
+```
 make experiment EXP=experiments/e4-mutation-smoke.yaml   # pin commits, mirror to gitserver, run, persist
 make experiment-status NAME=e4-mutation-smoke            # Redis progress + what is on disk
 make experiment-export NAME=e4-mutation-smoke            # experiments/results/e4-mutation-smoke.zip (only way data reaches the host)
@@ -37,11 +44,11 @@ experiment.
 
 | Spec | Tools | Repos | Purpose |
 |---|---|---|---|
-| `e0-micro.yaml` | all 15 tools, once | the 3 micro projects (`corpus/micro`: Java, Python, Go) | the voter bar: the micro check against the generated ground truth (`make analysis ARGS="micro e0-micro"`), which informs the role decision in `common/tools.yaml` (at least 7 of 14 in their functions in one paper language); 45 jobs |
+| `e0-micro.yaml` | all 15 tools, once | the 3 micro projects (`experiments/corpus/micro`: Java, Python, Go) | the voter bar: the micro check against the generated ground truth (`make analysis ARGS="micro e0-micro"`), which informs the role decision in `common/tools.yaml` (at least 7 of 14 in their functions in one paper language); 45 jobs |
 | `e0-stability.yaml` | the same 15, 3 repetitions | 3 micro projects + the 10 fastest pilot repos | E0: run-to-run variance (`stability.csv`) and consensus sets for the scores; 585 jobs |
-| `e1-pilot-corpus.yaml` | the same 15 | the 12 pilot projects in Java, Python and Go (`corpus/pilot-2026-10-08.yaml`) | first real workload: location-aware agreement on the pilot's pinned projects; large repos (Kafka, Keycloak) push CBOMkit towards its timeout |
-| `e1-pilot-60.yaml` | the same 15, once | 60 manually selected projects, 20 each in Java, Python and Go (`corpus/pilot-2026-10-22.yaml`) | second pilot, pinned to default-branch HEADs on 2026-10-22; 900 tool/repository pairs |
-| `e1-icpc-corpus.yaml` | the same 15 | 23 projects of the ICPC 2026 paper (`corpus/icpc-2026.yaml`, HEAD of 2026-10-18) | held-out counterpart of the pilot corpus: none of these repos was used to tune the vocabulary, the specs or CipherSift; six are marked `expect_crypto: low` (negative cases) |
+| `e1-pilot-corpus.yaml` | the same 15 | the 12 pilot projects in Java, Python and Go (`experiments/corpus/pilot-2026-10-08.yaml`) | first real workload: location-aware agreement on the pilot's pinned projects; large repos (Kafka, Keycloak) push CBOMkit towards its timeout |
+| `e1-pilot-60.yaml` | the same 15, once | 60 manually selected projects, 20 each in Java, Python and Go (`experiments/corpus/pilot-2026-10-22.yaml`) | second pilot, pinned to default-branch HEADs on 2026-10-22; 900 tool/repository pairs |
+| `e1-icpc-corpus.yaml` | the same 15 | 23 projects of the ICPC 2026 paper (`experiments/corpus/icpc-2026.yaml`, HEAD of 2026-10-18) | held-out counterpart of the pilot corpus: none of these repos was used to tune the vocabulary, the specs or CipherSift; six are marked `expect_crypto: low` (negative cases) |
 | `e4-mutation-smoke.yaml` | all 15 tools | pyjwt, jjwt, golang-jwt (pilot), 3 mutants each | the mutation harness end to end: the RSA-2048 keygen inserted in each style; CBOMkit and CryptoScan should find the direct one at its line (`mutation.csv`) |
 
 LLM providers are outside the current experiment scope; their implementation remains available for possible later use.
@@ -88,8 +95,8 @@ repos:                     # and/or explicit repos
     expect_crypto: low     # optional corpus metadata for the analysis (a negative case: little crypto expected)
     variants: [original, my-branch]   # optional: variants are branches bfcbom/<variant> in the mirror (not with mutation:)
   - full_name: bfcbom/micro-java
-    path: ../corpus/micro/java   # a plain directory (relative to this file) published to gitserver as a
-    language: Java               # deterministic fixture commit; no git_url/commit (see corpus/README.md)
+    path: corpus/micro/java   # a plain directory (relative to this file) published to gitserver as a
+    language: Java               # deterministic fixture commit; no git_url/commit (see experiments/corpus/README.md)
 mutation:                  # optional: every repo also gets insertion mutants as variants (E4, below)
   per_repo: 10             # mutants per repo (fewer when not enough (snippet, style) pairs fit a host)
   styles: [direct, wrapper, indirect]
@@ -401,8 +408,8 @@ observers are no voter groups, so an item only observers report has k 0). That t
 takes part; it is the basis for UpSet plots and the tools-per-item distribution. Options: `--run K` for another repetition, `--merge-llm` (every LLM worker one
 voter), `--observers-vote`, `--include-tailored`, `--closure` (refinement 2).
 
-**`micro <exp>`** scores every tool on the micro projects (`corpus/micro`, repos named `<owner>/micro-<language>`)
-against `corpus/micro/ground_truth.yaml`, 14 expected items per project (a catalog snippet in a function of its own;
+**`micro <exp>`** scores every tool on the micro projects (`experiments/corpus/micro`, repos named `<owner>/micro-<language>`)
+against `experiments/corpus/micro/ground_truth.yaml`, 14 expected items per project (a catalog snippet in a function of its own;
 the file calls them `assets`) plus 4 decoys (code that names or resembles cryptography without using it). Projects and
 ground truth are generated from the snippet catalog by `uv run python -m mutation.micro` (never edited by hand; a test
 fails when they drift; the ground truth's header states the rules). Scored from the normalised records

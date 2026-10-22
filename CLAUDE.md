@@ -120,7 +120,7 @@ normalisation, analysis outputs),
   worker job (recorded as `oom`, redone by `--retry-failed`), never redis or the git server. The corpus sampler
   would then also stratify by number of developers (GitHub contributors) next to language, stars, last push and
   size (size cap: `GITSERVER_MEMORY`, below).
-- **Corpus and fixtures** (`corpus/`, mounted read-only into the runner): `micro/<language>/` the micro projects of
+- **Corpus and fixtures** (`experiments/corpus/`, mounted read-only into the runner): `micro/<language>/` the micro projects of
   Java, Python and Go with `micro/ground_truth.yaml`, both generated from the snippet catalog (`mutation/micro.py`,
   checked in, a test keeps them equal; 14 expected calls, each in a function of its own, and 4 decoys per project; its
   header states the hit rule, decided 2026-10-22); `pilot-2026-10-08.yaml` (12 pinned real
@@ -500,7 +500,7 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
     (`PROMPT_VERSION`) and stated as part of the tool in the paper.
 11. **Corpus exclusions.** No repos from the tools' own test suites or published benchmarks, none whose crypto sits
     only in dependencies (the scope is first-party source), none exceeding a tool's timeout at E0
-    (`corpus/exclusions.yaml`, `make corpus-prune`).
+    (`experiments/corpus/exclusions.yaml`, `make corpus-prune`).
 12. **Minimum viable paper:** the exact matcher, insertion-only mutation and the paper languages with the independent
     engines already integrated; RaQuN, removal mutants and Dawid-Skene are additions on top.
 13. **Benchmark-informed tools.** A tool adapted while looking at our results (CipherSift: `tailored_on` in

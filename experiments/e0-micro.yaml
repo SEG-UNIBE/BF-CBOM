@@ -1,5 +1,5 @@
-# The voter bar: every tool once on the micro projects (corpus/micro, Java, Python and Go: 14 known crypto calls and
-# 4 decoys each, generated from the snippet catalog by mutation/micro.py; corpus/micro/ground_truth.yaml). A tool is
+# The voter bar: every tool once on the micro projects (experiments/corpus/micro, Java, Python and Go: 14 known crypto calls and
+# 4 decoys each, generated from the snippet catalog by mutation/micro.py; experiments/corpus/micro/ground_truth.yaml). A tool is
 # a voter if it finds at least 7 of the 14 in their functions on one paper language's project (the entry bar); below
 # it in every language it is `disqualified` (until the decision to leave such tools out: `role: observer` in
 # common/tools.yaml). The directories are published to the git server as deterministic fixture
@@ -13,11 +13,11 @@ tools: [cbomkit, cdxgen, cryptobomforge, cryptoscan, pqcheck, qdarpan, securin-x
 repetitions: 1
 repos:
   - full_name: bfcbom/micro-java
-    path: ../corpus/micro/java
+    path: corpus/micro/java
     language: Java
   - full_name: bfcbom/micro-python
-    path: ../corpus/micro/python
+    path: corpus/micro/python
     language: Python
   - full_name: bfcbom/micro-go
-    path: ../corpus/micro/go
+    path: corpus/micro/go
     language: Go

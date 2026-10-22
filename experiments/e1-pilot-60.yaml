@@ -8,4 +8,4 @@ name: e1-pilot-60
 description: second pilot with 60 manually selected projects, 20 each in Java, Python and Go
 tools: [cbomkit, cdxgen, cryptobomforge, cryptoscan, pqcheck, qdarpan, securin-xbom, cipherradar, xgrep, cbomkit-jar, ciphersift, scanoss, qelens, cryptarium, qscan]
 repetitions: 1
-corpus: ../corpus/pilot-2026-10-22.yaml
+corpus: corpus/pilot-2026-10-22.yaml

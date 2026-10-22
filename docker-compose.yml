@@ -81,7 +81,6 @@ services:
       - results-data:/data/results
       - git-data:/srv/git
       - ./experiments:/app/experiments:ro
-      - ./corpus:/app/corpus:ro
     restart: "no"
     deploy:
       resources:

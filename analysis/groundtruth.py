@@ -1,5 +1,5 @@
-"""Scoring a tool against the micro projects' ground truth (corpus/micro/ground_truth.yaml, generated from the
-snippet catalogs by mutation/micro.py; its header states the rules).
+"""Scoring a tool against the micro projects' ground truth (experiments/corpus/micro/ground_truth.yaml), generated
+from the snippet catalogs by mutation/micro.py; its header states the rules.
 
 This implements the entry bar (`ENTRY_BAR`: a tool finds at least half of a project's calls, lenient, in at least
 one language; below it in every language it was scored on, it is disqualified, `entry_verdict`) and gives recall,
@@ -26,7 +26,8 @@ from pathlib import Path
 import yaml
 
 DEFAULT_TRUTH = Path(
-    os.getenv("GROUND_TRUTH_PATH") or Path(__file__).resolve().parents[1] / "corpus" / "micro" / "ground_truth.yaml"
+    os.getenv("GROUND_TRUTH_PATH")
+    or Path(__file__).resolve().parents[1] / "experiments" / "corpus" / "micro" / "ground_truth.yaml"
 )
 ENTRY_BAR = 0.5  # a tool must find at least half of a project's calls (lenient) in at least one language
 PASSED, DISQUALIFIED, NOT_JUDGED = "passed", "disqualified", "not judged"  # entry_verdict

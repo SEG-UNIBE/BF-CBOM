@@ -11,7 +11,7 @@ Pure Python, no Redis, no UI. Reads the result tree written by the batch runner
 - `schema`:      RQ1: whole-document CycloneDX validation, meaningful shares, traceability (`snapshots` reads the
                  files of a pinned commit from the git mirror or a fetched cache)
 - `matchers`:    n-way matchers over the records: `exact` (matcher (b), canonical identity, call-site subgroups)
-- `groundtruth`: scoring against the micro projects' ground truth (corpus/micro/ground_truth.yaml)
+- `groundtruth`: scoring against the micro projects' ground truth (experiments/corpus/micro/ground_truth.yaml)
 - `tables`:      flat CSV tables (runs, normalised records, matcher groups/members/agreement, micro scores)
 - `summary`:     `_SUMMARY.md` rendered from the CSV tables; `freeze`: the frozen vocabulary and specs
 """

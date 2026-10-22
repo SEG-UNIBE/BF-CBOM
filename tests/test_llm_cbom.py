@@ -407,7 +407,7 @@ def test_has_api_key_rejects_placeholders():
 def test_select_files_covers_all_micro_languages():
     from common.llm_cbom import select_files
 
-    root = Path(__file__).resolve().parents[1] / "corpus" / "micro"
+    root = Path(__file__).resolve().parents[1] / "experiments" / "corpus" / "micro"
     for lang, sub, expected in (
         ("Java", "java", "CryptoDemo.java"),
         ("Python", "python", "crypto_demo.py"),

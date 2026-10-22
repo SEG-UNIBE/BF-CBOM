@@ -1,7 +1,7 @@
 # The 23 real projects of the ICPC 2026 paper (11 Python, 12 Java), pinned to their default-branch HEAD on
 # 2026-10-18 (git ls-remote), not to the commits the paper scanned. Held out: none of them was used to tune the
-# vocabulary, the adapter specs or CipherSift (unlike corpus/pilot-2026-10-08.yaml, the development set).
-# Format as corpus/pilot-2026-10-08.yaml; `expect_crypto` is metadata for the analysis, ignored by the runner:
+# vocabulary, the adapter specs or CipherSift (unlike experiments/corpus/pilot-2026-10-08.yaml, the development set).
+# Format as experiments/corpus/pilot-2026-10-08.yaml; `expect_crypto` is metadata for the analysis, ignored by the runner:
 # `low` = probably little or no crypto in first-party source (negative cases; refinement 11 would exclude them
 # from the main corpus).
 built_at: "2026-10-18"

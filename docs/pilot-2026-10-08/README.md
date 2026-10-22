@@ -15,9 +15,9 @@ Retained reports and survey:
 
 Related artifacts in BF-CBOM:
 
-- [Full pinned pilot corpus](../../corpus/pilot-2026-10-08-all.yaml) and the [paper-language subset](../../corpus/pilot-2026-10-08.yaml).
+- [Full pinned pilot corpus](../../experiments/corpus/pilot-2026-10-08-all.yaml) and the [paper-language subset](../../experiments/corpus/pilot-2026-10-08.yaml).
 - [Selected CBOM fixtures](../../tests/fixtures/pilot/) and the [original ground truth](../../tests/fixtures/pilot/ground_truth-2026-10-08.yaml).
 - [Tool registry](../../common/tools.yaml), which retains the dated pilot verdicts.
 
-The original micro projects have since been replaced; see the [corpus guide](../../corpus/README.md).
+The original micro projects have since been replaced; see the [corpus guide](../../experiments/corpus/README.md).
 Apart from the selected fixtures, raw tool outputs, logs and private session transcripts were not carried over.

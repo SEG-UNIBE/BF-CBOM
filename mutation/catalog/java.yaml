@@ -1,7 +1,7 @@
 # Snippet catalog for Java insertion mutants (Phase 4; loader mutation/catalog.py, format in experiments/README.md).
 #
 # Every snippet is JCA (java.security, javax.crypto, javax.net.ssl), which ships with the JDK, so every snippet fits every
-# Java project. The micro project corpus/micro/java is generated from this catalog (mutation/micro.py; AI-made,
+# Java project. The micro project experiments/corpus/micro/java is generated from this catalog (mutation/micro.py; AI-made,
 # on the human-review list before paper use).
 # `expected` is the snippet's canonical record in the normaliser's vocabulary (unit = the L4 identity of
 # analysis/levels.py), `also` the identities the snippet necessarily contains besides it. Templates: `$name` is an

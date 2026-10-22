@@ -91,8 +91,9 @@ def observers(tools: dict[str, dict] | None = None) -> frozenset[str]:
 
 def tailored_repos(tool: str, tools: dict[str, dict] | None = None, root: Path = REPO_ROOT) -> frozenset[str]:
     """Repositories a tool was tuned on (`tailored_on`, refinement 13), as `owner/name` full names: a corpus YAML
-    contributes its `repos`, a fixture directory such as corpus/micro one `bfcbom/<dir>-<child>` per sub-directory
-    (the naming of the micro projects in experiments/e0-stability.yaml). Unknown entries are ignored."""
+    contributes its `repos`, a fixture directory such as experiments/corpus/micro one `bfcbom/<dir>-<child>`
+    per sub-directory (the naming of the micro projects in experiments/e0-stability.yaml).
+    Unknown entries are ignored."""
     entry = (tools if tools is not None else load_tools()).get(tool) or {}
     names: set[str] = set()
     for item in entry.get("tailored_on") or []:

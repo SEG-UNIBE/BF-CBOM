@@ -5,9 +5,9 @@ Runs inside the `runner` container; needs network access to GitHub (a token rais
 search rate limit from 10 to 30 requests per minute).
 
 Exclusions (CLAUDE.md refinement 11): name patterns (CBOM tooling, benchmarks), the reviewed list
-`corpus/exclusions.yaml` (the generators' own repos and test suites, with a reason each), and the repos a tool was
-tuned on (`tailored_on` in common/tools.yaml, refinement 13). The crypto pre-filter greps first-party source only
-(no test, vendor, example or documentation paths). Every exclusion is recorded in the output with its reason.
+`experiments/corpus/exclusions.yaml` (the generators' own repos and test suites, with a reason each), and the repos
+a tool was tuned on (`tailored_on` in common/tools.yaml, refinement 13). The crypto pre-filter greps first-party
+source only (no test, vendor, example or documentation paths). Every exclusion is recorded with its reason.
 `prune_corpus` drops repos where a tool timed out in an earlier experiment (E0), with the reason.
 
 Repo size cap: the git server serves full clones from a container limited to GITSERVER_MEMORY (Makefile), so the
@@ -35,7 +35,7 @@ import yaml
 from .tools_registry import REPO_ROOT, tailored_map
 from .utils import resolve_remote_commit
 
-EXCLUSIONS_FILE = REPO_ROOT / "corpus" / "exclusions.yaml"
+EXCLUSIONS_FILE = REPO_ROOT / "experiments" / "corpus" / "exclusions.yaml"
 # Paths the crypto pre-filter ignores: the scope is first-party source (refinement 11; some tools skip tests too)
 NON_FIRST_PARTY = (
     "test", "tests", "testing", "spec", "vendor", "third_party", "thirdparty", "node_modules", "example", "examples",
@@ -186,7 +186,7 @@ def _excluded(full_name: str, patterns: list[str]) -> bool:
 
 
 def load_exclusions(path: Path = EXCLUSIONS_FILE) -> dict:
-    """{"repos": {full name (lower): reason}, "patterns": [(regex, reason)]} from corpus/exclusions.yaml."""
+    """{"repos": {full name (lower): reason}, "patterns": [(regex, reason)]} from experiments/corpus/exclusions.yaml."""
     if not Path(path).exists():
         return {"repos": {}, "patterns": []}
     data = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
@@ -237,7 +237,8 @@ def build_corpus(
     tailored: dict[str, frozenset[str]] | None = None,
 ) -> dict:
     """Stratified sample per language over stars x size cells, filtered and pinned to commits. Exclusions default to
-    corpus/exclusions.yaml and the registry's `tailored_on`; every excluded candidate is listed with its reason.
+    experiments/corpus/exclusions.yaml and the registry's `tailored_on`; every excluded candidate is listed
+    with its reason.
     `status(language, picked, now)` follows the search (the CLI's progress line): `now` is the cell searched or the
     repo checked, None once the language is done."""
     exclusions = load_exclusions() if exclusions is None else exclusions

@@ -4,7 +4,7 @@
 # projects that already declare `cryptography` (decided 2026-10-20: dependency files are never edited, so every mutant
 # is one edit). pyca's `backend` argument is optional from 3.1, the minimum below. TripleDES is left out: pyca 43
 # moved it to `hazmat.decrepit`, so its import would depend on the project's pinned version; sha3-256 takes its place.
-# The micro project corpus/micro/python is generated from this catalog (mutation/micro.py; AI-made, on the
+# The micro project experiments/corpus/micro/python is generated from this catalog (mutation/micro.py; AI-made, on the
 # human-review list before paper use). Imports are statements; `$name` refers to a name they bind. Locals carry a
 # prefix so that clashes (renamed) stay rare.
 version: "2026-10-20.1"

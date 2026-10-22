@@ -9,13 +9,13 @@ tools: [cbomkit, cdxgen, cryptobomforge, cryptoscan, pqcheck, qdarpan, securin-x
 repetitions: 3
 repos:
   - full_name: bfcbom/micro-java
-    path: ../corpus/micro/java
+    path: corpus/micro/java
     language: Java
   - full_name: bfcbom/micro-python
-    path: ../corpus/micro/python
+    path: corpus/micro/python
     language: Python
   - full_name: bfcbom/micro-go
-    path: ../corpus/micro/go
+    path: corpus/micro/go
     language: Go
   - full_name: panva/jose
     language: TypeScript

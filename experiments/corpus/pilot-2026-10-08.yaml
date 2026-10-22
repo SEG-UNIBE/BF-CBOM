@@ -1,7 +1,8 @@
-# All 16 real projects of the pilot experiment (2026-10-08), pinned to the commits scanned then: the record of what
-# the pilot scanned and of what CipherSift was tuned on (its `tailored_on` in common/tools.yaml reads this file).
-# Experiments use pilot-2026-10-08.yaml, the 12 of them in the paper languages.
-# Format: a corpus file for experiment specs (`corpus: ../corpus/pilot-2026-10-08-all.yaml`, see
+# The 12 real projects of the pilot experiment (2026-10-08) in the paper languages (Java, Python, Go), pinned to the
+# commits scanned then. The pilot also scanned panva/jose (TypeScript), openssh/openssh-portable (C), curl/curl (C) and
+# parse-community/parse-server (JavaScript), removed 2026-10-20 as not paper languages; all 16 are in
+# pilot-2026-10-08-all.yaml, which CipherSift's `tailored_on` reads (it was tuned on all of them).
+# Format: a corpus file for experiment specs (`corpus: corpus/pilot-2026-10-08.yaml`, see
 # experiments/README.md). The `pilot_*` keys are metadata for the analysis and are ignored by the runner.
 # The four short hashes recorded for the native corpus were resolved to full SHAs against the
 # upstream tags on 2026-10-15 (git ls-remote <tag>^{}).
@@ -58,7 +59,7 @@ repos:
     commit: a26c0f7b504bc39c2257b4180016c6c08bab738e
     pilot_ref: v2.17.0
     pilot_size: large
-  # ---- Go / C / JavaScript (pilot "native" corpus)
+  # ---- Go (pilot "native" corpus)
   - full_name: golang-jwt/jwt
     language: Go
     branch: main
@@ -77,30 +78,6 @@ repos:
     commit: 622be32d9288f7491092aacf19f7bbc035684fc0
     pilot_ref: v0.91.0
     pilot_size: mid
-  - full_name: panva/jose
-    language: TypeScript
-    branch: main
-    commit: 505a55b8f73536082367b2614cb77e927ba96ec1
-    pilot_ref: v6.2.12
-    pilot_size: mid
-  - full_name: openssh/openssh-portable
-    language: C
-    branch: master
-    commit: d76b2675116617394cd355a3437b4963a562b64d
-    pilot_ref: V_9_9_P2
-    pilot_size: mid
-  - full_name: curl/curl
-    language: C
-    branch: master
-    commit: 01346829096c61b372692f6dc43ffa778c6caccd
-    pilot_ref: curl-8_22_0
-    pilot_size: large
-  - full_name: parse-community/parse-server
-    language: JavaScript
-    branch: alpha
-    commit: 4ec73c57725d0157157e2a918ca518e5853c98ea
-    pilot_ref: "9.10.3"
-    pilot_size: large
   - full_name: hashicorp/vault
     language: Go
     branch: main

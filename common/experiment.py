@@ -67,7 +67,7 @@ class RepoSpec:
     stars: int | None = None
     size_kb: int | None = None
     variants: list[str] = field(default_factory=lambda: [ORIGINAL_VARIANT])
-    # A plain directory (e.g. corpus/micro/java) published to the git server by the runner instead of
+    # A plain directory (e.g. experiments/corpus/micro/java) published to the git server by the runner instead of
     # a remote repo; resolved to an absolute path at spec load time.
     path: str | None = None
     # Corpus metadata for the analysis, ignored by the runner: `low` marks a negative case (little crypto expected)
@@ -389,7 +389,7 @@ FIXTURE_DATE = "2026-10-08T00:00:00Z"
 
 
 def publish_fixture(spec: RepoSpec, *, mirror_dir: Path = GIT_MIRROR_DIR) -> str:
-    """Commit a plain directory (`RepoSpec.path`, e.g. corpus/micro/java) into the base mirror.
+    """Commit a plain directory (`RepoSpec.path`, e.g. experiments/corpus/micro/java) into the base mirror.
 
     The commit is deterministic (fixed author, date and message), so the SHA depends only on the
     files' contents and modes: the same fixture gets the same snapshot id on every machine.

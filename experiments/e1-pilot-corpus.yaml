@@ -1,5 +1,5 @@
 # All tools on the pilot's 12 real projects in the paper languages (Java, Python, Go), at the pinned commits
-# (corpus/pilot-2026-10-08.yaml).
+# (experiments/corpus/pilot-2026-10-08.yaml).
 # Several repos are large (Kafka, Keycloak, Vault): expect CBOMkit runs of 5-30 min each and
 # raise WORKER_TIMEOUT_SEC / memory for worker-cbomkit before running (pilot: 45 min, 16 GB heap).
 #   make experiment EXP=experiments/e1-pilot-corpus.yaml ARGS="--overwrite-old" EXPERIMENT_MEMORY_BUDGET_GB=0
@@ -8,4 +8,4 @@ name: e1-pilot-corpus
 description: pilot corpus rerun through BF-CBOM (location-aware agreement across tools), paper languages only
 tools: [cbomkit, cdxgen, cryptobomforge, cryptoscan, pqcheck, qdarpan, securin-xbom, cipherradar, xgrep, cbomkit-jar, ciphersift, scanoss, qelens, cryptarium, qscan]
 repetitions: 1
-corpus: ../corpus/pilot-2026-10-08.yaml
+corpus: corpus/pilot-2026-10-08.yaml

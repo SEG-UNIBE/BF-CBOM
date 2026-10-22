@@ -1,7 +1,7 @@
 # Findings so far
 
 Results gathered while building BF-CBOM 2.0, moved out of `CLAUDE.md` on 2026-10-18. They come from the development
-set (the pilot corpus `corpus/pilot-2026-10-08.yaml`, the micro projects `corpus/micro`) and from runs that will be
+set (the pilot corpus `experiments/corpus/pilot-2026-10-08.yaml`, the micro projects `experiments/corpus/micro`) and from runs that will be
 rerun before the paper's experiments; the date says which code produced a number. The micro projects are tiny and
 AI-written: their numbers are an inclusion check, not a ranking.
 

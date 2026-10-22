@@ -573,10 +573,10 @@ def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
               and cells[(t, lg)]["verdict"] in ("pass", "fail")]  # fmt: skip
     lines = ["## Micro projects", ""]
     lines += [
-        f"Each micro project (`corpus/micro`, one per language) is a small program generated from the snippet "
-        f"catalog (`mutation/micro.py`): {n_items} known crypto calls, each in a function of its own, plus decoys "
-        "(code that names or resembles cryptography without using it). That is the ground truth "
-        "(`corpus/micro/ground_truth.yaml`). A tool is a voter only if it finds enough of the calls.",
+        f"Each micro project (`experiments/corpus/micro`, one per language) is a small program generated from the "
+        f"snippet catalog (`mutation/micro.py`): {n_items} known crypto calls, each in a function of its own, "
+        "plus decoys (code that names or resembles cryptography without using it). That is the ground truth "
+        "(`experiments/corpus/micro/ground_truth.yaml`). A tool is a voter only if it finds enough of the calls.",
         "",
         f"**Entry bar: {bar} of {n_items} calls** (half, lenient call-site recall, below) in at least one language. "
         "One row per tool, one column per language: `pass` or `fail` with the calls the tool found in their "

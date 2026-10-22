@@ -13,7 +13,7 @@ from common.experiment import MutationSpec, RepoSpec, ensure_mirror, publish_fix
 from mutation.mutants import ensure_mutants
 
 FIXTURES = Path(__file__).parent / "fixtures" / "pilot"
-MICRO_JAVA = Path(__file__).resolve().parents[1] / "corpus" / "micro" / "java"
+MICRO_JAVA = Path(__file__).resolve().parents[1] / "experiments" / "corpus" / "micro" / "java"
 
 MUTANT = {
     "id": "ins-sha-256-direct-abcdef",
