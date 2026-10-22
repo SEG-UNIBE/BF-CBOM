@@ -38,13 +38,13 @@ SCHEMA_COLUMNS = [
     "schema", "valid", "errors", "error_kinds",
 ]  # fmt: skip
 # Per CycloneDX asset type: (dimension label, standard JSON paths relative to `cryptoProperties`, record dimension the
-# normaliser fills from any source or None). The paths are the type's own property set in CycloneDX 1.6/1.7.
+# normaliser fills from any source or None). The paths are the type's own property set in CycloneDX 1.6/1.7; the
+# standard has no key-size field (`parameterSetIdentifier` also holds a digest length or a parameter set: `parameter`).
 MEANINGFUL_FIELDS: dict[str, tuple[tuple[str, tuple[str, ...], str | None], ...]] = {
     "algorithm": (
         ("primitive", ("algorithmProperties.primitive",), "primitive"),
         ("parameter", ("algorithmProperties.parameterSetIdentifier", "algorithmProperties.curve",
                        "algorithmProperties.ellipticCurve"), "parameter"),
-        ("key_size", ("algorithmProperties.parameterSetIdentifier",), "key_size"),
         ("mode", ("algorithmProperties.mode",), "mode"),
         ("padding", ("algorithmProperties.padding",), "padding"),
         ("functions", ("algorithmProperties.cryptoFunctions",), "functions"),
@@ -197,8 +197,9 @@ def _record_has(values: dict, dim: str | None) -> bool:
 def meaningful_rows(normalized, cbom_by: dict[str, str | None]) -> list[dict]:
     """One row per (tool, asset type, dimension) over all CBOMs of `normalized` ((meta, path, NormalizedCbom)
     triples): `standard` counts assets whose raw component carries the field (the CBOM next to the normalised
-    one), `any` counts assets with a value from any source in the records (None for fields the normaliser does
-    not read). Components are counted once however many occurrences they have."""
+    one), `any` counts assets with the value in that field or from any other source in the records (None for fields
+    the normaliser does not read), so `any` >= `standard`. Components are counted once however many occurrences they
+    have."""
     assets: dict[tuple[str, str], int] = Counter()
     standard: dict[tuple[str, str], Counter] = defaultdict(Counter)
     any_src: dict[tuple[str, str], Counter] = defaultdict(Counter)
@@ -217,9 +218,10 @@ def meaningful_rows(normalized, cbom_by: dict[str, str | None]) -> list[dict]:
             assets[key] += 1
             comp = comps[r.component_index] if r.component_index < len(comps) else {}
             for label, paths, dim in MEANINGFUL_FIELDS[at]:
-                standard[key][label] += _present(comp, paths)
-                if dim is not None:
-                    any_src[key][label] += _record_has(r.values, dim)
+                present = _present(comp, paths)
+                standard[key][label] += present
+                if dim is not None:  # any source includes the standard field (SHA-256's "256" is no record value)
+                    any_src[key][label] += present or _record_has(r.values, dim)
     rows = []
     for (tool, at), total in sorted(assets.items()):
         for label, _, dim in MEANINGFUL_FIELDS[at]:

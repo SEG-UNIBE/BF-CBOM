@@ -311,10 +311,11 @@ schema (1.6, 1.7) is validated as a whole document with `jsonschema` (offline, `
 CBOM in `schema-run<k>.csv` (valid, error count, error kinds `<keyword>:<path>`); tools whose CBOM our worker assembles
 (`cbom_by: bf-cbom` in `common/tools.yaml`, the LLM workers) are reported apart. `meaningful-run<k>.csv` gives, per tool,
 CycloneDX asset type and that type's own fields (`analysis/schema.py:MEANINGFUL_FIELDS`: an algorithm's primitive,
-parameter = parameter set or curve, key size, mode, padding, functions, OID, security levels; a key's type, size,
+parameter = parameter set or curve, mode, padding, functions, OID, security levels; a key's type, size,
 algorithm, format; a certificate's subject, issuer, validity, signature algorithm, public key, format; a protocol's
-type, version, cipher suites), the share of assets carrying a value from the standard fields only and, where the
-normaliser reads such a value, from any source. `traceability-run<k>.csv` gives per (snapshot, tool, asset type) how
+type, version, cipher suites; CycloneDX has no key-size field), the share of assets carrying a value in the standard
+fields and, where the normaliser reads such a value, from any source (the standard fields included, so it is never
+lower). `traceability-run<k>.csv` gives per (snapshot, tool, asset type) how
 many records name a file (`located_file`), a file and a line (`located_line`), how many of those with a line exist at
 the pinned commit with the line inside the file (weak) and how many also have a vocabulary token within ±2 lines
 (strong, refinement 4); `related-crypto-material` (keys, secrets) is kept apart from algorithms. In `_SUMMARY.md`

@@ -50,6 +50,7 @@ def test_meaningful_counts_standard_fields_apart_from_any_source_per_asset_type(
     bom = _bom(
         _comp("AES-256-GCM"),  # key size and mode only in the name
         _comp("RSA", ap={"primitive": "pke", "parameterSetIdentifier": "2048"}),  # standard fields
+        _comp("SHA-256", ap={"parameterSetIdentifier": "256"}),  # a standard value the records do not keep
         {
             "type": "cryptographic-asset",
             "name": "server key",
@@ -65,13 +66,15 @@ def test_meaningful_counts_standard_fields_apart_from_any_source_per_asset_type(
     path.write_text(json.dumps(bom), encoding="utf-8")
     n = normalize_cbom(bom, "t")
     rows = {(r["asset_type"], r["dimension"]): r for r in schema.meaningful_rows([({}, path, n)], {"t": "tool"})}
-    algo = {d: rows[("algorithm", d)] for d in ("primitive", "parameter", "key_size", "mode", "security_level")}
-    assert all(r["assets"] == 2 for r in algo.values()) and "asset_type" not in {d for _, d in rows}
-    assert (algo["key_size"]["standard"], algo["key_size"]["any"]) == (1, 2)
+    algo = {d: rows[("algorithm", d)] for d in ("primitive", "parameter", "mode", "security_level")}
+    assert all(r["assets"] == 3 for r in algo.values()) and "asset_type" not in {d for _, d in rows}
+    assert ("algorithm", "key_size") not in rows  # CycloneDX has no key-size field
+    assert (algo["parameter"]["standard"], algo["parameter"]["any"]) == (2, 3)  # any source includes the field
     assert (algo["mode"]["standard"], algo["mode"]["any"]) == (0, 1)
-    assert (algo["primitive"]["standard"], algo["primitive"]["any"]) == (1, 2)  # AES's primitive is derived
+    assert (algo["primitive"]["standard"], algo["primitive"]["any"]) == (1, 3)  # AES's and SHA-256's are derived
     assert algo["security_level"]["any"] is None and algo["security_level"]["any_share"] is None  # not normalised
-    assert algo["key_size"]["cbom_by"] == "tool" and algo["mode"]["any_share"] == 0.5
+    assert algo["parameter"]["cbom_by"] == "tool" and algo["mode"]["any_share"] == round(1 / 3, 3)
+    assert all(r["any"] is None or r["any"] >= r["standard"] for r in rows.values())
     key = rows[("related-crypto-material", "type")]
     assert (key["assets"], key["standard"], key["any"]) == (1, 1, 1)
     assert rows[("related-crypto-material", "size")]["standard"] == 1 and rows[("protocol", "type")]["standard"] == 0

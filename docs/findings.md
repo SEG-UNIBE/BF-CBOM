@@ -160,7 +160,7 @@ below.
   CodeQL run without results, not the tool's output (removed 2026-10-20; cryptobom-forge writes its own empty draft
   document, and those runs are redone).
 - **Meaningful** (standard fields / any source): primitives mostly in standard fields except cdxgen (0 / 70 %) and
-  securin-xbom (42 / 96 %); key sizes largely outside the standard for pqcheck (12 / 44 %) and cdxgen (0 / 31 %); OIDs
+  securin-xbom (42 / 96 %); key sizes largely outside the standard for pqcheck (12 / 44 %) and cdxgen (0 / 31 %; that row counted any `parameterSetIdentifier`, digest lengths included, and went 2026-10-22); OIDs
   only from CBOMkit, Q-DARPAN and xgrep.
 - **Traceability** spot check with `--fetch` on uCrop: CryptoScan's 20 records all exist and are in range, none strong
   (regex hits on `nb_iterations=5` and `I##cn`, reported as PBKDF and certificate findings); CipherSift's and
