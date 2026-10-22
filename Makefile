@@ -138,11 +138,11 @@ experiment-cancel:
 experiment-delete:
 	docker compose run --rm runner experiment delete $(NAME) $(ARGS)
 
-# make experiment-export NAME=e4-mutation-smoke  -> exports/<name>.zip (the only path from the volume to the host);
+# make experiment-export NAME=e4-mutation-smoke  -> experiments/results/<name>.zip;
 # runs `analysis report` first (ARGS=--no-report skips it)
 experiment-export:
-	mkdir -p exports
-	docker compose run --rm -v "$(CURDIR)/exports:/export" runner experiment export $(NAME) --dest /export $(ARGS)
+	mkdir -p experiments/results
+	docker compose run --rm -v "$(CURDIR)/experiments/results:/export" runner experiment export $(NAME) --dest /export $(ARGS)
 
 # make corpus ARGS="--per-language 100"  -> results volume: corpus/corpus.yaml (export with experiment-export-corpus)
 corpus: ensure-env
@@ -153,8 +153,8 @@ corpus-prune:
 	docker compose run --rm runner experiment corpus prune $(ARGS)
 
 corpus-export:
-	mkdir -p exports
-	docker compose run --rm -v "$(CURDIR)/exports:/export" runner sh -c 'cp /data/results/corpus/*.yaml /export/'
+	mkdir -p experiments/results
+	docker compose run --rm -v "$(CURDIR)/experiments/results:/export" runner sh -c 'cp /data/results/corpus/*.yaml /export/'
 
 # make analysis ARGS="report e0-stability"  /  ARGS="micro e0-micro"  -> results volume: <exp>/_ANALYSIS/
 analysis:

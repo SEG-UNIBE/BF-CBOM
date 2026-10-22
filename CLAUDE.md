@@ -22,8 +22,9 @@ normalisation, analysis outputs),
   bakes the CLI and the workers bake `common/`.
 - **Nothing lands on the host unless exported.** Results and git mirrors stay in the named volumes `results-data` and
   `git-data`; `make experiment-export` exports experiments and `make corpus-export` exports sampled corpus YAMLs,
-  which is why these CLI commands run inside the `runner` container.
-  A copied export can be analysed on the host: `RESULTS_DIR=exports uv run bf-cbom analysis report <exp>`.
+  both into `experiments/results/` on the host. These CLI commands run inside the `runner` container.
+  An unzipped export can be analysed on the host:
+  `RESULTS_DIR=experiments/results uv run bf-cbom analysis report <exp>`.
 - **The laptop prepares, the VM runs.** Batch runs happen on the 64 GB VM with `EXPERIMENT_MEMORY_BUDGET_GB=0` for
   now (one wave). Limits are caps, not reservations; the measured peak with the then-selected 13 tools was
   21.5 of 60.5 GiB (2026-10-19). Current limits are in `common/tools.yaml` and `docker-compose.yml`.
@@ -124,7 +125,9 @@ normalisation, analysis outputs),
   checked in, a test keeps them equal; 14 expected calls, each in a function of its own, and 4 decoys per project; its
   header states the hit rule, decided 2026-10-22); `pilot-2026-10-08.yaml` (12 pinned real
   projects in Java, Python and Go, the development set; all 16 pilot projects in `pilot-2026-10-08-all.yaml`, read
-  by CipherSift's `tailored_on`); `icpc-2026.yaml` (the 23 ICPC paper repos at HEAD of 2026-10-18, held out);
+  by CipherSift's `tailored_on`); `pilot-2026-10-22.yaml` (second pilot: 60 manually selected repos, 20 per paper
+  language, default-branch HEADs pinned on 2026-10-22; `experiments/e1-pilot-60.yaml`);
+  `icpc-2026.yaml` (the 23 ICPC paper repos at HEAD of 2026-10-18, held out);
   `exclusions.yaml` (repos the corpus builder never samples, with reasons). `make corpus` builds a stratified GitHub
   corpus of Java, Python and Go repos (`common/corpus.py`; needs `GITHUB_TOKEN` in `docker/env/coordinator.env`).
   Repos above `CORPUS_MAX_REPO_SIZE_MB` (default `GITSERVER_MEMORY`/4: the git server must serve CBOMkit's full clone
@@ -229,7 +232,7 @@ mutation harness); every other language (C, JavaScript/TypeScript, Rust, ...) is
 where they declare support, but no analysis, figure or tuning effort goes into those languages.
 
 ## Status (updated 2026-10-22)
-- **Current experiment scope:** 15 CBOM generator tools in all five specs. LLM providers are excluded for now;
+- **Current experiment scope:** 15 CBOM generator tools in all current specs. LLM providers are excluded for now;
   the provider workers and their analysis support remain implemented for possible later use.
 - **Export review of 2026-10-19** (`docs/findings.md` "Export review"): the first VM runs of e0-stability,
   e1-pilot-corpus and e1-icpc-corpus were checked for plausibility. Fixed since: the git server's 256 MiB limit killed
@@ -252,7 +255,7 @@ where they declare support, but no analysis, figure or tuning effort goes into t
   openssh-portable, AutoGPTQ, sparrow) are redone by the rerun below. cdxgen's Go locations are read now (they were
   ignored). Vocabulary 2026-10-20.2. Any future LLM runs will use the new assembly.
 - **Observers added (2026-10-19):** qelens, cryptarium and qScan are workers with `role: observer` and are now in
-  all five experiment specs. Vocabulary 2026-10-19.2 (their specs only).
+  all current experiment specs. Vocabulary 2026-10-19.2 (their specs only).
 - **Analysis units and voters (2026-10-20):** tables count *assets*, *records* or *items* and say which
   (`analysis/README.md` "Units"; cross-tool comparisons count items); packaging per tool is declared in
   `analysis/README.md` and measured in `units-run<k>.csv`, the kind of place every record names (`line`, `window`,

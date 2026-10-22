@@ -7,7 +7,7 @@ Recipes, one per planned figure:
 
 ```python
 import pandas as pd
-A = "exports/e1-icpc-corpus/_ANALYSIS"   # or any copied export
+A = "experiments/results/e1-icpc-corpus/_ANALYSIS"   # or any copied export
 ```
 
 Observers (`role: observer` in `common/tools.yaml`: qelens, cryptarium, qScan) are in every table; their records never

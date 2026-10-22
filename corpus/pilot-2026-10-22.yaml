@@ -1,0 +1,252 @@
+# Second pilot: 60 user-selected repositories, 20 each in Java, Python and Go.
+# Pinned to each repository's default-branch HEAD on 2026-10-22 with git ls-remote --symref.
+# Selection is manual, not a stratified sample. Used by experiments/e1-pilot-60.yaml.
+# Short-name mappings include jsch -> mwiede/jsch, charm -> JHUISI/charm,
+# certificates -> smallstep/certificates, limen -> thecodearcher/limen,
+# newt -> fosrl/newt and webauthn -> go-webauthn/webauthn.
+built_at: "2026-10-22"
+source: user-selected second pilot (default-branch heads pinned on 2026-10-22)
+repos:
+  # ---- Java
+  - full_name: beemdevelopment/Aegis
+    language: Java
+    branch: master
+    commit: d6f4e5925a97e4e91593f1542085eae03432a759
+  - full_name: AuthMe/AuthMeReloaded
+    language: Java
+    branch: master
+    commit: d6729402ccb0003ac6b3f3b9477ee45aadadd2c0
+  - full_name: Hakky54/ayza
+    language: Java
+    branch: master
+    commit: 1f59bd190f35faf4f4b8f59fb08aed4ec6616146
+  - full_name: ballcat-projects/ballcat
+    language: Java
+    branch: master
+    commit: 05d6308cd3756d8561745559262faf6d4f02e553
+  - full_name: cryptomator/cryptomator
+    language: Java
+    branch: develop
+    commit: 248be3411f0dce97844c2254f12a7289ee93ea3d
+  - full_name: DependencyTrack/dependency-track
+    language: Java
+    branch: main
+    commit: 25bdb82aad990e2dc1bc573ba2cec1e4ec8c69c5
+  - full_name: ESAPI/esapi-java-legacy
+    language: Java
+    branch: develop
+    commit: 15562822fb890cd025fab103cc2e5d603ee0b81a
+  - full_name: M66B/FairEmail
+    language: Java
+    branch: master
+    commit: 66dfabf867480f8957b08b0d4209e2d075900e95
+  - full_name: mwiede/jsch
+    language: Java
+    branch: master
+    commit: 1a6f9395683e88bd7d20151be0a2b5c8f1e9465a
+  - full_name: nagyesta/lowkey-vault
+    language: Java
+    branch: main
+    commit: e898a475a23be5a84e9cda44bff236a4b239d03a
+  - full_name: dromara/MaxKey
+    language: Java
+    branch: main
+    commit: e147ade6a3c5f2e11a202b3e66c4522605bc4c6d
+  - full_name: apache/mina-sshd
+    language: Java
+    branch: master
+    commit: c4287faf844a0250e4a097640a0442270b756d9f
+  - full_name: bbottema/simple-java-mail
+    language: Java
+    branch: master
+    commit: 050e69425de1f76bffa4003db78c9b677195be51
+  - full_name: sparrowwallet/sparrow
+    language: Java
+    branch: master
+    commit: b9d3bbbf64600de14dab9f18850362bec7f87af9
+  - full_name: hierynomus/sshj
+    language: Java
+    branch: master
+    commit: 6fad160fe36605a68847ac8a527750c615b4bd04
+  - full_name: supertokens/supertokens-core
+    language: Java
+    branch: master
+    commit: 6d9adc17abff6e7d9ef48c0083466c3302eea71d
+  - full_name: dromara/surpass
+    language: Java
+    branch: master
+    commit: d4a5ad0c35c9097df3b2319743d48271a737307b
+  - full_name: webauthn4j/webauthn4j
+    language: Java
+    branch: master
+    commit: 98f42901428b555b0527e77b424bdb017c2683d0
+  - full_name: xipki/xipki
+    language: Java
+    branch: master
+    commit: 2127b71fceef2f02be59738cf2fd77fb24869377
+  - full_name: zaproxy/zaproxy
+    language: Java
+    branch: main
+    commit: 61b35a7438142961148ad0816940e1e86b968c8e
+  # ---- Python
+  - full_name: VibeTensor/attestix
+    language: Python
+    branch: main
+    commit: a89903c6ec15b7723c32a016f05427903b703249
+  - full_name: PyCQA/bandit
+    language: Python
+    branch: main
+    commit: 68ebe11ef79263be27ec223184b94a4fc394a622
+  - full_name: bunkerity/bunkerweb
+    language: Python
+    branch: master
+    commit: b09e418447718dc9a7eb40158e3e12ce719bfd5f
+  - full_name: certbot/certbot
+    language: Python
+    branch: main
+    commit: 0b98752f94bc07edaebc10567a3b04cb532f6021
+  - full_name: JHUISI/charm
+    language: Python
+    branch: dev
+    commit: b2db00be7adf681c6bc35d35be3682ba047b3577
+  - full_name: cowrie/cowrie
+    language: Python
+    branch: main
+    commit: c7773f49758bc021c8276924f05b5c58dc20d542
+  - full_name: pyca/cryptography
+    language: Python
+    branch: main
+    commit: ee708a84c5330922b975a63e9dcdb224fd0e84b6
+  - full_name: DefectDojo/django-DefectDojo
+    language: Python
+    branch: master
+    commit: 8cbbe0d8c82d007662d270ccd7ab3365e2c84a83
+  - full_name: lnbits/lnbits
+    language: Python
+    branch: dev
+    commit: 04b37f0d761222561bc8606cfe7edc86cabcce35
+  - full_name: Drakkar-Software/OctoBot
+    language: Python
+    branch: master
+    commit: c45fdc2c95c5bd3d649251fa90c327e2e8f86b00
+  - full_name: pritunl/pritunl
+    language: Python
+    branch: master
+    commit: cb81506236176615a6189bfbbd32f756af7e6608
+  - full_name: Legrandin/pycryptodome
+    language: Python
+    branch: master
+    commit: 740cb4574ca3d5995910c2533c4032906f86cdb8
+  - full_name: IdentityPython/pysaml2
+    language: Python
+    branch: master
+    commit: 2fb5b50ad348e31f4847252c80261b89ccd9f053
+  - full_name: meherett/python-hdwallet
+    language: Python
+    branch: master
+    commit: 3a5d40b0828ffba7fa7b8d5907fe53cb9e5896bd
+  - full_name: binref/refinery
+    language: Python
+    branch: master
+    commit: 13d8c68863c3d11d4e6cd36007fdd6c53459eda6
+  - full_name: secdev/scapy
+    language: Python
+    branch: master
+    commit: 49b03612d33d9d0d52300ab651e9a02e017de738
+  - full_name: cisco-ai-defense/skill-scanner
+    language: Python
+    branch: main
+    commit: de5fcf08fe0b32841602513c5b760a11ef4cbc4a
+  - full_name: ssh-mitm/ssh-mitm
+    language: Python
+    branch: master
+    commit: f05db2ba99067c3924df40d7b18a686ba466a994
+  - full_name: XX-net/XX-Net
+    language: Python
+    branch: master
+    commit: 054daa66dd027e4ee1318a3e6fc592f900b515ca
+  - full_name: Yubico/yubikey-manager
+    language: Python
+    branch: main
+    commit: 4ca60f706af930459138d8dc0f0f953480e1c7a4
+  # ---- Go
+  - full_name: Asymptote-Labs/agent-beacon
+    language: Go
+    branch: main
+    commit: 808a32199c16c68d0c18597ccf54d05d0c9078ab
+  - full_name: anyproto/any-sync
+    language: Go
+    branch: main
+    commit: 9c00aeeb97370712af8e99bde4a81c586651e903
+  - full_name: bettercap/bettercap
+    language: Go
+    branch: master
+    commit: 8eca2820f3c41d2004434ed5a291d87462caeeb7
+  - full_name: casdoor/casdoor
+    language: Go
+    branch: master
+    commit: dd0cc5d7af104d7feeacd3b5859402bf0bc4d1f7
+  - full_name: smallstep/certificates
+    language: Go
+    branch: master
+    commit: edc665053e5898d82af5e45101ddb85feab34454
+  - full_name: twpayne/chezmoi
+    language: Go
+    branch: master
+    commit: 05ff7ad9c11a44769b14dd4244ae3dd7ebbecce5
+  - full_name: cometbft/cometbft
+    language: Go
+    branch: main
+    commit: e5039f84bcade9d90dfa5751c2e270a2d107d56c
+  - full_name: decred/dcrd
+    language: Go
+    branch: master
+    commit: 3360ae4dbef8ccfd5880016cadd03a41af0aad9f
+  - full_name: pion/dtls
+    language: Go
+    branch: main
+    commit: af014e35f1e2cdf3d787600a6b5c41953a7d9a39
+  - full_name: shadow1ng/fscan
+    language: Go
+    branch: main
+    commit: 2ede41d743b87743b11f69e85dd37c634c1c0ef6
+  - full_name: rfjakob/gocryptfs
+    language: Go
+    branch: master
+    commit: cbe7c2bb0a933b3f8ac0c27e283673929054f753
+  - full_name: gopasspw/gopass
+    language: Go
+    branch: master
+    commit: 8b7c43edab00c079ebf50845612dcda203e48b36
+  - full_name: go-pkgz/auth
+    language: Go
+    branch: master
+    commit: f07b327394fca832c5c18c1659e009184544ebf8
+  - full_name: jumpserver/koko
+    language: Go
+    branch: dev
+    commit: 8f70dd3e21845400fb00864f272468d4ce24bffd
+  - full_name: thecodearcher/limen
+    language: Go
+    branch: master
+    commit: a691ec98c6c28ac26c2077e4f8f74b9fe7f4d86a
+  - full_name: fosrl/newt
+    language: Go
+    branch: main
+    commit: 329d6a1c6509aa0769fa5bf3b8437518fc4e83df
+  - full_name: projectdiscovery/nuclei
+    language: Go
+    branch: dev
+    commit: b0eeadc5541e3378fc2cc7a6f109e2eeb003c53b
+  - full_name: supabase/auth
+    language: Go
+    branch: master
+    commit: c3348e8f1cb31454e9783e4eb9eab1e71ad9652f
+  - full_name: owenthereal/upterm
+    language: Go
+    branch: master
+    commit: 845c706ec0735459ea0d4b0b04df211f7e1a86df
+  - full_name: go-webauthn/webauthn
+    language: Go
+    branch: master
+    commit: ccb9f1ef4864e92f9fb942b62ab1c4ef735f534a

@@ -349,7 +349,7 @@ Start with the micro projects, then inspect and export the results:
 make experiment EXP=experiments/e0-micro.yaml
 make experiment-status NAME=e0-micro
 make experiment-export NAME=e0-micro
-# Report and results: exports/e0-micro.zip, including e0-micro/_ANALYSIS/_SUMMARY.md
+# Report and results: experiments/results/e0-micro.zip, including e0-micro/_ANALYSIS/_SUMMARY.md
 ```
 
 The run waits for results; `make board` or `make experiment-status NAME=e0-micro` can also be used in a second
@@ -454,7 +454,7 @@ Reproducible, resumable batch runs for the research agenda described in `CLAUDE.
 make experiment EXP=experiments/e4-mutation-smoke.yaml   # pin, mirror, enqueue, collect (resumable)
 make experiment-status NAME=e4-mutation-smoke
 make board                                               # live board: running experiments, every worker's job, RAM, queue and last result
-make experiment-export NAME=e4-mutation-smoke            # -> exports/e4-mutation-smoke.zip (runs the analysis report first), the only path to the host
+make experiment-export NAME=e4-mutation-smoke            # -> experiments/results/e4-mutation-smoke.zip (runs the analysis report first), the only path to the host
 make experiment-list                                     # experiments stored on the volume
 make experiment-delete NAME=e4-mutation-smoke            # remove one from the volume (asks first; ARGS=--yes skips)
 make corpus ARGS="--per-language 100"                    # stratified GitHub corpus with pinned commits

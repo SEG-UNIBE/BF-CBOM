@@ -6,7 +6,7 @@ read-only into the `runner` container; everything they produce stays in Docker v
 ```
 make experiment EXP=experiments/e4-mutation-smoke.yaml   # pin commits, mirror to gitserver, run, persist
 make experiment-status NAME=e4-mutation-smoke            # Redis progress + what is on disk
-make experiment-export NAME=e4-mutation-smoke            # exports/e4-mutation-smoke.zip (only way data reaches the host)
+make experiment-export NAME=e4-mutation-smoke            # experiments/results/e4-mutation-smoke.zip (only way data reaches the host)
 make experiment-list                                     # experiments stored on the volume
 make experiment-delete NAME=e4-mutation-smoke            # remove one from the volume (asks first)
 make corpus ARGS="--per-language 100"                    # stratified corpus -> results volume corpus/corpus.yaml
@@ -40,6 +40,7 @@ experiment.
 | `e0-micro.yaml` | all 15 tools, once | the 3 micro projects (`corpus/micro`: Java, Python, Go) | the voter bar: the micro check against the generated ground truth (`make analysis ARGS="micro e0-micro"`), which informs the role decision in `common/tools.yaml` (at least 7 of 14 in their functions in one paper language); 45 jobs |
 | `e0-stability.yaml` | the same 15, 3 repetitions | 3 micro projects + the 10 fastest pilot repos | E0: run-to-run variance (`stability.csv`) and consensus sets for the scores; 585 jobs |
 | `e1-pilot-corpus.yaml` | the same 15 | the 12 pilot projects in Java, Python and Go (`corpus/pilot-2026-10-08.yaml`) | first real workload: location-aware agreement on the pilot's pinned projects; large repos (Kafka, Keycloak) push CBOMkit towards its timeout |
+| `e1-pilot-60.yaml` | the same 15, once | 60 manually selected projects, 20 each in Java, Python and Go (`corpus/pilot-2026-10-22.yaml`) | second pilot, pinned to default-branch HEADs on 2026-10-22; 900 tool/repository pairs |
 | `e1-icpc-corpus.yaml` | the same 15 | 23 projects of the ICPC 2026 paper (`corpus/icpc-2026.yaml`, HEAD of 2026-10-18) | held-out counterpart of the pilot corpus: none of these repos was used to tune the vocabulary, the specs or CipherSift; six are marked `expect_crypto: low` (negative cases) |
 | `e4-mutation-smoke.yaml` | all 15 tools | pyjwt, jjwt, golang-jwt (pilot), 3 mutants each | the mutation harness end to end: the RSA-2048 keygen inserted in each style; CBOMkit and CryptoScan should find the direct one at its line (`mutation.csv`) |
 
@@ -49,6 +50,17 @@ or receive a rank (see [Observers](../analysis/README.md#observers)). The micro 
 but does not edit roles in `common/tools.yaml` or the specs.
 Job totals include tool/repository pairs recorded as `unsupported` without scanning. E0 stability still includes
 four historical pilot repositories outside the paper languages (TypeScript, JavaScript and C).
+
+**Second pilot (60 repositories).** On the 64 GB VM, after `make up-prod`:
+
+```sh
+make experiment EXP=experiments/e1-pilot-60.yaml EXPERIMENT_MEMORY_BUDGET_GB=0
+make experiment-status NAME=e1-pilot-60
+make experiment-export NAME=e1-pilot-60   # generates the report and experiments/results/e1-pilot-60.zip
+```
+
+The corpus records the full repository names and commits. It is a manual selection, separate from the
+stratified corpus built by `make corpus`. Rerunning the command resumes this experiment at the pinned commits.
 
 After a change to one worker, `make experiment EXP=experiments/e4-mutation-smoke.yaml ARGS="--rerun <tool>"` redoes
 its runs on three small repos and their mutants, one repo per paper language; its micro check, the same on
@@ -338,8 +350,8 @@ into `SNAPSHOT_CACHE_DIR` (default `~/.cache/bf-cbom/snapshots`, one shallow `gi
 of this too (`report --fetch`).
 
 **Analysing a copied export on the host.** The analysis only reads files, so an export unzipped or copied into
-`exports/` can be analysed without Docker. Install the analysis dependencies with `uv sync --extra raqun`, then run
-`RESULTS_DIR=exports uv run bf-cbom analysis report <exp> --fetch`.
+`experiments/results/` can be analysed without Docker. Install the analysis dependencies with `uv sync --extra raqun`, then run
+`RESULTS_DIR=experiments/results uv run bf-cbom analysis report <exp> --fetch`.
 The VM runs the experiments; the laptop re-runs the analysis with other options.
 
 **RaQuN** (matcher (c), `analysis/matchers/raqun.py`) runs next to the exact matcher, always in the runner image
@@ -514,6 +526,6 @@ the record, every CBOM and its meta file. The export runs `analysis report` firs
 `_ANALYSIS/_SUMMARY.md` in the zip match the stored runs (`ARGS=--no-report` skips it):
 
 ```
-make experiment-export NAME=e0-stability   # -> exports/e0-stability.zip on the host, open e0-stability/_ANALYSIS/_SUMMARY.md
+make experiment-export NAME=e0-stability   # -> experiments/results/e0-stability.zip on the host, open e0-stability/_ANALYSIS/_SUMMARY.md
 ```
 

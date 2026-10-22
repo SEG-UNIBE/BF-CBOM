@@ -345,7 +345,7 @@ def _next_steps(ov: Overview, spec_file: str, live: dict | None, label: int) -> 
             steps.append((f"make experiment EXP={spec_file} ARGS=--retry-failed", f"redo the {failed} run(s) not ok"))
         if ov.missing:
             steps.append((f"make experiment EXP={spec_file}", f"resume the {ov.missing} missing run(s)"))
-        steps.append((f"make experiment-export NAME={ov.name}", "analysis report + zip into exports/"))
+        steps.append((f"make experiment-export NAME={ov.name}", "analysis report + zip into experiments/results/"))
     width = max(len(cmd) for cmd, _ in steps)
     return [
         f"{'next' if i == 0 else '':<{label}}{_style(cmd.ljust(width), bold=True)}   {why}"
