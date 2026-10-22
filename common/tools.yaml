@@ -53,21 +53,20 @@ tools:
   cdxgen:
     # role pending (2026-10-21): below the bar on these numbers, but its Go locations are read only since 2026-10-20
     # (it found the inserted RSA keygen at its line in all three Go mutants of e4-mutation-smoke); the next e0-micro
-    # decides: micro-go >= 6/11 keeps it a voter, else `role: observer`
+    # decides: at least 7/14 in one language on the generated projects keeps it a voter, else `role: observer`
     micro_2026-10-17: {java: 0/11, python: 0/11, go: 0/11, javascript: 4/11}
     engine: cdxgen
     memory_gb: 16                   # 4 OOM-killed Gradle on bisq/bisq2 (2026-10-18); 8 still OOM-killed on Chat2DB, bisq, bisq2, kafka (2026-10-19)
     approach: dependency manifests + evidence (atom); crypto output is mostly libraries and certificates
     cbom_by: tool
-    languages: [java, python, javascript, go]   # source-level crypto with locations: JS/TS only (12.8.x, run without -t)
+    languages: [java, python, javascript, go]   # crypto locations: JS/TS occurrences and Go sourceLocation properties
     status: integrated              # image 12.8.5 (11.7.0 found nothing on any micro project)
     notes: >
-      Algorithms with file/line only for JS/TS (and only without -t). Java: atom reports crypto only on reachable
-      flows (input source -> sink), so constants passed to getInstance give nothing (micro-java: 0 components with
-      any invocation). Python and Go: the worker passes -t python / -t go (without -t the code analysis falls back
-      to Java); cdxgen then reports algorithms without locations (micro-python 5, micro-go 6), which count at
-      repository level but not in location-based scoring. --include-crypto itself means crypto libraries and
-      key/certificate files.
+      Algorithms with file/line for JS/TS (occurrences) and Go (cdx:golem:crypto:sourceLocation, one per asset).
+      Python algorithms have no locations; Java's atom analysis has no crypto-generate sinks and yields none.
+      The worker passes --include-crypto --evidence and -t python / -t go for those languages. Go analysis needs
+      resolvable imports, network and a writable module cache; each job has its own GOPATH since 2026-10-22.
+      Earlier Go runs need to be redone. See docs/findings.md for the fixture and worker setup fixes.
     pilot: {java: fail, python: fail}   # no file/line for crypto findings; RQ1/RQ2 only
   cryptobomforge:
     micro_2026-10-17: {python: 8/11, c: 8/11}   # read from its IBM-draft windows since 2026-10-18 (before: 0/11, the call-site extraction did not read them)
@@ -116,7 +115,7 @@ tools:
     status: integrated
     micro_2026-10-17: {java: 9/11, python: 10/11, go: 10/11, javascript: 9/11, c: 1/11}   # record-based scoring (2026-10-18), strict the same; 2026-10-15 (0/0/5/6/0) was our setup error (no --include-quantum-safe, demo/ folder)
 
-  # ---- passed the pilot's inclusion bar (2026-10-08); workers added 2026-10-15 (recipes: docs/pilot-2026-10-08/README.md)
+  # ---- passed the pilot's inclusion bar (2026-10-08); workers added 2026-10-15 (provenance: docs/pilot-2026-10-08/README.md)
   pqcheck:
     micro_2026-10-17: {python: 8/11, go: 8/11}
     engine: pqcheck                 # github.com/Rafael-Ryu/pqcheck 0.1.0 (Apache-2.0), tree-sitter + go/types

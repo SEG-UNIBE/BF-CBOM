@@ -37,14 +37,21 @@ experiment.
 
 | Spec | Tools | Repos | Purpose |
 |---|---|---|---|
-| `e0-micro.yaml` | every non-LLM tool (15), once | the 3 micro projects (`corpus/micro`: Java, Python, Go) | the voter bar: the micro check against the generated ground truth (`make analysis ARGS="micro e0-micro"`), which decides `role` in `common/tools.yaml` (at least 7 of 14 in their functions in one paper language); 45 jobs |
+| `e0-micro.yaml` | all 15 tools, once | the 3 micro projects (`corpus/micro`: Java, Python, Go) | the voter bar: the micro check against the generated ground truth (`make analysis ARGS="micro e0-micro"`), which informs the role decision in `common/tools.yaml` (at least 7 of 14 in their functions in one paper language); 45 jobs |
 | `e0-stability.yaml` | the same 15, 3 repetitions | 3 micro projects + the 10 fastest pilot repos | E0: run-to-run variance (`stability.csv`) and consensus sets for the scores; 585 jobs |
-| `e1-pilot-corpus.yaml` | the same 16 | the 12 pilot projects in Java, Python and Go (`corpus/pilot-2026-10-08.yaml`) | first real workload: location-aware agreement on the pilot's pinned projects; large repos (Kafka, Keycloak) push CBOMkit towards its timeout |
-| `e1-icpc-corpus.yaml` | the same 16 | 23 projects of the ICPC 2026 paper (`corpus/icpc-2026.yaml`, HEAD of 2026-10-18) | held-out counterpart of the pilot corpus: none of these repos was used to tune the vocabulary, the specs or CipherSift; six are marked `expect_crypto: low` (negative cases) |
-| `e4-mutation-smoke.yaml` | every non-LLM tool (15) | pyjwt, jjwt, golang-jwt (pilot), 3 mutants each | the mutation harness end to end: the RSA-2048 keygen inserted in each style; CBOMkit and CryptoScan should find the direct one at its line (`mutation.csv`) |
+| `e1-pilot-corpus.yaml` | the same 15 | the 12 pilot projects in Java, Python and Go (`corpus/pilot-2026-10-08.yaml`) | first real workload: location-aware agreement on the pilot's pinned projects; large repos (Kafka, Keycloak) push CBOMkit towards its timeout |
+| `e1-icpc-corpus.yaml` | the same 15 | 23 projects of the ICPC 2026 paper (`corpus/icpc-2026.yaml`, HEAD of 2026-10-18) | held-out counterpart of the pilot corpus: none of these repos was used to tune the vocabulary, the specs or CipherSift; six are marked `expect_crypto: low` (negative cases) |
+| `e4-mutation-smoke.yaml` | all 15 tools | pyjwt, jjwt, golang-jwt (pilot), 3 mutants each | the mutation harness end to end: the RSA-2048 keygen inserted in each style; CBOMkit and CryptoScan should find the direct one at its line (`mutation.csv`) |
+
+LLM providers are outside the current experiment scope; their implementation remains available for possible later use.
+The 15 tools include three observers: tools whose findings are analysed but do not confirm other tools' findings
+or receive a rank (see [Observers](../analysis/README.md#observers)). The micro check reports entry-bar verdicts
+but does not edit roles in `common/tools.yaml` or the specs.
+Job totals include tool/repository pairs recorded as `unsupported` without scanning. E0 stability still includes
+four historical pilot repositories outside the paper languages (TypeScript, JavaScript and C).
 
 After a change to one worker, `make experiment EXP=experiments/e4-mutation-smoke.yaml ARGS="--rerun <tool>"` redoes
-its runs on three small repos, one per paper language (an LLM worker: on e0-stability); its micro check, the same on
+its runs on three small repos and their mutants, one repo per paper language; its micro check, the same on
 `e0-micro.yaml` (3 jobs). E1 on the full corpus (Java,
 Python and Go) and E4 on its mutation subset (see `CLAUDE.md`, Phases 4 and 5) have no specs yet; E1 needs the corpus
 from `make corpus` first, pruned with
@@ -57,7 +64,7 @@ Each spec is one `experiments/<name>.yaml`. An example with every field:
 
 ```yaml
 name: e1-corpus            # [A-Za-z0-9._-]
-tools: [cbomkit, cdxgen, cryptobomforge, deepseek]
+tools: [cbomkit, cdxgen, cryptobomforge, cryptoscan]
 repetitions: 3             # run_index 1..n per (repo, variant, tool)
 corpus: corpus.yaml        # optional: repos from a corpus file (relative to this spec)
 repos:                     # and/or explicit repos
@@ -81,7 +88,7 @@ mutation:                  # optional: every repo also gets insertion mutants as
 Rerunning a spec is resumable: runs whose `run<k>.meta.json` exists are skipped, commits come from the
 experiment's `_experiment.yaml` (below), and jobs still pending from an interrupted run are collected (`--requeue-pending` to reissue).
 `ARGS=--retry-failed` redoes stored runs whose status is not `ok`; `--rerun <tool>[,<tool>]` redoes every stored run
-of those tools, whatever its status (after a worker change, e.g. `--rerun deepseek,cryptobomforge`).
+of those tools, whatever its status (after a worker change, e.g. `--rerun cdxgen,cryptobomforge`).
 `ARGS=--overwrite-old` runs the whole spec as if it had never run: it first cancels the jobs an earlier run left and
 removes the experiment folder with everything in it (stored runs, the record, `_run-log.json`, `mutants.json`,
 `_ANALYSIS/`, files of older layouts), then resolves the spec afresh (the new session records `runs_overwritten`).
@@ -132,9 +139,10 @@ these fields existed: rerun them.
 compose memory limits of the workers that have jobs queued (`memory_gb` in `common/tools.yaml`, kept equal
 to `docker-compose.yml` by a test). `EXPERIMENT_MEMORY_BUDGET_GB` (Makefile, default 14 for a laptop whose
 Docker Desktop VM has ~20 GiB) caps that sum: the runner packs the tools into waves (largest first), feeds
-one wave, collects it, then feeds the next; workers of later waves sit idle meanwhile. With the default and
-all twelve workers that is four waves. On a machine with enough RAM set it to 0 (one wave, everything in
-parallel):
+one wave, collects it, then feeds the next; workers of later waves sit idle meanwhile. The wave count depends on
+the selected tools, their limits and replicas; the runner prints the plan. A tool above the budget runs alone
+with a warning, so the budget is not a hard cap. For the paper's runs on the 64 GB VM, use 0 (one wave,
+everything in parallel):
 
 ```
 make experiment EXP=experiments/e1-pilot-corpus.yaml EXPERIMENT_MEMORY_BUDGET_GB=0   # per call
@@ -175,7 +183,7 @@ the n-way matchers compare like with like, per dimension (algorithm, parameters,
 | What | Where | Holds |
 |---|---|---|
 | one adapter spec per tool | `analysis/adapters/<tool>.yaml` | the format the tool declares, which components count as findings, where each dimension sits in the tool's output (sources in order of precedence), the tool's own spellings (dictionary), notes on its quirks. Specs inherit from `_cyclonedx.yaml` (standard CycloneDX 1.6/1.7 paths), `_ibm-cbom-draft.yaml`, `_cbomkit.yaml`, `_llm.yaml` and state only their differences. Every integrated tool needs one (a test enforces it). |
-| one shared vocabulary | `analysis/data/algorithms.yaml` + `analysis/data/cyclonedx/` | canonical names from the vendored CycloneDX 1.7 cryptography registry (families such as `AES`, `RSAES-OAEP`, `ECDSA`, `SHA-2`; curves with their OID-equal aliases, `secp256r1` = `P-256` = `prime256v1`), enum spellings, JOSE/SSH/JCA identifiers, an API table, the meaning of `parameterSetIdentifier` per family. A spelling only one tool uses goes into that tool's spec; once two tools use it, it moves here. |
+| one shared vocabulary | `analysis/data/algorithms.yaml` + `analysis/data/cyclonedx/` | canonical names from the vendored CycloneDX 1.7 cryptography registry (families such as `AES`, `RSAES-OAEP`, `ECDSA`, `SHA-2`; curves with their OID-equal aliases, `secp256r1` = `P-256` = `prime256v1`), enum spellings, JOSE/SSH/JCA identifiers, an API table, the meaning of `parameterSetIdentifier` per family. Spellings traceable to standards or official APIs belong here regardless of how many tools use them; labels invented by a tool belong in its spec. |
 | one target format | `analysis/data/cbom-norm.schema.json` | the shape of a normalised file and record, the same for every tool; every output validates against it |
 
 *Worker adapters* (`common/cbom_adapters.py`, `workers/*`) are something else: they make a tool's raw output usable
@@ -282,24 +290,28 @@ make analysis ARGS="tables e0-stability"     # flat CSV tables (runs, records, e
 make analysis ARGS="score e0-stability"      # RQ4: confirmation, exclusivity, Dawid-Skene, leave-one-out, CIs; stability
 ```
 
-**`report <exp>`** normalises every CBOM once and writes everything the commands below write, then
+**`report <exp>`** normalises every CBOM once and writes the CSV tables for the analyses below, then
 `_ANALYSIS/_SUMMARY.md`: Markdown tables for a first look (runs per tool, the micro inclusion matrix and recall at two
 levels, who finds each micro asset, fill rates and spec issues, the L0-L4 ladder, how many voter groups report each
 algorithm per repository, LLM token counts, the list of files). The summary is rendered only from the CSV files, so
 it never shows anything they don't hold; `python -m analysis.summary <exp>/_ANALYSIS/` rebuilds it from an export.
-Its numbers carry `'` between thousands (13'043); the CSVs keep plain numbers.
+Its numbers carry `'` between thousands (13'043); the CSVs keep plain numbers. Each report clears and rebuilds
+`_ANALYSIS/`. The standalone `micro` command also writes `micro-run<k>.json`; `report` writes its micro results
+as CSV tables instead.
 `experiment export` runs `report` first (skip with `--no-report`), so every zip carries current tables. On a
 terminal both show a live line per step (done/total, remaining time, elapsed time and the run being worked on), so a
 long step reads as working, like a run's board ("Watching a run"); off a terminal each step prints one line when it
 ends.
 
-**`normalize <exp>`** reads every stored ok CBOM (all repetitions) into normalised records with its tool's adapter
-spec, as described in [Normalisation](#normalisation). It writes:
+**`normalize <exp>`** reads every stored ok CBOM (all repetitions, including mutants) into normalised records with
+its tool's adapter spec, as described in [Normalisation](#normalisation). It writes the normalised files and the
+first two diagnostic tables below. `tables` (also part of `report`) writes the per-run coverage, units and
+conformance tables. The diagnostic tables aggregate original variants only, so mutants do not multiply counts.
 
 | File | Content |
 |---|---|
 | `<snapshot>/<variant>/<tool>/run<k>.norm.json` | next to `run<k>.json`: declared format/version, adapter spec and versions, the original's sha256 (detects a stale file), stats, the records |
-| `analysis/normalize.json` | per tool over every run (the normaliser's diagnostics): formats declared, assets per asset type, where values came from (standard field, property, occurrence, name, API context), spec issues, conflicts, top unmapped values |
+| `_ANALYSIS/normalize.json` | per tool over all repetitions of original variants (the normaliser's diagnostics): formats declared, assets per asset type, where values came from (standard field, property, occurrence, name, API context), spec issues, conflicts, top unmapped values |
 | `_ANALYSIS/vocab.csv` | one row per (tool, source, raw value): status (`mapped`, `partial`, `unmapped`, `ambiguous`, `known`, or the entry's `kind`: `api`, `non-crypto`), what it mapped to, leftover tokens, via, interpretive, kind, count; the reviewable mapping table |
 | `_ANALYSIS/coverage-run<k>.csv` | one row per (tool, dimension), run k, original variants (the same CBOMs as `units-run<k>.csv`): algorithm assets (CBOM components) with a value the tool reported vs only one we derived, as counts and shares of the assets (fill-rate heatmaps); every row also carries the tool's `assets` and the assets per resolution (`mapped`, `ambiguous`, `api`, `non-crypto`, `undefined`) |
 | `_ANALYSIS/units-run<k>.csv` | one row per tool, run k, original variants: how it packages its findings: `assets` (algorithm components), `records` (their occurrences), `items` (distinct L4 identities of its mapped records per repository, summed), records_per_asset_median / _max, multi_occurrence_share (assets at more than one place), assets_per_item (above 1: one component per finding), unlocated_share (assets without a file), role (`analysis/README.md` "Packaging per tool"), loc_line / loc_window / loc_import / loc_file / loc_none / loc_unread (algorithm records by the kind of place they name, `analysis/README.md` "Units") |
@@ -313,7 +325,7 @@ CBOM in `schema-run<k>.csv` (valid, error count, error kinds `<keyword>:<path>`)
 CycloneDX asset type and that type's own fields (`analysis/schema.py:MEANINGFUL_FIELDS`: an algorithm's primitive,
 parameter = parameter set or curve, mode, padding, functions, OID, security levels; a key's type, size,
 algorithm, format; a certificate's subject, issuer, validity, signature algorithm, public key, format; a protocol's
-type, version, cipher suites; CycloneDX has no key-size field), the share of assets carrying a value in the standard
+type, version, cipher suites; algorithm assets have no dedicated key-size field), the share of assets carrying a value in the standard
 fields and, where the normaliser reads such a value, from any source (the standard fields included, so it is never
 lower). `traceability-run<k>.csv` gives per (snapshot, tool, asset type) how
 many records name a file (`located_file`), a file and a line (`located_line`), how many of those with a line exist at
@@ -326,8 +338,9 @@ into `SNAPSHOT_CACHE_DIR` (default `~/.cache/bf-cbom/snapshots`, one shallow `gi
 of this too (`report --fetch`).
 
 **Analysing a copied export on the host.** The analysis only reads files, so an export unzipped or copied into
-`exports/` can be analysed without Docker: `RESULTS_DIR=exports uv run misc/cli/cli.py analysis report <exp> --fetch`
-(the `.venv` has every dependency). The VM runs the experiments; the laptop re-runs the analysis with other options.
+`exports/` can be analysed without Docker. Install the analysis dependencies with `uv sync --extra raqun`, then run
+`RESULTS_DIR=exports uv run bf-cbom analysis report <exp> --fetch`.
+The VM runs the experiments; the laptop re-runs the analysis with other options.
 
 **RaQuN** (matcher (c), `analysis/matchers/raqun.py`) runs next to the exact matcher, always in the runner image
 (the `raqun` extra, PyQuN from the user's fork) and on the host after `uv sync --extra raqun` (`--raqun/--no-raqun`
@@ -341,7 +354,8 @@ Jaccard, share of groups that sit inside one group of the other matcher), and Ra
 values admitted at that level).
 
 **`score <exp>`** scores and ranks the tools without ground truth (RQ4, `analysis/score.py`) on the exact
-matcher's groups. Voters are voter groups (tools sharing an engine count once; `--merge-llm` merges the LLM workers).
+matcher's groups. Voter groups follow shared detection logic (the two CBOMkit packagings count once;
+using the same pattern engine alone does not merge tools). `--merge-llm` merges the LLM workers.
 Per tool, dimension (algorithm, key size, mode, padding, curve, digest, location) and level: the **confirmation rate**
 (share of the tool's items another voter group reports too: the same algorithm per repository, the same parameter
 value, a shared call site; an item is an L4 identity, a (identity, value) pair or a (identity, file:line) pair, read
@@ -401,20 +415,16 @@ further experiments) or `not judged` (no scored run). The same verdict is the `e
 
 A location window (CryptobomForge's IBM-draft `detectionContext`, the finding ±2 lines) counts at every line it spans.
 
-**`sites <exp>`** (legacy: its own extraction, to be retired in favour of matchers on the normalised records) extracts
-every reported location (file, line, algorithm family) and clusters sites of different
-tools that lie in the same file within ±2 lines and share a family. Per repository it prints the number of sites and
-clusters, the distribution of k (how many tools agree on a cluster) and per tool how many of its clusters are
-confirmed by at least one other tool or solo. Options: `--window N` for the line distance, `--match-unknown` to let
-sites of unknown family join clusters (off: it inflates weak tools), `--all-assets` to keep keys, certificates and
-protocols, `--run K` for another repetition (also available for `micro`).
+The former `sites` command is retired. `tables` and `report` write the exact matcher's repository and call-site
+groups (`scope: repo` / `site`) into the same `groups-exact-run<k>.csv`; `--window` controls the line distance
+(default 2). See the matcher description below.
 
 The commands write to the experiment's folder on the volume:
 
 ```
 <exp>/_ANALYSIS/
 ├── _SUMMARY.md                            # report: Markdown tables of everything below, for reading
-├── micro-run1.json                       # micro: one object per (project, tool): status, verdict, recalls at both levels, hits, missed, precision, false sites
+├── micro-run1.json                       # micro: per (project, tool), status, verdict, recalls, precision, F1, hits, misses, false sites and decoys
 ├── runs.csv                              # tables: one row per stored run (all repetitions)
 ├── groups-exact-run1.csv                 # tables: exact matcher, one row per group (repo scope per algorithm, site scope per call site)
 ├── members-exact-run1.csv                # tables: one row per (group, record)
@@ -451,7 +461,7 @@ record implying the algorithm), so tools without locations take part; clusters n
 several keys, and a group whose members span several L4 identities (`units`, `n_units`) shows what the level declares
 the same; records without an L4 identity (`resolution` undefined, api, non-crypto, ambiguous) are not matched. The
 full group, member and agreement tables are written at the scoring level (`--level`, default L3), the
-per-level summary `matchlevels-run<k>.csv` for all six. Inside a group the located records form call-site groups
+per-level summary `matchlevels-run<k>.csv` for all five levels (L0-L4). Inside a group the located records form call-site groups
 (same file, lines within `--window`, default 2; a window record spans `line` .. `line_end`). Per group and dimension
 (key size, mode, padding, curve, digest, location) the agreement table says how many voters report a value admitted
 at the level and how many carry the majority value. A member whose own identity differs from the group's key joined
@@ -461,7 +471,7 @@ files and never change these:
 
 | File | Layer | One row per | Main columns |
 |---|---|---|---|
-| `runs.csv` | runs | stored run, every repetition, incl. failed, timed-out and `unsupported` | repo, snapshot, commit, variant, tool, run, tailored (the tool was tuned on this repo), status, duration_sec, size_bytes, error (the most telling line), peak_memory_mb, memory_limit_mb, oom_kills, enqueued_at, started_at, finished_at, queue_sec, tool_version, image_ref, bfcbom_commit, bom_format, spec_version (as the CBOM declares), components, crypto_assets and, by the declared `assetType`, algorithm_assets, certificate_assets, protocol_assets, material_assets, other_assets, plus located_file_assets and located_line_assets (crypto assets with a file, and with a file and a line, in the CBOM), expect_crypto (from the spec), workaround (recorded setup workarounds: CryptoScan `--exclude`, CipherRadar `.cradarignore`); for LLM workers requests, requests_failed, chunks_total, chunks_sent, chunks_skipped (over `LLM_MAX_CHUNKS`, never sent), input_tokens, cached_input_tokens, cache_write_tokens, output_tokens, reasoning_tokens, models_answered |
+| `runs.csv` | runs | stored run, every repetition, incl. failed, timed-out and `unsupported` | repo, snapshot, commit, variant, variant_commit, language, tool, run, tailored (the tool was tuned on this repo), status, duration_sec, size_bytes, error (the most telling line), peak_memory_mb, memory_limit_mb, oom_kills, enqueued_at, started_at, finished_at, queue_sec, received_at, tool_version, image_ref, bfcbom_commit, bom_format, spec_version (as the CBOM declares), components, crypto_assets and, by the declared `assetType`, algorithm_assets, certificate_assets, protocol_assets, material_assets, other_assets, plus located_file_assets and located_line_assets (crypto assets with a file, and with a file and a line, in the CBOM), expect_crypto (from the spec), workaround (recorded setup workarounds, such as CipherRadar `.cradarignore`); for LLM workers requests, requests_failed, chunks_total, chunks_sent, chunks_skipped (over `LLM_MAX_CHUNKS`, never sent), input_tokens, cached_input_tokens, cache_write_tokens, output_tokens, reasoning_tokens, models_answered, cost_usd, priced_model, price_period, price_table_version |
 | `records-run<k>.csv` | records | normalised record: one (component, occurrence) of one tool | snapshot, variant, tool, run, location_kind (`line`, `window`, `import`, `file`, `none`, `unread`), record_id (`<tool>:<component>:<occurrence>`), site_id (`<tool>:<file>:<line>` when located), every record dimension, resolution (`mapped`, `ambiguous`, `api`, `non-crypto`, `undefined`; only `mapped` records become items), `raw_*`, `src_*`, unmapped, conflicts, spec_issues |
 | `groups-exact-run<k>.csv` | matches | group of the exact matcher: `repo` scope = one cluster per key at the level (its members plus attached records), `site` scope = its located records at one call site | matcher, repo, snapshot, commit, variant, run, group_id (`E00001`, clusters sorted by key; sites `E00001.001`), n_tools (tools, observers included; k counts voter groups: `voter_groups`), tools, language, level, scope, key (the level's key: a raw name at L0, an identity at L4), voters, voter_groups (observers are none), n_records, n_sites, units (L4 identities of the voting members; of all members when only observers are in), n_units, n_attached, located_voters, colocated_voters (repo scope; voters only), file, line_min, line_max, parent (site scope) |
 | `members-exact-run<k>.csv` | matches | (group, record) pair | matcher, snapshot, variant, run, group_id, record_id, tool, unit (the record's L4 identity), implied (attached through `--closure`), matched (its own identity differs from the group's key: joined through a lower level), attached (a generic or implying record, no key of its own in the group) |
@@ -476,8 +486,8 @@ files and never change these:
 | `mutation-rates.csv` | E4 | (tool, language, style or `all`, dimension) | tool, voter_group, role, language, style, dimension, repos, mutants (judged), detected, rate (mean of per-repository rates), pooled, ci_low, ci_high (bootstrap over repositories, only when supported: score.py's MIN_REPOS and MIN_ITEMS), supported |
 | `agreement-exact-run<k>.csv` | matches | (group, dimension) | matcher, repo, snapshot, variant, run, group_id, scope, key, dimension (key_size, mode, padding, curve, digest; location for repo groups), reporting (voters with a value), agreeing (voters carrying the majority value), majority, values |
 | `matchlevels-run<k>.csv` | matches | (matcher, level) | matcher, level, run, repos, items (algorithms by L4 identity), records, k1, k2, k3, k4plus (items by the voter groups of their largest group at the level), share_k2plus, `<dim>_groups` and `<dim>_agree` for key_size, mode, padding, curve, digest (groups with 2+ voters reporting a value admitted at the level; share where all agree), location_groups, location_agree (groups with 2+ located voters; share with 2+ at one call site) |
-| `micro-run<k>.csv` | ground truth | micro project and tool of the spec, also unsupported and failed runs | project, language, tool, status (of the run, `missing` without one), verdict (`pass`, `fail`, `unsupported`, `error`, `missing`), strict, lenient, repo, recall_strict, recall_lenient, recall_repo, sites_in_file, sites_correct, precision, passes_bar, missed, repo_missed, repo_extra (families reported that the project does not contain) |
-| `micro-items-run<k>.csv` | ground truth | (micro project, tool, expected item) of every scored run | project, language, tool, item, families, insertion_style (`direct`, `constant`), callsite_strict, callsite_lenient, repo |
+| `micro-run<k>.csv` | ground truth | micro project and tool of the spec, also unsupported and failed runs | project, language, tool, run, tailored, status (of the run, `missing` without one), verdict (`pass`, `fail`, `unsupported`, `error`, `missing`), n_items, strict, lenient, repo, recall_strict, recall_lenient, recall_repo, sites_in_file, sites_correct, precision, f1, bar_items, passes_bar, entry_bar (`passed`, `disqualified`, `not judged`, over all scored projects of the tool), missed, repo_missed, repo_extra (families reported that the project does not contain), decoys (count), decoys_hit (ids) |
+| `micro-items-run<k>.csv` | ground truth | (micro project, tool, expected item) of every scored run | project, language, tool, run, item, families, insertion_style (`direct`, `indirect`), callsite_strict, callsite_lenient, repo |
 
 Join keys: records on `(snapshot, variant, run, record_id)`, groups on `(snapshot, variant, run, group_id)`. Group ids
 restart per snapshot and variant. `snapshot` is the result folder name `<owner>__<repo>@<sha12>`; `repo` and `commit`

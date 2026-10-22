@@ -2,7 +2,7 @@
 
 The analysis writes flat CSV tables into `<exp>/_ANALYSIS/` (`experiments/README.md` lists every file and column).
 The figures of the paper are built from them later, by hand, with pandas and matplotlib; nothing here runs in the
-pipeline. When drawing them, follow the `dataviz` skill (one palette, light and dark variants, accessible colours).
+pipeline. Use one accessible palette consistently, with light and dark variants where needed.
 Recipes, one per planned figure:
 
 ```python
@@ -22,10 +22,11 @@ scores = pd.read_csv(f"{A}/score-run1.csv").query("role == 'voter'")
 **Tools per item, UpSet plot (RQ2).** Which voter groups report which items per repository.
 ```python
 groups = pd.read_csv(f"{A}/groups-exact-run1.csv").query("scope == 'repo'")
-members = pd.read_csv(f"{A}/members-exact-run1.csv").query("implied != True")
 # one row per (repo group, voter group); `voters` is a ';'-joined list in groups-exact
-sets = groups.assign(voter=groups["voters"].str.split(";")).explode("voter")
-memberships = pd.crosstab(sets["group_id"], sets["voter"]).astype(bool)   # the UpSet input (e.g. upsetplot.plot)
+sets = groups.dropna(subset=["voters"]).assign(voter=lambda d: d["voters"].str.split(";")).explode("voter")
+# Group ids restart in each snapshot: keep the complete key.
+keys = ["snapshot", "variant", "run", "group_id"]
+memberships = pd.crosstab([sets[c] for c in keys], sets["voter"]).astype(bool)  # UpSet input
 ```
 
 **Fill-rate heatmap (RQ2).** Share of algorithm assets per tool and dimension with a reported value.
@@ -36,7 +37,7 @@ heat = cov.pivot(index="tool", columns="dimension", values="reported_share")
 
 **Meaningful: standard fields vs any source (RQ1).**
 ```python
-m = pd.read_csv(f"{A}/meaningful-run1.csv")
+m = pd.read_csv(f"{A}/meaningful-run1.csv").query("asset_type == 'algorithm'")
 pd.melt(m, id_vars=["tool", "dimension"], value_vars=["standard_share", "any_share"])   # grouped bars per dimension
 ```
 
@@ -58,19 +59,23 @@ agree = ml.set_index(["matcher", "level"]).filter(like="_agree")                
 
 **Ranking with confidence intervals (RQ4).**
 ```python
-sc = pd.read_csv(f"{A}/score-run1.csv").query("dimension == 'algorithm'").sort_values("confirmation")
-# dot = confirmation, whiskers = ci_low .. ci_high; a second marker column for ds_support
-err = [sc["confirmation"] - sc["ci_low"], sc["ci_high"] - sc["confirmation"]]
+sc = pd.read_csv(f"{A}/score-run1.csv").query("dimension == 'algorithm' and role == 'voter'")
+ranked = sc.dropna(subset=["rank", "ci_low", "ci_high"]).sort_values("rate")
+# dot = rate (mean per-repository confirmation), whiskers = ci_low .. ci_high
+err = [ranked["rate"] - ranked["ci_low"], ranked["ci_high"] - ranked["rate"]]
 ```
 Stability of the ranking: `loo-run1.csv` (`kendall_tau` per left-out voter group); stability across levels: rerun
-`analysis report --level L2` and compare `rank`.
+`make analysis ARGS="report <exp> --level L2"` and compare `rank`. Save the previous tables first:
+each report replaces `_ANALYSIS/`.
 
-**Cost per found and per confirmed asset (LLM workers).**
+**Cost per found and per confirmed item (for historical or future LLM runs).** The current experiment specs do
+not include these providers. Use a report scored on one repetition (`--run 1 --no-consensus`) so cost and item
+counts refer to the same runs.
 ```python
-runs = pd.read_csv(f"{A}/runs.csv")
+runs = pd.read_csv(f"{A}/runs.csv").query("variant == 'original' and run == 1 and tailored == False")
 cost = runs.groupby("tool")["cost_usd"].sum()
-items = sc.set_index("tool")[["items", "confirmed"]]
-per_asset = pd.concat([cost, items], axis=1).dropna().assign(
+items = sc.set_index("tool")[["items", "confirmed"]]  # sc from the single-repetition report above
+per_item = pd.concat([cost, items], axis=1).dropna().assign(
     per_found=lambda d: d["cost_usd"] / d["items"], per_confirmed=lambda d: d["cost_usd"] / d["confirmed"]
 )
 ```

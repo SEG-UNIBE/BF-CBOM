@@ -8,6 +8,10 @@ normalisation, analysis outputs),
 `docs/pilot-2026-10-08/` (the colleague's pilot).
 
 ## Rules
+- **Current scope and wording (2026-10-22):** describe BF-CBOM publicly as integrating **15 CBOM generator tools**.
+  LLM providers are excluded for now and may be considered later; their existing implementation is retained.
+  Do not define the tools by contrast with LLMs. Keep research roles such as observers in the research docs,
+  with an explanation when first introduced, rather than in the public tool-count description.
 - **Start with make, never plain compose.** `make up-prod` starts the stack detached and opens the live board
   (`misc/cli/stack_cmd.py`; Ctrl-C closes it, the stack keeps running; `make board` reopens it, `make logs` shows the
   raw logs, `make down` stops the stack); clean rebuild `make clean-docker && make up-prod
@@ -17,11 +21,13 @@ normalisation, analysis outputs),
   `-delete` / `-export`, `analysis`, `corpus`, `corpus-prune`, `board`. After every pull run `make up-prod` first: the runner
   bakes the CLI and the workers bake `common/`.
 - **Nothing lands on the host unless exported.** Results and git mirrors stay in the named volumes `results-data` and
-  `git-data`; `make experiment-export` is the only path out, which is why the CLI runs inside the `runner` container.
+  `git-data`; `make experiment-export` exports experiments and `make corpus-export` exports sampled corpus YAMLs,
+  which is why these CLI commands run inside the `runner` container.
   A copied export can be analysed on the host: `RESULTS_DIR=exports uv run bf-cbom analysis report <exp>`.
 - **The laptop prepares, the VM runs.** Batch runs happen on the 64 GB VM with `EXPERIMENT_MEMORY_BUDGET_GB=0` for
-  now (one wave: the prod worker limits sum to 69 GiB, but limits are caps, and the measured peak with all 13 tools
-  in one wave was 21.5 of 60.5 GiB, 2026-10-19). The laptop is for code, configs and analysing copied exports.
+  now (one wave). Limits are caps, not reservations; the measured peak with the then-selected 13 tools was
+  21.5 of 60.5 GiB (2026-10-19). Current limits are in `common/tools.yaml` and `docker-compose.yml`.
+  The laptop is for code, configs and analysing copied exports.
 - **Results are disposable until the paper's runs.** One code path per feature, no compatibility with older result
   layouts; old experiments are rerun, not migrated.
 - **Benchmark every tool as shipped, in its best fair run** (refinement 15). Fix our setup, never the tool.
@@ -158,9 +164,9 @@ normalisation, analysis outputs),
 - **Normalisation, three kinds of files.** One **adapter spec per tool** `analysis/adapters/<tool>.yaml` (declared
   format, which components are findings, where each dimension sits in order of precedence, the tool's own dictionary,
   named extractors; inherits `_cyclonedx.yaml`, `_ibm-cbom-draft.yaml`, `_cbomkit.yaml`, `_llm.yaml`); one **shared
-  vocabulary** for synonyms that are not tool-specific (`analysis/data/algorithms.yaml` plus the vendored CycloneDX
-  1.7 registry and 1.6/1.7 schemas in `analysis/data/cyclonedx/`; a spelling one tool uses goes into its spec, once
-  two tools use it, it moves to the shared vocabulary); one **target format** `analysis/data/cbom-norm.schema.json`.
+  vocabulary** for spellings traceable to standards or official APIs (`analysis/data/algorithms.yaml` plus the
+  vendored CycloneDX 1.7 registry and 1.6/1.7 schemas in `analysis/data/cyclonedx/`), regardless of how many tools use
+  them; labels invented by a tool belong in its spec. One **target format**: `analysis/data/cbom-norm.schema.json`.
   A new tool needs a spec (a test fails otherwise). *Worker adapters* (`common/cbom_adapters.py`, `workers/*`) make
   raw output usable CycloneDX at scan time; *adapter specs* read CycloneDX into records, offline.
 
@@ -215,14 +221,16 @@ real projects.
   depend on each tool's packaging: `analysis/README.md` "Units".)
 - **RQ4:** can tools be scored and ranked without ground truth?
 
-Decisions: mutants are hosted on the local git server; the LLM generator reads the code; the corpus is ~100 repos per
+Decisions: mutants are hosted on the local git server; the corpus is ~100 repos per
 paper language, mutation runs on a ~30-repo subset per language.
 
 **Paper languages (decided 2026-10-20):** the paper analyses Java, Python and Go (Go added the same day, with the
 mutation harness); every other language (C, JavaScript/TypeScript, Rust, ...) is irrelevant for now: tools still run
 where they declare support, but no analysis, figure or tuning effort goes into those languages.
 
-## Status (2026-10-20)
+## Status (updated 2026-10-22)
+- **Current experiment scope:** 15 CBOM generator tools in all five specs. LLM providers are excluded for now;
+  the provider workers and their analysis support remain implemented for possible later use.
 - **Export review of 2026-10-19** (`docs/findings.md` "Export review"): the first VM runs of e0-stability,
   e1-pilot-corpus and e1-icpc-corpus were checked for plausibility. Fixed since: the git server's 256 MiB limit killed
   CBOMkit's full clones of keycloak and ansible (`GITSERVER_MEMORY`, 4g); cdxgen was OOM-killed at 8 GiB on four Java
@@ -242,9 +250,9 @@ where they declare support, but no analysis, figure or tuning effort goes into t
   CycloneDX CBOM of its own (the 2026-10-15 audit's placeholder): cryptobom-forge writes its own empty draft document
   (checked 2026-10-20), so every stored CryptobomForge CBOM is the tool's; the placeholder runs (curl,
   openssh-portable, AutoGPTQ, sparrow) are redone by the rerun below. cdxgen's Go locations are read now (they were
-  ignored). Vocabulary 2026-10-20.2. The DeepSeek rerun below picks up the new assembly.
-- **Observers added (2026-10-19):** qelens, cryptarium and qScan are workers with `role: observer` and are in the
-  three experiment specs; the reruns below pick them up. Vocabulary 2026-10-19.2 (their specs only).
+  ignored). Vocabulary 2026-10-20.2. Any future LLM runs will use the new assembly.
+- **Observers added (2026-10-19):** qelens, cryptarium and qScan are workers with `role: observer` and are now in
+  all five experiment specs. Vocabulary 2026-10-19.2 (their specs only).
 - **Analysis units and voters (2026-10-20):** tables count *assets*, *records* or *items* and say which
   (`analysis/README.md` "Units"; cross-tool comparisons count items); packaging per tool is declared in
   `analysis/README.md` and measured in `units-run<k>.csv`, the kind of place every record names (`line`, `window`,
@@ -266,8 +274,7 @@ where they declare support, but no analysis, figure or tuning effort goes into t
   `experiments/e4-mutation-smoke.yaml` waits for the VM. Removal mutants come after E1 (they need its voters).
 - **Waiting for the VM:** `make up-prod`, then each experiment as a whole (the user's preference, 2026-10-20):
   `make experiment EXP=experiments/e1-pilot-corpus.yaml ARGS="--overwrite-old" EXPERIMENT_MEMORY_BUDGET_GB=0`, the
-  same for e1-icpc-corpus, e0-stability and e0-micro (DeepSeek is out of every spec since 2026-10-22, no credit, so
-  no LLM runs for now; `make experiment-delete
+  same for e1-icpc-corpus, e0-stability and e0-micro (LLM providers are outside the current scope; `make experiment-delete
   NAME=<x>` for the former smoke experiments e0-smoke, e0-cbomkit-smoke, e0-llm-smoke and e0-phase2-smoke, whose
   specs went 2026-10-21); `make experiment EXP=experiments/e4-mutation-smoke.yaml EXPERIMENT_MEMORY_BUDGET_GB=0`;
   then build the E1 corpus (Java, Python and Go) with `GITHUB_TOKEN` and prune it, check replicas.
@@ -388,9 +395,9 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
   Plus `micro-run<k>.csv`, `micro-items-run<k>.csv`, `items-run<k>.csv`, `units-run<k>.csv` (per repository `units-repo-run<k>.csv`), `levels-run<k>.csv`, `coverage-run<k>.csv`,
   `conformance-run<k>.csv`, the RQ1, score and stability tables. Join keys: (snapshot, variant, run, record_id) and
   (snapshot, variant, run, group_id); group ids restart per snapshot and variant. Full list: `experiments/README.md`.
-- **Report** (`analysis/report/README.md`): plot recipes on the CSVs (UpSet of tools per asset, fill-rate heatmaps,
-  ladder, ranking with CIs, cost per confirmed asset). The figures are built by the user later, following the
-  `dataviz` skill.
+- **Report** (`analysis/report/README.md`): plot recipes on the CSVs (UpSet of tools per item, fill-rate heatmaps,
+  ladder, ranking with CIs, cost per confirmed item). The figures are built by the user later with a consistent,
+  accessible palette.
 
 ## Phase 4: mutation harness (`mutation/`, RQ4 validation; insertion built 2026-10-20)
 - **Snippet catalog** (`mutation/catalog/{java,python,go}.yaml`, versioned; also the source of the micro projects,
@@ -480,8 +487,9 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
 6. **Reachable insertions** (Phase 4): only into methods with a caller or an entry point, never under tests; the
    insertion kind is recorded as a covariate.
 7. **Removal bias is acknowledged, not fixed** (Phase 4): insertion and removal results are reported apart.
-8. **Worker replicas.** Workers are stateless BLPOP consumers, so `docker compose up --scale worker-<tool>=N` works;
-   E0 timings decide N per tool; the memory budget counts replicas (`EXPERIMENT_REPLICAS`).
+8. **Worker replicas.** Workers are stateless BLPOP consumers. Compose's `--scale worker-<tool>=N` can start replicas
+   when invoked with the Makefile's exported image settings; there is no dedicated scaling target yet.
+   E0 timings decide N per tool; the memory budget counts replicas (`EXPERIMENT_REPLICAS`), which does not start them.
 9. **Statistics for few tools** (Phase 5). Kendall τ over a handful of ranks is coarse: add Spearman between agreement
    score and mutation detection rate over all tool × dimension × language cells, with bootstrap over repos; Java,
    Python and Go are three replications of the method.

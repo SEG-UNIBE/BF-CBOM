@@ -2,7 +2,7 @@
 # set, so not held out), to measure run-to-run variance before any agreement claim (CLAUDE.md Phase 5, E0).
 # The repos are the pilot's fastest (max run 2-131 s on 2026-10-16); vault, pyjwt, jasypt, keycloak, jjwt are left
 # out for time. Analysis: `make analysis ARGS="report e0-stability"` writes stability.csv and scores the consensus sets.
-#   make experiment EXP=experiments/e0-stability.yaml EXPERIMENT_MEMORY_BUDGET_GB=52
+#   make experiment EXP=experiments/e0-stability.yaml EXPERIMENT_MEMORY_BUDGET_GB=0
 name: e0-stability
 description: "run-to-run stability (E0): all tools, three repetitions, micro projects plus ten small pilot repositories"
 tools: [cbomkit, cdxgen, cryptobomforge, cryptoscan, pqcheck, qdarpan, securin-xbom, cipherradar, xgrep, cbomkit-jar, ciphersift, scanoss, qelens, cryptarium, qscan]

@@ -50,11 +50,11 @@ It also offers **benchmarking capabilities** to orchestrate batch CBOM generatio
 
 ### CBOM Generators Under Scrutiny
 
-BF-CBOM currently integrates thirteen CBOM generator workers (plus two opt-in LLM providers) to enable side-by-side comparisons.
+BF-CBOM integrates 15 CBOM generator tools for side-by-side comparisons.
 Each generator brings a unique methodology for detecting and cataloging cryptographic assets:
 
 - **[`CBOMKit`](https://github.com/PQCA/cbomkit)**:
-IBM Research's dedicated CBOM generator for Python and Java, now maintained by the Post-Quantum Cryptography Alliance.
+IBM Research's dedicated CBOM generator for Java, Python and Go, now maintained by the Post-Quantum Cryptography Alliance.
 Uses SonarQube for static analysis and supports compliance policy checks.
 
 - **`CBOMKit` action jar** ([cbomkit-action](https://github.com/cbomkit/cbomkit-action)):
@@ -65,11 +65,6 @@ CycloneDX's official generator, primarily for SBOMs but with CBOM extensions sin
 
 - **[`CryptobomForge`](https://github.com/Santandersecurityresearch/cryptobom-forge)**:
 Santander Security Research's CLI tool that turns CodeQL SARIF output into a CBOM (IBM's pre-standard draft format). The worker runs CodeQL's experimental crypto queries, which exist for Python and C/C++ only.
-
-- **[`DeepSeek`](https://www.deepseek.com/)**:
-LLM-based approach: the worker clones the repository, selects source files that reference crypto APIs, sends them with line numbers to DeepSeek's `deepseek-v4-pro` (the provider's defaults: it reasons before answering, and no temperature is sent) and assembles a CycloneDX 1.7 CBOM with file and line per asset, the algorithm families and curves mapped onto the 1.7 registry (`common/llm_cbom.py`; other providers plug in as thin adapters).
-
-- **`ChatGPT` / `Claude`** (prepared, opt-in): the same code-reading pipeline with OpenAI or Anthropic models. Put the API key into `docker/env/worker-chatgpt.env` or `docker/env/worker-claude.env` and start with `make up-prod EXTRA_PROFILES=llm`; without keys these workers are not started.
 
 - **[`CryptoScan`](https://github.com/csnp/cryptoscan)**:
 CyberSecurity NonProfit's pattern-based scanner (Apache-2.0) with a catalogue of 90+ crypto patterns across 15+ languages; emits CycloneDX 1.6 CBOMs with code locations. Run with `--include-quantum-safe`, since it otherwise leaves out AES, SHA-2, HMAC and PBKDF2.
@@ -94,8 +89,6 @@ tree-sitter and YAML-rule scanner for Java, Python and Go source and their depen
 
 - **[`SCANOSS crypto-finder`](https://github.com/scanoss/crypto-finder)** (GPL-2.0-only):
 opengrep rules plus call-graph reachability, CycloneDX 1.7 with file and line per asset. Its full rule set comes from the SCANOSS API and needs a key; without one the worker runs the documented offline mode with the public open rules ([`open-crypto-rules`](https://github.com/scanoss/open-crypto-rules), GPL-3.0), which cover Go, C, JavaScript and Rust but not Java or Python. The image holds the unmodified release binary (0.37.1), the opengrep release SCANOSS's own image ships (1.22.0) and the rules at a pinned commit, all checksum- or commit-verified; the Dockerfile names their sources. A research key for the Java and Python rules has been requested.
-
-**Observers** (`role: observer` in `common/tools.yaml`): tools that failed the pilot's inclusion bar. They run in the experiments and are analysed like every tool, and the other tools confirm their findings, but they confirm nobody and are never ranked (`--observers-vote` turns them into voters).
 
 - **[`qelens`](https://github.com/qelens/cbom)** (MPL-2.0): Rust/tree-sitter scanner for Python and JavaScript, crate `cbom` 0.1.2, CycloneDX 1.6 with file and line per asset.
 
@@ -242,6 +235,9 @@ make up-prod
 ```
 
 Note that it can take up to 20 minutes, depending on your hardware and internet speed.
+
+Use the Make targets for stack and runner commands: they export the image version and base-image name required by
+Compose. After pulling code changes, run `make up-prod` again to rebuild the runner and workers before experiments.
 
 The stack starts in the background, and a live board opens once it is up: the experiments that run, every worker
 with its job, its memory, its queue and its last result, and whether Redis, the git server and the UI answer.
@@ -401,7 +397,7 @@ Workers mark a job running the moment they take it (`common/jobs.py`), using the
 
 Every inspection resolves each repository's branch to a commit SHA when it starts (`git ls-remote`, no token needed) and stores it with the repo snapshot.
 Workers that clone check out exactly that commit (`common/utils.py:clone_repo`), so re-executing or retrying an inspection scans the same bytes.
-Each `JobResult` records `tool_version` (reported by the worker, e.g. `cdxgen 12.8.5`), `image_ref` (the image it ran in) and `run_index`, plus `notes` for non-fatal fallbacks such as cdxgen rerunning without `--evidence`.
+Each `JobResult` records `tool_version` (reported by the worker, e.g. `cdxgen 12.8.5`), `image_ref` (the image it ran in), `bfcbom_commit` (the checkout used to build it) and `run_index`, plus timing, peak memory, OOM kills and run notes.
 
 ### Batch experiments (journal extension)
 
@@ -418,23 +414,26 @@ make experiment-export NAME=e4-mutation-smoke            # -> exports/e4-mutatio
 make experiment-list                                     # experiments stored on the volume
 make experiment-delete NAME=e4-mutation-smoke            # remove one from the volume (asks first; ARGS=--yes skips)
 make corpus ARGS="--per-language 100"                    # stratified GitHub corpus with pinned commits
-make experiment EXP=experiments/e0-micro.yaml            # every tool once on the hand-written micro projects (corpus/micro): the voter bar
+make experiment EXP=experiments/e0-micro.yaml            # 15 tools on 3 generated micro projects: the voter bar
 make experiment EXP=experiments/e0-stability.yaml        # every tool 3x on the micro projects and ten pilot repos
 make analysis ARGS="report e0-stability"                 # everything below in one pass + _ANALYSIS/_SUMMARY.md (Markdown tables)
 make analysis ARGS="normalize e0-stability"              # every CBOM -> normalised records, one adapter spec per tool (analysis/adapters/)
 make analysis ARGS="schema e0-stability"                 # RQ1: CycloneDX validity, meaningful shares, traceability (--fetch on a laptop)
 make analysis ARGS="levels e0-stability"                 # how much agreement normalisation creates (levels L0 raw to L4 tool specs)
-make analysis ARGS="micro e0-micro"                      # recall (call site and repo level) and precision per tool against corpus/micro/ground_truth.yaml
+make analysis ARGS="micro e0-micro"                      # recall, precision, F1, decoy hits and entry-bar verdicts
 make analysis ARGS="tables e0-stability"                 # flat CSV tables (runs, records, exact-matcher groups, micro) for pandas/R
 make analysis ARGS="score e0-stability"                  # RQ4: confirmation, exclusivity, Dawid-Skene, leave-one-out, CIs; stability
 ```
 
 #### Parallelism and Memory
 
+For the paper's runs, the laptop prepares code and analyses copied exports; the 64 GB VM runs the batches with
+`EXPERIMENT_MEMORY_BUDGET_GB=0`. The default budget remains 14 GiB for smaller Docker VMs.
+
 - **One job per worker container.** Each worker pops one job from its Redis queue, runs the tool in a subprocess, pushes the result and only then takes the next job. A batch therefore has as many jobs in flight as there are worker containers: with `make up-prod` that is one per generator, each working on a different repository. Queued jobs cost nothing but a Redis list entry, so the size of a batch never affects memory.
-- **More throughput: replicas.** Workers are stateless, so a tool can be scaled to several containers that share the same queue: `docker compose up -d --scale worker-cryptoscan=3`. Each replica has the full memory limit of its service, so tell the runner: `make experiment EXP=... EXPERIMENT_REPLICAS="cryptoscan=3"` counts the tool three times in the memory budget and records the replicas in `_run-log.json`. Untested beyond one replica per tool so far (verify on the VM).
-- **Memory limits are caps, not reservations.** Every worker has a memory limit in `docker-compose.yml` (8 GiB for the two CBOMkit workers, 6 GiB for CryptobomForge, 4 GiB for most others). They sum to roughly 57 GiB for the thirteen generators, far more than a laptop's Docker VM (Docker Desktop defaults to a fraction of the host RAM). Idle workers use little, but on large repositories the JVM and CodeQL based tools grow towards their caps, and if the VM itself runs out of memory the kernel kills arbitrary containers.
-- **Memory budget (waves).** `EXPERIMENT_MEMORY_BUDGET_GB` in the `Makefile` (default 14, meant for a Docker VM of about 20 GiB) caps the summed limits of the tools a batch feeds at the same time. The runner packs the tools into waves, largest first, runs one wave to completion, then starts the next; the plan is printed before anything is enqueued. With all thirteen generators the default gives five waves. On a machine with enough RAM set the budget to 0 (one wave, everything in parallel), either per call or once in the `Makefile`:
+- **More throughput: replicas.** Workers are stateless, so several containers can share a tool's queue. Replica startup uses Compose's `--scale` option and must retain the Makefile's exported image version and base-image settings; there is no dedicated Make target for scaling yet. Once replicas are running, `make experiment EXP=... EXPERIMENT_REPLICAS="cryptoscan=3"` counts that tool three times in the memory budget and records the replicas in `_run-log.json`; it does not start them. Untested beyond one replica per tool so far (verify on the VM).
+- **Memory limits are caps, not reservations.** Every worker has a memory limit in `docker-compose.yml`, mirrored by `memory_gb` in `common/tools.yaml` (currently 16 GiB for cdxgen, 8 GiB for each CBOMkit worker and 6 GiB for CryptobomForge). The sum depends on the selected tools and replicas. Idle workers use little, but large jobs can approach their caps; the VM also needs memory for the coordinator, Redis, git server and other services.
+- **Memory budget (waves).** `EXPERIMENT_MEMORY_BUDGET_GB` in the `Makefile` (default 14, meant for a Docker VM of about 20 GiB) groups tools into waves by their summed limits. The runner packs the tools largest first, runs one wave to completion, then starts the next; the plan is printed before anything is enqueued. A tool whose limit exceeds the budget runs alone with a warning (currently cdxgen at the default budget), so the budget is not a hard memory cap. On a machine with enough RAM set it to 0 (one wave, everything in parallel), either per call or once in the `Makefile`:
 
   ```bash
   make experiment EXP=experiments/e1-pilot-corpus.yaml EXPERIMENT_MEMORY_BUDGET_GB=0
