@@ -6,6 +6,6 @@
 #   make analysis ARGS="report e1-pilot-corpus"
 name: e1-pilot-corpus
 description: pilot corpus rerun through BF-CBOM (location-aware agreement across tools), paper languages only
-tools: [cbomkit, cdxgen, cryptobomforge, cryptoscan, deepseek, pqcheck, qdarpan, securin-xbom, cipherradar, xgrep, cbomkit-jar, ciphersift, scanoss, qelens, cryptarium, qscan]
+tools: [cbomkit, cdxgen, cryptobomforge, cryptoscan, pqcheck, qdarpan, securin-xbom, cipherradar, xgrep, cbomkit-jar, ciphersift, scanoss, qelens, cryptarium, qscan]
 repetitions: 1
 corpus: ../corpus/pilot-2026-10-08.yaml

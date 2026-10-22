@@ -7,7 +7,7 @@
 # After a change to one worker: ARGS="--rerun <tool>" (5 jobs).
 name: e0-micro
 description: "the voter bar: every tool once on the five micro projects with known ground truth"
-tools: [cbomkit, cdxgen, cryptobomforge, cryptoscan, deepseek, pqcheck, qdarpan, securin-xbom, cipherradar, xgrep, cbomkit-jar, ciphersift, scanoss, qelens, cryptarium, qscan]
+tools: [cbomkit, cdxgen, cryptobomforge, cryptoscan, pqcheck, qdarpan, securin-xbom, cipherradar, xgrep, cbomkit-jar, ciphersift, scanoss, qelens, cryptarium, qscan]
 repetitions: 1
 repos:
   - full_name: bfcbom/micro-java

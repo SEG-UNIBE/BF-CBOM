@@ -5,6 +5,6 @@
 #   make experiment-export NAME=e1-icpc-corpus        # runs the analysis report first
 name: e1-icpc-corpus
 description: ICPC 2026 paper repositories rerun through BF-CBOM at today's commits (held out from all tuning)
-tools: [cbomkit, cdxgen, cryptobomforge, cryptoscan, deepseek, pqcheck, qdarpan, securin-xbom, cipherradar, xgrep, cbomkit-jar, ciphersift, scanoss, qelens, cryptarium, qscan]
+tools: [cbomkit, cdxgen, cryptobomforge, cryptoscan, pqcheck, qdarpan, securin-xbom, cipherradar, xgrep, cbomkit-jar, ciphersift, scanoss, qelens, cryptarium, qscan]
 repetitions: 1
 corpus: ../corpus/icpc-2026.yaml

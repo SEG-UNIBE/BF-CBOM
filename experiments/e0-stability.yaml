@@ -5,7 +5,7 @@
 #   make experiment EXP=experiments/e0-stability.yaml EXPERIMENT_MEMORY_BUDGET_GB=52
 name: e0-stability
 description: "run-to-run stability (E0): all tools, three repetitions, micro projects plus ten small pilot repositories"
-tools: [cbomkit, cdxgen, cryptobomforge, cryptoscan, deepseek, pqcheck, qdarpan, securin-xbom, cipherradar, xgrep, cbomkit-jar, ciphersift, scanoss, qelens, cryptarium, qscan]
+tools: [cbomkit, cdxgen, cryptobomforge, cryptoscan, pqcheck, qdarpan, securin-xbom, cipherradar, xgrep, cbomkit-jar, ciphersift, scanoss, qelens, cryptarium, qscan]
 repetitions: 3
 repos:
   - full_name: bfcbom/micro-java
