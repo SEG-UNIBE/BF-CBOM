@@ -40,15 +40,14 @@ def clock(seconds: float) -> str:
 
 def forecast(
     left: dict[str, int], mean: dict[str, float], running: dict[str, float], waves: list[list[str]]
-) -> tuple[float | None, str | None, bool]:
+) -> tuple[float | None, bool]:
     """The remaining time of a batch whose tools work their own queues in parallel, one job at a time: per tool, its
     jobs left times its mean duration so far, less what its running job has taken (at most one mean); the slowest
-    tool ends a wave and the waves follow each other. Returns (seconds, the slowest tool, whether it is a lower bound:
-    a tool with jobs left and no result yet counts as 0), or (None, None, True) when no tool with jobs left has a
-    result yet."""
-    total, slowest, lower, known = 0.0, None, False, False
+    tool ends a wave and the waves follow each other. Returns (seconds, whether it is a lower bound: a tool with jobs
+    left and no result yet counts as 0), or (None, True) when no tool with jobs left has a result yet."""
+    total, lower, known = 0.0, False, False
     for wave in waves:
-        worst, worst_tool = 0.0, None
+        worst = 0.0
         for t in wave:
             if left.get(t, 0) <= 0:
                 continue
@@ -56,21 +55,17 @@ def forecast(
                 lower = True
                 continue
             known = True
-            secs = max(left[t] * mean[t] - min(running.get(t, 0.0), mean[t]), 0.0)
-            if worst_tool is None or secs > worst:
-                worst, worst_tool = secs, t
+            worst = max(worst, left[t] * mean[t] - min(running.get(t, 0.0), mean[t]))
         total += worst
-        slowest = slowest or worst_tool  # the one holding up the first wave with work left
-    return (total, slowest, lower) if known else (None, None, True)
+    return (total, lower) if known else (None, True)
 
 
-def remaining(fc: tuple[float | None, str | None, bool], *, tool: bool = True) -> str:
-    """A forecast as text: `1:42:10 (cbomkit)`, `≥ 0:12:00 (xgrep)` while a tool has no result yet, `–` unknown."""
-    secs, slowest, lower = fc
+def remaining(fc: tuple[float | None, bool]) -> str:
+    """A forecast as text: `1:42:10`, `≥ 0:12:00` while a tool has no result yet, `–` unknown."""
+    secs, lower = fc
     if secs is None:
         return "–"
-    text = ("≥ " if lower else "") + clock(secs)
-    return f"{text} ({slowest})" if tool and slowest else text
+    return ("≥ " if lower else "") + clock(secs)
 
 
 class _CountColumn(ProgressColumn):

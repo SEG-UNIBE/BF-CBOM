@@ -68,7 +68,7 @@ def test_board_shows_workers_queues_and_experiments_with_their_remaining_time():
     assert "14.6/16.0" in text and "ok 0:00:41 jwtk/jjwt@1a2b3c4" in text and "timeout 0:30:00" in text
     (line,) = [line.rstrip() for line in text.splitlines() if line.startswith("e1-pilot-corpus")]
     # cbomkit: 6 left x 10 min, less the 2:05 its job has run; cdxgen: 1 x 100 s; the slowest ends the batch
-    assert "412/720" in line and "1/1" in line and "1:00:00" in line and line.endswith("0:57:55 (cbomkit)")
+    assert "412/720" in line and "1/1" in line and "1:00:00" in line and line.endswith("0:57:55")
     assert "1 busy · 3 idle · 1 down" in text and "redis ✓" in text and stack_cmd.FOOTER in text
     rows = [line.split()[0] for line in text.splitlines() if line.split() and line.split()[0] in workers]
     assert rows == ["cbomkit", "cdxgen", "extra", "pyqun", "deepseek"]  # busy, idle, down
@@ -79,12 +79,31 @@ def test_board_shows_workers_queues_and_experiments_with_their_remaining_time():
 def test_forecast_takes_the_slowest_tool_per_wave_and_adds_the_waves():
     mean = {"cbomkit": 600.0, "xgrep": 10.0}
     assert progress.forecast({"cbomkit": 3, "xgrep": 50}, mean, {"cbomkit": 100.0}, [["cbomkit", "xgrep"]]) == (
-        1700.0, "cbomkit", False)  # fmt: skip
+        1700.0, False)  # fmt: skip
     # a later wave starts when the first is done; its tool without a result yet makes the time a lower bound
     fc = progress.forecast({"cbomkit": 3, "xgrep": 50, "cdxgen": 4}, mean, {}, [["cbomkit", "xgrep"], ["cdxgen"]])
-    assert fc == (1800.0, "cbomkit", True) and progress.remaining(fc) == "≥ 0:30:00 (cbomkit)"
+    assert fc == (1800.0, True) and progress.remaining(fc) == "≥ 0:30:00"
     assert progress.forecast({"cbomkit": 1}, mean, {"cbomkit": 900.0}, [["cbomkit"]])[0] == 0.0  # overdue: now
     assert progress.remaining(progress.forecast({"cdxgen": 4}, mean, {}, [["cdxgen"]])) == "–"  # nothing known
+
+
+def test_experiment_columns_keep_their_width_while_a_run_moves():
+    early = {"name": "e1-pilot-corpus", "status": "running", "done": 7, "total": 720, "failed": 0, "wave": "1/12",
+             "started": NOW - 31, "forecast": (None, True)}  # fmt: skip
+    late = {**early, "status": "stalled", "done": 712, "failed": 345, "wave": "10/12", "started": NOW - 45 * 3600,
+            "forecast": (11 * 3600.0, True)}  # fmt: skip
+    for width in (80, 160):
+        lines = []
+        for e in (early, late):
+            console = Console(record=True, width=width, color_system=None)
+            console.print(stack_cmd.experiments_table(stack_cmd.Snapshot(now=NOW, experiments=[e]), width))
+            lines.append(console.export_text().splitlines()[:2])
+        (head, first), (head_late, last) = lines
+        assert head == head_late  # the same column widths
+        for col in ("results", "wave", "failed", "running", "left"):  # right-aligned: ends where its header does
+            end = head.index(col) + len(col)
+            assert first[end - 1] != " " and last[end - 1] != " " and first[end : end + 1] in ("", " "), (width, col)
+        assert "  7/720" in first and " 1/12" in first and "≥ 11:00:00" in last and "45:00:00" in last
 
 
 def test_board_without_experiments_or_redis():

@@ -6,7 +6,8 @@ what the running stack does, read from Redis only, so it runs in the runner like
 - Experiments: every running or stalled experiment (the status hash `exp:<name>` the runner writes) and every
   running UI inspection, with a bar, the results stored, the wave, the failures and the remaining time
   (`progress.forecast`: per tool its jobs left times its mean duration so far, from what the runner records in
-  `exp:<name>:tools`; the slowest tool, named, ends the batch; none for inspections).
+  `exp:<name>:tools`; the slowest tool ends the batch; none for inspections). The columns keep their width while a
+  run moves: it depends on the totals and the number of waves, never on the current values.
 - Workers: one row per worker service (`BOARD_SERVICES`, every container of the stack as make lists it, so a crashed
   worker shows as down), from its heartbeat (`common/worker.py:publish_heartbeat`): busy / idle / down, the job and
   its origin (`jobs:routing`), for how long, the container's RAM against its limit, the jobs queued and the last
@@ -54,6 +55,7 @@ HEARTBEAT_NAMES = {"misc-treesimilarity": "treesimilartiy"}  # its worker names 
 ACTIVE = ("running", "stalled")
 RECENT_SEC = 600  # a finished experiment stays on the board this long
 FOOTER = "Ctrl-C closes the board · the stack keeps running · make board · make logs · make down"
+LONGEST_CLOCK = clock(99 * 3600)  # the widest clock the experiments table makes room for (`running`, `left`)
 
 
 @dataclass
@@ -203,10 +205,21 @@ def _int(v) -> int:
         return 0
 
 
-def eta(e: dict, *, tool: bool = True) -> str:
+def eta(e: dict) -> str:
     if e["total"] and e["done"] >= e["total"]:
         return "done"
-    return remaining(e["forecast"], tool=tool) if e.get("forecast") else "–"
+    return remaining(e["forecast"]) if e.get("forecast") else "–"
+
+
+def _counted(done: int, total: int) -> str:
+    """`done/total` with done padded to the total's width: ` 33/180` and `133/180` take the same room."""
+    return f"{count(done):>{len(count(total))}}/{count(total)}"
+
+
+def _wave(wave: str) -> str:
+    """An experiment's `i/n` with i padded to n's width (an inspection's wave is a bare number)."""
+    i, slash, n = wave.partition("/")
+    return f"{i:>{len(n)}}/{n}" if slash else wave
 
 
 def _gib(mb: float | None) -> str:
@@ -253,9 +266,11 @@ def experiments_table(snap: Snapshot, width: int = 160) -> Table | Text:
     t.add_column("experiment", no_wrap=True, overflow="ellipsis", ratio=1, min_width=12)
     bar_width = 24 if width >= 120 else 10
     t.add_column("", no_wrap=True, width=bar_width)
-    for col, justify, min_width in (("results", "right", 9), ("wave", "left", 4), ("failed", "right", 6),
-                                    ("running", "right", 8), ("left", "right", 10)):  # fmt: skip
-        t.add_column(col, justify=justify, no_wrap=True, min_width=min_width)
+    # fixed widths from what a run does not change (totals, waves, the widest clock), so no column shifts as it moves
+    of = max(len(count(e["total"])) for e in snap.experiments)
+    for col, w in (("results", 2 * of + 1), ("wave", max(len(_wave(e["wave"])) for e in snap.experiments)),
+                   ("failed", of), ("running", len(LONGEST_CLOCK)), ("left", len(f"≥ {LONGEST_CLOCK}"))):  # fmt: skip
+        t.add_column(col, justify="right", no_wrap=True, width=max(w, len(col)))
     for e in snap.experiments:
         style = "" if e["status"] in ACTIVE else "dim"
         bar = ProgressBar(total=max(e["total"], 1), completed=min(e["done"], e["total"]), width=bar_width,
@@ -267,8 +282,7 @@ def experiments_table(snap: Snapshot, width: int = 160) -> Table | Text:
         elif e["status"] not in ACTIVE:
             name.append(f" ({e['status']})", style="dim")
         running = clock(max(snap.now - e["started"], 0)) if e["started"] else ""
-        left = eta(e, tool=width >= 120)  # the slowest tool's name only where there is room
-        t.add_row(name, bar, f"{count(e['done'])}/{count(e['total'])}", e["wave"], failed, running, left)
+        t.add_row(name, bar, _counted(e["done"], e["total"]), _wave(e["wave"]), failed, running, eta(e))
     return t
 
 

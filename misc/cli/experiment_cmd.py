@@ -292,7 +292,7 @@ class _Board:
         mean = {t: self.seconds[t] / n for t, n in self.done.items() if n}
         longest = {t: max(secs for secs, _ in jobs) for t, jobs in busy.items() if jobs}
         for t, task in self.lines.items():
-            progress.update(task, eta=progress.remaining(progress.forecast(left, mean, longest, [[t]]), tool=False))
+            progress.update(task, eta=progress.remaining(progress.forecast(left, mean, longest, [[t]])))
         progress.update(self.all, eta=progress.remaining(progress.forecast(left, mean, longest, self.waves)))
 
     def _summary(self) -> None:
