@@ -80,6 +80,22 @@ repository level (refinement 1). Every call-site cell stayed equal except two, b
   sites accept a family the asset's name contains (SHA-2 for HMAC-SHA512).
 - The exact matcher (2026-10-18) left all 65 (project, tool) cells unchanged.
 
+### 2026-10-22, cdxgen on micro-go: a fixture without go.sum
+e0-micro and e0-stability (VM, 2026-10-21) give cdxgen 5/11 on micro-go, one below the bar. Its CBOM is read
+completely (six assets, one location each, all at their lines); the rest was checked in throwaway runs of cdxgen
+12.8.5 on micro-go:
+- **Our setup error: micro-go had no `go.sum`.** It imports `golang.org/x/crypto/pbkdf2`, so the module did not build
+  (`missing go.sum entry`), cdxgen's `go list -deps` failed and its Go analyser (golem 2.5.1, type-checked through
+  go/packages) could not import pbkdf2. With the `go.sum` (added 2026-10-22; `go build` and `go vet` pass) it reports
+  `PBKDF2` at line 56: 6/11 strict and lenient with our scorer. golem's `go list` downloads the modules `go.sum` pins
+  even with `--no-install-deps` (the workers have network; without network the import fails again).
+- **The invocation is already cdxgen's best:** `--evidence` implies `--deep`; `--profile research` turns golem's
+  data-flow on but adds no asset; the dedicated `cbom` command finds no Go asset at all (it never runs golem).
+- **By design, not ours:** golem's catalog has no entry for `ecdsa.GenerateKey` / `SignASN1`, `cipher.NewGCM` /
+  `NewCBCEncrypter`, `des.NewTripleDESCipher` and `rsa.EncryptOAEP`, and the CBOM keeps one location per asset
+  (golem's raw output also has SHA-256 at the OAEP and PBKDF2 lines and a CSPRNG, which the CBOM leaves out or lists
+  without a location).
+
 ## Normaliser on e1-pilot-corpus (2026-10-16)
 116 ok CBOMs of 11 tools, about 41k records, 2 s.
 - Algorithm records with a tool-reported family: 87-100 % per tool (CryptobomForge 7 %: mostly `UNKNOWN`).

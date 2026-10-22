@@ -18,6 +18,9 @@ TIMEOUT_SEC = int(os.getenv("WORKER_TIMEOUT_SEC", "120"))  # default 120s for re
 # falls back to Java without one, so Python and Go repos need their -t (micro-python: 0 -> 5 algorithms,
 # micro-go: 0 -> 6, 2026-10-17). JavaScript/TypeScript must run without -t: its source-level crypto
 # inventory (the only one with file/line) runs only in the default all-types mode. Java: the same either way.
+# Go (golem) type-checks through go/packages: an import resolves only when the repo's go.sum pins it, and golem's
+# `go list` then downloads the module itself, also with --no-install-deps (needs network). cdxgen's `cbom` command
+# finds no Go asset (it never runs golem) and --profile research adds none (checked 2026-10-22, docs/findings.md).
 _PROJECT_TYPE = {"python": "python", "go": "go"}
 
 # Configure logging
