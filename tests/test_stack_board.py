@@ -1,5 +1,5 @@
 """The stack board (misc/cli/stack_cmd.py) on a fake Redis: workers from their heartbeats, queues, experiments and the
-remaining time; and the heartbeat it reads (common/worker.py)."""
+remaining time (misc/cli/progress.py:forecast); and the heartbeat it reads (common/worker.py)."""
 
 import json
 import time
@@ -10,7 +10,7 @@ from typer.testing import CliRunner
 
 from common.jobs import JOB_ROUTING_KEY
 from common.worker import publish_heartbeat
-from misc.cli import stack_cmd
+from misc.cli import progress, stack_cmd
 from misc.cli.cli import app
 
 NOW = 1_800_000_000.0
@@ -37,15 +37,19 @@ def _world():
     r.rpush("jobs:cbomkit", "a", "b", "c")
     r.hset(JOB_ROUTING_KEY, "j1", "exp:e1-pilot-corpus")
     r.hset("exp:e1-pilot-corpus", mapping={"status": "running", "expected_jobs": "720", "skipped_jobs": "20",
-           "stored_jobs": "392", "failed_jobs": "3", "wave": "1/1", "started_at": _iso(NOW - 3600)})  # fmt: skip
+           "stored_jobs": "392", "failed_jobs": "3", "wave": "1/1", "started_at": _iso(NOW - 3600),
+           "tool_jobs": json.dumps({"cbomkit": 10, "cdxgen": 5}),
+           "waves": json.dumps([["cbomkit", "cdxgen"]])})  # fmt: skip
+    r.hset("exp:e1-pilot-corpus:tools", mapping={"cbomkit:n": 4, "cbomkit:sec": 2400.0, "cdxgen:n": 4,
+           "cdxgen:sec": 400.0})  # fmt: skip
     r.hset("exp:e1-pilot-corpus:pending", "j1", "{}")
     r.hset("exp:old", mapping={"status": "completed", "finished_at": _iso(NOW - 86400)})
     return r
 
 
-def _text(snap, history, width=160, height=0) -> str:
+def _text(snap, width=160, height=0) -> str:
     console = Console(record=True, width=width, color_system=None)
-    console.print(stack_cmd.render(snap, history, width, height))
+    console.print(stack_cmd.render(snap, width, height))
     return console.export_text()
 
 
@@ -59,36 +63,41 @@ def test_board_shows_workers_queues_and_experiments_with_their_remaining_time():
     (exp,) = snap.experiments  # exp:old finished a day ago, exp:<name>:pending is no status hash
     assert (exp["name"], exp["done"], exp["total"], exp["failed"]) == ("e1-pilot-corpus", 412, 720, 3)
 
-    history = {}
-    stack_cmd.observe(history, snap)
-    text = _text(snap, history)
+    text = _text(snap)
     assert "apache/kafka@771b957 run1 · e1-pilot-corpus" in text and "0:02:05" in text  # the job and how long
     assert "14.6/16.0" in text and "ok 0:00:41 jwtk/jjwt@1a2b3c4" in text and "timeout 0:30:00" in text
     (line,) = [line.rstrip() for line in text.splitlines() if line.startswith("e1-pilot-corpus")]
-    assert "412/720" in line and "1/1" in line and "1:00:00" in line and line.endswith("–")  # no rate yet
+    # cbomkit: 6 left x 10 min, less the 2:05 its job has run; cdxgen: 1 x 100 s; the slowest ends the batch
+    assert "412/720" in line and "1/1" in line and "1:00:00" in line and line.endswith("0:57:55 (cbomkit)")
     assert "1 busy · 3 idle · 1 down" in text and "redis ✓" in text and stack_cmd.FOOTER in text
     rows = [line.split()[0] for line in text.splitlines() if line.split() and line.split()[0] in workers]
     assert rows == ["cbomkit", "cdxgen", "extra", "pyqun", "deepseek"]  # busy, idle, down
-    assert "rrxxnnuu" not in text and "rrxxnnuu" in _text(snap, history, width=140, height=50)  # the logo if it fits
-    assert "rrxxnnuu" not in _text(snap, history, width=140, height=20)
+    assert "rrxxnnuu" not in text and "rrxxnnuu" in _text(snap, width=140, height=50)  # the logo if it fits
+    assert "rrxxnnuu" not in _text(snap, width=140, height=20)
 
-    r.hset("exp:e1-pilot-corpus", "stored_jobs", "398")  # 6 more in a minute: 302 left at 0.1/s
-    later = stack_cmd.snapshot(r, SERVICES, probe=lambda url: True, now=NOW + 60)
-    stack_cmd.observe(history, later)
-    assert "0:50:20" in _text(later, history)
+
+def test_forecast_takes_the_slowest_tool_per_wave_and_adds_the_waves():
+    mean = {"cbomkit": 600.0, "xgrep": 10.0}
+    assert progress.forecast({"cbomkit": 3, "xgrep": 50}, mean, {"cbomkit": 100.0}, [["cbomkit", "xgrep"]]) == (
+        1700.0, "cbomkit", False)  # fmt: skip
+    # a later wave starts when the first is done; its tool without a result yet makes the time a lower bound
+    fc = progress.forecast({"cbomkit": 3, "xgrep": 50, "cdxgen": 4}, mean, {}, [["cbomkit", "xgrep"], ["cdxgen"]])
+    assert fc == (1800.0, "cbomkit", True) and progress.remaining(fc) == "≥ 0:30:00 (cbomkit)"
+    assert progress.forecast({"cbomkit": 1}, mean, {"cbomkit": 900.0}, [["cbomkit"]])[0] == 0.0  # overdue: now
+    assert progress.remaining(progress.forecast({"cdxgen": 4}, mean, {}, [["cdxgen"]])) == "–"  # nothing known
 
 
 def test_board_without_experiments_or_redis():
     r = fakeredis.FakeRedis(decode_responses=True)
     snap = stack_cmd.snapshot(r, SERVICES, probe=lambda url: False, now=NOW)
-    text = _text(snap, {})
+    text = _text(snap)
     assert "no experiment running" in text and "0 busy · 0 idle · 4 down" in text and "git server ✗" in text
 
     server = fakeredis.FakeServer()
     server.connected = False
     down = stack_cmd.snapshot(fakeredis.FakeRedis(server=server, decode_responses=True), SERVICES,
                               probe=lambda url: False, now=NOW)  # fmt: skip
-    assert "Redis does not answer" in _text(down, {}) and "redis ✗" in _text(down, {})
+    assert "Redis does not answer" in _text(down) and "redis ✗" in _text(down)
 
 
 def test_board_once_prints_one_snapshot(monkeypatch):

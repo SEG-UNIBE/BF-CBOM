@@ -18,7 +18,8 @@ make board ARGS=--once                                   # one snapshot of it, t
 it runs and for how long). `make board`, in a second terminal, shows the whole stack (an experiment's bar counts the
 results the runner has stored, so after `ARGS=--no-wait` it moves once `make experiment-collect` runs):
 - every running experiment with a bar, results stored out of expected, its wave, the failures so far and the time
-  left;
+  left (per tool its jobs left times its mean duration so far, less what its running job has taken; the slowest tool
+  ends the batch and is named, `≥` while a tool has no result yet; the runner's own progress shows the same);
 - every worker: busy, idle or down, the job it runs (repo, run, experiment) and for how long, the container's RAM
   against its limit, the jobs queued for it and its last result;
 - whether Redis, the git server and the UI answer, and the host's RAM.
@@ -144,7 +145,8 @@ enqueued and stored in the experiment's Redis status (`waves`, `wave`).
 
 **Watching a run.** On a terminal `run` and `collect` keep a live board at the bottom (`misc/cli/progress.py`): one
 line for all results (done/total, remaining time, elapsed time, the wave and the statuses so far), then one per tool
-with its count, the job it runs now and for how long (the longest-running one first, from the start times the workers
+with its count and remaining time (`progress.forecast`: its jobs left times its mean duration so far; the batch ends
+with its slowest tool, named on the first line), the job it runs now and for how long (the longest-running one first, from the start times the workers
 write to Redis), how many wait and what failed; tools of a later wave wait with their clock still. Every stored
 result still prints its own line above the board (status, tool, snapshot, run, duration, path). Pinning and
 mirroring count the repos the same way, and so does `corpus build` per language (repos picked out of the quota, the

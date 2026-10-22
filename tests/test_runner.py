@@ -122,6 +122,9 @@ def test_run_stores_results_resumes_retries_and_exports(world, tmp_path):
     assert statuses[("o__second", "t2")] == "error" and sum(s == "ok" for s in statuses.values()) == 3
     status = world["redis"].hgetall(experiment_cmd._status_key("e-fake"))  # what the stack board reads
     assert (status["stored_jobs"], status["failed_jobs"], status["expected_jobs"]) == ("4", "1", "4")
+    tools = world["redis"].hgetall(experiment_cmd._tools_key("e-fake"))  # the board's forecast per tool
+    assert json.loads(status["tool_jobs"]) == {"t1": 2, "t2": 2} and (tools["t1:n"], tools["t2:n"]) == ("2", "2")
+    assert float(tools["t1:sec"]) >= 0
     meta = json.loads(next(exp.glob("o__first@*/original/t1/run1.meta.json")).read_text())
     assert meta["enqueued_at"] and meta["tool_version"] == "t1 1.0" and meta["variant"] == "original"
     (session,) = ex.load_run_log(exp)

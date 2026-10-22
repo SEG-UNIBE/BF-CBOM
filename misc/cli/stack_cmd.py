@@ -4,8 +4,9 @@ what the running stack does, read from Redis only, so it runs in the runner like
 - Header: the logo on a wide terminal, the version and commit, the UI's address, whether Redis, the git server and
   the UI answer, the host's RAM and CPUs.
 - Experiments: every running or stalled experiment (the status hash `exp:<name>` the runner writes) and every
-  running UI inspection, with a bar, the results stored, the wave, the failures and the remaining time (from the
-  rate the board saw over the last `progress.ETA_WINDOW_SEC`).
+  running UI inspection, with a bar, the results stored, the wave, the failures and the remaining time
+  (`progress.forecast`: per tool its jobs left times its mean duration so far, from what the runner records in
+  `exp:<name>:tools`; the slowest tool, named, ends the batch; none for inspections).
 - Workers: one row per worker service (`BOARD_SERVICES`, every container of the stack as make lists it, so a crashed
   worker shows as down), from its heartbeat (`common/worker.py:publish_heartbeat`): busy / idle / down, the job and
   its origin (`jobs:routing`), for how long, the container's RAM against its limit, the jobs queued and the last
@@ -20,7 +21,6 @@ import datetime as dt
 import json
 import os
 import time
-from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -37,7 +37,7 @@ from common.experiment import GITSERVER_URL
 from common.jobs import EXPERIMENT_ROUTE_PREFIX, JOB_ROUTING_KEY
 from common.memory import host_memory
 from coordinator.redis_io import count_done_jobs, list_inspections
-from misc.cli.progress import ETA_WINDOW_SEC, clock, count
+from misc.cli.progress import clock, count, forecast, remaining
 
 stack_app = typer.Typer(
     help="The running stack at a glance",
@@ -134,15 +134,17 @@ def snapshot(r: redis.Redis, services: list[str], *, probe=None, now: float | No
         finished = _epoch(meta.get("finished_at"))
         if meta.get("status") not in ACTIVE and not (finished and snap.now - finished < RECENT_SEC):
             continue
+        name = key.split(":", 1)[1]
         snap.experiments.append(
             {
-                "name": key.split(":", 1)[1],
+                "name": name,
                 "status": meta.get("status", ""),
                 "done": _int(meta.get("skipped_jobs")) + _int(meta.get("stored_jobs")),
                 "total": _int(meta.get("expected_jobs")),
                 "failed": _int(meta.get("failed_jobs")),
                 "wave": meta.get("wave", ""),
                 "started": _epoch(meta.get("started_at")),
+                "forecast": _forecast(meta, r.hgetall(f"{key}:tools"), snap, name),
             }
         )
     for insp_id, meta in list_inspections(r):
@@ -160,6 +162,23 @@ def snapshot(r: redis.Redis, services: list[str], *, probe=None, now: float | No
                 }
             )
     return snap
+
+
+def _forecast(meta: dict, tools: dict, snap: Snapshot, name: str) -> tuple:
+    """The experiment's remaining time from this session's jobs per tool (`tool_jobs`), the results and seconds the
+    runner stored per tool (`<tool>:n`, `<tool>:sec`) and how long each of its tools' running job has taken (the
+    heartbeats)."""
+    jobs = _json(meta.get("tool_jobs")) or {}
+    n = {t: _int(tools.get(f"{t}:n")) for t in jobs}
+    left = {t: c - n[t] for t, c in jobs.items()}
+    mean = {t: float(tools.get(f"{t}:sec") or 0) / n[t] for t in jobs if n[t]}
+    running = {}
+    for w in snap.workers:
+        info = (w["beat"] or {}).get("job") or {}
+        if w["origin"] == name and info.get("started"):
+            running[w["name"]] = max(snap.now - info["started"], 0.0)
+    waves = _json(meta.get("waves")) or [sorted(jobs)]
+    return forecast(left, mean, running, waves if isinstance(waves, list) else [sorted(jobs)])
 
 
 def _origin(r: redis.Redis, target: str) -> str:
@@ -184,23 +203,10 @@ def _int(v) -> int:
         return 0
 
 
-def observe(history: dict[str, deque], snap: Snapshot) -> None:
-    """Remember each experiment's count over the ETA window, for its rate."""
-    for e in snap.experiments:
-        h = history.setdefault(e["name"], deque())
-        h.append((snap.now, e["done"]))
-        while h and snap.now - h[0][0] > ETA_WINDOW_SEC:
-            h.popleft()
-
-
-def eta(history: dict[str, deque], e: dict) -> str:
-    h = history.get(e["name"])
+def eta(e: dict, *, tool: bool = True) -> str:
     if e["total"] and e["done"] >= e["total"]:
         return "done"
-    if not h or len(h) < 2 or h[-1][1] <= h[0][1]:
-        return "–"
-    rate = (h[-1][1] - h[0][1]) / (h[-1][0] - h[0][0])
-    return clock(max(e["total"] - e["done"], 0) / rate)
+    return remaining(e["forecast"], tool=tool) if e.get("forecast") else "–"
 
 
 def _gib(mb: float | None) -> str:
@@ -240,7 +246,7 @@ def header(snap: Snapshot, width: int, height: int) -> list:
     return out
 
 
-def experiments_table(snap: Snapshot, history: dict[str, deque], width: int = 160) -> Table | Text:
+def experiments_table(snap: Snapshot, width: int = 160) -> Table | Text:
     if not snap.experiments:
         return Text("no experiment running · make experiment EXP=experiments/<spec>.yaml", style="dim")
     t = Table(box=None, pad_edge=False, show_header=True, header_style="bold", expand=True)
@@ -248,7 +254,7 @@ def experiments_table(snap: Snapshot, history: dict[str, deque], width: int = 16
     bar_width = 24 if width >= 120 else 10
     t.add_column("", no_wrap=True, width=bar_width)
     for col, justify, min_width in (("results", "right", 9), ("wave", "left", 4), ("failed", "right", 6),
-                                    ("running", "right", 8), ("left", "right", 8)):  # fmt: skip
+                                    ("running", "right", 8), ("left", "right", 10)):  # fmt: skip
         t.add_column(col, justify=justify, no_wrap=True, min_width=min_width)
     for e in snap.experiments:
         style = "" if e["status"] in ACTIVE else "dim"
@@ -261,7 +267,8 @@ def experiments_table(snap: Snapshot, history: dict[str, deque], width: int = 16
         elif e["status"] not in ACTIVE:
             name.append(f" ({e['status']})", style="dim")
         running = clock(max(snap.now - e["started"], 0)) if e["started"] else ""
-        t.add_row(name, bar, f"{count(e['done'])}/{count(e['total'])}", e["wave"], failed, running, eta(history, e))
+        left = eta(e, tool=width >= 120)  # the slowest tool's name only where there is room
+        t.add_row(name, bar, f"{count(e['done'])}/{count(e['total'])}", e["wave"], failed, running, left)
     return t
 
 
@@ -317,7 +324,7 @@ def workers_table(snap: Snapshot) -> Table:
     return t
 
 
-def render(snap: Snapshot, history: dict[str, deque], width: int, height: int = 0) -> Group:
+def render(snap: Snapshot, width: int, height: int = 0) -> Group:
     parts = header(snap, width, height) + [Text("")]
     if not snap.redis_ok:
         parts.append(Text("Redis does not answer: is the stack up? (make up-prod)", style="bold red"))
@@ -326,7 +333,7 @@ def render(snap: Snapshot, history: dict[str, deque], width: int, height: int = 
         down = sum(1 for w in snap.workers if w["beat"] is None)
         title = Text("Workers", style="bold")
         title.append(f"  {busy} busy · {len(snap.workers) - busy - down} idle · {down} down", style="dim")
-        parts += [Text("Experiments", style="bold"), experiments_table(snap, history, width), Text(""), title,
+        parts += [Text("Experiments", style="bold"), experiments_table(snap, width), Text(""), title,
                   workers_table(snap)]  # fmt: skip
     parts += [Text(""), Text(FOOTER, style="dim")]
     return Group(*parts)
@@ -343,18 +350,13 @@ def board(
     r = redis.Redis(host=redis_host, port=redis_port, decode_responses=True, socket_timeout=5)
     services = [s for s in os.getenv("BOARD_SERVICES", "").split(",") if s]
     console = Console()
-    history: dict[str, deque] = {}
     if once or not console.is_terminal:
-        snap = snapshot(r, services)
-        observe(history, snap)
-        console.print(render(snap, history, console.width, console.height))
+        console.print(render(snapshot(r, services), console.width, console.height))
         return
     try:
         with Live(console=console, screen=True, auto_refresh=False) as live:
             while True:
-                snap = snapshot(r, services)
-                observe(history, snap)
-                live.update(render(snap, history, console.width, console.height), refresh=True)
+                live.update(render(snapshot(r, services), console.width, console.height), refresh=True)
                 time.sleep(interval)
     except KeyboardInterrupt:
         pass

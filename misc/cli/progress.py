@@ -38,6 +38,41 @@ def clock(seconds: float) -> str:
     return f"{m // 60}:{m % 60:02d}:{s:02d}"
 
 
+def forecast(
+    left: dict[str, int], mean: dict[str, float], running: dict[str, float], waves: list[list[str]]
+) -> tuple[float | None, str | None, bool]:
+    """The remaining time of a batch whose tools work their own queues in parallel, one job at a time: per tool, its
+    jobs left times its mean duration so far, less what its running job has taken (at most one mean); the slowest
+    tool ends a wave and the waves follow each other. Returns (seconds, the slowest tool, whether it is a lower bound:
+    a tool with jobs left and no result yet counts as 0), or (None, None, True) when no tool with jobs left has a
+    result yet."""
+    total, slowest, lower, known = 0.0, None, False, False
+    for wave in waves:
+        worst, worst_tool = 0.0, None
+        for t in wave:
+            if left.get(t, 0) <= 0:
+                continue
+            if t not in mean:
+                lower = True
+                continue
+            known = True
+            secs = max(left[t] * mean[t] - min(running.get(t, 0.0), mean[t]), 0.0)
+            if worst_tool is None or secs > worst:
+                worst, worst_tool = secs, t
+        total += worst
+        slowest = slowest or worst_tool  # the one holding up the first wave with work left
+    return (total, slowest, lower) if known else (None, None, True)
+
+
+def remaining(fc: tuple[float | None, str | None, bool], *, tool: bool = True) -> str:
+    """A forecast as text: `1:42:10 (cbomkit)`, `≥ 0:12:00 (xgrep)` while a tool has no result yet, `–` unknown."""
+    secs, slowest, lower = fc
+    if secs is None:
+        return "–"
+    text = ("≥ " if lower else "") + clock(secs)
+    return f"{text} ({slowest})" if tool and slowest else text
+
+
 class _CountColumn(ProgressColumn):
     """`done/total` and, while it runs, the remaining time; empty for a step without a count."""
 
@@ -45,7 +80,11 @@ class _CountColumn(ProgressColumn):
         if task.fields.get("of") is None:
             return Text("")
         text = f"{count(task.fields['done'])}/{count(task.fields['of'])}"
-        if not task.finished and task.time_remaining is not None:
+        if task.finished:
+            return Text(text)
+        if "eta" in task.fields:  # the caller's forecast (`update(eta=...)`), else rich's rate
+            return Text(f"{text} eta {task.fields['eta']}" if task.fields["eta"] else text)
+        if task.time_remaining is not None:
             text += f" eta {clock(task.time_remaining)}"
         return Text(text)
 
@@ -109,13 +148,15 @@ def line(name: str, *, total: int | None = None, done: int = 0, start: bool = Tr
     return _live.add_task(name, total=bar, completed=done, start=start, done=done, of=total, item="")
 
 
-def update(task, *, done: int | None = None, item: str | None = None) -> None:
-    """Move a line to `done` and/or name what it works on now."""
+def update(task, *, done: int | None = None, item: str | None = None, eta: str | None = None) -> None:
+    """Move a line to `done`, name what it works on now and/or give its remaining time (`forecast`, `remaining`)."""
     if _live is None or task is None:
         return
     fields: dict = {} if done is None else {"completed": done, "done": done}
     if item is not None:
         fields["item"] = item
+    if eta is not None:
+        fields["eta"] = eta
     _live.update(task, **fields)
 
 

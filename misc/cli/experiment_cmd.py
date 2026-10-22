@@ -100,6 +100,12 @@ def _running_key(name: str) -> str:
     return f"exp:{name}:running"  # job_id -> started_at, written by the workers (common/jobs.py)
 
 
+def _tools_key(name: str) -> str:
+    # `<tool>:n` and `<tool>:sec`: the results stored this session per tool and their summed durations, for the
+    # remaining time (progress.forecast) of the stack board, next to `tool_jobs` in the status hash
+    return f"exp:{name}:tools"
+
+
 def _job_from_descriptor(job_id: str, desc: dict) -> PlannedJob:
     return PlannedJob(
         job_id=job_id,
@@ -214,14 +220,17 @@ def _running_for(started_at: str) -> float | None:
 class _Board:
     """The live view of a batch on a terminal (misc/cli/progress.py): one line for all results, with the wave and the
     statuses so far, then one per tool with its count, the job it runs now and for how long, what is still queued and
-    what failed. The per-result lines keep scrolling above it; off a terminal they are all there is."""
+    what failed, and the remaining time per tool and for the batch (progress.forecast, from the durations so far).
+    The per-result lines keep scrolling above it; off a terminal they are all there is."""
 
     def __init__(self, jobs: list[PlannedJob], *, stored: int = 0, waves: list[list[str]] | None = None):
         per_tool = Counter(j.tool for j in jobs)
+        self.per_tool = per_tool
         self.waves = waves or [sorted(per_tool)]
         self.wave_label = ""
         self.statuses: Counter = Counter()
         self.done: Counter = Counter()
+        self.seconds: Counter = Counter()
         self.failed: dict[str, Counter] = defaultdict(Counter)
         self.started: set[str] = set()
         self.all = progress.line("results", total=stored + len(jobs), done=stored)
@@ -237,9 +246,10 @@ class _Board:
             self.started.add(t)
         self._summary()
 
-    def stored(self, job: PlannedJob, status: str, done: int) -> None:
+    def stored(self, job: PlannedJob, status: str, done: int, duration: float | None = None) -> None:
         self.statuses[status] += 1
         self.done[job.tool] += 1
+        self.seconds[job.tool] += duration or 0.0
         if status != "ok":
             self.failed[job.tool][status] += 1
         progress.update(self.all, done=done)
@@ -278,6 +288,12 @@ class _Board:
                     parts.append(f"wave {i}")
                 parts += [f"{progress.count(n)} {s}" for s, n in sorted(self.failed[t].items())]
                 progress.update(self.lines[t], item=" · ".join(parts))
+        left = {t: n - self.done[t] for t, n in self.per_tool.items()}
+        mean = {t: self.seconds[t] / n for t, n in self.done.items() if n}
+        longest = {t: max(secs for secs, _ in jobs) for t, jobs in busy.items() if jobs}
+        for t, task in self.lines.items():
+            progress.update(task, eta=progress.remaining(progress.forecast(left, mean, longest, [[t]]), tool=False))
+        progress.update(self.all, eta=progress.remaining(progress.forecast(left, mean, longest, self.waves)))
 
     def _summary(self) -> None:
         statuses = sorted(self.statuses, key=lambda s: (s != "ok", s))
@@ -434,12 +450,14 @@ def run(
             err=True,
         )
     total = len(jobs) + len(pending)
+    r.delete(_tools_key(spec.name))
     r.hset(
         _status_key(spec.name),
         mapping={
             "status": "running" if total else "completed",
             "started_at": now_iso(),
             "expected_jobs": str(expected_jobs(spec, exp_dir)),
+            "tool_jobs": json.dumps(Counter(j.tool for j in [*jobs, *pending.values()])),  # this session's
             "issued_jobs": "0",
             "failed_jobs": "0",  # stored this session with a status other than ok (the stack board shows it)
             "skipped_jobs": str(skipped),
@@ -595,6 +613,8 @@ def _collect(
             r.hset(_status_key(name), mapping={"stored_jobs": str(done), "updated_at": now_iso()})
             if result.status != "ok":
                 r.hincrby(_status_key(name), "failed_jobs", 1)
+            r.hincrby(_tools_key(name), f"{job.tool}:n", 1)
+            r.hincrbyfloat(_tools_key(name), f"{job.tool}:sec", result.duration_sec or 0.0)
             colour = typer.colors.GREEN if result.status == "ok" else typer.colors.RED
             typer.secho(
                 f"[{done}/{total}] {result.status:<7} {job.tool:<15} {job.snapshot.full_name}@{job.snapshot.variant} "
@@ -603,7 +623,7 @@ def _collect(
                 err=True,
             )
             if board is not None:
-                board.stored(job, result.status, done)
+                board.stored(job, result.status, done, result.duration_sec)
         if board is not None:
             board.poll(r, name, pending)
         if got_any:
@@ -667,7 +687,7 @@ def _forget(r: redis.Redis, name: str) -> int:
     entries and any result not collected yet. Returns the number of pending jobs."""
     pending = {jid: _job_from_descriptor(jid, json.loads(d)) for jid, d in r.hgetall(_pending_key(name)).items()}
     _cancel_pending(r, name, pending)
-    r.delete(_status_key(name), _pending_key(name), _running_key(name), f"results:{_route_key(name)}")
+    r.delete(_status_key(name), _pending_key(name), _running_key(name), _tools_key(name), f"results:{_route_key(name)}")
     return len(pending)
 
 
