@@ -144,7 +144,7 @@ normalisation, analysis outputs),
     occurrences); the ladder and the scores count items.
   - `normalize/`: CBOM -> normalised records (below); `normalize` also writes `run<k>.norm.json` next to each CBOM.
   - `schema.py`: RQ1 (whole-document validation, meaningful shares) and RQ2's traceability; `snapshots.py` reads a pinned
-    commit's files from the git mirror or a cache fetched with `--fetch`.
+    commit's files from the git mirror or a cache fetched with `--fetch` (a fixture: published from its local directory).
   - `levels.py`: the L0-L4 ladder on a fixed unit (refinement 14): `level_matches` clusters a repo's records level
     by level; the exact matcher, the ladder and the tools-per-item distribution share it.
   - `matchers/`: n-way matchers on the records, `exact.py` and `raqun.py`, compared by `compare.py` (Phase 3).
@@ -367,7 +367,7 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
   lack of detail, not of correctness; the 56 -> 71 % gap is the agreement that breaks on details. The pilot's
   call-site matcher (a) was retired 2026-10-18; its line window lives on in (b).
   - (b) the **exact matcher** (`matchers/exact.py`): its groups are the ladder's clusters at a level, one per key
-    (records whose identity at some level up to `--level`, default L3, is that key; cumulative), so location-less
+    (records whose identity at some level up to `--level`, default L4, is that key; cumulative), so location-less
     tools take part. Clusters never merge through a record with several keys (decided 2026-10-19: the earlier
     union-find let `hmac.new` merge HMAC with SHA-1 and `SHA-2` merge SHA-256 with SHA-512); a cluster whose members
     span several L4 identities is what the level declares "the same" (`units`, `multi_unit_clusters`); generic

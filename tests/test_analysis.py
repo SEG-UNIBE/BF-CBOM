@@ -5,6 +5,7 @@ on the micro projects (CBOMkit action jar, pqcheck 0.1.0, CipherRadar efa5d9d).
 """
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -181,7 +182,7 @@ def test_tables_command_writes_joinable_tables(tmp_path, monkeypatch):
     assert {m["group_id"] for m in members} == group_ids == {a["group_id"] for a in agreement}
     repo = [g for g in groups if g["scope"] == "repo"]
     sites = [g for g in groups if g["scope"] == "site"]
-    assert all(g["level"] == "L3" and g["parent"] == "" for g in repo) and all(g["parent"] in group_ids for g in sites)
+    assert all(g["level"] == "L4" and g["parent"] == "" for g in repo) and all(g["parent"] in group_ids for g in sites)
     for g in groups:
         assert int(g["n_records"]) == sum(m["group_id"] == g["group_id"] for m in members)
     # CBOMkit and CipherRadar agree on micro-java: most repo groups have both voters, most sites too
@@ -189,7 +190,7 @@ def test_tables_command_writes_joinable_tables(tmp_path, monkeypatch):
     dims = {a["dimension"] for a in agreement}
     assert dims == {"key_size", "mode", "padding", "curve", "digest", "location"}
     info = json.loads((out / "tables-run1.json").read_text())
-    assert info["settings"]["level"] == "L3" and info["settings"]["window"] == 2
+    assert info["settings"]["level"] == "L4" and info["settings"]["window"] == 2
 
 
 def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch, old_truth):
@@ -239,9 +240,16 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     info = json.loads((out / "tables-run1.json").read_text())
     assert info["rows"]["items-run1.csv"] == len(algos) and info["vocabulary"]["algorithms"]
     summary = (out / "_SUMMARY.md").read_text(encoding="utf-8")
-    assert summary.startswith("# exp-tables: analysis summary (run 1)")
+    assert summary.startswith("# Analysis Summary of Experiment `exp-tables`\n")
+    toc = summary[summary.index("## Contents") : summary.index("## Preamble")]
+    links = re.findall(r"^ *- \[(.+)\]\(#(.+)\)$", toc, flags=re.M)  # every entry links to a heading below
+    headings = re.findall(r"^#{2,3} (.+)$", summary[len(toc) :], flags=re.M)
+    assert [title for title, _ in links] == headings
+    assert links[0] == ("Preamble", "preamble") and ("How to read this summary", "how-to-read-this-summary") in links
+    assert ("RQ3a: the L0-L4 deltas (the agreement ladder)", "rq3a-the-l0-l4-deltas-the-agreement-ladder") in links
     assert info["voters"]["cipherradar"] == {"voter_group": "cipherradar", "role": "voter", "engine": "opengrep-rules"}
-    sections = ("## Research questions", "## Runs", "## Bar exam: the micro projects", "## RQ1 Conformance",
+    sections = ("## Preamble", "### How to read this summary", "### Research questions", "### Runs",
+                "## Bar exam: the micro projects", "## RQ1 Conformance",
                 "### Spec issues", "## RQ2 Volume", "### What the tools report, as written",
                 "### Units per tool", "### Traceable", "## RQ3 Agreement", "### Voter groups",
                 "### RQ3a: the L0-L4 deltas", "#### Spellings per identity", "### RQ3b: agreement at L4",
@@ -250,7 +258,7 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
         assert section in summary, section
     positions = [summary.index(s) for s in sections]
     assert positions == sorted(positions)  # the sections come in the order of the questions
-    assert "| cbomkit | pass 11 |" in summary and "| pqcheck | – |" in summary
+    assert "| cbomkit | ✅ 11 |" in summary and "| pqcheck | – |" in summary
     assert "Per repository (`units-repo-run<k>.csv`)" in summary
     meaningful = summary.index("### Meaningful")
     assert meaningful < summary.index("#### Asset type `algorithm`", meaningful) < summary.index("### Traceable")
@@ -328,9 +336,13 @@ def test_summary_markdown_from_csv_rows():
     ]  # fmt: skip
     lines = sm._micro(rows, [])
     assert "| tool | java | go | entry bar |" in lines  # paper languages first, then the tool's verdict
-    assert lines.index("| good | pass 11 | – | passed |") < lines.index("| weak | fail 2 | error | disqualified |")
+    assert lines.index("| good | ✅ 11 | – | ✅ passed |") < lines.index("| weak | ⛔ 2 | error | ⛔ disqualified |")
+    verdicts = next(x for x in lines if x.startswith("**Verdicts**"))  # the hand-over into the later specs
+    assert verdicts.startswith("**Verdicts**: 1 of 2 tools pass the bar, 1 is disqualified (weak). Every passed tool ")
+    assert "no `tool_languages:` entry follows" in verdicts and "tools: [good]" in lines
+    assert "tool_languages:" not in lines
     assert "| weak | 0 / 2 · 7 |  |" in lines
-    assert "| weak | 18% / 50% / 27% |  |" in lines and "| good | 100% / 100% / 100% | – |" in lines
+    assert "| weak | 0.18 / 0.50 / 0.27 |  |" in lines and "| good | 1.00 / 1.00 / 1.00 | – |" in lines
 
 
 def test_reported_section_shows_raw_counts_and_the_repo_matrix():
@@ -378,7 +390,7 @@ def test_reported_section_shows_raw_counts_and_the_repo_matrix():
     ]
     rows[-1]["run"] = "2"
     lines = sm._reported(rows, 1)
-    assert "| t1 | 2 | 43 | 10 | 8 | 2 | 0 | 0 | 0 | 60% | 50% | 1 | 5 |" in lines
+    assert "| t1 | 2 | 43 | 10 | 8 | 2 | 0 | 0 | 0 | 0.60 | 0.50 | 1 | 5 |" in lines
     assert "| t2 | 0 |  |  |  |  |  |  |  |  |  |  |  |" in lines
     assert "| repo | language | expect | t1 | t2 |" in lines
     assert "| o/a | java |  | 10 | – |" in lines and "| o/b | python | low | 0 | × |" in lines
@@ -424,12 +436,12 @@ def test_summary_starts_with_when_how_long_and_how_much_ram(tmp_path, monkeypatc
     result = CliRunner().invoke(analysis_cmd.analysis_app, ["report", "exp-tables"])
     assert result.exit_code == 0, result.output
     summary = (exp / "_ANALYSIS" / "_SUMMARY.md").read_text(encoding="utf-8")
-    assert summary.index("## Experiment") < summary.index("## Runs")
+    assert summary.index("| repositories |") < summary.index("## Contents") < summary.index("### Runs")
     assert "| ran | 2026-10-18 08:00 UTC to 2026-10-18 10:30 UTC |" in summary
     assert "| duration | 2 h 30 min in 1 runner session(s) |" in summary
     assert "| host | 20.0 GiB RAM, 10 CPUs (Docker VM) |" in summary
     assert "| memory budget | 14 GiB -> 2 wave(s) (last session) |" in summary
-    assert "| peak RAM in use | 15.0 GiB of 20.0 GiB (75%) on the VM" in summary
+    assert "| peak RAM in use | 15.0 GiB of 20.0 GiB (0.75) on the VM" in summary
     assert "| peak RAM of a job | 2.9 GiB: `cbomkit` on `bfcbom/micro-java`" in summary
     assert "| queue wait | median 90 s, max 90 s before a job started |" in summary
     assert (

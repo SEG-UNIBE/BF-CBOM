@@ -48,6 +48,7 @@ from common.experiment import (
     RESULTS_DIR,
     analysis_dir,
     experiment_dir,
+    fixture_dir,
     is_experiment,
     iter_results,
     load_mutants,
@@ -115,7 +116,8 @@ FETCH_OPT = typer.Option(
     "--fetch",
     help="Fetch every pinned commit of the experiment into the snapshot cache (SNAPSHOT_CACHE_DIR, default "
     "~/.cache/bf-cbom/snapshots; one shallow git fetch per repo) so file_exists and the traceability check work on "
-    "a copied export; on the VM the git mirror is used anyway",
+    "a copied export; on the VM the git mirror is used anyway. A fixture (`path:`, the micro projects) needs no "
+    "flag: it is published from its local directory",
 )
 OBSERVERS_VOTE_OPT = typer.Option(
     False,
@@ -129,7 +131,7 @@ INCLUDE_TAILORED_OPT = typer.Option(
     help="Keep (tool, repo) pairs the tool was tuned on (tools.yaml tailored_on) in the agreement numbers",
 )
 WINDOW_OPT = typer.Option(2, help="Line window of the exact matcher's call-site groups (same file, lines within it)")
-LEVEL_OPT = typer.Option("L3", "--level", help="Ladder level of the exact matcher's algorithm key (L0-L4)")
+LEVEL_OPT = typer.Option("L4", "--level", help="Ladder level of the exact matcher's algorithm key (L0-L4)")
 
 
 def _err(msg: str, code: int = 1):
@@ -261,14 +263,26 @@ def norm_path(cbom_path: Path) -> Path:
 
 def _store(exp_dir: Path, *, fetch: bool = False) -> SnapshotStore:
     """The snapshot files behind the experiment: the git mirror on the VM, or the local cache (`--fetch` fills it
-    with the pinned commits of `_experiment.yaml` from their source URLs; fixtures are published, not fetched)."""
+    with the pinned commits of `_experiment.yaml` from their source URLs). A fixture (`path:`, the micro projects)
+    the store lacks is published into the cache from its local directory without `--fetch`: no network, and only
+    when the directory still gives the recorded commit."""
     store = SnapshotStore()
+
+    def log(message: str) -> None:
+        typer.echo(message, err=True)
+
+    pinned = sorted(pinned_repos(exp_dir).items())
+    for name, repo in pinned:
+        if repo.is_fixture and repo.commit and store.repo(name, repo.commit) is None:
+            local = fixture_dir(repo.path)
+            if local is None:
+                log(f"  {name}: fixture directory {repo.path} not found here: no snapshot files")
+            else:
+                store.publish_fixture(name, local, repo.commit, log=log)
     if fetch:
-        repos = [
-            (name, repo) for name, repo in sorted(pinned_repos(exp_dir).items()) if repo.commit and not repo.is_fixture
-        ]
+        repos = [(name, repo) for name, repo in pinned if repo.commit and not repo.is_fixture]
         for name, repo in progress.track(repos, "fetch snapshots", item=lambda x: x[0]):
-            store.fetch(name, repo.source_url, repo.commit, log=lambda m: typer.echo(m, err=True))
+            store.fetch(name, repo.source_url, repo.commit, log=log)
     return store
 
 
@@ -466,7 +480,7 @@ def _tables_step(
     write: Writer,
     *,
     window: int,
-    level: str = "L3",
+    level: str = "L4",
     closure: bool = False,
     merge_llm: bool = False,
     observers_vote: bool = False,
@@ -887,7 +901,7 @@ def run_report(
     *,
     run: int = 1,
     window: int = 2,
-    level: str = "L3",
+    level: str = "L4",
     all_assets: bool = False,
     merge_llm: bool = False,
     observers_vote: bool = False,

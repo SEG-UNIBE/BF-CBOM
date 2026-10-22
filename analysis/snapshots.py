@@ -16,7 +16,7 @@ import subprocess
 from collections import OrderedDict
 from pathlib import Path
 
-from common.experiment import GIT_MIRROR_DIR, mirror_path
+from common.experiment import GIT_MIRROR_DIR, RepoSpec, mirror_path, publish_fixture
 
 SNAPSHOT_CACHE_DIR = Path(os.getenv("SNAPSHOT_CACHE_DIR", str(Path.home() / ".cache" / "bf-cbom" / "snapshots")))
 _READ_CACHE = 512  # files kept in memory
@@ -79,6 +79,16 @@ class SnapshotStore:
             log(f"  {full_name}: fetch failed: {proc.stderr.strip()[-200:]}")
         self._repos.pop((full_name, commit), None)
         return self.repo(full_name, commit) is not None
+
+    def publish_fixture(self, full_name: str, directory: Path, commit: str, *, log=None) -> bool:
+        """Make the snapshot cache hold a fixture (`path:` in the spec) from its local directory, committed exactly as
+        the runner published it (common/experiment.py:publish_fixture is deterministic); True when that gives
+        `commit`, else the directory changed since the run and the fixture stays unavailable."""
+        sha = publish_fixture(RepoSpec(full_name=full_name, path=str(directory)), bare=self.cache_path(full_name))
+        self._repos.pop((full_name, commit), None)
+        if sha != commit and log:
+            log(f"  {full_name}: {directory} gives commit {sha[:12]}, the experiment ran {commit[:12]} (changed since)")
+        return sha == commit
 
     def source(self, full_name: str, commit: str | None) -> str | None:
         found = self.repo(full_name, commit)

@@ -147,6 +147,27 @@ def test_snapshot_store_reads_the_mirror_or_fetches_into_the_cache(tmp_path):
     assert "README.md" in fetched.files("o/r", sha)
 
 
+def test_snapshot_store_publishes_a_fixture_from_its_directory(tmp_path):
+    from common.experiment import RepoSpec, fixture_dir, publish_fixture
+
+    src = tmp_path / "micro"
+    (src / "pkg").mkdir(parents=True)
+    (src / "pkg" / "crypto.py").write_text("import hashlib\n", encoding="utf-8")
+    recorded = publish_fixture(RepoSpec(full_name="bfcbom/micro-x", path=str(src)), mirror_dir=tmp_path / "mirror")
+    store = SnapshotStore(mirror_dir=tmp_path / "none", cache_dir=tmp_path / "cache")
+    assert store.source("bfcbom/micro-x", recorded) is None
+    assert store.publish_fixture("bfcbom/micro-x", src, recorded)  # the same content gives the same commit
+    assert store.source("bfcbom/micro-x", recorded) == "cache"
+    assert "pkg/crypto.py" in store.files("bfcbom/micro-x", recorded)
+    (src / "pkg" / "crypto.py").write_text("import hmac\n", encoding="utf-8")  # changed since the run
+    other, messages = SnapshotStore(mirror_dir=tmp_path / "none", cache_dir=tmp_path / "cache2"), []
+    assert not other.publish_fixture("bfcbom/micro-x", src, recorded, log=messages.append)
+    assert other.source("bfcbom/micro-x", recorded) is None and "changed since" in messages[0]
+    # the runner's path of a fixture, rebased onto this checkout
+    assert fixture_dir("/app/experiments/corpus/micro/java").name == "java"
+    assert fixture_dir("/app/experiments/corpus/micro/nope") is None and fixture_dir(None) is None
+
+
 def test_traceability_weak_and_strong(tmp_path):
     src, sha = _snapshot_repo(tmp_path)
     mirrors = tmp_path / "mirrors"

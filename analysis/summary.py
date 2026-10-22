@@ -44,35 +44,35 @@ FILES = {
     "coverage-run{k}.csv": "per tool and dimension: algorithm assets with a value (reported vs derived), and what "
     "their names are (resolution)",
     "conformance-run{k}.csv": "spec issues per tool and kind (assets: field, enum, type, deprecated; documents)",
-    "schema-run{k}.csv": "RQ1: one row per CBOM: declared format and version, schema validity, error count and kinds",
-    "meaningful-run{k}.csv": "RQ1: per tool, asset type and dimension, assets with a value from standard fields / any",
-    "traceability-run{k}.csv": "RQ2: per (snapshot, tool, asset type), records with a file, with a file and line, "
+    "schema-run{k}.csv": "one row per CBOM: declared format and version, schema validity, error count and kinds",
+    "meaningful-run{k}.csv": "per tool, asset type and dimension, assets with a value from standard fields / any",
+    "traceability-run{k}.csv": "per (snapshot, tool, asset type), records with a file, with a file and line, "
     "existing at the commit, in range, strong",
     "vocab.csv": "what every raw value mapped to, per tool and source (the reviewable mapping table)",
     "groups-exact-run{k}.csv": "exact matcher: one row per group (repo scope per item, site scope per call site)",
     "members-exact-run{k}.csv": "exact matcher: one row per (group, record); `matched` = joined through a lower "
     "level, `implied` with --closure",
-    "matchlevels-run{k}.csv": "RQ3: per matcher and level, items by number of voter groups and the agreement per "
+    "matchlevels-run{k}.csv": "per matcher and level, items by number of voter groups and the agreement per "
     "dimension inside the groups",
     "agreement-exact-run{k}.csv": "exact matcher: one row per (group, dimension): voters reporting, agreeing, majority",
-    "groups-raqun-run{k}.csv": "RaQuN (matcher (c)): one row per group, with its attribute-set similarity",
+    "groups-raqun-run{k}.csv": "RaQuN: one row per group, with its attribute-set similarity",
     "members-raqun-run{k}.csv": "RaQuN: one row per (group, record)",
     "agreement-raqun-run{k}.csv": "RaQuN: one row per (group, dimension)",
-    "matchers-run{k}.csv": "RQ3: per repository, exact vs RaQuN: common records, groups, co-membership pair Jaccard",
-    "score-run{k}.csv": "RQ3b: per tool, dimension and level: items, confirmation (CI), exclusivity, rank, Dawid-Skene",
-    "loo-run{k}.csv": "RQ3b: ranking without each voter group and its Kendall tau against the full ranking",
-    "grouping-run{k}.csv": "RQ3b: ranking with every tool its own voter group and with the LLM workers merged, and "
-    "its Kendall tau against the declared voter groups",
+    "matchers-run{k}.csv": "per repository, exact vs RaQuN: common records, groups, co-membership pair Jaccard",
+    "score-run{k}.csv": "per tool, dimension and level: items, confirmation (CI), exclusivity, coverage, rank, "
+    "Dawid-Skene",
+    "loo-run{k}.csv": "the order without each voter group and its Kendall tau against the full order",
+    "grouping-run{k}.csv": "the order with every tool its own voter group and with the LLM workers merged, and its "
+    "Kendall tau against the declared voter groups",
     "stability.csv": "per (tool, snapshot) with repeated runs: Jaccard across runs, record-count CV, consensus set",
-    "mutants.csv": "RQ4: one row per mutant (mutants.json): the planted call or decoy, its file, lines, host and patch",
-    "mutation.csv": "RQ4: per (mutant, tool): found at the site / span / file / repo, by group, parameters, "
+    "mutants.csv": "one row per mutant (mutants.json): the planted call or decoy, its file, lines, host and patch",
+    "mutation.csv": "per (mutant, tool): found at the site / span / file / repo, by group, parameters, "
     "`false_positive` on a decoy, extra and lost units and sites",
-    "mutation-rates.csv": "RQ4: per tool, language, style and dimension: detection rate (mean of per-repository "
-    "rates, CI)",
-    "mutation-scores.csv": "RQ4: per tool, language and style: recall on the planted calls (site, group), precision "
-    "over calls and decoys, F1, CIs over repositories",
-    "bridge-run{k}.csv": "RQ4 -> RQ3: per language, each tool's confirmation rate at L4 against its F1; Spearman "
-    "over the cells and Kendall tau between the rankings",
+    "mutation-rates.csv": "per tool, language, style and dimension: detection rate (mean of per-repository rates, CI)",
+    "mutation-scores.csv": "per tool, language and style: recall on the planted calls (site, group), precision over "
+    "calls and decoys, F1, CIs over repositories",
+    "bridge-run{k}.csv": "the bridge to RQ3: per language, each tool's confirmation rate at L4 against its F1; "
+    "Spearman over the cells and Kendall tau between the rankings",
 }
 
 
@@ -115,8 +115,9 @@ def _float(v) -> float | None:
 
 
 def _pct(v) -> str:
+    """A share as a fraction with two decimals (0.43, 1.00): every share in the summary, so columns line up."""
     f = _float(v)
-    return "" if f is None else f"{f:.0%}"
+    return "" if f is None else f"{f:.2f}"
 
 
 def _num(v) -> str:
@@ -168,6 +169,8 @@ def _false(v) -> bool:
     return str(v).strip().lower() == "false"
 
 
+VERDICT_MARK = {"pass": "✅", "fail": "⛔"}  # a micro project's verdict in the bar-exam table
+ENTRY_MARK = {"passed": "✅", "disqualified": "⛔"}  # the tool's entry-bar verdict
 OBSERVER_NOTE = (
     "`°` = observer (tools.yaml `role`): confirmed by the voters like every tool, but it confirms nobody, is in no "
     "pooled row and no k, and gets no rank (`--observers-vote` makes it a voter)."
@@ -187,35 +190,28 @@ def _lang_key(lang: str) -> tuple[int, str]:
 
 
 def _header(spec: dict, info: dict, run: int) -> list[str]:
+    """The title, the spec's description as a subtitle and one line on what the summary was rendered from."""
     name = spec.get("name") or "?"
-    vocab = info.get("vocabulary") or {}
-    lines = [f"# {name}: analysis summary (run {run})", ""]
-    if spec.get("description"):
-        lines += [str(spec["description"]).strip(), ""]
-    repos = spec.get("repos") or []
-    tools = spec.get("tools") or []
-    when = info.get("generated_at") or datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
-    lines.append(
-        f"Generated {when} by `analysis report`: {_n(len(repos))} repos, {len(tools)} tools, "
-        f"{spec.get('repetitions', 1)} repetition(s), as listed with their commits in `_experiment.yaml`. "
-        f"Vocabulary {vocab.get('algorithms', '?')}, "
-        f"CycloneDX registry {vocab.get('registry', '?')}."
-    )
-    lines += ["The data behind every table are the CSV files listed at the end (`;` joins lists inside a cell).", ""]
-    return lines + _reading()
+    lines = [f"# Analysis Summary of Experiment `{name}`", ""]
+    description = str(spec.get("description") or "").strip()
+    if description:
+        subtitle = description[0].upper() + description[1:]
+        lines += [f"*{subtitle}{'' if subtitle[-1] in '.!?' else '.'}*", ""]
+
+    return lines
 
 
 def _reading() -> list[str]:
     """The terms every table uses, defined once, so that the summary reads without the code or the READMEs."""
     return [
-        "## How to read this summary",
+        "### How to read this summary",
         "",
         "The terms the tables below use:",
         "",
-        "- **Run**: one tool on one repository once; with several repetitions each pair runs several times. A "
-        "**variant** is the repository as pinned (`original`) or a mutant of it with one planted crypto call or "
-        "decoy (RQ4). "
-        "Unless a table says otherwise it shows run 1 of the original variants.",
+        "- **Run**: one tool on one repository once; with several repetitions each pair runs several times, and a "
+        "table then reads run 1 unless it says otherwise. A **variant** is the repository as pinned (`original`) or "
+        "a mutant of it with one planted crypto call or decoy (RQ4); a table reads the original variants unless it "
+        "says otherwise.",
         "- **Asset**: one component of a tool's CBOM, as the tool wrote it. **Record**: one place an asset lists "
         "(an asset listed at three places gives three records). How a tool packages its findings decides these "
         "counts: one component per algorithm with all its places, or one component per finding.",
@@ -230,20 +226,42 @@ def _reading() -> list[str]:
         'never confirms itself (section "Voter groups"). A tool\'s item is **confirmed** when a tool of another voter '
         "group reports it too. **k** = the number of voter groups that report an item (k=1: one group only, "
         "unconfirmed).",
-        "- **Observer** (`°` after its name): a tool below the micro projects' entry bar (disqualified). Its items are "
-        "checked "
-        "against the voters like everyone's, but it confirms nobody and counts in no k, so the voters' numbers are "
-        "the same with and without it.",
+        "- **Observer** (`°` after its name): a tool the registry marks `role: observer` (`common/tools.yaml`; a "
+        "transitional role of the tools below the colleague's pilot bar). Its items are checked against the voters "
+        "like everyone's, but it confirms nobody and counts in no k, so the voters' numbers are the same with and "
+        "without it. The bar exam's verdicts of this run stand in their own section and do not set the role.",
         "- **Cells**: `–` = the repository's language is outside the tool's languages (not run), `×` = the run "
-        "failed or timed out, empty = nothing to show; `1'234` = 1234. Cells that combine numbers (`a / b`, "
-        "`x (y)`, `rate [low, high]`) are explained under their table, with an example read from the table.",
+        "failed or timed out, empty = nothing to show; `1'234` = 1234; every share is a fraction with two decimals "
+        "(`0.43` = 43 %, `1.00` = all). Cells that combine numbers (`a / b`, `x (y)`, `rate [low, high]`) are "
+        "explained under their table, with an example read from the table.",
         "",
     ]
 
 
+def _anchor(heading: str) -> str:
+    """A heading's GitHub anchor: lower case, punctuation dropped, spaces to hyphens."""
+    text = re.sub(r"[^\w\- ]", "", heading.replace("`", "").lower())
+    return text.strip().replace(" ", "-")
+
+
+def _toc(lines: list[str]) -> list[str]:
+    """A table of contents from the `##` and `###` headings of the rendered body, with anchor links."""
+    out, seen = ["## Contents", ""], Counter()
+    for line in lines:
+        if not line.startswith("## ") and not line.startswith("### "):
+            continue
+        depth, title = line.split(" ", 1)
+        anchor = _anchor(title)
+        if seen[anchor]:
+            anchor = f"{anchor}-{seen[anchor]}"  # GitHub numbers repeated headings
+        seen[_anchor(title)] += 1
+        out.append(f"{'  ' if depth == '###' else ''}- [{title}](#{anchor})")
+    return out + [""]
+
+
 def _questions() -> list[str]:
     """The research questions (analysis/rqs.py), so the summary carries its own frame."""
-    lines = ["## Research questions", "", "The sections below answer, in this order:", ""]
+    lines = ["### Research questions", "", "The sections below answer, in this order:", ""]
     for rq in RQS:
         tables = ", ".join(f"`{t.replace('{k}', '<k>')}`" for t in rq.tables)
         lines.append(f"- **{rq.id}, {rq.title.lower()}:** {rq.question} ({tables})")
@@ -255,18 +273,22 @@ def _eg(text: str) -> list[str]:
     return ["", f"*Example:* {text}"] if text else []
 
 
-def _experiment(rows: list[dict], sessions: list[dict]) -> list[str]:
-    """When it ran, for how long, on how much RAM, the peaks and the code that ran (the runner's run log plus the
-    runs' meta)."""
+def _experiment(
+    rows: list[dict], sessions: list[dict], *, spec: dict | None = None, info: dict | None = None, run: int = 1
+) -> list[str]:
+    """The overview table: what the spec covers (repos, tools, repetitions), when it ran, for how long, on how much
+    RAM, the peaks and the code that ran (the record, the runner's run log and the runs' meta), and what this summary
+    was rendered with."""
     ran = [r for r in rows if r.get("status") != "unsupported"]
-    lines = [
-        "## Experiment",
-        "",
-        "When and where the experiment ran, how long it took, how much memory it used, and which BF-CBOM code built "
-        "the images (`runs.csv`, `_run-log.json`).",
-        "",
-    ]
+    spec, info = spec or {}, info or {}
+    lines: list[str] = []
     table: list[list] = []
+    if spec:
+        repos, tools, reps = spec.get("repos") or [], spec.get("tools") or [], _int(spec.get("repetitions", 1)) or 1
+        table.append(["repositories", f"{_n(len(repos))}, pinned with their commits in `_experiment.yaml`"])
+        table.append(["tools", f"{len(tools)}: {', '.join(f'`{x}`' for x in tools)}"])
+        table.append(["repetitions", f"{reps}" + (f"; the tables show run {run} unless they say otherwise"
+                                                   if reps > 1 or run > 1 else "")])  # fmt: skip
     if sessions:
         s_start = [t for e in sessions if (t := _ts(e.get("started_at")))]
         s_end = [t for e in sessions if (t := _ts(e.get("finished_at") or e.get("updated_at")))]
@@ -304,7 +326,7 @@ def _experiment(rows: list[dict], sessions: list[dict]) -> list[str]:
     peaks = [p for e in sessions if (p := _float(e.get("ram_peak_used_mb"))) is not None]
     if peaks:
         total = _float(host.get("ram_total_mb"))
-        share = f" of {_gib(total)} GiB ({max(peaks) / total:.0%})" if total else ""
+        share = f" of {_gib(total)} GiB ({_pct(max(peaks) / total)})" if total else ""
         table.append(["peak RAM in use", f"{_gib(max(peaks))} GiB{share} on the VM, sampled every 2 s"])
     per_job = [(p, r) for r in ran if (p := _float(r.get("peak_memory_mb"))) is not None]
     if per_job:
@@ -326,6 +348,14 @@ def _experiment(rows: list[dict], sessions: list[dict]) -> list[str]:
         table.append(["worker image ids", f"{len(image_ids)} recorded in `_run-log.json` (by content, per session)"])
     if not table:
         return []
+    vocab = info.get("vocabulary") or {}
+    if vocab:
+        registry = str(vocab.get("registry") or "?")
+        table.append(["vocabulary", f"{vocab.get('algorithms', '?')} (`analysis/data/algorithms.yaml`), CycloneDX "
+                                    f"registry {registry[:10] if 'T' in registry else registry}"])  # fmt: skip
+    table.append(["summary generated", info.get("generated_at") or datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")])
+    table.append(["data", "rendered by `analysis report` from the CSV files listed under [Files](#files); `;` joins "
+                          "lists inside a cell"])  # fmt: skip
     lines += md_table(["", ""], table, "ll")
     return lines + [""]
 
@@ -365,7 +395,7 @@ def _runs(rows: list[dict]) -> list[str]:
     if memory:
         header += ["peak GiB", "limit GiB", "OOM kills"]
     lines = [
-        "## Runs",
+        "### Runs",
         "",
         "Every stored run, all repetitions and variants: one row per tool.",
         "",
@@ -500,8 +530,8 @@ def _reported(rows: list[dict], run: int) -> list[str]:
         )
     lines = ["### What the tools report, as written", ""]
     lines += [
-        f"What each tool wrote into its CBOMs, counted as written, before any normalisation (run {run}, original "
-        "variants, ok runs only). One row per tool, summed over the repositories.",
+        "What each tool wrote into its CBOMs, counted as written, before any normalisation (original variants, ok "
+        "runs only). One row per tool, summed over the repositories.",
         "",
         "- `repos ok`: repositories with an ok run.",
         "- `components`: every component of the CBOMs, the dependency listings of inventory tools included.",
@@ -513,7 +543,7 @@ def _reported(rows: list[dict], run: int) -> list[str]:
         "- `empty`: ok runs that reported no crypto asset; `median`: crypto assets per repository.",
         "",
         "Asset counts follow each tool's packaging, so they compare output formats, not findings: what each tool "
-        'found is counted in items under RQ2 ("Units per tool").',
+        'found is counted in items below ("Units per tool").',
         "",
     ]
     header = ["tool", "repos ok", "components", "crypto assets", *[h for _, h in ASSET_KINDS], "file", "file+line",
@@ -582,7 +612,7 @@ def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
             return "not run"
         mark = r"\*" if _true(r.get("tailored")) else ""
         if r["verdict"] in ("pass", "fail"):
-            return f"{r['verdict']} {r['lenient']}{mark}"
+            return f"{VERDICT_MARK[r['verdict']]} {r['lenient']}{mark}"
         return "–" if r["verdict"] == "unsupported" else r["verdict"] + mark
 
     def recall_cell(r: dict | None) -> str:
@@ -597,51 +627,66 @@ def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
         f"Each micro project (`experiments/corpus/micro`, one per language) is a small program generated from the "
         f"snippet catalog (`mutation/micro.py`): {n_items} known crypto calls, each in a function of its own, "
         "plus decoys (code that names or resembles cryptography without using it). That is the ground truth "
-        "(`experiments/corpus/micro/ground_truth.yaml`). A tool is a voter only if it finds enough of the calls.",
+        "(`experiments/corpus/micro/ground_truth.yaml`). The verdicts below are the one filter on the tools: a "
+        "person reads them and writes the tools and their languages into the later specs by hand (`tools`, "
+        "`tool_languages:`); no code reads them.",
         "",
         f"**Entry bar: {bar} of {n_items} calls** (half, lenient call-site recall, below) in at least one language. "
-        "One row per tool, one column per language: `pass` or `fail` with the calls the tool found in their "
-        "functions (`–` = outside the tool's languages, `error` = the run failed or timed out). Then the tool's "
-        "verdict, `entry bar`: `passed` when it clears the bar in at least one language, `disqualified` when it was "
-        "scored and clears it nowhere (the candidates to leave out of the further experiments; until that is "
-        "decided they run as observers, `role: observer`), `not judged` without any scored run."
-        + (
-            " `*` = the tool was tuned on this project (`tailored_on` in tools.yaml, refinement 13), so its number "
-            "there is inflated by construction."
-            if tailored
-            else ""
-        ),
+        f"One row per tool, one column per language: `{VERDICT_MARK['pass']} n` (pass) or `{VERDICT_MARK['fail']} n` "
+        "(fail) with n the calls the tool found in their functions (`–` = outside the tool's languages, `error` = "
+        "the run failed or timed out). Then the tool's verdict, `entry bar`: `passed` when it clears the bar in at "
+        "least one language, `disqualified` when it was scored and clears it nowhere (a candidate to leave out of "
+        "the later specs), `not judged` without any scored run.",
         "",
     ]
     lines += md_table(["tool", *langs, "entry bar"],
-                      [[t] + [verdict_cell(cells.get((t, lg))) for lg in langs] + [entry[t]] for t in tools],
+                      [[t] + [verdict_cell(cells.get((t, lg))) for lg in langs] + [_entry_cell(entry[t])]
+                       for t in tools],
                       "l" + "r" * len(langs) + "l")  # fmt: skip
+    if tailored:
+        lines += [
+            "",
+            "`*` = tailored: the tool was tuned on this very project (`tailored_on` in tools.yaml, refinement 13), so "
+            "the number is inflated by construction; the pair is left out of every agreement table below.",
+        ]
     if scored:
         t, lg, r = scored[0]
+        shown = verdict_cell(r).replace("\\*", "*")
         lines += _eg(
-            f"`{verdict_cell(r)}` for {t} in {lg}: {t} reported {r['lenient']} of the {n_items} calls of micro-{lg} in "
-            f"their functions, so it {'passes' if r['verdict'] == 'pass' else 'fails'} the bar of {bar}."
+            f"`{shown}` for {t} in {lg}: {t} reported {r['lenient']} of the {n_items} calls of micro-{lg} in their "
+            f"functions, so it {'passes' if r['verdict'] == 'pass' else 'fails'} the bar of {bar}."
         )
+    lines += _handover(rows, tools, langs)
     lines += [
         "",
         f"**Recall at two levels**: the same projects in detail, each cell out of {n_items}, written "
-        "`strict / lenient · repo`:",
+        "`strict / lenient · repo`. A call counts as found by the *family* of its algorithm (the ground truth's "
+        "`group`: RSA, EC, AES, SHA-2, HMAC, ...), not by its exact name, so a record `AES` counts for an "
+        "AES-256-GCM call:",
         "",
-        "- `strict`: calls with a record of their group (RSA, EC, AES, SHA-2, ...) on one of their lines, the body of "
-        "their function (a reported span counts at every line it covers); for a key generation a key record of the "
-        "group counts too.",
-        "- `lenient`: also a record of unknown family there.",
-        "- `repo`: calls whose group the tool reports anywhere in the project, location ignored; calls sharing a group "
-        "(two RSA, three AES) are found together. It can be lower than the call sites: it needs a known family.",
+        "- `strict`: the tool has a record of that family on the call's own lines, the body of its function (a "
+        "reported span counts at every line it covers; for a key generation a key record of the family counts too).",
+        "- `lenient`: `strict`, or a record on those lines whose name fits no family (a code identifier such as "
+        "`Cipher.getInstance`, a label nobody can read): the tool points at the right place, but not clearly at the "
+        "right algorithm. The entry bar uses this number.",
+        "- `repo`: the family is reported somewhere in the project, location ignored; calls sharing a family (two "
+        "RSA, three AES) are found or missed together. It can be lower than `lenient`: a record without a family "
+        "counts nowhere here.",
         "",
     ]
     lines += md_table(["tool", *langs], [[t] + [recall_cell(cells.get((t, lg))) for lg in langs] for t in tools])
     if scored:
-        t, lg, r = next((x for x in scored if len({x[2]["strict"], x[2]["lenient"], x[2]["repo"]}) > 1), scored[0])
+        # the cell with three different numbers reads best
+        t, lg, r = max(scored, key=lambda x: len({x[2]["strict"], x[2]["lenient"], x[2]["repo"]}))
+        s, le, rp = _int(r["strict"]), _int(r["lenient"]), _int(r["repo"])
+        more = (
+            f"on {le - s} more it reports something there whose name fits no family, so {le} lenient"
+            if le > s
+            else "nothing more counts leniently"
+        )
         lines += _eg(
-            f"`{recall_cell(r)}` for {t} in {lg}: {r['strict']} calls found in their functions with their group, "
-            f"{r['lenient']} when a record of unknown family there counts too, and {r['repo']} by their group anywhere "
-            "in the project."
+            f"`{recall_cell(r)}` for {t} in {lg}: on the lines of {s} calls it reports the right family; {more}; the "
+            f"family of {rp} calls is reported somewhere in the project."
         )
     lines += _quality(cells, langs, tools)
     if expected:
@@ -664,7 +709,8 @@ def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
             "",
             "**Who finds each expected call**: one row per call of the ground truth (its style in brackets when the "
             "algorithm is not named in the call itself), one column per language; `found / scored` = how many of the "
-            "tools that ran on that project found it at its lines (lenient). A low count marks a call most tools miss.",
+            "tools that ran on that project found it at its lines (lenient); empty = the call is not in that "
+            "language's catalog. A low count marks a call most tools miss.",
             "",
         ]
         lines += md_table(["expected item", *langs], table)
@@ -676,6 +722,57 @@ def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
             lines += _eg(f"`{cell}` for {item} in {lg}: {f} of the {n} tools scored on micro-{lg} found it.")
     lines += _decoys(rows, langs, tools)
     return lines + [""]
+
+
+def _entry_cell(verdict: str) -> str:
+    """The entry-bar verdict with its mark (`passed`, `disqualified`; `not judged` has none)."""
+    mark = ENTRY_MARK.get(verdict)
+    return f"{mark} {verdict}" if mark else verdict
+
+
+def _handover(rows: list[dict], tools: list[str], langs: list[str]) -> list[str]:
+    """The verdicts as a person writes them into the later specs: the tools that passed, and for a passed tool that
+    failed the bar in a language it was scored on, the languages it passed in (`tool_languages:`). No code reads
+    this; it is the hand-over."""
+    cells = {(r["tool"], r["language"]): r for r in rows}
+    entry = {r["tool"]: r.get("entry_bar") or "" for r in rows}
+    passed = sorted(t for t in tools if entry[t] == "passed")
+    out = sorted(t for t in tools if entry[t] == "disqualified")
+    unjudged = sorted(t for t in tools if entry[t] not in ("passed", "disqualified"))
+    if not passed and not out:
+        return []
+    narrowed: dict[str, list[str]] = {}
+    failed_runs: list[str] = []
+    for t in passed:
+        verdicts = {lg: cells[(t, lg)]["verdict"] for lg in langs if (t, lg) in cells}
+        if "fail" in verdicts.values():
+            narrowed[t] = [lg for lg, v in verdicts.items() if v == "pass"]
+        broken = [lg for lg, v in verdicts.items() if v not in ("pass", "fail", "unsupported")]
+        if broken:
+            failed_runs.append(f"{t} in {', '.join(broken)}")
+    parts = [f"**Verdicts**: {len(passed)} of {len(tools)} tools pass the bar"]
+    if out:
+        parts.append(f"{len(out)} {'is' if len(out) == 1 else 'are'} disqualified ({', '.join(out)})")
+    if unjudged:
+        parts.append(f"{len(unjudged)} not judged ({', '.join(unjudged)})")
+    text = ", ".join(parts) + ". "
+    if narrowed:
+        text += (
+            f"{len(narrowed)} passed tool{'s' if len(narrowed) > 1 else ''} failed the bar in a language it was "
+            "scored on, so a `tool_languages:` entry narrows it to the languages it passed in (and drops its "
+            "declared languages outside the micro projects, which the paper does not analyse). "
+        )
+    else:
+        text += "Every passed tool passes in every language it was scored on, so no `tool_languages:` entry follows. "
+    if failed_runs:
+        text += f"No verdict where the run failed, a decision by hand: {'; '.join(failed_runs)}. "
+    text += "As a spec writes it (hand-edited; no code reads the verdicts):"
+    block = ["```yaml", f"tools: [{', '.join(passed)}]"]
+    if narrowed:
+        block.append("tool_languages:")
+        block += [f"  {t}: [{', '.join(lgs)}]" for t, lgs in narrowed.items()]
+    block.append("```")
+    return ["", text, "", *block]
 
 
 def _quality(cells: dict, langs: list[str], tools: list[str]) -> list[str]:
@@ -691,8 +788,9 @@ def _quality(cells: dict, langs: list[str], tools: list[str]) -> list[str]:
         "",
         "**Recall, precision and F1**: one row per tool, one column per language, `recall / precision / F1`. Recall: "
         "the calls found (lenient) out of all calls. Precision: the correct places out of all places the tool "
-        "reported in the project's source file; a place is correct on a call's lines with its group or an unknown "
-        "family, or on a line the ground truth accepts (a sub-use such as a digest, an import of the call's API), so "
+        "reported in the project's source file; a place is correct on a call's lines with its family or with a name "
+        "that fits no family, or on a line the ground truth accepts (a sub-use such as a digest, an import of the "
+        "call's API), so "
         "a report on a decoy, on unrelated code or with the wrong family is a false one (`–`: the tool reported no "
         "place). F1: the harmonic mean of the two, 0 when the tool found no call.",
         "",
@@ -704,8 +802,9 @@ def _quality(cells: dict, langs: list[str], tools: list[str]) -> list[str]:
     if eg:
         t, lg, r = eg
         lines += _eg(
-            f"`{cell(r)}` for {t} in {lg}: it found {_pct(r['recall_lenient'])} of the calls, {_pct(r['precision'])} "
-            f"of the places it reported are correct, and the two combine to an F1 of {_pct(r['f1'])}."
+            f"`{cell(r)}` for {t} in {lg}: it found a share of {_pct(r['recall_lenient'])} of the calls, "
+            f"{_pct(r['precision'])} of the places it reported are correct, and the two combine to an F1 of "
+            f"{_pct(r['f1'])}."
         )
     return lines
 
@@ -716,28 +815,46 @@ def _decoys(rows: list[dict], langs: list[str], tools: list[str]) -> list[str]:
         return []
     cells = {(r["tool"], r["language"]): r for r in rows}
 
-    def cell(r: dict | None) -> str:
+    def hits(r: dict | None) -> list[str] | None:
+        """The decoy kinds the tool reported crypto on; None where it was not scored."""
         if r is None or r["verdict"] not in ("pass", "fail"):
-            return "–" if r is not None and r["verdict"] == "unsupported" else ""
-        hit = [d for d in (r.get("decoys_hit") or "").split(";") if d]
-        return f"{len(hit)}/{r['decoys']}" + (f": {', '.join(hit)}" if hit else "")
+            return None
+        return [d for d in (r.get("decoys_hit") or "").split(";") if d]
 
-    table = [[t] + [cell(cells.get((t, lg))) for lg in langs] for t in tools]
+    def cell(r: dict | None) -> str:
+        hit = hits(r)
+        if hit is None:
+            return "–" if r is not None and r["verdict"] == "unsupported" else ""
+        return f"{len(hit)}/{r['decoys']}"
+
+    def kinds(tool: str) -> str:
+        """The kinds hit, each with the languages when not hit in every language the tool was scored on."""
+        scored = {lg: hits(cells.get((tool, lg))) for lg in langs}
+        scored = {lg: h for lg, h in scored.items() if h is not None}
+        by_kind: dict[str, list[str]] = {}
+        for lg, h in scored.items():
+            for d in h:
+                by_kind.setdefault(d, []).append(lg)
+        return ", ".join(d + ("" if len(lgs) == len(scored) else f" ({', '.join(lgs)})") for d, lgs in by_kind.items())
+
+    table = [[t] + [cell(cells.get((t, lg))) for lg in langs] + [kinds(t)] for t in tools]
     lines = [
         "",
         "**Decoys**: false positives with ground truth. Each project holds decoys in functions of their own: a comment "
         "and a log message naming algorithms, a CRC32 checksum and a Base64 encoding. None of them uses "
         "cryptography, so any crypto record a tool reports on their lines is a false positive. One row per tool, one "
-        "column per language: `hit/decoys`, then the decoys hit.",
+        "column per language: `hit/decoys` (`–` = the language is outside the tool's languages, so it did not run "
+        "there); `decoys hit` = the kinds it reported crypto on, with the languages in brackets when not in every "
+        "language it was scored on.",
         "",
     ]
-    lines += md_table(["tool", *langs], table)
-    eg = next(((t, lg, c) for t, *cs in table for lg, c in zip(langs, cs, strict=True) if c and ":" in c), None)
+    lines += md_table(["tool", *langs, "decoys hit"], table, "l" + "r" * len(langs) + "l")
+    eg = next(((t, lg, c, k) for t, *cs, k in table for lg, c in zip(langs, cs, strict=True)
+               if "/" in c and not c.startswith("0/")), None)  # fmt: skip
     if eg:
-        t, lg, c = eg
-        n, rest = c.split(": ", 1)
-        lines += _eg(f"`{c}` for {t} in {lg}: {t} reported crypto on {n.split('/')[0]} of the {n.split('/')[1]} "
-                     f"decoys of micro-{lg} ({rest}).")  # fmt: skip
+        t, lg, c, k = eg
+        lines += _eg(f"`{c}` for {t} in {lg}: {t} reported crypto on {c.split('/')[0]} of the {c.split('/')[1]} "
+                     f"decoys of micro-{lg}; which ones stands in `decoys hit` ({k}).")  # fmt: skip
     return lines
 
 
@@ -854,7 +971,8 @@ def _rq2(
             "components listed at more than one place.",
             "- `assets per item`: components per algorithm. About 1: the tool lists each algorithm once with all its "
             "places; much more: it writes one component per finding, so its asset count says little about what it "
-            "found.",
+            "found; below 1: a component whose places carry different algorithms (the evidence at a place outranks "
+            "the component's name) counts as an item for each.",
             "- `no location`: the share of components without a file.",
             "",
         ]
@@ -1015,8 +1133,8 @@ def _rq1(schema: list[dict], meaningful: list[dict], conf: list[dict]) -> list[s
                         if not example and _pct(r["standard_share"]) != _pct(r["any_share"]):
                             example = (
                                 f"`{cells[-1]}` for {t} under `{d.replace('_', ' ')}` ({at}): "
-                                f"{_pct(r['standard_share'])} of its {_n(r['assets'])} {at} assets carry the value in "
-                                f"the standard's field, {_pct(r['any_share'])} carry it somewhere, so "
+                                f"a share of {_pct(r['standard_share'])} of its {_n(r['assets'])} {at} assets carry "
+                                f"the value in the standard's field, {_pct(r['any_share'])} carry it somewhere, so "
                                 f"{_pct((_float(r['any_share']) or 0) - (_float(r['standard_share']) or 0))} give it "
                                 "only outside the field."
                             )
@@ -1121,9 +1239,9 @@ def _matchers(rows: list[dict]) -> list[str]:
         "- `repos`, `records`: the repositories and records compared; `groups ...`: how many groups each matcher "
         "made of them.",
         "- `pair Jaccard`: of all record pairs that at least one matcher puts in one group, the share both do "
-        "(100% = the same grouping).",
+        "(1.00 = the same grouping).",
         f"- `{a} in one {b}`: the share of {a}'s groups whose records all sit in a single group of {b} (mean over the "
-        f"repositories), and the reverse. Below 100%: the second matcher splits those groups. {b} holds at most one "
+        f"repositories), and the reverse. Below 1.00: the second matcher splits those groups. {b} holds at most one "
         "value set per tool in a group, so it splits a tool's reports of one algorithm with different values.",
         "",
     ]
@@ -1162,7 +1280,8 @@ def _matching(levels: list[dict], groups: list[dict], matchers: list[dict]) -> l
             "share where all of them give the same value (the number of such groups in brackets). Parameters count "
             "from L2 on.",
             "- `location`: among the groups where at least two voter groups give a location, the share where two of "
-            "them point at the same call site (the same file, lines within ±2).",
+            "them point at the same call site (the same file, lines within ±2); empty for `raqun`, which has no "
+            "call sites.",
             "",
             "Pairs a tool was tuned on are left out, as in the ladder and the scores.",
             "",
@@ -1173,7 +1292,7 @@ def _matching(levels: list[dict], groups: list[dict], matchers: list[dict]) -> l
         for r in levels:
             items = _int(r["items"])
             shares = [
-                f"{_n(_int(r[c]))} ({_int(r[c]) / items:.0%})" if items else "" for c in ("k1", "k2", "k3", "k4plus")
+                f"{_n(_int(r[c]))} ({_pct(_int(r[c]) / items)})" if items else "" for c in ("k1", "k2", "k3", "k4plus")
             ]
             cells = [r["matcher"], r["level"], items, *shares]
             for d in MATCH_DIMS:
@@ -1181,7 +1300,8 @@ def _matching(levels: list[dict], groups: list[dict], matchers: list[dict]) -> l
                 cells.append(f"{_pct(r.get(f'{d}_agree'))} ({_n(n)})" if n else "")
             table.append(cells)
         lines += md_table(header, table, "ll" + "r" * (len(header) - 2))
-        eg = next((c for c in table if c[0] == "exact" and c[1] == "L3"), table[-1] if table else None)
+        lines += _headline(levels)
+        eg = next((c for c in table if c[0] == "exact" and c[1] == LEVEL_ORDER[-1]), table[-1] if table else None)
         if eg and eg[2]:
             agree = next(((d, c) for d, c in zip(MATCH_DIMS, eg[7:], strict=True) if c and d != "location"), None)
             text = (
@@ -1202,16 +1322,46 @@ def _matching(levels: list[dict], groups: list[dict], matchers: list[dict]) -> l
     return lines
 
 
+def _headline(levels: list[dict]) -> list[str]:
+    """RQ3b's headline: the share of items at least two voter groups agree on at the top level, RaQuN on whole
+    findings next to the exact matcher on the algorithm alone (matchlevels-run<k>.csv)."""
+    top = {r["matcher"]: r for r in levels if r["level"] == LEVEL_ORDER[-1] and _int(r["items"])}
+    if "exact" not in top:
+        return []
+
+    def confirmed(r: dict) -> float:
+        return round(1 - _int(r["k1"]) / _int(r["items"]), 2)
+
+    ex, n = confirmed(top["exact"]), _n(_int(top["exact"]["items"]))
+    if "raqun" not in top:
+        text = (
+            f"**Headline at {LEVEL_ORDER[-1]}**: of the {n} items, another voter group reports the same algorithm for "
+            f"a share of {_pct(ex)} (the exact matcher); RaQuN was not run (`--no-raqun`)."
+        )
+        return ["", text]
+    rq = confirmed(top["raqun"])
+    text = (
+        f"**Headline at {LEVEL_ORDER[-1]}**: of the {n} items, another voter group reports the same finding with the "
+        f"same details for a share of {_pct(rq)} (RaQuN) and the same algorithm, details aside, for {_pct(ex)} (the "
+        "exact matcher)"
+    )
+    text += f"; the {_pct(ex - rq)} between the two is agreement that breaks on the details." if ex > rq else "."
+    return ["", text]
+
+
 def _scores(rows: list[dict], loo: list[dict], grouping: list[dict] | None = None) -> list[str]:
-    """RQ3b: the per-tool rates per dimension (analysis/score.py); the rankings are sensitivity rows."""
+    """RQ3b: the per-tool rates per dimension (analysis/score.py); the orders are sensitivity rows."""
     if not rows:
         return []
     level = rows[0].get("level") or "?"
-    lines = ["### RQ3b: per-tool rates (no ranking without ground truth)", ""]
+    lines = ["### RQ3b: per-tool rates", ""]
     lines += [
         "Without a reference CBOM, a tool is scored by how much of what it reports other, independent tools report "
         f"too (the exact matcher's groups at {level}). One table per dimension (`algorithm`, then the parameters and "
-        "`location`), one row per tool, ranked:",
+        "`location`), one row per tool, in the order of its rate. The order is no ranking claim: a tool that reports "
+        "little and only the obvious has a high rate, so `coverage` stands next to it, and the ranking by F1 is "
+        "RQ4's. The checks below (leave one voter out, other voter groupings) ask whether the order itself is "
+        "stable.",
         "",
         "- `repos`, `items`: where and what the tool reports. For `algorithm` an item is an algorithm in a "
         "repository; for a parameter it is (algorithm, value), e.g. (AES, key size 256); for `location` it is "
@@ -1221,8 +1371,8 @@ def _scores(rows: list[dict], loo: list[dict], grouping: list[dict] | None = Non
         "the repositories, so one large repository does not decide it. The brackets are a 95 % bootstrap confidence "
         "interval: the repositories resampled 200 times, the range that holds the middle 95 % of the averages. A "
         "wide range means few repositories or very different ones.",
-        "- `rank`: by `rate`, only for tools with items in at least 3 repositories and at least 10 items in total "
-        "(`–`: too little to rank; then no interval either).",
+        "- `rank`: the position in that order, only for tools with items in at least 3 repositories and at least 10 "
+        "items in total (`–`: too little; then no interval either).",
         "- `pooled`: the same share over all the tool's items at once (large repositories weigh more).",
         "- `exclusivity`: the share of its items no other voter group reports at all (pooled). Agreement cannot "
         "tell whether these are findings the others miss or false positives (RQ4 can).",
@@ -1263,8 +1413,9 @@ def _scores(rows: list[dict], loo: list[dict], grouping: list[dict] | None = Non
             table.append(row)
             if not example and ci and _pct(r["ci_low"]) != _pct(r["ci_high"]):  # an interval with a width
                 example = (
-                    f"`{row[5]}` for {r['tool']} ({dim}): in the average repository {_pct(r['rate'])} of its items are "
-                    f"reported by another voter group too; resampling the repositories puts that average between "
+                    f"`{row[5]}` for {r['tool']} ({dim}): in the average repository a share of {_pct(r['rate'])} of "
+                    f"its items are reported by another voter group too; resampling the repositories puts that average "
+                    "between "
                     f"{_pct(r['ci_low'])} and {_pct(r['ci_high'])}. Over all its {_n(r['items'])} items at once the "
                     f"share is {_pct(r['rate_pooled'])}, and no other voter group reports {_pct(r['exclusivity'])} "
                     "of them at all."
@@ -1707,8 +1858,9 @@ def _ladder(all_rows: list[dict]) -> list[str]:
     eg = next((row for row in table if row[0] != "all" and row[2] and row[2] != row[1 + len(levels)]), None)
     if eg:
         lines += _eg(
-            f"{eg[0]} reports {_n(eg[-1])} items; another voter group reports {eg[2]} of them under the identical "
-            f"name ({levels[0]}) and {eg[1 + len(levels)]} once every normalisation step counts ({levels[-1]})."
+            f"{eg[0]} reports {_n(eg[-1])} items; another voter group reports a share of {eg[2]} of them under the "
+            f"identical name ({levels[0]}) and {eg[1 + len(levels)]} once every normalisation step counts "
+            f"({levels[-1]})."
         )
     if any(r.get("role") == "observer" for r in rows):
         lines += ["", OBSERVER_NOTE]
@@ -1771,7 +1923,7 @@ def _overlap(groups: list[dict]) -> list[str]:
         n = len(best)
         sites = sum(_int(g.get("n_sites")) for g in rows)
         coloc = sum(_int(g.get("colocated_voters")) >= 2 for g in rows)
-        shares = [f"{_n(c.get(b, 0))} ({c.get(b, 0) / n:.0%})" if n else "" for b in buckets]
+        shares = [f"{_n(c.get(b, 0))} ({_pct(c.get(b, 0) / n)})" if n else "" for b in buckets]
         return [label, n, *shares, sites, coloc]
 
     table = [line("all", repo)]
@@ -1779,12 +1931,13 @@ def _overlap(groups: list[dict]) -> list[str]:
         table.append(line(lg, [g for g in repo if (g.get("language") or "?").lower() == lg]))
     lines = [
         f"**Per language**, the exact matcher at the scoring level ({level}): one row per language (`all` first). "
-        "`items` and `k=1` ... `k=4+` as above; `sites` = the call sites inside those groups (records in the same "
+        "`items` and `k=1` ... `k≥4` as above; `sites` = the call sites inside those groups (records in the same "
         "file with lines within ±2 form one site); `co-located` = groups where at least two voter groups point at "
         "the same call site.",
         "",
     ]
-    lines += md_table(["language", "items", *[f"k={b}" for b in buckets], "sites", "co-located"], table)
+    lines += md_table(["language", "items", *[f"k={b}" if b != "4+" else "k≥4" for b in buckets], "sites",
+                       "co-located"], table)  # fmt: skip
     return lines + [""]
 
 
@@ -1932,9 +2085,8 @@ def render(analysis_dir: Path, *, run: int = 1) -> str:
     def rows(name: str) -> list[dict]:
         return read_csv(analysis_dir / name.format(k=run))
 
-    lines = _header(spec or {}, info, run)
-    lines += _questions()
-    lines += _experiment(rows("runs.csv"), load_run_log(analysis_dir.parent))
+    lines = ["## Preamble", "", "The terms the tables use, the questions they answer, and every stored run.", ""]
+    lines += _reading() + _questions()
     lines += _runs(rows("runs.csv"))
     lines += _negatives(rows("runs.csv"), run)
     lines += _micro(rows("micro-run{k}.csv"), rows("micro-items-run{k}.csv"))
@@ -1962,7 +2114,9 @@ def render(analysis_dir: Path, *, run: int = 1) -> str:
     lines += _stability(rows("stability.csv"))
     lines += _llm(rows("runs.csv"), rows("score-run{k}.csv"))
     lines += _files(info, run)
-    return "\n".join(lines).rstrip() + "\n"
+    overview = _experiment(rows("runs.csv"), load_run_log(analysis_dir.parent), spec=spec or {}, info=info, run=run)
+    lines = _header(spec or {}, info, run) + overview + _toc(lines) + lines
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).rstrip() + "\n"
 
 
 def write(analysis_dir: Path, *, run: int = 1) -> Path:

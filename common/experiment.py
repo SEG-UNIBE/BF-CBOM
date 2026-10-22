@@ -371,6 +371,26 @@ def variant_branch(variant: str, commit: str) -> str:
     return f"{BRANCH_PREFIX}{commit}" if variant == ORIGINAL_VARIANT else f"{BRANCH_PREFIX}{variant}"
 
 
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def fixture_dir(recorded: str | None) -> Path | None:
+    """The directory of a fixture on this machine: the recorded path (`/app/experiments/corpus/micro/java` in the
+    runner), else the same path under this checkout (`experiments/...`), so a laptop reads the micro projects behind a
+    copied export; None when neither exists."""
+    if not recorded:
+        return None
+    p = Path(recorded)
+    if p.is_dir():
+        return p
+    parts = p.parts
+    if "experiments" in parts:
+        local = _REPO_ROOT.joinpath(*parts[parts.index("experiments") :])
+        if local.is_dir():
+            return local
+    return None
+
+
 def mirror_path(full_name: str, mirror_dir: Path = GIT_MIRROR_DIR) -> Path:
     """Base mirror of a repo: all upstream refs plus the mutant branches."""
     return mirror_dir / f"{full_name}.git"
@@ -425,8 +445,9 @@ FIXTURE_AUTHOR = ("BF-CBOM fixtures", "fixtures@bf-cbom.invalid")
 FIXTURE_DATE = "2026-10-08T00:00:00Z"
 
 
-def publish_fixture(spec: RepoSpec, *, mirror_dir: Path = GIT_MIRROR_DIR) -> str:
-    """Commit a plain directory (`RepoSpec.path`, e.g. experiments/corpus/micro/java) into the base mirror.
+def publish_fixture(spec: RepoSpec, *, mirror_dir: Path = GIT_MIRROR_DIR, bare: Path | None = None) -> str:
+    """Commit a plain directory (`RepoSpec.path`, e.g. experiments/corpus/micro/java) into the base mirror (or into
+    `bare`: the analysis's snapshot cache on a laptop, analysis/snapshots.py).
 
     The commit is deterministic (fixed author, date and message), so the SHA depends only on the
     files' contents and modes: the same fixture gets the same snapshot id on every machine.
@@ -468,7 +489,7 @@ def publish_fixture(spec: RepoSpec, *, mirror_dir: Path = GIT_MIRROR_DIR) -> str
         sha = _git(["-C", str(work), "rev-parse", "HEAD"]).stdout.strip()
         if not _SHA_RE.match(sha):
             raise ExperimentError(f"fixture commit failed for {spec.full_name}")
-        bare = mirror_path(spec.full_name, mirror_dir)
+        bare = bare or mirror_path(spec.full_name, mirror_dir)
         if not (bare / "HEAD").exists():
             bare.parent.mkdir(parents=True, exist_ok=True)
             proc = _git(["clone", "--bare", "--quiet", str(work), str(bare)])

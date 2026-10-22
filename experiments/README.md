@@ -361,7 +361,8 @@ every asset type has its own table under `#### Asset type`, CycloneDX's four in 
 certificate, protocol, related-crypto-material), then `unknown` for values outside them. The traceability check needs
 the snapshot's files: on the VM the git mirror; on a laptop with a copied export `--fetch` pulls each pinned commit once
 into `SNAPSHOT_CACHE_DIR` (default `~/.cache/bf-cbom/snapshots`, one shallow `git fetch` per repo). `report` runs all
-of this too (`report --fetch`).
+of this too (`report --fetch`). A fixture (`path:`, the micro projects) needs no `--fetch`: the report publishes it
+from its local directory into the cache, when that directory still gives the recorded commit.
 
 **Analysing a copied export on the host.** The analysis only reads files, so an export unzipped or copied into
 `experiments/results/` can be analysed without Docker. Install the analysis dependencies with `uv sync --extra raqun`, then run
@@ -487,7 +488,7 @@ plus records attached by vocabulary knowledge: a generic report such as SHA-2 ne
 record implying the algorithm), so tools without locations take part; clusters never merge through a record with
 several keys, and a group whose members span several L4 identities (`units`, `n_units`) shows what the level declares
 the same; records without an L4 identity (`resolution` undefined, api, non-crypto, ambiguous) are not matched. The
-full group, member and agreement tables are written at the scoring level (`--level`, default L3), the
+full group, member and agreement tables are written at the scoring level (`--level`, default L4), the
 per-level summary `matchlevels-run<k>.csv` for all five levels (L0-L4). Inside a group the located records form call-site groups
 (same file, lines within `--window`, default 2; a window record spans `line` .. `line_end`). Per group and dimension
 (key size, mode, padding, curve, digest, location) the agreement table says how many voters report a value admitted
@@ -535,7 +536,7 @@ groups["tools"].str.split(";")          # list cells
 micro = pd.read_csv("_ANALYSIS/micro-run1.csv")
 micro.pivot(index="tool", columns="language", values="lenient")      # the inclusion matrix
 items = pd.read_csv("_ANALYSIS/items-run1.csv")
-items.drop_duplicates(["snapshot", "variant", "unit"])["k_L3"].value_counts()   # voter groups per item at L3
+items.drop_duplicates(["snapshot", "variant", "unit"])["k_L4"].value_counts()   # voter groups per item at L4
 ```
 
 **Export.** The analysis files live inside the experiment folder, so the normal export takes them along together with

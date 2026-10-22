@@ -65,7 +65,7 @@ class RaqunMatcher:
     def __init__(
         self,
         *,
-        level: str = "L3",
+        level: str = "L4",
         voter_of: dict[str, str] | None = None,
         vocab: Vocabulary | None = None,
     ):

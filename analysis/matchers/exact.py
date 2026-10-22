@@ -32,7 +32,7 @@ class ExactMatcher:
     def __init__(
         self,
         *,
-        level: str = "L3",
+        level: str = "L4",
         window: int = 2,
         closure: bool = False,
         voter_of: dict[str, str] | None = None,
