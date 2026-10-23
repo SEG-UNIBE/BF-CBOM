@@ -3,8 +3,10 @@ matcher comparison (analysis/matchers/compare.py, always)."""
 
 import json
 import os
+import random
 import subprocess
 import sys
+from itertools import combinations
 from pathlib import Path
 
 import pytest
@@ -128,6 +130,29 @@ def test_compare_partitions_by_co_membership():
     assert (row["records_common"], row["groups_a"], row["groups_b"]) == (5, 2, 3)
     assert (row["pairs_a"], row["pairs_b"], row["pairs_both"], row["pair_jaccard"]) == (4, 2, 2, 0.5)
     assert (row["a_in_one_b"], row["b_in_one_a"]) == (0.5, 1.0)  # E1 splits over R1+R2; every R group is inside one E
+
+
+def test_compare_counts_the_pairs_a_listing_would_hold():
+    rng = random.Random(1)
+    recs = [_rec(i, "abc"[i % 3], "x") for i in range(80)]
+
+    def partition(prefix: str, n: int) -> list[MatchGroup]:
+        out: dict[int, list] = {}
+        for r in recs[: rng.randint(60, 80)]:  # some records grouped by one matcher only
+            out.setdefault(rng.randrange(n), []).append(r)
+        return [MatchGroup(f"{prefix}{g}", "repo", "x", members) for g, members in out.items()]
+
+    one, other = partition("E", 4), partition("R", 9)
+
+    def listed(groups, common):
+        ids = [sorted({r.record_id for r in g.members} & common) for g in groups]
+        return {frozenset(p) for rids in ids for p in combinations(rids, 2)}
+
+    common = {r.record_id for g in one for r in g.members} & {r.record_id for g in other for r in g.members}
+    pairs_a, pairs_b = listed(one, common), listed(other, common)
+    row = compare(one, other, "exact", "raqun")
+    assert (row["pairs_a"], row["pairs_b"], row["pairs_both"]) == (len(pairs_a), len(pairs_b), len(pairs_a & pairs_b))
+    assert row["pair_jaccard"] == round(len(pairs_a & pairs_b) / len(pairs_a | pairs_b), 3)
 
 
 def test_raqun_groups_structured_assets_across_tools():

@@ -2,13 +2,15 @@
 
 Both matchers partition the algorithm records of a repository into groups (repo scope). Over the records both
 matchers grouped, the co-membership pairs (two records in one group) are compared: the Jaccard of the two pair sets,
-and per group how often all of a group's members land in a single group of the other matcher.
+and per group how often all of a group's members land in a single group of the other matcher. The pairs are counted
+from the group sizes, never listed: a group of n records holds n(n-1)/2 of them, which on a large repository are tens
+of millions (listing them killed the report on corpus-pilot-medium, 2026-10-23).
 """
 
 from __future__ import annotations
 
-from collections import defaultdict
-from itertools import combinations
+from collections import Counter, defaultdict
+from math import comb
 
 from .base import MatchGroup
 
@@ -28,11 +30,10 @@ def _membership(groups: list[MatchGroup]) -> dict[str, str]:
     return out
 
 
-def _pairs(member_of: dict[str, str], records: set[str]) -> set[frozenset[str]]:
-    by_group: dict[str, list[str]] = defaultdict(list)
-    for rid in records:
-        by_group[member_of[rid]].append(rid)
-    return {frozenset(p) for rids in by_group.values() for p in combinations(sorted(rids), 2)}
+def _pairs(member_of: dict, records: set[str]) -> int:
+    """The co-membership pairs among `records`: two records share a group of `member_of` (a group id, or a pair of
+    group ids for the pairs both matchers share)."""
+    return sum(comb(n, 2) for n in Counter(member_of[rid] for rid in records).values())
 
 
 def _in_one(member_of_a: dict[str, str], member_of_b: dict[str, str], records: set[str]) -> float | None:
@@ -47,18 +48,18 @@ def compare(groups_a: list[MatchGroup], groups_b: list[MatchGroup], name_a: str,
     a, b = _membership(groups_a), _membership(groups_b)
     common = set(a) & set(b)
     pairs_a, pairs_b = _pairs(a, common), _pairs(b, common)
-    both = pairs_a & pairs_b
-    union = pairs_a | pairs_b
+    both = _pairs({rid: (a[rid], b[rid]) for rid in common}, common)
+    union = pairs_a + pairs_b - both
     return {
         "matcher_a": name_a,
         "matcher_b": name_b,
         "records_common": len(common),
         "groups_a": len({a[r] for r in common}),
         "groups_b": len({b[r] for r in common}),
-        "pairs_a": len(pairs_a),
-        "pairs_b": len(pairs_b),
-        "pairs_both": len(both),
-        "pair_jaccard": round(len(both) / len(union), 3) if union else None,
+        "pairs_a": pairs_a,
+        "pairs_b": pairs_b,
+        "pairs_both": both,
+        "pair_jaccard": round(both / union, 3) if union else None,
         "a_in_one_b": _in_one(a, b, common),
         "b_in_one_a": _in_one(b, a, common),
     }
