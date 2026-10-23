@@ -296,8 +296,7 @@ def location_kind(rec, store: SnapshotStore, repo: str, commit: str | None) -> s
     if rec.line_end and int(rec.line_end) > int(rec.line):
         return "window"
     files = store.files(repo, commit)
-    text = store.read(repo, commit, rec.file) if files is not None and rec.file in files else None
-    lines = text.splitlines() if text is not None else []
+    lines = (store.lines(repo, commit, rec.file) if files is not None and rec.file in files else None) or []
     if not 1 <= int(rec.line) <= len(lines):
         return "unread"
     pattern = _IMPORT_LINE.get(Path(rec.file).suffix.lower())
@@ -315,8 +314,7 @@ def trace_record(rec, store: SnapshotStore, repo: str, commit: str | None, token
     exists = rec.file in files
     if not exists:
         return located, False, False, False
-    text = store.read(repo, commit, rec.file)
-    lines = text.splitlines() if text is not None else []
+    lines = store.lines(repo, commit, rec.file) or []
     in_range = 1 <= int(rec.line) <= len(lines)
     if not in_range:
         return located, True, False, False

@@ -140,6 +140,11 @@ def test_snapshot_store_reads_the_mirror_or_fetches_into_the_cache(tmp_path):
         store.read("o/r", sha, "pkg/crypto.py").startswith("import hashlib") and store.read("o/r", sha, "nope") is None
     )
     assert store.files("o/r", "0" * 40) is None and store.source("x/y", sha) is None
+    assert store.lines("o/r", sha, "pkg/crypto.py")[0] == "import hashlib" and store.lines("o/r", sha, "pkg") is None
+    assert store.read("o/r", sha, "README.md") is not None  # the same cat-file process serves every file of the repo
+    assert len(store._batches) == 1
+    store.close()
+    assert not store._batches and store.read("o/r", sha, "pkg/crypto.py").startswith("import hashlib")  # restarted
 
     fetched = SnapshotStore(mirror_dir=tmp_path / "none", cache_dir=cache)
     assert fetched.source("o/r", sha) is None
@@ -213,7 +218,7 @@ def test_traceability_weak_and_strong(tmp_path):
 
 
 class _FakeStore:
-    """A snapshot with a few files in memory (SnapshotStore's files/read)."""
+    """A snapshot with a few files in memory (SnapshotStore's files/read/lines)."""
 
     def __init__(self, files: dict[str, str]):
         self._files = files
@@ -223,6 +228,10 @@ class _FakeStore:
 
     def read(self, repo, commit, path):
         return self._files.get(path)
+
+    def lines(self, repo, commit, path):
+        text = self.read(repo, commit, path)
+        return text.splitlines() if text is not None else None
 
 
 def test_location_kind_tells_calls_from_imports_windows_and_missing_places():

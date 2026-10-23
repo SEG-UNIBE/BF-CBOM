@@ -7,6 +7,10 @@ Two places can hold a snapshot's objects, both bare git repositories:
   laptop: `fetch` pulls one commit from the repo's `source_url` (`git fetch --depth 1`), opt-in (`--fetch`), once.
 
 Without either, `files` and `read` return None and the analysis reports the columns as unavailable.
+
+Files are read through one long-lived `git cat-file --batch` process per bare repository (one request per file on
+its stdin, no fork): a `git show` per file costs ~16 ms of process start against ~0.4 ms this way, and a report reads
+every located record's file twice (the traceability check and the records' places).
 """
 
 from __future__ import annotations
@@ -19,7 +23,7 @@ from pathlib import Path
 from common.experiment import GIT_MIRROR_DIR, RepoSpec, mirror_path, publish_fixture
 
 SNAPSHOT_CACHE_DIR = Path(os.getenv("SNAPSHOT_CACHE_DIR", str(Path.home() / ".cache" / "bf-cbom" / "snapshots")))
-_READ_CACHE = 512  # files kept in memory
+_READ_CACHE = 512  # files kept in memory (text and split lines each)
 
 
 def _git(args: list[str], *, timeout: float = 600) -> subprocess.CompletedProcess:
@@ -45,6 +49,48 @@ class SnapshotStore:
         self._repos: dict[tuple[str, str], tuple[Path, str] | None] = {}
         self._files: dict[tuple[str, str], frozenset[str] | None] = {}
         self._texts: OrderedDict[tuple[str, str, str], str | None] = OrderedDict()
+        self._lines: OrderedDict[tuple[str, str, str], list[str] | None] = OrderedDict()
+        self._batches: dict[Path, subprocess.Popen] = {}  # one `git cat-file --batch` per bare repo
+
+    def close(self) -> None:
+        """End the cat-file processes (also on garbage collection)."""
+        for proc in self._batches.values():
+            if proc.poll() is None:
+                proc.stdin.close()
+                proc.wait(timeout=10)
+        self._batches.clear()
+
+    def __del__(self) -> None:
+        try:
+            self.close()
+        except Exception:  # noqa: BLE001  interpreter shutdown: nothing to report
+            pass
+
+    def _cat(self, bare: Path, spec: str) -> bytes | None:
+        """One blob (`<commit>:<path>`) through the bare repo's `git cat-file --batch` process, started on first use;
+        None when the object is missing or no blob (a directory). A broken process is dropped and restarted."""
+        proc = self._batches.get(bare)
+        if proc is None or proc.poll() is not None:
+            proc = subprocess.Popen(
+                ["git", "-C", str(bare), "cat-file", "--batch"],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+            )
+            self._batches[bare] = proc
+        try:
+            proc.stdin.write(spec.encode("utf-8", errors="surrogateescape") + b"\n")
+            proc.stdin.flush()
+            header = proc.stdout.readline().rstrip(b"\n").split()
+            if len(header) != 3:  # `<spec> missing` or `<spec> ambiguous`
+                return None
+            data = proc.stdout.read(int(header[2]))
+            proc.stdout.read(1)  # the newline after the content
+            return data if header[1] == b"blob" else None
+        except (OSError, ValueError):
+            proc.kill()
+            self._batches.pop(bare, None)
+            return None
 
     def cache_path(self, full_name: str) -> Path:
         return self.cache_dir / (full_name.replace("/", "__") + ".git")
@@ -114,16 +160,23 @@ class SnapshotStore:
             return self._texts[key]
         text = None
         found = self.repo(full_name, commit)
-        if found is not None:
-            proc = subprocess.run(
-                ["git", "-C", str(found[0]), "show", f"{commit}:{path}"],
-                capture_output=True,
-                timeout=120,
-                check=False,
-            )
-            if proc.returncode == 0:
-                text = proc.stdout.decode("utf-8", errors="replace")
+        if found is not None and "\n" not in path:
+            data = self._cat(found[0], f"{commit}:{path}")
+            text = data.decode("utf-8", errors="replace") if data is not None else None
         self._texts[key] = text
         if len(self._texts) > _READ_CACHE:
             self._texts.popitem(last=False)
         return text
+
+    def lines(self, full_name: str, commit: str | None, path: str) -> list[str] | None:
+        """The file's lines at the snapshot (`read`, split once and cached), or None when absent."""
+        key = (full_name, commit or "", path)
+        if key in self._lines:
+            self._lines.move_to_end(key)
+            return self._lines[key]
+        text = self.read(full_name, commit, path)
+        lines = text.splitlines() if text is not None else None
+        self._lines[key] = lines
+        if len(self._lines) > _READ_CACHE:
+            self._lines.popitem(last=False)
+        return lines
