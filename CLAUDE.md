@@ -321,7 +321,9 @@ where they declare support, but no analysis, figure or tuning effort goes into t
   for curating the mapping table; per-field columns in `micro-run<k>.csv`; inferring `functions` from API names.
 - **Next:** the VM reruns above -> the verdicts into the specs by hand -> corpus-main built and pruned (enough Python repos
   that already depend on `cryptography`, for the pyca snippets) -> mutation-smoke -> the corpus-main run -> the rater
-  study and mutation-main -> Phase 6.
+  study and mutation-main -> Phase 6. `experiments/mutation-pilot.yaml` (9 pilot-medium repos, 3 per language, every
+  snippet once per repo plus as many decoys; selected 2026-10-23, `experiments/README.md` "Mutation pilot") runs after
+  mutation-smoke and before mutation-main.
 
 ## Phases 1-3 (done 2026-10-15 to 2026-10-18)
 What exists and the decisions behind it. Numbers: `docs/findings.md`.
@@ -518,9 +520,10 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
 - One command, `bf-cbom experiment reproduce`, reruns the analysis from the raw results.
 
 ## Verification still to do
-- **Mutation smoke test** (`experiments/mutation-smoke.yaml`, on the VM): the RSA-2048 keygen in three styles and
-  three decoys into pyjwt, jjwt and golang-jwt; at least CBOMkit and CryptoScan report the direct insertion at the
-  recorded file and line and report no decoy; the F1 columns of `mutation-scores.csv` are filled.
+- **Mutation smoke test: done** (`experiments/mutation-smoke.yaml`, VM run 2026-10-22, reviewed 2026-10-23,
+  `docs/findings.md` "Mutation smoke"): all 252 runs ok, every planted call found at its line by CBOMkit and
+  CryptoScan in all three languages and styles, no decoy hit by either, the F1 columns filled; CipherRadar hits the
+  comment and log-message decoys and files the RSA keygen as RSASSA-PKCS1 (`found_group`, not `found_site`).
 - **End to end:** bar-micro and a 5-repo corpus spec from the spec to the tables with `bf-cbom experiment reproduce`.
 - **On the VM:** replica scaling (`--scale` with `EXPERIMENT_REPLICAS`) and traceability against the mirror.
 

@@ -134,6 +134,16 @@ def _sites(records, vocab: Vocabulary, shifts: list | None = None, file: str | N
     return out
 
 
+def _place(rec, vocab: Vocabulary, shifts: list | None = None, file: str | None = None) -> tuple | None:
+    """What identifies a located record across the original and the mutant: its unit, or its raw name when it has
+    none (CipherRadar's library-import markers, qelens' category names), with its file and line (shifted into the
+    mutant for the original's records of `file`). None for a record without a place."""
+    if not (rec.file and rec.line):
+        return None
+    line = _shift(rec.line, shifts) if shifts is not None and rec.file == file else rec.line
+    return (_key(rec, vocab) or f"name:{rec.name}", rec.file, line)
+
+
 def evaluate(
     mutant: dict, mutant_runs: dict[int, list], original_runs: dict[int, list], *, window: int = 2, vocab=None
 ) -> dict:
@@ -146,15 +156,13 @@ def evaluate(
     group = vocab.group_of(exp.get("family")) if exp.get("family") else None
     path, call, shifts = mutant["file"], int(mutant["call_line"]), mutant.get("shifts") or []
     spans = [(s["start"] - window, s["end"] + window) for s in mutant.get("spans") or []]
-    original_sites = set().union(*(_sites(recs, vocab, shifts, path) for recs in original_runs.values()))
+    original_places = {p for recs in original_runs.values() for r in recs if (p := _place(r, vocab, shifts, path))}
     original_units = _majority([{k for r in recs if (k := _key(r, vocab))} for recs in original_runs.values()])
     per_run = []
     mutant_unit_sets, mutant_site_sets = [], []
     new_total = 0
     for recs in mutant_runs.values():
-        new = [
-            r for r in recs if not (r.file and r.line and (_key(r, vocab), r.file, r.line) in original_sites)
-        ]  # a finding of the original moved by the insertion is not new
+        new = [r for r in recs if _place(r, vocab) not in original_places]  # the original's, moved, is not new
         new_total += len(new)
         mine = [r for r in new if _key(r, vocab) == want]
         in_file = [r for r in mine if r.file == path]

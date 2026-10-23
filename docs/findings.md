@@ -429,3 +429,36 @@ is `unread`: the mirror is on the VM); the runs are redone on the VM with the ca
   its 804 records `UNKNOWN`; CipherSift puts curve Ed25519 on Ed448; CBOMkit's two packagings agree on every repo
   both ran. Peak VM RAM 40.3 GiB; wall time 2 h 26 min, queue wait median 532 s (cdxgen's and CBOMkit's serial
   queues).
+
+## Mutation smoke (`mutation-smoke`, VM run 2026-10-22, reviewed 2026-10-23)
+The harness end to end on the VM: the RSA-2048 key generation in three styles plus three decoys into pyjwt, jjwt and
+golang-jwt (18 mutants, 21 variants, 252 runs, 18 min). Every run ok; hosts 57 (pyjwt), 89 (golang-jwt) and 1'261
+(jjwt); every mutant placed, none skipped. The criterion held: CBOMkit (both packagings) and CryptoScan report the
+inserted call at its line (±2) in every language and style, and hit no decoy; `mutation-scores.csv` has its F1
+columns. Read with the vocabulary of 2026-10-23.2:
+- **At the site in every language and style:** cbomkit, cbomkit-jar, CipherSift, CryptoScan, xgrep, qScan (Java's
+  indirect insertion aside), securin-xbom (Java, Python), pqcheck (Python, Go), SCANOSS (Go), CryptobomForge (Python),
+  Q-DARPAN (Go; Java direct and wrapper, not indirect), cdxgen (Go only: its Java and Python CBOMs name no algorithm,
+  as in the pilots). Q-DARPAN's and qScan's miss of the Java *indirect* style (the algorithm name passed through a
+  variable) is the data-flow split refinement 5 was built for.
+- **qelens** finds the call on the span (the import line) but not at the call line, as in the pilots (0.59 of its
+  places are import lines). **cryptarium** has no locations and the originals already contain RSA (JWT libraries), so
+  nothing can be told (`masked`).
+- **CipherRadar** reports `RSA-2048` at the planted line in all three repositories but files it as `algorithmFamily:
+  RSASSA-PKCS1`, its own field, so the record's identity is the signature scheme, not the planted unit `RSA`:
+  `found_group` (same group) is true, `found_site` false, recall site 0.00 / recall group 1.00. A tool label, not a
+  matching defect (never force a tool's output into the right class). It also reports algorithms on the comment
+  decoy (MD5, DES, SHA-256 in a comment) and the log-message decoy (RSA) in every language: the planted negatives
+  catch a pattern tool's string matches. CryptoScan hits one decoy (Go, "Certificate Expiration Check" next to the
+  log message).
+- **The bridge** over 29 (tool, language) cells: Spearman 0.6 (Go), 0.3 (Java), undefined in Python (every judged
+  tool at F1 1.00 or 0.00), 0.1 pooled; with three mutants per language this is a smoke, not a result.
+- **Fixed on review:** `new_records` counted every record a tool cannot be matched by identity (CipherRadar's
+  library-import markers, 1'700 on jjwt) as new on every mutant; records are now matched by unit, or by raw name when
+  they have none, so the column reads 1-5 for most tools (CipherRadar 33 on the Java mutant: the inserted JCA imports
+  and calls trigger several of its patterns). `found_*` and `false_positive` were unaffected except that an
+  identity-less record moved by the insertion no longer counts as a new one on a decoy.
+- **What the pilot adds** (`experiments/mutation-pilot.yaml`): nine repositories, three per language (the floor for a
+  bootstrap interval), every catalog snippet once per repository, so the per-(tool, language, style) cells of RQ4 are
+  all filled; the smoke's single snippet (RSA, present in every JWT library, hence `masked` for the repository level)
+  says nothing about the other fourteen.

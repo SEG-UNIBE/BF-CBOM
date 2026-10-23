@@ -1,0 +1,66 @@
+# Mutation pilot: nine crypto-rich repositories from corpus-pilot-medium, three per language (the floor for a
+# bootstrap interval over repositories, analysis/score.py MIN_REPOS). Selected 2026-10-23 for clean scans (every
+# supported tool ok, no OOM kill at the pinned commits), algorithm diversity, first-party locations and runtime;
+# selection evidence and the preflight in experiments/README.md, "Mutation pilot". A purposive pilot cohort, not a
+# sample: it validates the harness and gives first per-language numbers; the paper's RQ4 numbers come from mutation-main.
+#
+# Each repo: original + 15 call mutants (every catalog snippet once, five per style) + 15 decoys = 31 variants.
+# All 15 tools, one repetition: 9 x 31 x 15 = 4185 planned results, 3348 supported scans and 837 unsupported
+# (Java 11, Python 13, Go 12 supported tools). Extrapolated from the pilot-medium durations: ~14 summed tool-hours,
+# the cdxgen lane ~4.5 h with one replica (~2.2 h with two: EXPERIMENT_REPLICAS="cdxgen=2" and --scale).
+# Run mutation-smoke first. On the VM after make up-prod:
+#   make experiment EXP=experiments/mutation-pilot.yaml EXPERIMENT_MEMORY_BUDGET_GB=0
+#   make experiment-status NAME=mutation-pilot
+#   make experiment-export NAME=mutation-pilot
+name: mutation-pilot
+description: mutation pilot on nine crypto-rich, broadly processable repositories selected from pilot-medium, three per language
+tools: [cbomkit, cdxgen, cryptobomforge, cryptoscan, pqcheck, qdarpan, securin-xbom, cipherradar, xgrep, cbomkit-jar, ciphersift, scanoss, qelens, cryptarium, qscan]
+repetitions: 1
+mutation:
+  per_repo: 15
+  decoys: equal
+  styles: [direct, wrapper, indirect]
+  snippets: all
+  seed: 1
+repos:
+  # Java: an SSH library, an authenticator app and a web-security API; three contexts rather than three libraries.
+  - full_name: mwiede/jsch
+    language: Java
+    branch: master
+    commit: 1a6f9395683e88bd7d20151be0a2b5c8f1e9465a
+  - full_name: beemdevelopment/Aegis
+    language: Java
+    branch: master
+    commit: d6f4e5925a97e4e91593f1542085eae03432a759
+  - full_name: ESAPI/esapi-java-legacy
+    language: Java
+    branch: develop
+    commit: 15562822fb890cd025fab103cc2e5d603ee0b81a
+  # Python: hardware-key management, SSH interception and an SSH/Telnet honeypot; all three depend on `cryptography`,
+  # so the pyca snippets fit.
+  - full_name: Yubico/yubikey-manager
+    language: Python
+    branch: main
+    commit: 4ca60f706af930459138d8dc0f0f953480e1c7a4
+  - full_name: ssh-mitm/ssh-mitm
+    language: Python
+    branch: master
+    commit: f05db2ba99067c3924df40d7b18a686ba466a994
+  - full_name: cowrie/cowrie
+    language: Python
+    branch: main
+    commit: c7773f49758bc021c8276924f05b5c58dc20d542
+  # Go: transport cryptography, WebAuthn and a password manager; all three require golang.org/x/crypto, so the
+  # PBKDF2 snippet fits.
+  - full_name: pion/dtls
+    language: Go
+    branch: main
+    commit: af014e35f1e2cdf3d787600a6b5c41953a7d9a39
+  - full_name: go-webauthn/webauthn
+    language: Go
+    branch: master
+    commit: ccb9f1ef4864e92f9fb942b62ab1c4ef735f534a
+  - full_name: gopasspw/gopass
+    language: Go
+    branch: master
+    commit: 8b7c43edab00c079ebf50845612dcda203e48b36

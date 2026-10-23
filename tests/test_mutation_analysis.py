@@ -53,6 +53,20 @@ def test_a_new_record_at_the_call_line_is_detected_and_a_moved_one_is_not():
     assert missed["found_site"] is False and missed["found_span"] is False and missed["found_file"] is False
 
 
+def test_a_record_without_identity_is_matched_by_name_so_a_moved_marker_is_not_new():
+    # CipherRadar's library-import markers carry no algorithm; on jjwt 1'700 of them counted as new on every mutant
+    def marker(line):
+        return NormRecord(record_id=f"t:lib:{line}", tool="t", component_index=0, occurrence_index=0, name="jca-import",
+                          values={"asset_type": "library"}, file="a/App.java", line=line)  # fmt: skip
+
+    original = [*ORIGINAL, marker(3)]
+    moved = [_rec("SHA-256", "a/App.java", 37), ORIGINAL[1], marker(3)]  # line 3 is above the insertion: unmoved
+    out = mu.evaluate(MUTANT, {1: [*moved, _rec("SHA-256", "a/App.java", 20)]}, {1: original})
+    assert out["new_records"] == 1  # the planted call only; the marker is the original's
+    appeared = mu.evaluate(MUTANT, {1: [*moved, marker(31)]}, {1: original})
+    assert appeared["new_records"] == 1 and appeared["found_site"] is False  # a new marker counts, finds nothing
+
+
 def test_span_site_and_group_are_told_apart():
     on_span = mu.evaluate(MUTANT, {1: [_rec("SHA-256", "a/App.java", 24)]}, {1: [ORIGINAL[1]]})
     assert on_span["found_span"] and not on_span["found_site"] and on_span["found_repo"]  # new to the repository

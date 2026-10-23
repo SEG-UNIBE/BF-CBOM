@@ -54,7 +54,7 @@ runs), `corpus-` (real repositories as they are), `mutation-` (real repositories
 | `corpus-pilot-medium.yaml` | the same 15, once | 60 manually selected projects, 20 each in Java, Python and Go (`experiments/corpus/pilot-2026-10-22.yaml`) | second pilot, pinned to default-branch HEADs on 2026-10-22; 900 tool/repository pairs |
 | `corpus-icpc.yaml` | the same 15 | 23 projects of the ICPC 2026 paper (`experiments/corpus/icpc-2026.yaml`, HEAD of 2026-10-18) | held-out counterpart of the pilot corpus: none of these repos was used to tune the vocabulary, the specs or CipherSift; six are marked `expect_crypto: low` (negative cases) |
 | `mutation-smoke.yaml` | all 15 tools | pyjwt, jjwt, golang-jwt (pilot), 3 mutants each | the mutation harness end to end: the RSA-2048 keygen inserted in each style; CBOMkit and CryptoScan should find the direct one at its line (`mutation.csv`) |
-| `mutation.yaml` | all 15 tools, once | 6 pinned pilot-medium repos, 2 per language | compact mutation pilot: 12 calls and 12 decoys per repo; 2250 planned results, currently 1800 supported scans |
+| `mutation-pilot.yaml` | all 15 tools, once | 9 pinned pilot-medium repos, 3 per language | mutation pilot: every catalog snippet once per repo (15 calls, 5 per style) and 15 decoys; 4185 planned results, currently 3348 supported scans |
 
 LLM providers are outside the current experiment scope; their implementation remains available for possible later use.
 The 15 tools include three observers: tools whose findings are analysed but do not confirm other tools' findings
@@ -74,49 +74,61 @@ make experiment-export NAME=corpus-pilot-medium   # generates the report and exp
 The corpus records the full repository names and commits. It is a manual selection, separate from the
 stratified corpus built by `make corpus`. Rerunning the command resumes this experiment at the pinned commits.
 
-**Compact mutation pilot (`mutation.yaml`, selected 2026-10-23).** Six repositories keep the 25-variant multiplier
-manageable while retaining two contexts per language. The evidence is the exported `corpus-pilot-medium/_ANALYSIS/`
-(`runs.csv`, `units-repo-run1.csv`, `items-run1.csv`, `records-run1.csv`; report generated 2026-10-23 08:32 UTC).
-Candidates were screened for successful supported scans, no OOM events, multiple tools reporting algorithms at
-first-party locations, algorithm diversity and low runtime. The smaller pilot was checked too; medium-pilot
-candidates already supplied a balanced cohort. These are purposively selected, favourable pilot cases, not a random
+**Mutation pilot (`mutation-pilot.yaml`, selected 2026-10-23).** Nine repositories, three per language: three is the
+floor for a bootstrap interval over repositories (`analysis/score.py` `MIN_REPOS`, which `mutation-scores.csv` and the
+bridge use), so every per-language recall, precision and F1 of the pilot comes with an interval. The evidence is the
+exported `corpus-pilot-medium/_ANALYSIS/` (`runs.csv`, `units-repo-run1.csv`, `items-run1.csv`, `records-run1.csv`;
+re-rendered with vocabulary 2026-10-23.2). Candidates were screened for successful supported scans, no OOM kill,
+several tools reporting algorithms at first-party locations, algorithm diversity, low runtime and a different context
+from the other two repositories of the language. These are purposively selected, favourable pilot cases, not a random
 or held-out sample. They do not replace the planned mutation-main corpus or support population-wide claims.
 
 | Repository | Language | Successful / supported tools | Tools reporting algorithm items | Distinct algorithm identities | Summed tool seconds |
 |---|---|---:|---:|---:|---:|
-| `mwiede/jsch` | Java | 11/11 | 10 | 44 | 289 |
+| `mwiede/jsch` | Java | 11/11 | 10 | 45 | 289 |
 | `beemdevelopment/Aegis` | Java | 11/11 | 10 | 14 | 258 |
+| `ESAPI/esapi-java-legacy` | Java | 11/11 | 9 | 16 | 190 |
 | `Yubico/yubikey-manager` | Python | 13/13 | 13 | 34 | 135 |
-| `ssh-mitm/ssh-mitm` | Python | 13/13 | 13 | 23 | 132 |
-| `pion/dtls` | Go | 12/12 | 12 | 31 | 106 |
-| `go-webauthn/webauthn` | Go | 12/12 | 12 | 24 | 84 |
+| `ssh-mitm/ssh-mitm` | Python | 13/13 | 13 | 22 | 132 |
+| `cowrie/cowrie` | Python | 13/13 | 13 | 24 | 285 |
+| `pion/dtls` | Go | 12/12 | 12 | 30 | 106 |
+| `go-webauthn/webauthn` | Go | 12/12 | 12 | 23 | 84 |
+| `gopasspw/gopass` | Go | 12/12 | 12 | 24 | 123 |
 
 Identities are the union of normalised L4 algorithm items reported by tools, not verified ground truth; repeated
 occurrences and cross-tool duplicates are not counted as extra identities. Successful tools have `status=ok`;
-unsupported tools are excluded from that denominator. No selected run recorded an OOM kill. Aegis adds an
-application context alongside JSch; SSHJ is a viable reserve but would duplicate the SSH-library context. Very large
-or troubled cases such as Vault, Keycloak, FairEmail and Scapy were not chosen: their cost or failures would be
-multiplied across variants. No tool is removed from the experiment on the basis of its pilot findings.
+unsupported tools are excluded from that denominator. No selected run recorded an OOM kill. The contexts: an SSH
+library, an authenticator app and a web-security API (Java); hardware-key management, SSH interception and a honeypot
+(Python); transport cryptography, WebAuthn and a password manager (Go). SSHJ and supertokens-core are reserves (SSHJ
+would duplicate the SSH-library context; supertokens-core costs 491 s per scan). Very large or troubled cases such as
+Vault, Keycloak, FairEmail and Scapy were not chosen: their cost or failures would be multiplied across variants. No
+tool is removed from the experiment on the basis of its pilot findings.
 
-Mutation preflight used source archives at exactly the six pinned pilot commits and the existing generator with
-`per_repo: 12`, `decoys: equal`, all snippets/styles, seed 1, catalog version `2026-10-22.1`. The generator's source
-tree was supplied from each archive and its commit-writing step was replaced with in-memory capture. All six
-produced 12 distinct snippet/style pairs (4 per style) and 12 decoys (3 per kind), across 24 distinct source files
-per repo, with no skipped-insertion notes. Host counts in the table's order were 1438, 1227, 597, 665, 1288 and 310.
-This checks dependency eligibility and insertion syntax/placement; it does not compile the complete projects or
-measure how the tools detect the inserted calls. Both Python projects admitted asymmetric/AES snippets, and both
-Go projects admitted PBKDF2. The actual VM run records the full patches in `mutants.json`.
+`per_repo: 15` plants every catalog snippet once per repository (the generator takes the least-used snippet per
+style, so 15 calls are 5 per style), and `decoys: equal` as many decoys; with three repositories per language every
+(snippet, style) cell of a language is filled three times. Mutation preflight (2026-10-23, the first six repositories)
+used source archives at the pinned commits and the generator with `per_repo: 12`, `decoys: equal`, all
+snippets/styles, seed 1, catalog version `2026-10-22.1`, its commit-writing step replaced with in-memory capture: all
+six produced 12 distinct snippet/style pairs and 12 decoys across 24 distinct source files per repo, with no
+skipped-insertion notes; host counts were 1438 (jsch), 1227 (Aegis), 597 (yubikey-manager), 665 (ssh-mitm),
+1288 (dtls) and 310 (webauthn). This checks dependency eligibility and insertion syntax/placement; it does not compile
+the complete projects or measure how the tools detect the inserted calls. The Python projects admitted the pyca
+snippets and the Go projects PBKDF2 (`golang.org/x/crypto`). The three repositories added for the interval (ESAPI,
+cowrie, gopass) were not preflighted; a repository with too few hosts gets fewer mutants and a note in
+`mutants.json`. The VM run records the full patches there.
 
-Budget: 6 x 25 variants x 15 tools = 2250 planned results; current language support means 1800 actual scans and
-450 unsupported results. Multiplying the original pilot durations by 25 gives about 7 summed tool-hours. The
-slowest worker lane (cdxgen) extrapolates to about 2.46 hours with one replica, before mutation preparation and
-resource contention; these are planning estimates, not measured mutant runtimes. Repetitions are 1, keeping the
-existing stability experiment responsible for repeatability checks.
+Budget: 9 x 31 variants x 15 tools = 4185 planned results; current language support means 3348 actual scans and
+837 unsupported results. Multiplying the pilot-medium durations (1'602 s summed over the nine originals) by 31 gives
+about 14 summed tool-hours. The slowest worker lane (cdxgen, 519 s summed) extrapolates to about 4.5 hours with one
+replica, 2.2 with two (`EXPERIMENT_REPLICAS="cdxgen=2"` after `--scale worker-cdxgen=2`, the replica test the VM
+list still holds), before mutation preparation and resource contention; these are planning estimates, not measured
+mutant runtimes. Repetitions are 1, keeping the existing stability experiment responsible for repeatability checks.
+`mutation-smoke` runs first.
 
 ```sh
-make experiment EXP=experiments/mutation.yaml EXPERIMENT_MEMORY_BUDGET_GB=0
-make experiment-status NAME=mutation
-make experiment-export NAME=mutation
+make experiment EXP=experiments/mutation-pilot.yaml EXPERIMENT_MEMORY_BUDGET_GB=0
+make experiment-status NAME=mutation-pilot
+make experiment-export NAME=mutation-pilot
 ```
 
 After a change to one worker, `make experiment EXP=experiments/mutation-smoke.yaml ARGS="--rerun <tool>"` redoes
@@ -586,7 +598,7 @@ files and never change these:
 | `grouping-run<k>.csv` | scores | (dimension, voter grouping) | dimension, level, grouping (`declared`, `per-tool`, `llm-merged`, `engine-merged`), voter_groups, ranked, kendall_tau (against `declared`), ranking: the sensitivity checks of the voter groups (`analysis/README.md` "Voter groups") |
 | `stability.csv` | scores | (tool, snapshot, variant) with >= 2 runs | repo, snapshot, variant, tool, level, runs, records_mean, records_cv, items_mean, jaccard_mean, jaccard_min, consensus, unstable |
 | `mutants.csv` | RQ4 | mutant (mutants.json) | repo, snapshot, commit, language, variant (the mutant id), variant_commit, snippet, style, catalog_version, unit (expected L4 identity, `protocol:TLS` for the TLS context), family, expected, also, file, call_line, related_lines, spans (`kind:start-end`), host, host_line, host_callers, host_entry, imports_added, qualified (Java types written fully qualified), patch |
-| `mutation.csv` | RQ4 | (mutant, tool) | repo, snapshot, language, variant, snippet, style, tool, voter_group, role, status (`ok`, or why it is not judged: the mutant's or the original's run missing or not ok), runs_mutant, runs_original, unit, masked (the original already has the unit: no repository-level value), found_repo, found_file, found_span (inserted lines ±2), found_site (call line ±2), found_group (lenient: same group at the site), key_size, mode, padding, curve, digest, iterations, protocol_version (the expected value on a new record of the unit on the inserted lines; empty = not judged), extra_units, lost_units, extra_sites, lost_sites (other changes; majority sets), new_records (per run). Only new records count: an original finding moved by the insertion is not new; with repetitions a value holds in most of the mutant's runs |
+| `mutation.csv` | RQ4 | (mutant, tool) | repo, snapshot, language, variant, snippet, style, tool, voter_group, role, status (`ok`, or why it is not judged: the mutant's or the original's run missing or not ok), runs_mutant, runs_original, unit, masked (the original already has the unit: no repository-level value), found_repo, found_file, found_span (inserted lines ±2), found_site (call line ±2), found_group (lenient: same group at the site), key_size, mode, padding, curve, digest, iterations, protocol_version (the expected value on a new record of the unit on the inserted lines; empty = not judged), extra_units, lost_units, extra_sites, lost_sites (other changes; majority sets), new_records (per run: records absent from the original at the same place, the original's lines shifted into the mutant; a record is matched by its unit, or by its raw name when it has none, so a tool's identity-less import markers are not new on every mutant). Only new records count: an original finding moved by the insertion is not new; with repetitions a value holds in most of the mutant's runs |
 | `mutation-rates.csv` | RQ4 | (tool, language, style or `all`, dimension) | tool, voter_group, role, language, style, dimension, repos, mutants (judged), detected, rate (mean of per-repository rates), pooled, ci_low, ci_high (bootstrap over repositories, only when supported: score.py's MIN_REPOS and MIN_ITEMS), supported |
 | `mutation-scores.csv` | RQ4 | (tool, language, style or `all`) | tool, voter_group, role, language, style, repos, calls, found_site, found_group, decoys, decoys_hit, recall_site, recall_low, recall_high, recall_group, precision, f1, f1_low, f1_high, supported |
 | `bridge-run<k>.csv` | RQ4 -> RQ3 | (language, tool) cells and per language `all` | language, tool, confirmation, f1, n, spearman, kendall_tau |
