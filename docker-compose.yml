@@ -73,6 +73,7 @@ services:
       # Sum of worker memory limits (tools.yaml memory_gb) a batch run feeds at once; tools beyond it run in
       # later waves. Set per machine in the Makefile / environment; 0 = no limit (one wave).
       - EXPERIMENT_MEMORY_BUDGET_GB=${EXPERIMENT_MEMORY_BUDGET_GB:-14}
+      - BF_CBOM_JOBS=${BF_CBOM_JOBS:-0}  # worker processes of `analysis report` (--jobs; Makefile)
       # The git server's memory cap (recorded per session) and the corpus size cap derived from it (common/corpus.py)
       - GITSERVER_MEMORY=${GITSERVER_MEMORY:-6g}
       - CORPUS_MAX_REPO_SIZE_MB=${CORPUS_MAX_REPO_SIZE_MB:-}
@@ -85,7 +86,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2g
+          # RUNNER_MEMORY (Makefile): the analysis report's normalised CBOMs plus its worker processes (--jobs)
+          memory: ${RUNNER_MEMORY:-8g}
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     profiles: [tools]

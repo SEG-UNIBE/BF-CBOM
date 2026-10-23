@@ -98,25 +98,34 @@ def test_score_records_windows_location_free_records_and_extra_families():
 SNAPSHOT = "bfcbom__micro-java@0123456789ab"
 
 
-def _fake_experiment(root: Path) -> Path:
-    """Tiny stored experiment: two ok runs on micro-java plus one unsupported run without a CBOM."""
+PYTHON_SNAPSHOT = "bfcbom__micro-python@0123456789ac"
+
+
+def _fake_experiment(root: Path, *, python: bool = False) -> Path:
+    """Tiny stored experiment: two ok runs on micro-java plus one unsupported run without a CBOM; with `python` also
+    micro-python (cbomkit and pqcheck ok, cipherradar unsupported), so the matchers have two repositories."""
     exp = root / "exp-tables"
     exp.mkdir()
     (exp / "_experiment.yaml").write_text(
         "name: exp-tables\ntools: [cbomkit, cipherradar, pqcheck]\nrepos:\n"
-        "  - full_name: bfcbom/micro-java\n    language: Java\n",
+        "  - full_name: bfcbom/micro-java\n    language: Java\n"
+        + ("  - full_name: bfcbom/micro-python\n    language: Python\n" if python else ""),
         encoding="utf-8",
     )
-    for tool in ("cbomkit", "cipherradar", "pqcheck"):
-        d = exp / SNAPSHOT / "original" / tool
-        d.mkdir(parents=True)
-        meta = {"worker": tool, "run_index": 1, "variant": "original", "base_commit": "0123456789ab" + "0" * 28}
-        if tool == "pqcheck":
-            meta.update(status="unsupported", language="Java")
-        else:
-            meta.update(status="ok", duration_sec=1.5, tool_version="1.0")
-            (d / "run1.json").write_text(json.dumps(_cbom(f"{tool}_micro-java")), encoding="utf-8")
-        (d / "run1.meta.json").write_text(json.dumps(meta), encoding="utf-8")
+    snapshots = {SNAPSHOT: ("java", "pqcheck", "0123456789ab")}
+    if python:
+        snapshots[PYTHON_SNAPSHOT] = ("python", "cipherradar", "0123456789ac")
+    for snapshot, (language, unsupported, sha12) in snapshots.items():
+        for tool in ("cbomkit", "cipherradar", "pqcheck"):
+            d = exp / snapshot / "original" / tool
+            d.mkdir(parents=True)
+            meta = {"worker": tool, "run_index": 1, "variant": "original", "base_commit": sha12 + "0" * 28}
+            if tool == unsupported:
+                meta.update(status="unsupported", language=language.capitalize())
+            else:
+                meta.update(status="ok", duration_sec=1.5, tool_version="1.0")
+                (d / "run1.json").write_text(json.dumps(_cbom(f"{tool}_micro-{language}")), encoding="utf-8")
+            (d / "run1.meta.json").write_text(json.dumps(meta), encoding="utf-8")
     return exp
 
 
@@ -264,6 +273,44 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert meaningful < summary.index("#### Asset type `algorithm`", meaningful) < summary.index("### Traceable")
     assert "**RQ3 Agreement**" in summary[summary.index("## Files") :]  # files by question
     assert "| cbomkit | 11 / 11 · 11 |" in summary
+
+
+def test_report_is_identical_sequential_and_parallel(tmp_path, monkeypatch, old_truth):
+    """The process pool (misc/cli/parallel.py) changes nothing in any table, the summary or the normalised CBOMs:
+    every file written with --jobs 1 and with two spawned workers is the same byte for byte (timestamps aside)."""
+    from typer.testing import CliRunner
+
+    from misc.cli import analysis_cmd
+
+    exp = _fake_experiment(tmp_path, python=True)
+    monkeypatch.setattr(analysis_cmd, "experiment_dir", lambda name: tmp_path / name)
+
+    def files() -> dict[str, bytes]:
+        out = {
+            p.relative_to(exp).as_posix(): p.read_bytes()
+            for p in exp.rglob("*")
+            if p.is_file() and (p.parent.name == "_ANALYSIS" or p.name == "run1.norm.json")
+        }
+        summary = out["_ANALYSIS/_SUMMARY.md"].split(b"\n")
+        out["_ANALYSIS/_SUMMARY.md"] = b"\n".join(line for line in summary if b"summary generated" not in line)
+        info = json.loads(out["_ANALYSIS/tables-run1.json"])
+        info.pop("generated_at", None)
+        out["_ANALYSIS/tables-run1.json"] = json.dumps(info).encode()
+        return out
+
+    runner = CliRunner()
+    result = runner.invoke(analysis_cmd.analysis_app, ["report", "exp-tables", "--jobs", "1"])
+    assert result.exit_code == 0, result.output
+    sequential = files()
+    result = runner.invoke(analysis_cmd.analysis_app, ["report", "exp-tables", "--jobs", "2"])
+    assert result.exit_code == 0, result.output
+    parallel = files()
+    assert len(sequential) > 20 and sequential.keys() == parallel.keys()
+    assert [name for name in sequential if sequential[name] != parallel[name]] == []
+    # two repositories went through the match step, four CBOMs through normalisation and validation
+    groups = _read_csv(exp / "_ANALYSIS" / "groups-exact-run1.csv")
+    assert {r["snapshot"] for r in groups} == {SNAPSHOT, PYTHON_SNAPSHOT}
+    assert len(_read_csv(exp / "_ANALYSIS" / "schema-run1.csv")) == 4
 
 
 def test_spellings_per_identity_count_distinct_raw_values_per_tool():

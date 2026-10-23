@@ -485,5 +485,11 @@ For the paper's runs, the laptop prepares code and analyses copied exports; the 
 
   The per-tool numbers come from `memory_gb` in `common/tools.yaml`, which a test keeps equal to the compose limits; adjust both when changing a limit. With `--scale`, set `EXPERIMENT_REPLICAS` so the budget counts each replica. Stored experiments can be browsed in the UI's Experiments page (read-only: summary, runs table, CSV downloads).
 - **Interactive batch inspection.** The Streamlit UI applies the same budget: the Setup page shows the wave plan for the selected workers, and when an inspection starts, jobs for workers outside the first wave are created as *held* (⏸️ in the grid) and queued only once every job of the current wave has finished. A background thread in the coordinator advances the waves, so the browser tab can be closed; it starts with the first page view after the coordinator (re)starts.
+- **The analysis report in parallel.** `analysis report` (and `experiment export`, which runs it first) normalises,
+  validates and matches in a process pool, one CBOM or one repository per task: `--jobs N`, env `BF_CBOM_JOBS`,
+  default auto (`min(CPUs, 8)` for a step with 16 or more items). Its results do not depend on the worker count. The
+  runner's memory cap bounds the pool: `RUNNER_MEMORY` (Makefile, default 8g). Both are Makefile variables, so on a
+  64 GB VM `make experiment-export NAME=<exp> BF_CBOM_JOBS=16 RUNNER_MEMORY=32g`; on the host
+  `RESULTS_DIR=experiments/results uv run bf-cbom analysis report <exp> --jobs 4`.
 
 See `experiments/README.md` for the spec format and `experiments/corpus/README.md` for the repository lists and fixtures (plain directories such as `experiments/corpus/micro/java` are published to the git server as deterministic commits). The offline analysis library lives in `analysis/`. `make clean-docker` keeps the volumes; `docker compose down -v` removes them.

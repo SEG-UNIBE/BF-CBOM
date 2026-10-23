@@ -169,6 +169,14 @@ normalisation, analysis outputs),
     included) and F1, the entry bar (`ENTRY_BAR`: half the calls, lenient, in one language) and each tool's verdict
     (`passed`, `disqualified`, `not judged`: `entry_verdict`), field-by-field comparison with `expected`.
   - `tables.py` (flat CSV tables), `summary.py` (`_SUMMARY.md`, rendered from the CSVs only).
+  - **In parallel** (2026-10-23): `report` normalises, validates and matches in a process pool, one CBOM or one
+    repository per task (`misc/cli/parallel.py:pmap`, the tasks in `analysis/tasks.py`; `--jobs`, env `BF_CBOM_JOBS`;
+    0 = auto, min(CPUs, 8) for a step with 16 or more items, else sequential). The workers are spawned, never forked
+    (rich's thread, the store's `git cat-file` pipes), load the vocabulary themselves and return plain dataclasses in
+    input order, so every file is byte-identical to `--jobs 1` (a test checks it). Memory bounds the pool, not CPUs:
+    the runner's cap is `RUNNER_MEMORY` (Makefile, 8g; 2g was OOM-killed on corpus-pilot-medium; on the VM
+    `make experiment-export NAME=<exp> BF_CBOM_JOBS=16 RUNNER_MEMORY=32g`), and the snapshot store keeps at most 64 MB
+    of file lines.
   - Commands: `report` (everything, one pass), `normalize`, `schema`, `levels`, `micro`, `tables`, `score`. The UI's
     Experiments page shows stored experiments read-only.
 - **Normalisation, three kinds of files.** One **adapter spec per tool** `analysis/adapters/<tool>.yaml` (declared
@@ -378,7 +386,9 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
   - (c) **RaQuN** (`matchers/raqun.py`): PyQuN's n-way matching with a structured similarity (Jaccard over
     `<dimension>=<value>` attributes: the identity at the level and the standard's dimensions, never our `group`),
     on the exact matcher's records (mapped, with an L4 identity; decided 2026-10-21), location-free, at most one
-    asset per tool per group, run at every level like (b) with the values admitted at that level, configured as in
+    asset per tool per group. Controlled comparison (2026-10-23): only the algorithm identity varies across levels;
+    all other attributes use full normalised values from L0 onward. Each level is an independent run, with no
+    cumulative grouping guarantee. Configured as in
     the RaQuN paper (k = n, the tools in the repository; Jaccard >= 0.75; decided 2026-10-21, no further
     configurations). Installed with the `raqun` extra. The UI's "Find Similar Components" (`misc/pyqun`, BERT over a bag of strings) is a different thing and
     stays a comparison only.

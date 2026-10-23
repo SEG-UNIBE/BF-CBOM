@@ -23,7 +23,8 @@ from pathlib import Path
 from common.experiment import GIT_MIRROR_DIR, RepoSpec, mirror_path, publish_fixture
 
 SNAPSHOT_CACHE_DIR = Path(os.getenv("SNAPSHOT_CACHE_DIR", str(Path.home() / ".cache" / "bf-cbom" / "snapshots")))
-_READ_CACHE = 512  # files kept in memory (text and split lines each)
+_CACHE_BYTES = 64 * 2**20  # split lines kept in memory, summed over files: a bound by count let 512 bundled
+# megabyte files of one repository (MaxKey's front-end) exceed the runner's 2 GB on 2026-10-23
 
 
 def _git(args: list[str], *, timeout: float = 600) -> subprocess.CompletedProcess:
@@ -44,12 +45,18 @@ def _has_commit(bare: Path, commit: str) -> bool:
 
 
 class SnapshotStore:
-    def __init__(self, mirror_dir: Path = GIT_MIRROR_DIR, cache_dir: Path = SNAPSHOT_CACHE_DIR):
+    def __init__(
+        self,
+        mirror_dir: Path = GIT_MIRROR_DIR,
+        cache_dir: Path = SNAPSHOT_CACHE_DIR,
+        *,
+        cache_bytes: int = _CACHE_BYTES,
+    ):
         self.mirror_dir, self.cache_dir = Path(mirror_dir), Path(cache_dir)
         self._repos: dict[tuple[str, str], tuple[Path, str] | None] = {}
         self._files: dict[tuple[str, str], frozenset[str] | None] = {}
-        self._texts: OrderedDict[tuple[str, str, str], str | None] = OrderedDict()
-        self._lines: OrderedDict[tuple[str, str, str], list[str] | None] = OrderedDict()
+        self._cache_bytes, self._cached_bytes = cache_bytes, 0
+        self._lines: OrderedDict[tuple[str, str, str], tuple[list[str] | None, int]] = OrderedDict()  # (lines, size)
         self._batches: dict[Path, subprocess.Popen] = {}  # one `git cat-file --batch` per bare repo
 
     def close(self) -> None:
@@ -152,31 +159,32 @@ class SnapshotStore:
                 self._files[key] = frozenset(p for p in proc.stdout.split("\0") if p) if proc.returncode == 0 else None
         return self._files[key]
 
-    def read(self, full_name: str, commit: str | None, path: str) -> str | None:
-        """The file's text at the snapshot (undecodable bytes replaced), or None when absent."""
-        key = (full_name, commit or "", path)
-        if key in self._texts:
-            self._texts.move_to_end(key)
-            return self._texts[key]
-        text = None
+    def _text(self, full_name: str, commit: str | None, path: str) -> str | None:
+        """The file's text at the snapshot, uncached (undecodable bytes replaced), or None when absent."""
         found = self.repo(full_name, commit)
-        if found is not None and "\n" not in path:
-            data = self._cat(found[0], f"{commit}:{path}")
-            text = data.decode("utf-8", errors="replace") if data is not None else None
-        self._texts[key] = text
-        if len(self._texts) > _READ_CACHE:
-            self._texts.popitem(last=False)
-        return text
+        if found is None or "\n" in path:
+            return None
+        data = self._cat(found[0], f"{commit}:{path}")
+        return data.decode("utf-8", errors="replace") if data is not None else None
 
     def lines(self, full_name: str, commit: str | None, path: str) -> list[str] | None:
-        """The file's lines at the snapshot (`read`, split once and cached), or None when absent."""
+        """The file's lines at the snapshot, or None when absent; kept least-recently-used within `cache_bytes` (a
+        file above the whole budget is read and not kept)."""
         key = (full_name, commit or "", path)
         if key in self._lines:
             self._lines.move_to_end(key)
-            return self._lines[key]
-        text = self.read(full_name, commit, path)
-        lines = text.splitlines() if text is not None else None
-        self._lines[key] = lines
-        if len(self._lines) > _READ_CACHE:
-            self._lines.popitem(last=False)
+            return self._lines[key][0]
+        text = self._text(full_name, commit, path)
+        lines, size = (text.splitlines(), len(text)) if text is not None else (None, 0)
+        if size <= self._cache_bytes:
+            self._lines[key] = (lines, size)
+            self._cached_bytes += size
+            while self._cached_bytes > self._cache_bytes:
+                _, (_, dropped) = self._lines.popitem(last=False)
+                self._cached_bytes -= dropped
         return lines
+
+    def read(self, full_name: str, commit: str | None, path: str) -> str | None:
+        """The file's text at the snapshot (its `lines` joined), or None when absent."""
+        lines = self.lines(full_name, commit, path)
+        return None if lines is None else "\n".join(lines)

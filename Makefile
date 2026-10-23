@@ -18,6 +18,13 @@ EXPERIMENT_MEMORY_BUDGET_GB ?= 14
 # on GitHub exceeds CORPUS_MAX_REPO_SIZE_MB (default GITSERVER_MEMORY/4, i.e. 1536 MB) are not sampled.
 GITSERVER_MEMORY ?= 6g
 CORPUS_MAX_REPO_SIZE_MB ?=
+# Memory cap of the runner (compose limit). `analysis report` holds every normalised CBOM of an experiment and runs
+# up to 8 worker processes (--jobs, misc/cli/parallel.py), each with one parsed CBOM or one repository's records
+# plus numpy and scikit-learn; 2g was killed on corpus-pilot-medium (exit 137, 2026-10-23).
+RUNNER_MEMORY ?= 8g
+# Worker processes of `analysis report` (--jobs; 0 = auto: min(CPUs, 8) for a step with 16+ items). On the 64 GB VM:
+#   make experiment-export NAME=<exp> BF_CBOM_JOBS=16 RUNNER_MEMORY=32g
+BF_CBOM_JOBS ?= 0
 # Export everything defined above to downstream commands for cross-shell support
 .EXPORT_ALL_VARIABLES:
 # ====================================================

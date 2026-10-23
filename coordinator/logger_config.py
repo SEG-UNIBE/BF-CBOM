@@ -4,6 +4,7 @@ Import this module to get the configured logger across all pages.
 """
 
 import logging
+import multiprocessing
 import os
 
 import streamlit as st
@@ -22,6 +23,9 @@ def _init_logging():
 # Initialize the logger once at module level
 logger = _init_logging()
 
-# Log startup information
-print("[coordinator] Logger initialized")
-logger.info("Coordinator logger initialized (version=%s)", getattr(st, "__version__", "?"))
+# Log startup information in the main process only: a spawned worker of the analysis report (misc/cli/parallel.py)
+# re-imports the CLI's main module, and its banner would land on the terminal past the progress display (the worker's
+# process name is set before that import, its parent-process handle only after it)
+if multiprocessing.current_process().name == "MainProcess":
+    print("[coordinator] Logger initialized")
+    logger.info("Coordinator logger initialized (version=%s)", getattr(st, "__version__", "?"))

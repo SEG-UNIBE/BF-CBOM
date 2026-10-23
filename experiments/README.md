@@ -369,6 +369,14 @@ from its local directory into the cache, when that directory still gives the rec
 `RESULTS_DIR=experiments/results uv run bf-cbom analysis report <exp> --fetch`.
 The VM runs the experiments; the laptop re-runs the analysis with other options.
 
+**In parallel.** `report` (and `tables`, `normalize`, `schema`, `levels`, `score`, `micro`) normalises, validates and
+matches in a process pool, one CBOM or one repository per task: `--jobs N` (env `BF_CBOM_JOBS`; `experiment export`
+takes it too). `0`, the default, is auto: `min(CPUs, 8)` workers for a step with 16 or more items, else sequential;
+`1` is sequential. The results do not depend on it: every table, the summary and the normalised CBOMs are byte-identical
+to `--jobs 1`. In the runner the pool is bounded by `RUNNER_MEMORY` (Makefile, default 8g); both are Makefile variables
+(`make experiment-export NAME=<exp> BF_CBOM_JOBS=16 RUNNER_MEMORY=32g` on the 64 GB VM). A worker the cap kills ends
+the report, so lower the jobs or raise the cap.
+
 **RaQuN** (matcher (c), `analysis/matchers/raqun.py`) runs next to the exact matcher, always in the runner image
 (the `raqun` extra, PyQuN from the user's fork) and on the host after `uv sync --extra raqun` (`--raqun/--no-raqun`
 forces it): tools are models, a tool's distinct canonical assets are elements, built from the exact matcher's

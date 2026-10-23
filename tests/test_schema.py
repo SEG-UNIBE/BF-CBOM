@@ -143,6 +143,16 @@ def test_snapshot_store_reads_the_mirror_or_fetches_into_the_cache(tmp_path):
     assert store.lines("o/r", sha, "pkg/crypto.py")[0] == "import hashlib" and store.lines("o/r", sha, "pkg") is None
     assert store.read("o/r", sha, "README.md") is not None  # the same cat-file process serves every file of the repo
     assert len(store._batches) == 1
+    # the lines cache is bounded by bytes, not files: a file above the budget is read and not kept, and an older
+    # file makes room for a newer one
+    texts = {p: store.read("o/r", sha, p) for p in ("pkg/crypto.py", "README.md")}
+    tiny = SnapshotStore(mirror_dir=mirrors, cache_dir=cache, cache_bytes=1)
+    assert tiny.lines("o/r", sha, "pkg/crypto.py") == texts["pkg/crypto.py"].splitlines() and not tiny._lines
+    one = SnapshotStore(mirror_dir=mirrors, cache_dir=cache, cache_bytes=max(len(t) for t in texts.values()))
+    assert one.lines("o/r", sha, "pkg/crypto.py") and one.lines("o/r", sha, "README.md")
+    assert [k[2] for k in one._lines] == ["README.md"]
+    assert one._cached_bytes == sum(size for _, size in one._lines.values()) > 0
+    tiny.close(), one.close()
     store.close()
     assert not store._batches and store.read("o/r", sha, "pkg/crypto.py").startswith("import hashlib")  # restarted
 

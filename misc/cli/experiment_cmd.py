@@ -795,6 +795,7 @@ def export(
     name: str = NAME_ARG,
     dest: Path = DEST_OPT,
     no_report: bool = typer.Option(False, "--no-report", help="Zip as stored, without running `analysis report`"),
+    jobs: int = typer.Option(0, "--jobs", envvar="BF_CBOM_JOBS", help="Worker processes of the report (0 = auto)"),
 ):
     """Zip one experiment (its record, run log, all CBOMs and meta files, _ANALYSIS/ with _SUMMARY.md). The only way
     data leaves the volume. Runs `analysis report` first, so the CSV tables and _SUMMARY.md in the zip are current."""
@@ -806,7 +807,7 @@ def export(
             from misc.cli.analysis_cmd import run_report  # local import: the analysis is not needed for the runs
 
             try:
-                run_report(exp_dir)
+                run_report(exp_dir, jobs=jobs)
             except Exception as e:  # incl. typer.Exit; an export must never fail because the analysis did
                 typer.secho(f"analysis report failed ({e!r}); exporting the stored files only", fg=typer.colors.YELLOW)
         dest.mkdir(parents=True, exist_ok=True)
