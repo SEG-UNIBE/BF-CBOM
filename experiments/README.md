@@ -241,8 +241,12 @@ with its count and remaining time (`progress.forecast`: its jobs left times its 
 with its slowest tool), the job it runs now and for how long (the longest-running one first, from the start times the workers
 write to Redis), how many wait and what failed; tools of a later wave wait with their clock still. Every stored
 result still prints its own line above the board (status, tool, snapshot, run, duration, path). Pinning and
-mirroring count the repos the same way, and so does `corpus build` per language (repos picked out of the quota, the
-cell searched or the repo cloned for the crypto check). Off a terminal only the lines print. `--no-wait` enqueues only the
+mirroring count the repos the same way (a line announces the two slow cases, a mirror cloned on first use and a
+fetch for a pinned commit the mirror lacks; everything else is local), and so does `corpus build` per language (repos
+picked out of the quota, the cell searched or the repo cloned for the crypto check). Off a terminal only the lines
+print. The display belongs to the terminal `make experiment` runs in; `make experiment-attach` joins it from another
+shell (tmux window, second ssh session) and shows the board and the result lines from then on. Detach with
+Ctrl-P Ctrl-Q: Ctrl-C there interrupts the run exactly as in its own terminal, and `make experiment-collect` resumes it. `--no-wait` enqueues only the
 first wave; after `make experiment-collect NAME=<exp>` rerun `run` for the next one. Jobs left pending by an interrupted
 run are already in the queues and are collected in wave 1 regardless of the budget.
 

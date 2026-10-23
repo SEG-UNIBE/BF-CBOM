@@ -413,24 +413,35 @@ def mirror_url(full_name: str, variant_commit: str, server_url: str = GITSERVER_
 
 
 def _git(args: list[str], *, timeout: float | None = 900) -> subprocess.CompletedProcess:
+    """Run git; a call that gives no answer within `timeout` seconds (a stalled network, a huge repository) is an
+    `ExperimentError` naming the command, so the step fails with that reason instead of a traceback."""
     env = os.environ.copy()
     env.setdefault("GIT_TERMINAL_PROMPT", "0")
-    return subprocess.run(["git", *args], capture_output=True, text=True, env=env, timeout=timeout, check=False)
+    try:
+        return subprocess.run(["git", *args], capture_output=True, text=True, env=env, timeout=timeout, check=False)
+    except subprocess.TimeoutExpired:
+        shown = " ".join(a for a in args if not a.startswith("--"))
+        raise ExperimentError(
+            f"git {shown} gave no answer within {timeout} s (a stalled network or a very large repository)"
+        ) from None
 
 
-def ensure_mirror(spec: RepoSpec, commit: str, *, mirror_dir: Path = GIT_MIRROR_DIR) -> Path:
+def ensure_mirror(spec: RepoSpec, commit: str, *, mirror_dir: Path = GIT_MIRROR_DIR, log=lambda m: None) -> Path:
     """Make sure the bare mirror holds `commit` and has the branch for the original variant.
 
     Creates the bare repo on first use (`git clone --bare`), fetches when the commit is missing,
-    and allows fetching arbitrary reachable SHAs so workers can check out exactly that commit.
+    and allows fetching arbitrary reachable SHAs so workers can check out exactly that commit. Both go over the
+    network and can take minutes, so each is announced through `log`; a mirror that has the commit costs nothing.
     """
     bare = mirror_path(spec.full_name, mirror_dir)
     if not (bare / "HEAD").exists():
         bare.parent.mkdir(parents=True, exist_ok=True)
+        log(f"  cloning {spec.full_name} into the mirror (first use)")
         proc = _git(["clone", "--bare", "--quiet", spec.source_url, str(bare)])
         if proc.returncode != 0:
             raise ExperimentError(f"mirror clone failed for {spec.full_name}: {proc.stderr.strip()[-300:]}")
     if _git(["-C", str(bare), "cat-file", "-e", f"{commit}^{{commit}}"]).returncode != 0:
+        log(f"  fetching {spec.full_name}: commit {commit[:12]} is not in the mirror yet")
         proc = _git(["-C", str(bare), "fetch", "--quiet", "origin", "+refs/heads/*:refs/heads/*"])
         if proc.returncode != 0 or _git(["-C", str(bare), "cat-file", "-e", f"{commit}^{{commit}}"]).returncode != 0:
             raise ExperimentError(f"commit {commit[:12]} of {spec.full_name} not found upstream")
@@ -537,7 +548,10 @@ def snapshot_files(full_name: str, commit: str | None, *, mirror_dir: Path = GIT
     bare = mirror_path(full_name, mirror_dir)
     if not commit or not (bare / "HEAD").exists():
         return None
-    proc = _git(["-C", str(bare), "ls-tree", "-r", "--name-only", "-z", commit], timeout=120)
+    try:
+        proc = _git(["-C", str(bare), "ls-tree", "-r", "--name-only", "-z", commit], timeout=120)
+    except ExperimentError:
+        return None
     if proc.returncode != 0:
         return None
     return frozenset(p for p in proc.stdout.split("\0") if p)
@@ -652,7 +666,7 @@ def resolve_snapshots(
             if not commit:
                 raise ExperimentError(f"cannot resolve {repo.full_name}@{branch} (unknown branch or unreachable)")
         log(f"  {repo.full_name}@{branch} -> {commit[:12]}")
-        bare = ensure_mirror(repo, commit, mirror_dir=mirror_dir)
+        bare = ensure_mirror(repo, commit, mirror_dir=mirror_dir, log=log)
         if cap_mb and (size := mirror_size_mb(bare)) > cap_mb:
             log(
                 f"  warning: mirror of {repo.full_name} is {size} MB, above the repo size cap {cap_mb} MB "

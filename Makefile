@@ -126,6 +126,15 @@ experiment: ensure-env
 	EXPERIMENT_IMAGE_IDS="$$(docker images --no-trunc --format '{{.Repository}}:{{.Tag}}={{.ID}}' --filter 'reference=bf-cbom/*:$(VERSION)' | paste -sd ',' -)" \
 	docker compose run --rm -e EXPERIMENT_IMAGE_IDS -e EXPERIMENT_REPLICAS runner experiment run /app/$(EXP) $(ARGS)
 
+# make experiment-attach  -> join the terminal of the `experiment run` of this stack from another shell: its progress
+# board and the result lines from now on. Detach with Ctrl-P Ctrl-Q; Ctrl-C interrupts the run as in its own terminal.
+experiment-attach:
+	@id=$$(docker ps --no-trunc --filter label=com.docker.compose.project=bf-cbom \
+		--filter label=com.docker.compose.service=runner --format '{{.ID}} {{.Command}}' \
+		| grep -F 'experiment run' | cut -d' ' -f1 | head -1); \
+	test -n "$$id" || { echo "no experiment run is running in this stack (make experiment EXP=...)"; exit 1; }; \
+	docker attach --detach-keys='ctrl-p,ctrl-q' $$id
+
 # make experiment-status NAME=mutation-smoke   /   make experiment-list
 experiment-status:
 	docker compose run --rm runner experiment status $(NAME)
@@ -185,8 +194,8 @@ $(ENV_DIR)/%.env: $(ENV_DIR)/%.env.template
 	@$(ENSURE_ENV_SCRIPT) $< $@
 
 .PHONY: clean-docker build-base build-all release up-dev up-prod up-prod-pull up-all down board logs ps show-workers \
-	experiment experiment-status experiment-list experiment-collect experiment-cancel experiment-delete \
-	experiment-export corpus corpus-prune corpus-export analysis clean-cache
+	experiment experiment-attach experiment-status experiment-list experiment-collect experiment-cancel \
+	experiment-delete experiment-export corpus corpus-prune corpus-export analysis clean-cache
 
 # Frees Docker's build cache and dangling images (safe: volumes and tagged images are kept).
 # Repeated rebuilds of the large worker images fill the Docker VM disk ("No space left on device").

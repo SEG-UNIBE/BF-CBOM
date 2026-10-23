@@ -18,7 +18,8 @@ normalisation, analysis outputs),
   NO_CACHE=1`. Never run plain `docker compose up` or `docker compose run`: the Makefile exports the image tag
   (`VERSION`) and `BASE_IMAGE`; without them compose looks for `:latest` images and tries to build from a nonexistent
   `base`. Every runner command has a target: `experiment`, `experiment-list` / `-status` / `-collect` / `-cancel` /
-  `-delete` / `-export`, `analysis`, `corpus`, `corpus-prune`, `board`. After every pull run `make up-prod` first: the runner
+  `-delete` / `-export`, `analysis`, `corpus`, `corpus-prune`, `board`; `experiment-attach` joins the terminal of
+  the running `experiment run` from another shell (detach with Ctrl-P Ctrl-Q, never Ctrl-C). After every pull run `make up-prod` first: the runner
   bakes the CLI and the workers bake `common/`.
 - **Nothing lands on the host unless exported.** Results and git mirrors stay in the named volumes `results-data` and
   `git-data`; `make experiment-export` exports experiments and `make corpus-export` exports sampled corpus YAMLs,
@@ -73,7 +74,10 @@ normalisation, analysis outputs),
 - **Batch experiments.** `make experiment EXP=experiments/<x>.yaml` runs `bf-cbom experiment run` in the runner
   (`misc/cli/experiment_cmd.py`, logic in `common/experiment.py`): it pins every repo's commit, mirrors it to the
   `gitserver` service (one served repo `<owner>/<repo>--<sha12>.git` per snapshot, because CBOMkit only checks out a
-  clone's default branch; a mutant is a branch `bfcbom/<id>`), enqueues through the normal Redis protocol and
+  clone's default branch; a mutant is a branch `bfcbom/<id>`; the base mirror in `git-data` is cloned on first use
+  and fetched when the pinned commit is missing, each announced by a line, and nothing else goes over the network,
+  so a rerun pins 60 repos in seconds; a git call that stalls for 15 min fails the step with that reason,
+  `_git`), enqueues through the normal Redis protocol and
   stores the results on `results-data`. A spec's `mutation:` block makes every repo's variants the original plus
   generated mutants, planted calls and planted decoys (`mutation/mutants.py`, Phase 4), pinned in `mutants.json` like
   the commits in `_experiment.yaml`; `tool_languages:` narrows a tool to some languages in this experiment, a hand edit (after reading the

@@ -143,6 +143,40 @@ def test_repo_dict_to_info_prefers_explicit_branch_and_keeps_commit():
 # ----- mirroring, pinning, planning, persistence -----
 
 
+def test_ensure_mirror_announces_its_clone_and_fetch_only(upstream, tmp_path: Path):
+    src, sha1, sha2 = upstream
+    mirrors = tmp_path / "mirrors"
+    repos = [{"full_name": "own/repo", "git_url": str(src)}]
+    repo = ex.spec_from_dict({"name": "e", "tools": ["t"], "repos": repos}).repos[0]
+    lines: list[str] = []
+    ex.ensure_mirror(repo, sha2, mirror_dir=mirrors, log=lines.append)
+    assert lines == ["  cloning own/repo into the mirror (first use)"]
+    lines.clear()
+    ex.ensure_mirror(repo, sha1, mirror_dir=mirrors, log=lines.append)  # the mirror has it: silent
+    assert lines == []
+    (src / "b.py").write_text("x = 1\n")
+    _git("add", ".", cwd=src)
+    _git("commit", "-q", "-m", "three", cwd=src)
+    sha3 = _git("rev-parse", "HEAD", cwd=src)
+    ex.ensure_mirror(repo, sha3, mirror_dir=mirrors, log=lines.append)
+    assert lines == [f"  fetching own/repo: commit {sha3[:12]} is not in the mirror yet"]
+    assert _git("rev-parse", f"refs/heads/bfcbom/{sha3}", cwd=mirrors / "own" / "repo.git") == sha3
+
+
+def test_a_git_call_that_stalls_is_an_experiment_error_naming_the_command(monkeypatch):
+    def stall(cmd, **kwargs):
+        raise subprocess.TimeoutExpired(cmd, kwargs["timeout"])
+
+    monkeypatch.setattr(ex.subprocess, "run", stall)
+    with pytest.raises(ex.ExperimentError) as e:
+        ex._git(["clone", "--bare", "--quiet", "https://example.invalid/o/r", "/srv/git/o/r.git"], timeout=900)
+    assert str(e.value) == (
+        "git clone https://example.invalid/o/r /srv/git/o/r.git gave no answer within 900 s "
+        "(a stalled network or a very large repository)"
+    )
+    assert ex.snapshot_files("o/r", "a" * 40, mirror_dir=Path("/nonexistent")) is None
+
+
 def test_mirror_pin_plan_and_write(upstream, tmp_path: Path):
     src, sha1, sha2 = upstream
     mirrors = tmp_path / "mirrors"

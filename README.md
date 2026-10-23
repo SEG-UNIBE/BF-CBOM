@@ -250,6 +250,7 @@ The same commands work on every platform and after `make up-prod-pull`:
 ```bash
 make board                # reopen the live board (Ctrl+C closes it; the stack keeps running)
 make board ARGS=--once    # print one snapshot of it and exit (e.g. over ssh, or into a file)
+make experiment-attach    # join the terminal of a running `make experiment` (detach with Ctrl-P Ctrl-Q, not Ctrl-C)
 make logs                 # the containers' raw logs, followed
 make ps                   # the containers and their state
 make down                 # stop the stack
@@ -353,7 +354,8 @@ make experiment-export NAME=bar-micro
 ```
 
 The run waits for results; `make board` or `make experiment-status NAME=bar-micro` can also be used in a second
-terminal while it runs. Repeating the run command resumes missing work. After changing worker code, rebuild
+terminal while it runs, and `make experiment-attach` joins the run's own terminal with its progress board (detach
+with Ctrl-P Ctrl-Q; Ctrl-C would interrupt the run). Repeating the run command resumes missing work. After changing worker code, rebuild
 with `make up-prod`, then use `ARGS="--rerun <tool>"` on the experiment command to replace that tool's results.
 For a new tool, create a separate spec under `experiments/` with a unique `name` and only that tool in `tools`
 (copy the micro spec's `repos`). `--rerun` selects results to redo; it does not restrict the spec to one tool.
