@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from analysis.levels import LEVELS
 from analysis.matchers import ExactMatcher, MatchGroup
 from analysis.matchers.compare import compare
 from analysis.matchers.raqun import attributes
@@ -53,7 +54,66 @@ def test_structured_attributes_are_canonical_dimension_values():
         "primitive=ae",
     }  # the standard's dimensions: our coarse group is no attribute
     assert attributes(_rec(1, "a", "parseCsvMap"), "L3") == {"algorithm=parsecsvmap"}
-    assert attributes(rec, "L1") == {"algorithm=aes256gcm"}  # no normalised values below L2
+    assert attributes(rec, "L1") == {"algorithm=aes256gcm", "family=AES", "key_size=256", "mode=GCM", "primitive=ae"}
+
+
+@pytest.mark.parametrize(
+    "via,src", [("field", "cryptoProperties.algorithmProperties.mode"), ("parse", "name"), ("dictionary", "properties")]
+)
+def test_raqun_parameters_are_fixed_at_every_level_regardless_of_source(via, src):
+    rec = _rec(0, "a", "AES-256-GCM", algorithm="AES", family="AES", mode="GCM", key_size=256)
+    rec.via = {dim: via for dim in rec.values}
+    rec.src = {dim: src for dim in rec.values}
+    expected_keys = ["AES-256-GCM", "aes256gcm", "aes256gcm", "AES", "AES"]
+    for level, key in zip(LEVELS, expected_keys, strict=True):
+        assert attributes(rec, level) == {f"algorithm={key}", "family=AES", "mode=GCM", "key_size=256"}
+
+
+def test_raqun_uses_parameter_differences_even_at_l0():
+    pytest.importorskip("RaQuN_Lab")
+    from analysis.matchers.raqun import RaqunMatcher
+
+    records = [
+        _rec(0, "a", "AES", family="AES", key_size=128, mode="CBC"),
+        _rec(1, "b", "AES", family="AES", key_size=256, mode="GCM"),
+        _rec(2, "c", "AES", family="AES", key_size=128, mode="CBC"),
+    ]
+    for level in LEVELS:
+        groups = RaqunMatcher(level=level).match(records)
+        assert {frozenset(r.record_id for r in g.members) for g in groups} == {
+            frozenset({"a:0:0", "c:2:0"}),
+            frozenset({"b:1:0"}),
+        }
+
+
+def test_inspection_csv_preserves_names_attributes_and_empty_tool_cells(tmp_path):
+    import csv
+
+    from analysis.tables import raqun_inspection_rows, write_csv
+
+    recs = [
+        _rec(0, "a", 'AES, "256"', algorithm="AES", family="AES", key_size=256),
+        _rec(1, "a", "AES-256", algorithm="AES", family="AES", key_size=256),
+        _rec(2, "b", "AES", algorithm="AES", family="AES", key_size=256),
+    ]
+    groups = {("owner__repo@abc", "original"): [MatchGroup("R00001", "repo", "AES", recs, {"similarity": 1.0})]}
+    rows, columns = raqun_inspection_rows(groups, level="L4", run=2, tools=["a", "b", "c"])
+    path = tmp_path / "raqun-L4-run2.csv"
+    write_csv(path, rows, columns)
+    with path.open(newline="") as fh:
+        (row,) = csv.DictReader(fh)
+    assert (row["repo"], row["level"], row["run"], row["n_tools"], row["n_records"]) == (
+        "owner/repo",
+        "L4",
+        "2",
+        "2",
+        "3",
+    )
+    assert row["a"] == json.dumps(['AES, "256"', "AES-256"]) + (
+        " <algorithm=AES; family=AES; key_size=256> [2 records]"
+    )
+    assert row["b"] == '["AES"] <algorithm=AES; family=AES; key_size=256> [1 records]'
+    assert row["c"] == "" and row["similarity"] == "1.0"
 
 
 def test_compare_partitions_by_co_membership():

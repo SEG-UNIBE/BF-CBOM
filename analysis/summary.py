@@ -52,13 +52,19 @@ FILES = {
     "groups-exact-run{k}.csv": "exact matcher: one row per group (repo scope per item, site scope per call site)",
     "members-exact-run{k}.csv": "exact matcher: one row per (group, record); `matched` = joined through a lower "
     "level, `implied` with --closure",
-    "matchlevels-run{k}.csv": "per matcher and level, items by number of voter groups and the agreement per "
-    "dimension inside the groups",
+    "matchlevels-run{k}.csv": "per matcher and level, items by number of voter groups, the agreement per "
+    "dimension inside the groups and the matcher's seconds",
     "agreement-exact-run{k}.csv": "exact matcher: one row per (group, dimension): voters reporting, agreeing, majority",
     "groups-raqun-run{k}.csv": "RaQuN: one row per group, with its attribute-set similarity",
+    **{
+        f"raqun-{lv}-run{{k}}.csv": f"RaQuN at {lv}, to read: one row per group, per tool the names it reported, the "
+        "attributes matched and the records behind them"
+        for lv in LEVEL_ORDER
+    },
     "members-raqun-run{k}.csv": "RaQuN: one row per (group, record)",
     "agreement-raqun-run{k}.csv": "RaQuN: one row per (group, dimension)",
-    "matchers-run{k}.csv": "per repository, exact vs RaQuN: common records, groups, co-membership pair Jaccard",
+    "matchers-run{k}.csv": "per repository and level, exact vs RaQuN: common records, groups, co-membership pair "
+    "Jaccard, each matcher's seconds",
     "score-run{k}.csv": "per tool, dimension and level: items, confirmation (CI), exclusivity, coverage, rank, "
     "Dawid-Skene",
     "loo-run{k}.csv": "the order without each voter group and its Kendall tau against the full order",
@@ -1267,6 +1273,11 @@ def _matching(levels: list[dict], groups: list[dict], matchers: list[dict]) -> l
         "holds at most one value set per tool, a tool's records with the same values count as one). How many voter "
         "groups end up together says how much the tools agree.",
         "",
+        "RaQuN keeps all non-identity attributes fixed at their full normalised values from L0 onward; only the "
+        "algorithm identity varies across levels. Each level is matched independently, so groups can rearrange "
+        "and their count need not decrease. The parameter-agreement columns below still follow the ladder's "
+        "source-admission rules; those rules do not restrict RaQuN's matching inputs.",
+        "",
     ]
     if levels:
         lines += [
@@ -1316,10 +1327,31 @@ def _matching(levels: list[dict], groups: list[dict], matchers: list[dict]) -> l
                     f"voter groups give a {agree[0].replace('_', ' ')}, and in {share} of them all give the same."
                 )
             lines += _eg(text)
+        lines += _timing(levels)
         lines += [""]
     lines += _overlap(groups)
     lines += _matchers(matchers)
     return lines
+
+
+def _timing(levels: list[dict]) -> list[str]:
+    """The matchers' wall time per level, summed over the repositories (`seconds` in matchlevels-run<k>.csv)."""
+    by = {(r["matcher"], r["level"]): _float(r.get("seconds")) for r in levels}
+    names = {"exact": "exact matcher", "raqun": "RaQuN"}
+    matchers = [m for m in names if any(by.get((m, lv)) is not None for lv in LEVEL_ORDER)]
+    if not matchers:
+        return []
+    table = [
+        [names[m], *(f"{by[(m, lv)]:.2f}" if by.get((m, lv)) is not None else "" for lv in LEVEL_ORDER)]
+        for m in matchers
+    ]
+    text = (
+        f"**Matching time**: seconds per matcher and level, summed over the {_n(_int(levels[0]['repos']))} "
+        "repositories; measured in the report around each matcher's call alone (the vocabulary load and PyQuN's "
+        "imports are outside the clock, and the process pool does not change the sum). A level is one clustering for "
+        "the exact matcher and one n-way matching for RaQuN."
+    )
+    return ["", text, "", *md_table(["matcher", *LEVEL_ORDER], table, "l" + "r" * len(LEVEL_ORDER))]
 
 
 def _headline(levels: list[dict]) -> list[str]:

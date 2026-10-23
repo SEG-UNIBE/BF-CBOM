@@ -373,7 +373,7 @@ The VM runs the experiments; the laptop re-runs the analysis with other options.
 matches in a process pool, one CBOM or one repository per task: `--jobs N` (env `BF_CBOM_JOBS`; `experiment export`
 takes it too). `0`, the default, is auto: `min(CPUs, 8)` workers for a step with 16 or more items, else sequential;
 `1` is sequential. The results do not depend on it: every table, the summary and the normalised CBOMs are byte-identical
-to `--jobs 1`. In the runner the pool is bounded by `RUNNER_MEMORY` (Makefile, default 8g); both are Makefile variables
+to `--jobs 1` (the matchers' timing columns aside). In the runner the pool is bounded by `RUNNER_MEMORY` (Makefile, default 8g); both are Makefile variables
 (`make experiment-export NAME=<exp> BF_CBOM_JOBS=16 RUNNER_MEMORY=32g` on the 64 GB VM). A worker the cap kills ends
 the report, so lower the jobs or raise the cap.
 
@@ -385,8 +385,22 @@ standard's dimensions, not our `group`), RaQuN's Jaccard on them is the per-fiel
 `groups-raqun`/`members-raqun`/`agreement-raqun-run<k>.csv` have the same columns as the exact tables (at the
 scoring level), `matchers-run<k>.csv` compares the two partitions per repository and level (co-membership pair
 Jaccard, share of groups that sit inside one group of the other matcher), and RaQuN's rows in
-`matchlevels-run<k>.csv` put it next to the exact matcher level by level (its attributes are the identity and the
-values admitted at that level).
+`matchlevels-run<k>.csv` put it next to the exact matcher level by level. Only `algorithm=<identity at the level>`
+varies: `family`, `primitive`, `mode`, `padding`, `curve`, `key_size` and `digest` use their full normalised values
+from L0 onward, with missing values omitted (controlled comparison, 2026-10-23). Each level is matched independently;
+groups can rearrange and their count need not decrease. The parameter-agreement columns still use the ladder's
+source-admission rules; these describe the resulting groups, not the attributes fed into RaQuN. Each matcher's wall
+time is recorded next to its results: per repository and level in `matchers-run<k>.csv` (`exact_seconds`,
+`raqun_seconds`), summed per level in `matchlevels-run<k>.csv` (`seconds`), and as the summary's "Matching time"
+table (RaQuN's n-way matching next to the exact matcher's clustering; measured around the `match` call alone, PyQuN's
+imports and the vocabulary load excluded, so the process pool does not change the sums).
+
+For visual inspection, **`raqun-L0-run<k>.csv` through `raqun-L4-run<k>.csv`** show one match per row and one
+column per tool. A cell contains the distinct reported names, the exact attributes fed into matching at that level,
+and the number of underlying records, e.g. `["AES-256-GCM"] <algorithm=AES; family=AES; key_size=256; mode=GCM>
+[3 records]`. An empty tool cell means that tool has no element in the match. Singleton matches are included;
+filter `n_tools >= 2` for cross-tool matches. Repository, snapshot, variant, run, level, group ID and similarity
+identify the match; group IDs are local to that snapshot, variant, run and level, not stable across levels.
 
 **`score <exp>`** computes the per-tool rates without ground truth (RQ3b, `analysis/score.py`; no ranking claim) on the exact
 matcher's groups. Voter groups follow shared detection logic (the two CBOMkit packagings count once;
@@ -554,4 +568,3 @@ the record, every CBOM and its meta file. The export runs `analysis report` firs
 ```
 make experiment-export NAME=stability-pilot   # -> experiments/results/stability-pilot.zip on the host, open stability-pilot/_ANALYSIS/_SUMMARY.md
 ```
-

@@ -241,10 +241,20 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert int(exact[0]["items"]) == int(exact[-1]["items"])  # the unit is fixed across levels
     k2plus = [int(r["k2"]) + int(r["k3"]) + int(r["k4plus"]) for r in exact]
     assert k2plus == sorted(k2plus)  # cumulative: agreement never drops at a higher level
+    assert all(float(r["seconds"]) >= 0 for r in levels)  # each matcher's time per level
+    assert "**Matching time**" in (out / "_SUMMARY.md").read_text(encoding="utf-8")
     if raqun.available():  # the `raqun` extra (CI, the runner image): matcher (c) at every level, next to exact
         assert [r["level"] for r in levels if r["matcher"] == "raqun"] == list(lv.LEVELS)
-        assert {r["level"] for r in _read_csv(out / "matchers-run1.csv")} == set(lv.LEVELS)
+        matchers = _read_csv(out / "matchers-run1.csv")
+        assert {r["level"] for r in matchers} == set(lv.LEVELS)
+        assert all(float(r["exact_seconds"]) >= 0 and float(r["raqun_seconds"]) >= 0 for r in matchers)
         assert _read_csv(out / "groups-raqun-run1.csv")
+        for level in lv.LEVELS:
+            inspection = _read_csv(out / f"raqun-{level}-run1.csv")
+            assert inspection and {r["level"] for r in inspection} == {level}
+            assert all("cbomkit" in r and "cipherradar" in r for r in inspection)
+            assert all(sum(bool(r[t]) for t in ("cbomkit", "cipherradar")) == int(r["n_tools"]) for r in inspection)
+            assert any("algorithm=" in r["cbomkit"] for r in inspection)
     assert {a["tool"] for a in algos} == {"cbomkit", "cipherradar"} and algos[0]["language"] == "Java"
     info = json.loads((out / "tables-run1.json").read_text())
     assert info["rows"]["items-run1.csv"] == len(algos) and info["vocabulary"]["algorithms"]
@@ -277,7 +287,8 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
 
 def test_report_is_identical_sequential_and_parallel(tmp_path, monkeypatch, old_truth):
     """The process pool (misc/cli/parallel.py) changes nothing in any table, the summary or the normalised CBOMs:
-    every file written with --jobs 1 and with two spawned workers is the same byte for byte (timestamps aside)."""
+    every file written with --jobs 1 and with two spawned workers is the same byte for byte (the timestamps and the
+    matchers' timings aside)."""
     from typer.testing import CliRunner
 
     from misc.cli import analysis_cmd
@@ -292,7 +303,15 @@ def test_report_is_identical_sequential_and_parallel(tmp_path, monkeypatch, old_
             if p.is_file() and (p.parent.name == "_ANALYSIS" or p.name == "run1.norm.json")
         }
         summary = out["_ANALYSIS/_SUMMARY.md"].split(b"\n")
-        out["_ANALYSIS/_SUMMARY.md"] = b"\n".join(line for line in summary if b"summary generated" not in line)
+        timing_rows = (b"| exact matcher |", b"| RaQuN |")  # the "Matching time" table
+        out["_ANALYSIS/_SUMMARY.md"] = b"\n".join(
+            line for line in summary if b"summary generated" not in line and not line.startswith(timing_rows)
+        )
+        timing = {"matchlevels-run1.csv": {"seconds"}, "matchers-run1.csv": {"exact_seconds", "raqun_seconds"}}
+        for name, columns in timing.items():
+            if f"_ANALYSIS/{name}" in out:
+                rows = [{k: v for k, v in r.items() if k not in columns} for r in _read_csv(exp / "_ANALYSIS" / name)]
+                out[f"_ANALYSIS/{name}"] = json.dumps(rows).encode()
         info = json.loads(out["_ANALYSIS/tables-run1.json"])
         info.pop("generated_at", None)
         out["_ANALYSIS/tables-run1.json"] = json.dumps(info).encode()

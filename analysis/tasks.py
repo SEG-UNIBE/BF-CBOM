@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+from time import perf_counter
 
 from analysis import levels as lv, schema as sch
 from analysis.matchers import raqun as rq
@@ -25,8 +26,10 @@ NormalizeItem = tuple[dict, Path, str, str | None, frozenset[str] | None, bool]
 SchemaItem = tuple[dict, Path, str | None, str | None]
 # ((snapshot, variant), its records, the levels, window, closure, voter map, RaQuN too)
 MatchItem = tuple[tuple[str, str], list[NormRecord], tuple[str, ...], int, bool, VoterMap, bool]
-# ({level: exact groups}, {level: RaQuN groups} or None, {level: compare row})
-MatchResult = tuple[dict[str, list[MatchGroup]], dict[str, list[MatchGroup]] | None, dict[str, dict]]
+# ({level: exact groups}, {level: RaQuN groups} or None, {level: compare row}, {matcher: {level: seconds}})
+MatchResult = tuple[
+    dict[str, list[MatchGroup]], dict[str, list[MatchGroup]] | None, dict[str, dict], dict[str, dict[str, float]]
+]
 
 
 def write_json(path: Path, data, *, sort_keys: bool = False) -> None:
@@ -78,18 +81,29 @@ def schema_one(item: SchemaItem) -> dict | None:
 
 def match_snapshot(item: MatchItem) -> MatchResult:
     """Both matchers on one repository's records at every level: the exact matcher's groups per level and, when asked,
-    RaQuN's groups per level with the comparison of the two partitions (analysis/matchers/compare.py). One result
-    per repository keeps the records shared between the levels' groups shared in the pickle too."""
+    RaQuN's groups per level with the comparison of the two partitions (analysis/matchers/compare.py), plus each
+    matcher's wall time per level, measured around its `match` call alone: the matcher is built (the vocabulary
+    load) and PyQuN imported before the clock starts, so a worker's first repository costs what the others cost.
+    One result per repository keeps the records shared between the levels' groups shared in the pickle too."""
     key, records, levels, window, closure, voter_of, raqun = item
-    exact = {
-        level: ExactMatcher(level=level, window=window, closure=closure, voter_of=voter_of).match(records)
-        for level in levels
-    }
+    seconds: dict[str, dict[str, float]] = {"exact": {}, "raqun": {}}
+    exact: dict[str, list[MatchGroup]] = {}
+    for level in levels:
+        matcher = ExactMatcher(level=level, window=window, closure=closure, voter_of=voter_of)
+        start = perf_counter()
+        exact[level] = matcher.match(records)
+        seconds["exact"][level] = perf_counter() - start
     if not raqun:
-        return exact, None, {}
-    groups = {level: rq.RaqunMatcher(level=level, voter_of=voter_of).match(records) for level in levels}
+        return exact, None, {}, seconds
+    rq.available()  # PyQuN's imports, once per process
+    groups: dict[str, list[MatchGroup]] = {}
+    for level in levels:
+        raqun_matcher = rq.RaqunMatcher(level=level, voter_of=voter_of)
+        start = perf_counter()
+        groups[level] = raqun_matcher.match(records)
+        seconds["raqun"][level] = perf_counter() - start
     compared = {level: compare(exact[level], groups[level], "exact", "raqun") for level in levels}
-    return exact, groups, compared
+    return exact, groups, compared, seconds
 
 
 LEVELS = lv.LEVELS  # the levels a MatchItem names, re-exported for the caller

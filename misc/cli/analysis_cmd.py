@@ -550,8 +550,10 @@ def _match_step(
 ) -> tuple[dict[tuple[str, str], list], list[dict]]:  # fmt: skip
     """Both matchers at every level, one repository per task (analysis/tasks.py:match_snapshot, in the process pool):
     groups/members/agreement-exact-run<k>.csv at the scoring level and, with RaQuN, the same -raqun tables and
-    matchers-run<k>.csv (RaQuN vs the exact matcher per repository and level). Returns the exact matcher's groups at
-    the scoring level and the matchlevels rows (exact per level, then RaQuN per level)."""
+    matchers-run<k>.csv (RaQuN vs the exact matcher per repository and level, with each matcher's seconds there) and
+    raqun-<level>-run<k>.csv (RaQuN's groups to read, one column per tool). Returns the exact matcher's groups at
+    the scoring level and the matchlevels rows (exact per level, then RaQuN per level, each with the matcher's
+    seconds summed over the repositories)."""
     keys = list(per_snapshot)  # sorted by _match_input; every table below follows this order
     items: list[tasks.MatchItem] = [
         (key, per_snapshot[key], lv.LEVELS, window, closure, voter_of, raqun) for key in keys
@@ -560,7 +562,16 @@ def _match_step(
     matched = pmap(tasks.match_snapshot, items, jobs=jobs, name=name, item=lambda it: tbl.full_name(it[0][0]))
     results = dict(zip(keys, matched, strict=True))
     exact_by_level = {lv_name: {key: results[key][0][lv_name] for key in keys} for lv_name in lv.LEVELS}
-    rows = [tbl.matchlevel_row("exact", lv_name, run, exact_by_level[lv_name], voter_of) for lv_name in lv.LEVELS]
+
+    def level_rows(matcher: str, by_level: dict[str, dict]) -> list[dict]:
+        out = []
+        for lv_name in lv.LEVELS:
+            row = tbl.matchlevel_row(matcher, lv_name, run, by_level[lv_name], voter_of)
+            row["seconds"] = round(sum(results[key][3][matcher][lv_name] for key in keys), 3)
+            out.append(row)
+        return out
+
+    rows = level_rows("exact", exact_by_level)
 
     def group_tables(matcher: str, by_key: dict[tuple[str, str], list]) -> None:
         g_rows: list[dict] = []
@@ -587,15 +598,24 @@ def _match_step(
     group_tables("exact", exact_by_level[level])
     if raqun:
         raqun_by_level = {lv_name: {key: results[key][1][lv_name] for key in keys} for lv_name in lv.LEVELS}
-        rows += [tbl.matchlevel_row("raqun", lv_name, run, raqun_by_level[lv_name], voter_of) for lv_name in lv.LEVELS]
+        tools = sorted({r.tool for records in per_snapshot.values() for r in records})
+        for lv_name in lv.LEVELS:
+            inspection, columns = tbl.raqun_inspection_rows(
+                raqun_by_level[lv_name], level=lv_name, run=run, tools=tools
+            )
+            write(f"raqun-{lv_name}-run{run}.csv", inspection, columns)
+        rows += level_rows("raqun", raqun_by_level)
         cmp_rows = [
             {"repo": tbl.full_name(snapshot), "snapshot": snapshot, "variant": variant, "run": run, "level": lv_name,
-             **results[(snapshot, variant)][2][lv_name]}
+             **results[(snapshot, variant)][2][lv_name],
+             "exact_seconds": round(results[(snapshot, variant)][3]["exact"][lv_name], 4),
+             "raqun_seconds": round(results[(snapshot, variant)][3]["raqun"][lv_name], 4)}
             for lv_name in lv.LEVELS
             for snapshot, variant in keys
         ]  # fmt: skip
         group_tables("raqun", raqun_by_level[level])
-        write(f"matchers-run{run}.csv", cmp_rows, MATCHERS_COLUMNS)
+        # the two timing columns are the report's measurement, not the comparison's
+        write(f"matchers-run{run}.csv", cmp_rows, [*MATCHERS_COLUMNS, "exact_seconds", "raqun_seconds"])
     return exact_by_level[level], rows
 
 

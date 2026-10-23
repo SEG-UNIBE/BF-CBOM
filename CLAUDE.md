@@ -156,7 +156,9 @@ normalisation, analysis outputs),
     matching took the candidates in set order, not by similarity), the shared default objects and the iteration
     order, so the groups are deterministic; matcher (c) numbers from before 2026-10-21 came from the unsorted
     candidates and are rerun, not compared. RaQuN per level costs five matchings per repository (`--no-raqun`
-    skips it; running it at the scoring level only is not built).
+    skips it; running it at the scoring level only is not built). Each matcher's seconds per repository and level
+    are recorded (`matchers-`, `matchlevels-run<k>.csv`; the summary's "Matching time" table), measured around the
+    `match` call alone, so RaQuN's n-way matching and the exact matcher's clustering are compared on cost too.
   - `score.py`, `stability.py`, `costs.py`: RQ3b's per-tool rates (no ranking), run-to-run stability, LLM costs from
     `analysis/data/llm_prices.yaml`.
   - `mutation.py`: RQ4, each tool's recall on the planted calls, precision on the planted decoys and F1, and the
@@ -173,7 +175,7 @@ normalisation, analysis outputs),
     repository per task (`misc/cli/parallel.py:pmap`, the tasks in `analysis/tasks.py`; `--jobs`, env `BF_CBOM_JOBS`;
     0 = auto, min(CPUs, 8) for a step with 16 or more items, else sequential). The workers are spawned, never forked
     (rich's thread, the store's `git cat-file` pipes), load the vocabulary themselves and return plain dataclasses in
-    input order, so every file is byte-identical to `--jobs 1` (a test checks it). Memory bounds the pool, not CPUs:
+    input order, so every file is byte-identical to `--jobs 1`, the matchers' timings aside (a test checks it). Memory bounds the pool, not CPUs:
     the runner's cap is `RUNNER_MEMORY` (Makefile, 8g; 2g was OOM-killed on corpus-pilot-medium; on the VM
     `make experiment-export NAME=<exp> BF_CBOM_JOBS=16 RUNNER_MEMORY=32g`), and the snapshot store keeps at most 64 MB
     of file lines.

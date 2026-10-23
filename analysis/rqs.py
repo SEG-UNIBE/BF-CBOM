@@ -39,7 +39,8 @@ RQ3 = RQ(
     "disagreement is representational rather than substantive?",
     ("levels-run{k}.csv", "matchlevels-run{k}.csv", "vocab.csv", "items-run{k}.csv", "groups-exact-run{k}.csv",
      "members-exact-run{k}.csv", "agreement-exact-run{k}.csv", "groups-raqun-run{k}.csv", "members-raqun-run{k}.csv",
-     "agreement-raqun-run{k}.csv", "matchers-run{k}.csv", "score-run{k}.csv", "loo-run{k}.csv",
+     "agreement-raqun-run{k}.csv", "raqun-L0-run{k}.csv", "raqun-L1-run{k}.csv", "raqun-L2-run{k}.csv",
+     "raqun-L3-run{k}.csv", "raqun-L4-run{k}.csv", "matchers-run{k}.csv", "score-run{k}.csv", "loo-run{k}.csv",
      "grouping-run{k}.csv"),
 )  # fmt: skip
 RQ4 = RQ(

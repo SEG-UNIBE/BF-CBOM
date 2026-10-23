@@ -11,6 +11,9 @@ element and RaQuN's nearest-neighbour search; the greedy matching merges candida
 that a match holds at most one element per model. Location-free, like RaQuN; the groups are repo scope. The BERT
 variant stays the UI's "Find Similar Components" (misc/pyqun) as a comparison, not an analysis matcher.
 
+The level varies only `algorithm=`; all other attributes use the full normalised values from L0 onward. Each
+level is an independent matching, not a cumulative grouping ladder; greedy choices can rearrange groups.
+
 Configured as in the RaQuN paper (Schultheiß et al. 2023): k = n neighbours per element (n = the tools in the
 repository) and the Jaccard index with threshold 0.75, its best F-measure.
 
@@ -24,10 +27,11 @@ PyQuN >= 1.0.0 walks the elements by id and sorts the candidates by similarity w
 from __future__ import annotations
 
 from collections import Counter, defaultdict
+from functools import lru_cache
 
 from common.tools_registry import votes
 
-from ..levels import UNIT_LEVEL, identity, parameter_at
+from ..levels import UNIT_LEVEL, identity
 from ..normalize.record import NormRecord
 from ..normalize.vocab import Vocabulary, load_vocabulary
 from .base import MatchGroup
@@ -36,24 +40,43 @@ STRUCTURED_DIMS = ("family", "primitive", "mode", "padding", "curve", "key_size"
 THRESHOLD = 0.75  # the Jaccard index a match must keep
 
 
+@lru_cache(maxsize=1)
+def _pyqun() -> tuple:
+    """numpy and PyQuN's classes, imported on first use (the `raqun` extra; a host venv without it has neither).
+    Cached, so `available()` also serves as the warm-up before a timed match (analysis/tasks.py:match_snapshot)."""
+    import numpy as np
+    from RaQuN_Lab.datamodel.matching.similarities.match.JaccardIndex import JaccardIndex
+    from RaQuN_Lab.datamodel.matching.similarities.match.shouldmatch.ThresholdSMStrategy import ThresholdSMStrategy
+    from RaQuN_Lab.datamodel.modelset.attribute.DefaultAttribute import DefaultAttribute
+    from RaQuN_Lab.datamodel.modelset.Element import Element
+    from RaQuN_Lab.datamodel.modelset.Model import Model
+    from RaQuN_Lab.datamodel.modelset.ModelSet import ModelSet
+    from RaQuN_Lab.strategies.RaQuN.candidatesearch.NNCandidateSearch.NNCandidateSearch import NNCandidateSearch
+    from RaQuN_Lab.strategies.RaQuN.candidatesearch.NNCandidateSearch.vectorization.Vectorizer import Vectorizer
+    from RaQuN_Lab.strategies.RaQuN.matching.GreedyMatching import GreedyMatching
+    from RaQuN_Lab.strategies.RaQuN.RaQuN import VanillaRaQuN
+
+    return (np, JaccardIndex, ThresholdSMStrategy, DefaultAttribute, Element, Model, ModelSet, NNCandidateSearch,
+            Vectorizer, GreedyMatching, VanillaRaQuN)  # fmt: skip
+
+
 def available() -> bool:
     try:
-        import RaQuN_Lab.strategies.RaQuN.RaQuN  # noqa: F401
+        _pyqun()
     except ImportError:
         return False
     return True
 
 
 def attributes(rec: NormRecord, level: str, vocab: Vocabulary | None = None) -> frozenset[str]:
-    """The structured attribute set of a record at a ladder level: `algorithm=<identity at the level>` plus
-    `<dimension>=<value>` for every value admitted at that level (`levels.parameter_at`: nothing below L2, standard
-    fields at L2, parsed names from L3, any source at L4)."""
+    """Vary only `algorithm=<identity at the level>`; keep all other normalised attributes fixed across levels.
+    Missing dimensions remain absent. Attribute provenance does not gate the matching inputs by level."""
     attrs = set()
     key = identity(rec, level, vocab)
     if key:
         attrs.add(f"algorithm={key}")
     for dim in STRUCTURED_DIMS:
-        v = parameter_at(rec, level, dim)
+        v = rec.values.get(dim)
         if v is not None:
             attrs.add(f"{dim}={v}")
     return frozenset(attrs)
@@ -74,20 +97,8 @@ class RaqunMatcher:
         self.vocab = vocab or load_vocabulary()
 
     def match(self, records: list[NormRecord]) -> list[MatchGroup]:
-        import numpy as np
-        from RaQuN_Lab.datamodel.matching.similarities.match.JaccardIndex import JaccardIndex
-        from RaQuN_Lab.datamodel.matching.similarities.match.shouldmatch.ThresholdSMStrategy import (
-            ThresholdSMStrategy,
-        )
-        from RaQuN_Lab.datamodel.modelset.attribute.DefaultAttribute import DefaultAttribute
-        from RaQuN_Lab.datamodel.modelset.Element import Element
-        from RaQuN_Lab.datamodel.modelset.Model import Model
-        from RaQuN_Lab.datamodel.modelset.ModelSet import ModelSet
-        from RaQuN_Lab.strategies.RaQuN.candidatesearch.NNCandidateSearch.NNCandidateSearch import NNCandidateSearch
-        from RaQuN_Lab.strategies.RaQuN.candidatesearch.NNCandidateSearch.vectorization.Vectorizer import Vectorizer
-        from RaQuN_Lab.strategies.RaQuN.matching.GreedyMatching import GreedyMatching
-        from RaQuN_Lab.strategies.RaQuN.RaQuN import VanillaRaQuN
-
+        (np, JaccardIndex, ThresholdSMStrategy, DefaultAttribute, Element, Model, ModelSet, NNCandidateSearch,
+         Vectorizer, GreedyMatching, VanillaRaQuN) = _pyqun()  # fmt: skip
         algorithms = [
             r
             for r in records

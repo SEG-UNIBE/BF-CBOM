@@ -82,6 +82,7 @@ MATCHLEVELS_COLUMNS = [
     "matcher", "level", "run", "repos", "items", "records", "k1", "k2", "k3", "k4plus", "share_k2plus",
     *[f"{d}_groups" for d in ("key_size", "mode", "padding", "curve", "digest", "location")],
     *[f"{d}_agree" for d in ("key_size", "mode", "padding", "curve", "digest", "location")],
+    "seconds",  # the matcher's wall time at the level, summed over the repositories (the report fills it)
 ]  # fmt: skip
 AGREEMENT_COLUMNS = [
     "matcher", "repo", "snapshot", "variant", "run", "group_id", "scope", "key", "dimension", "reporting",
@@ -381,6 +382,38 @@ def group_rows(
             for row in agreement(g, voter_of=voter_of)
         ]
     return g_rows, m_rows, a_rows
+
+
+def raqun_inspection_rows(
+    groups_by_snapshot: dict[tuple[str, str], list[MatchGroup]], *, level: str, run: int, tools: list[str]
+) -> tuple[list[dict], list[str]]:
+    """One readable match per row, with the actual element attributes and reported names side by side by tool."""
+    from .matchers.raqun import attributes
+
+    columns = ["repo", "snapshot", "variant", "run", "level", "group_id", "similarity", "n_tools", "n_records", *tools]
+    rows = []
+    for (snapshot, variant), groups in sorted(groups_by_snapshot.items()):
+        for g in groups:
+            row = {
+                "repo": full_name(snapshot),
+                "snapshot": snapshot,
+                "variant": variant,
+                "run": run,
+                "level": level,
+                "group_id": g.group_id,
+                "similarity": g.extra.get("similarity"),
+                "n_tools": g.k,
+                "n_records": len(g.members),
+            }
+            by_tool: dict[str, list[NormRecord]] = defaultdict(list)
+            for rec in g.members:
+                by_tool[rec.tool].append(rec)
+            for tool, records in sorted(by_tool.items()):
+                names = json.dumps(sorted({r.name for r in records if r.name}), ensure_ascii=False)
+                attrs = "; ".join(sorted(attributes(records[0], level)))
+                row[tool] = f"{names} <{attrs}> [{len(records)} records]"
+            rows.append(row)
+    return rows, columns
 
 
 def matchlevel_row(
