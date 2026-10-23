@@ -131,6 +131,19 @@ normalisation, analysis outputs),
   worker job (recorded as `oom`, redone by `--retry-failed`), never redis or the git server. The corpus sampler
   would then also stratify by number of developers (GitHub contributors) next to language, stars, last push and
   size (size cap: `GITSERVER_MEMORY`, below).
+- **Later: replicas from the spec** (noted 2026-10-23, not built). On mutation-pilot cdxgen had done 34 of 279
+  jobs after 1:18 h (forecast 9:21 h) and CBOMkit was the other long lane, while the other 13 tools were done within
+  1:15 h and their RAM sat idle. Replicas need no worker code: every replica pops from the tool's one queue
+  `jobs:<tool>`, no worker has a writable shared volume, and each CBOMkit replica embeds its own server. The design:
+  a spec field `replicas: {cdxgen: 3}` (keys among `tools`, ints >= 1, recorded in `_experiment.yaml`) replaces the
+  env `EXPERIMENT_REPLICAS` for the budget; `make experiment` asks the runner (`experiment replicas <spec>`, one
+  stdout line) and starts them with `docker compose up -d --no-deps --no-recreate --scale worker-<tool>=N` before
+  the run, since the runner keeps no Docker access; they start with the run, not when other tools finish (limits
+  are caps, not reservations), and stay up until `make up-prod`. With it: `progress.forecast` divides a tool's
+  remaining work by its running jobs (today it assumes one, so the forecast is N times too long), per-replica
+  heartbeats `worker:<tool>:replica:<host>` next to `worker:<tool>:alive` so the board shows `busy 3/3` and the
+  summed RAM (today replicas overwrite one key), `concurrency` (the most jobs of a tool seen running at once) in
+  `_run-log.json`, and a note that run times measured with replicas include CPU contention (`runtime.csv`).
 - **Corpus and fixtures** (`experiments/corpus/`, mounted read-only into the runner): `micro/<language>/` the micro projects of
   Java, Python and Go with `micro/ground_truth.yaml`, both generated from the snippet catalog (`mutation/micro.py`,
   checked in, a test keeps them equal; 14 expected calls, each in a function of its own, and 4 decoys per project; its
