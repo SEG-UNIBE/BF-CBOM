@@ -30,7 +30,7 @@ RQ2 = RQ(
     "Volume",
     "How much do the tools report, and in what detail?",
     ("runs.csv", "records-run{k}.csv", "units-run{k}.csv", "units-repo-run{k}.csv", "coverage-run{k}.csv",
-     "traceability-run{k}.csv"),
+     "traceability-run{k}.csv", "runtime.csv"),
 )  # fmt: skip
 RQ3 = RQ(
     "RQ3",

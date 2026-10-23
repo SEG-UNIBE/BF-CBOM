@@ -39,6 +39,7 @@ from analysis.normalize import (
     NormalizedCbom,
     Report,
 )
+from analysis.normalize.locations import CODE_EXT
 from analysis.snapshots import SnapshotStore
 from analysis.stability import STABILITY_COLUMNS, stability_rows
 from analysis.tasks import write_json
@@ -289,6 +290,23 @@ def _store(exp_dir: Path, *, fetch: bool = False) -> SnapshotStore:
     return store
 
 
+def _sizes(exp_dir: Path, store: SnapshotStore, languages: dict[str, str | None]) -> dict[str, tuple[int, int]]:
+    """{snapshot: (files, source files of the repository's language)} at the pinned commit, for the run-time table's
+    size columns; a snapshot the store does not hold (a copied export without `--fetch`) is left out."""
+    out: dict[str, tuple[int, int]] = {}
+    for meta, cbom_path in iter_results(exp_dir):
+        snapshot = cbom_path.parents[2].name
+        if snapshot in out:
+            continue
+        full = tbl.full_name(snapshot)
+        files = store.files(full, meta.get("base_commit") or (meta.get("repo_info") or {}).get("commit"))
+        if files is None:
+            continue
+        exts = CODE_EXT.get((languages.get(full) or "").lower())
+        out[snapshot] = (len(files), sum(1 for f in files if exts is None or f.lower().endswith(exts)))
+    return out
+
+
 def _original(item: Normalized) -> bool:
     """A run on an original snapshot. Mutants (variants) feed the mutation step only: in the agreement analyses a
     mutated repository would count once per mutant (the agreement analyses are computed on the originals)."""
@@ -498,8 +516,10 @@ def _tables_step(
     store = store or SnapshotStore()
     languages = _languages(exp_dir)
     with progress.step("runs"):
-        runs = tbl.run_rows(exp_dir, languages, tailored=tailored_map(), expects=_expects(exp_dir))
+        sizes = _sizes(exp_dir, store, languages)
+        runs = tbl.run_rows(exp_dir, languages, tailored=tailored_map(), expects=_expects(exp_dir), sizes=sizes)
     write("runs.csv", runs, tbl.RUNS_COLUMNS)
+    write("runtime.csv", tbl.runtime_rows(runs), tbl.RUNTIME_COLUMNS)
     voter_of = _voter_of(merge_llm, observers_vote)
     norm_rows: list[dict] = []
     commits: dict[str, str | None] = {}

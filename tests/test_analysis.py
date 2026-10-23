@@ -670,3 +670,53 @@ def test_every_integrated_tool_declares_its_packaging():
     declared = {re.sub(r"[^a-z0-9]", "", name.lower()) for row in rows for name in row.split(",")}
     integrated = {t for t, info in load_tools().items() if info.get("status") == "integrated"}
     assert {t for t in integrated if re.sub(r"[^a-z0-9]", "", t) not in declared} == set()
+
+
+def _run(tool, snapshot, seconds, *, status="ok", variant="original", run=1, language="Java", source=None):
+    return {"tool": tool, "snapshot": snapshot, "variant": variant, "run": run, "language": language,
+            "status": status, "duration_sec": seconds, "repo_source_files": source}  # fmt: skip
+
+
+def test_runtime_rows_count_each_repository_once_with_spread_ci_and_size():
+    from analysis.tables import runtime_rows
+
+    runs = [
+        # slow: four Java repos whose time grows with their size; repo a ran twice and has a mutant
+        _run("slow", "a", 100.0, source=100), _run("slow", "a", 120.0, run=2, source=100),
+        _run("slow", "a", 1000.0, variant="m-1", source=100),  # a's median is 120: the mutant does not dominate
+        _run("slow", "b", 200.0, source=200), _run("slow", "c", 400.0, source=400),
+        _run("slow", "d", 900.0, status="timeout", source=800),  # ran, no ok time: counts in hours and timeouts only
+        _run("slow", "e", 800.0, language="Python", source=800),
+        _run("slow", "f", None, status="unsupported", language="Go"),  # never ran
+        # fast: about the same everywhere
+        _run("fast", "a", 10.0), _run("fast", "b", 11.0), _run("fast", "c", 10.0),
+    ]  # fmt: skip
+    rows = {(r["tool"], r["language"]): r for r in runtime_rows(runs)}
+    assert set(rows) == {("fast", "all"), ("fast", "Java"), ("slow", "all"), ("slow", "Java"), ("slow", "Python")}
+    slow = rows[("slow", "all")]
+    assert (slow["repos"], slow["runs"], slow["timeouts"]) == (4, 7, 1)  # a, b, c, e; the unsupported run is out
+    assert slow["median_sec"] == 300.0  # median of 120, 200, 400, 800
+    assert slow["max_sec"] == 1000.0  # the slowest single ok run
+    assert slow["median_ci_low"] <= 300.0 <= slow["median_ci_high"]
+    assert slow["timeout_share"] == round(1 / 7, 3)
+    assert slow["hours"] == round((100 + 120 + 1000 + 200 + 400 + 900 + 800) / 3600, 2)
+    assert slow["rerun_cv"] == round(10 / 110, 2) and slow["rerun_pairs"] == 1  # a/original: 100 and 120
+    assert slow["size_rho"] == 1.0 and slow["sec_per_1k_source_files"] == 1000.0
+    fast = rows[("fast", "all")]
+    assert fast["spread_cv"] < 0.1 < slow["spread_cv"]
+    assert "size_rho" not in fast and "rerun_cv" not in fast  # no sizes, no repetitions
+    assert "median_ci_low" not in rows[("slow", "Python")]  # one repository: no interval
+    assert runtime_rows(runs) == runtime_rows(runs)  # the bootstrap is seeded
+
+
+def test_runtime_section_lists_the_slowest_tool_first_with_its_languages():
+    from analysis.summary import _rq2
+    from analysis.tables import RUNTIME_COLUMNS, runtime_rows
+
+    runs = [_run("fast", s, 10.0, source=50) for s in "abc"] + [_run("slow", s, 600.0, source=50) for s in "abc"]
+    runs += [_run("slow", "p", 60.0, language="Python", source=50)]
+    rows = [{c: ("" if r.get(c) is None else str(r[c])) for c in RUNTIME_COLUMNS} for r in runtime_rows(runs)]
+    text = "\n".join(_rq2([], [], [], [], [], rows))
+    assert "### Run time" in text
+    assert text.index("| slow |") < text.index("| fast |")
+    assert "| tool | Java | Python |" in text and "| slow | 600 (3) | 60 (1) |" in text

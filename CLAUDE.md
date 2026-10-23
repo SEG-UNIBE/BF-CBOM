@@ -264,7 +264,9 @@ records and items, never as assets, which depend on each tool's packaging (`anal
 - **RQ2, volume:** how much do the tools report, and in what detail? Assets, records and items per tool
   and repo, the asset types, the fill rate per dimension (reported vs derived), locations and whether they hold at the
   commit (weak and strong traceability), names nobody can read (`resolution`); descriptive, more is not better
-  (`runs.csv`, `units-`, `coverage-`, `traceability-run<k>.csv`).
+  (`runs.csv`, `units-`, `coverage-`, `traceability-run<k>.csv`), and what a scan costs: per tool and language
+  the median time over repositories with a bootstrap CI, p90, max, the spread across repositories and between
+  reruns, timeouts and the scaling with source files (`runtime.csv`, the summary's "Run time").
 - **RQ3, agreement:** how far do the tools agree on what is in a repository, per kind of
   information, and how much of their disagreement is representational rather than substantive? *RQ3a*, the deltas
   L0 -> L4 on fixed items, shown for both matchers: the gap is representational heterogeneity (naming, packaging,

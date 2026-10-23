@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import csv
 import json
+import random
 import statistics
 from collections import Counter, defaultdict
 from collections.abc import Iterable
@@ -36,7 +37,8 @@ LIST_SEP = ";"
 ASSET_COMPONENT_TYPES = ("cryptographic-asset", "crypto-asset")  # the latter: IBM draft 1.4-cbom-1.0
 
 RUNS_COLUMNS = [
-    "repo", "snapshot", "commit", "variant", "variant_commit", "language", "expect_crypto", "tool", "run", "tailored",
+    "repo", "snapshot", "commit", "variant", "variant_commit", "language", "expect_crypto", "repo_files",
+    "repo_source_files", "tool", "run", "tailored",
     "status", "duration_sec", "size_bytes", "error", "workaround", "peak_memory_mb", "memory_limit_mb", "oom_kills",
     "enqueued_at", "started_at", "finished_at", "queue_sec", "received_at",
     "tool_version", "image_ref", "bfcbom_commit", "bom_format", "spec_version",
@@ -255,12 +257,15 @@ def run_rows(
     languages: dict[str, str | None] | None = None,
     tailored: dict[str, frozenset[str]] | None = None,
     expects: dict[str, str | None] | None = None,
+    sizes: dict[str, tuple[int, int]] | None = None,
 ) -> list[dict]:
     """One row per stored meta file; CBOM counts only where the CBOM exists and parses. `tailored`: {tool: repos it
-    was tuned on} (refinement 13) for the `tailored` column; `expects`: {repo: expect_crypto} from the spec."""
+    was tuned on} (refinement 13) for the `tailored` column; `expects`: {repo: expect_crypto} from the spec; `sizes`:
+    {snapshot: (files, source files of its language)} from the snapshot store (empty without one)."""
     languages = languages or {}
     tailored = tailored or {}
     expects = expects or {}
+    sizes = sizes or {}
     rows = []
     for meta, cbom_path in iter_results(exp_dir):
         snapshot = cbom_path.parents[2].name
@@ -274,6 +279,8 @@ def run_rows(
             "variant_commit": meta.get("variant_commit"),
             "language": meta.get("language") or languages.get(repo),
             "expect_crypto": expects.get(repo),
+            "repo_files": (sizes.get(snapshot) or (None, None))[0],
+            "repo_source_files": (sizes.get(snapshot) or (None, None))[1],
             "tool": tool,
             "run": meta.get("run_index"),
             "tailored": repo in tailored.get(tool, ()),
@@ -304,6 +311,100 @@ def run_rows(
                 row.update(_cbom_counts(cbom))
         rows.append(row)
     return rows
+
+
+# ----- run time (RQ2: what a scan costs) -----
+
+RUNTIME_COLUMNS = [
+    "tool", "language", "repos", "runs", "timeouts", "timeout_share", "median_sec", "median_ci_low", "median_ci_high",
+    "p90_sec", "max_sec", "spread_cv", "rerun_cv", "rerun_pairs", "hours", "sec_per_1k_source_files", "size_rho",
+]  # fmt: skip
+RUNTIME_MIN_REPOS = 3  # a CI and a size correlation only over at least this many repositories (score.py's MIN_REPOS)
+RUNTIME_BOOTSTRAP = 1000
+
+
+def _quantile(values: list[float], q: float) -> float:
+    """The q-quantile with linear interpolation between the order statistics (values sorted)."""
+    pos = q * (len(values) - 1)
+    lo = int(pos)
+    hi = min(lo + 1, len(values) - 1)
+    return values[lo] + (values[hi] - values[lo]) * (pos - lo)
+
+
+def _cv(values: list[float]) -> float | None:
+    """Coefficient of variation (population sd / mean), None below two values or for a zero mean."""
+    if len(values) < 2 or not statistics.mean(values):
+        return None
+    return statistics.pstdev(values) / statistics.mean(values)
+
+
+def runtime_rows(runs: list[dict], *, seed: int = 20261023) -> list[dict]:
+    """Per tool and language (and `all`), how long its scans take, from runs.csv. The unit is the repository: a
+    repository's time is the median of its ok runs (all variants and repetitions), so a mutated repository or a
+    repeated run counts once. `median_sec` is the median over the repositories with a bootstrap CI over them (95 %,
+    percentile, only with RUNTIME_MIN_REPOS); `p90_sec` over the repositories too, `max_sec` the slowest single ok run;
+    `spread_cv` the CV of the repositories' times (how much the repository decides); `rerun_cv` the median CV of the
+    ok runs of one snapshot and variant with several runs (run-to-run noise; empty without repetitions); `hours` the
+    wall time of every run that ran (ok, error, timeout, oom); `timeout_share` of those; `sec_per_1k_source_files`
+    the median over repositories of time per thousand source files of the repository's language; `size_rho`
+    Spearman between a repository's time and its source files. Unsupported runs never ran and are left out."""
+    from .score import spearman
+
+    ran = [r for r in runs if r.get("status") not in (None, "", "unsupported")]
+    scopes: dict[tuple[str, str], list[dict]] = defaultdict(list)
+    for r in ran:
+        scopes[(r["tool"], "all")].append(r)
+        if r.get("language"):
+            scopes[(r["tool"], r["language"])].append(r)
+    out = []
+    for (tool, language), rs in sorted(scopes.items(), key=lambda kv: (kv[0][0], kv[0][1] != "all", kv[0][1])):
+        seconds = [(r, float(r["duration_sec"])) for r in rs if r.get("duration_sec") not in (None, "")]
+        ok = [(r, d) for r, d in seconds if r["status"] == "ok"]
+        per_repo: dict[str, list[float]] = defaultdict(list)
+        per_cell: dict[tuple[str, str], list[float]] = defaultdict(list)
+        source: dict[str, int] = {}
+        for r, d in ok:
+            per_repo[r["snapshot"]].append(d)
+            per_cell[(r["snapshot"], r.get("variant") or "")].append(d)
+            if r.get("repo_source_files") not in (None, ""):
+                source[r["snapshot"]] = int(r["repo_source_files"])
+        repo_sec = {s: statistics.median(v) for s, v in sorted(per_repo.items())}
+        values = sorted(repo_sec.values())
+        timeouts = sum(r["status"] == "timeout" for r in rs)
+        row = {
+            "tool": tool,
+            "language": language,
+            "repos": len(repo_sec),
+            "runs": len(rs),
+            "timeouts": timeouts,
+            "timeout_share": round(timeouts / len(rs), 3),
+            "hours": round(sum(d for _, d in seconds) / 3600, 2),
+        }
+        if values:
+            row |= {
+                "median_sec": round(statistics.median(values), 1),
+                "p90_sec": round(_quantile(values, 0.9), 1),
+                "max_sec": round(max(d for _, d in ok), 1),
+            }
+            if (cv := _cv(values)) is not None:
+                row["spread_cv"] = round(cv, 2)
+        if len(values) >= RUNTIME_MIN_REPOS:
+            rng = random.Random(seed)
+            medians = sorted(statistics.median(rng.choice(values) for _ in values) for _ in range(RUNTIME_BOOTSTRAP))
+            row["median_ci_low"] = round(_quantile(medians, 0.025), 1)
+            row["median_ci_high"] = round(_quantile(medians, 0.975), 1)
+        reruns = [cv for v in per_cell.values() if (cv := _cv(v)) is not None]
+        if reruns:
+            row["rerun_cv"] = round(statistics.median(reruns), 2)
+            row["rerun_pairs"] = len(reruns)
+        rates = [1000 * repo_sec[s] / n for s, n in source.items() if n]
+        if rates:
+            row["sec_per_1k_source_files"] = round(statistics.median(rates), 1)
+        sized = {s: float(n) for s, n in source.items()}
+        if len(sized) >= RUNTIME_MIN_REPOS and (rho := spearman(repo_sec, sized)) is not None:
+            row["size_rho"] = round(rho, 2)
+        out.append(row)
+    return out
 
 
 # ----- records (normalised) -----

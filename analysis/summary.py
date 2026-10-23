@@ -23,6 +23,7 @@ import yaml
 from common.experiment import load_run_log, spec_path
 
 from .rqs import BAR_EXAM, BAR_EXAM_NOTE, BAR_EXAM_TABLES, RQ1, RQ2, RQ3, RQ4, RQS, STABILITY, STABILITY_NOTE
+from .tables import RUNTIME_BOOTSTRAP, RUNTIME_MIN_REPOS
 
 SUMMARY_FILE = "_SUMMARY.md"
 LANGUAGE_ORDER = ["java", "python", "go", "javascript", "typescript", "c", "cpp"]
@@ -32,6 +33,9 @@ COVERAGE_SHOWN = ["key_size", "mode", "padding", "curve", "digest"]
 FILES = {
     "runs.csv": "one row per stored run, all repetitions (status, duration, tool version, raw CBOM counts by asset "
     "type, LLM tokens and costs)",
+    "runtime.csv": "per tool and language (and all): repositories, median seconds with a bootstrap CI over "
+    "repositories, p90, max, spread across repositories and between reruns, timeouts, hours, seconds per 1k "
+    "source files and Spearman against size",
     "records-run{k}.csv": "one row per normalised record: every dimension with its raw value and source",
     "micro-run{k}.csv": "one row per (micro project, tool): status, verdict, recall at call sites and repo level",
     "micro-items-run{k}.csv": "one row per (micro project, tool, expected item): found at call site (strict, "
@@ -998,12 +1002,18 @@ def _units_per_repo(unit_repos: list[dict]) -> list[str]:
 
 
 def _rq2(
-    reported: list[str], units: list[dict], cov: list[dict], unit_repos: list[dict], trace: list[dict]
+    reported: list[str],
+    units: list[dict],
+    cov: list[dict],
+    unit_repos: list[dict],
+    trace: list[dict],
+    runtime: list[dict] | None = None,
 ) -> list[str]:
     """RQ2: what the tools wrote (as written), how each packages its findings (units-run<k>.csv, per repository
     units-repo-run<k>.csv), what its assets' names are and which values they carry (coverage-run<k>.csv), and whether
-    its locations lead to real code (traceability-run<k>.csv); one run of the original variants throughout."""
-    if not reported and not units and not cov and not trace:
+    its locations lead to real code (traceability-run<k>.csv); one run of the original variants throughout. Last,
+    what a scan costs (runtime.csv: every run of every variant)."""
+    if not reported and not units and not cov and not trace and not runtime:
         return []
     intro = (
         RQ2.question + " First what the tools wrote, as written; then the units after normalisation, the names and "
@@ -1082,7 +1092,78 @@ def _rq2(
         lines += md_table(header, table, "lr" + "r" * (len(RESOLUTION_SHOWN) + len(COVERAGE_SHOWN))) + [""]
     if any(u.get("role") == "observer" for u in units):
         lines += [OBSERVER_NOTE, ""]
-    return lines + _traceability(trace)
+    return lines + _traceability(trace) + _runtime(runtime or [])
+
+
+def _runtime(rows: list[dict]) -> list[str]:
+    """How long each tool's scans take (runtime.csv): over all languages with its spread, then the median per
+    language. Slowest first: the order is the finding."""
+    every = sorted((r for r in rows if r["language"] == "all" and r.get("median_sec")),
+                   key=lambda r: (-(_float(r["median_sec"]) or 0), r["tool"]))  # fmt: skip
+    if not every:
+        return []
+
+    def ci(r: dict) -> str:
+        lo, hi = _float(r.get("median_ci_low")), _float(r.get("median_ci_high"))
+        return "" if lo is None or hi is None else f"{_num(lo)} - {_num(hi)}"
+
+    table = [
+        [r["tool"], r["repos"], _num(r["median_sec"]), ci(r), _num(r.get("p90_sec")), _num(r.get("max_sec")),
+         _pct(r.get("spread_cv")), _pct(r.get("rerun_cv")), _pct(r.get("timeout_share")), _num(r.get("hours")),
+         _num(r.get("sec_per_1k_source_files")), _pct(r.get("size_rho"))]
+        for r in every
+    ]  # fmt: skip
+    sized = any(r.get("size_rho") or r.get("sec_per_1k_source_files") for r in every)
+    lines = [
+        "### Run time",
+        "",
+        "What a scan costs: one row per tool over every run it made, all variants and repetitions, slowest first "
+        "(`runtime.csv`). The unit is the repository: its time is the median of its ok runs, so a mutated or "
+        "repeated repository counts once. Times are the worker's wall time for the job, the clone from the local "
+        "git server included.",
+        "",
+        "- `repos`: repositories with an ok run; `median s`: the median of their times; `95 % CI`: a bootstrap "
+        f"interval of that median over the repositories (resampled {RUNTIME_BOOTSTRAP} times; only with "
+        f"{RUNTIME_MIN_REPOS} or more).",
+        "- `p90 s`: the time 90 % of the repositories stay under; `max s`: the slowest single ok run.",
+        "- `spread`: the coefficient of variation of the repositories' times (sd / mean): around 0 the tool takes "
+        "about as long everywhere, above 1 the repository decides.",
+        "- `rerun`: the median coefficient of variation between repeated runs of one snapshot (run-to-run noise; "
+        "empty without repetitions).",
+        "- `timeouts`: the share of its runs that hit the time limit (their time is the limit, so a high share makes "
+        "the median an underestimate); `hours`: the summed wall time of every run, failed ones included.",
+    ]
+    if sized:
+        lines += [
+            "- `s / 1k files`: the median over repositories of seconds per thousand source files of the repository's "
+            "language; `ρ size`: Spearman between a repository's time and its source files (near 1: the time grows "
+            "with the code; near 0: something else, such as start-up or dependency resolution, dominates).",
+        ]
+    else:
+        lines += ["- The size columns are empty: the snapshot files were not available (rerun with `--fetch`)."]
+    header = ["tool", "repos", "median s", "95 % CI", "p90 s", "max s", "spread", "rerun", "timeouts", "hours",
+              "s / 1k files", "ρ size"]  # fmt: skip
+    lines += [""] + md_table(header, table) + [""]
+    languages = sorted({r["language"] for r in rows if r["language"] != "all"})
+    if len(languages) > 1:
+        by = {(r["tool"], r["language"]): r for r in rows}
+        table = [
+            [r["tool"]] + [
+                f"{_num(c['median_sec'])} ({c['repos']})" if (c := by.get((r["tool"], lang))) and c.get("median_sec")
+                else ""
+                for lang in languages
+            ]
+            for r in every
+        ]  # fmt: skip
+        lines += (
+            [
+                "Median seconds per language, with the repositories in brackets:",
+                "",
+            ]
+            + md_table(["tool", *languages], table)
+            + [""]
+        )
+    return lines
 
 
 def _spec_issues(conf: list[dict], tools: list[str]) -> list[str]:
@@ -2188,6 +2269,7 @@ def render(analysis_dir: Path, *, run: int = 1) -> str:
         rows("coverage-run{k}.csv"),
         rows("units-repo-run{k}.csv"),
         rows("traceability-run{k}.csv"),
+        rows("runtime.csv"),
     )
     lines += _rq3(
         info,
