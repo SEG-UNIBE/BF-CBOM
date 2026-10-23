@@ -366,6 +366,57 @@ def _experiment(
     return lines + [""]
 
 
+PAPER_LANGUAGES = ("Java", "Python", "Go")  # the folded table's column order (CLAUDE.md "Paper languages")
+
+
+def _repo_cell(repo: dict) -> str:
+    """A repository as the record names it: a GitHub link that opens the pinned commit, or the plain name for a
+    fixture (a local directory published to the git server, `path:`) and for any other host."""
+    name, commit = repo.get("full_name") or "", repo.get("commit") or ""
+    if repo.get("path"):
+        return f"{name} (fixture)"
+    url = (repo.get("git_url") or f"https://github.com/{name}").removesuffix(".git").rstrip("/")
+    if not url.startswith("https://github.com/"):
+        return name
+    return f"[{name}]({url}/tree/{commit})" if commit else f"[{name}]({url})"
+
+
+def _repositories(spec: dict) -> list[str]:
+    """The repositories the record names, each at its pinned commit: flat with the size when the corpus builder
+    recorded one (`size_kb`), else folded into one column per language so a corpus of hundreds stays readable."""
+    repos = [r for r in spec.get("repos") or [] if r.get("full_name")]
+    if not repos:
+        return []
+    order = {lang: i for i, lang in enumerate(PAPER_LANGUAGES)}
+
+    def rank(repo: dict) -> tuple:
+        lang = repo.get("language") or ""
+        return (order.get(lang, len(order)), lang, repo["full_name"].lower())
+
+    repos.sort(key=rank)
+    lines = [
+        "### Repositories",
+        "",
+        f"The {_n(len(repos))} repositories the stored runs cover, each at its pinned commit (a link opens the "
+        "repository at that commit; a fixture is a local directory published to the git server, without a page). "
+        "Mutants are variants of these repositories and are not listed.",
+        "",
+    ]
+    if any(r.get("size_kb") for r in repos):
+        table = [
+            [_repo_cell(r), r.get("language") or "", f"{_int(r['size_kb']) / 1024:.1f}" if r.get("size_kb") else ""]
+            for r in repos
+        ]
+        return lines + md_table(["repository", "language", "size MB"], table, "llr") + [""]
+    by_language: dict[str, list[str]] = defaultdict(list)
+    for r in repos:
+        by_language[r.get("language") or "unknown"].append(_repo_cell(r))
+    columns = list(by_language.values())  # in rank order: the paper languages first, then the rest by name
+    header = [f"{lang} ({_n(len(cells))})" for lang, cells in by_language.items()]
+    table = [[col[i] if i < len(col) else "" for col in columns] for i in range(max(map(len, columns)))]
+    return lines + md_table(header, table, "l" * len(header)) + [""]
+
+
 def _runs(rows: list[dict]) -> list[str]:
     if not rows:
         return []
@@ -1268,15 +1319,14 @@ def _matching(levels: list[dict], groups: list[dict], matchers: list[dict]) -> l
     lines = ["### RQ3b: agreement at L4 (matching)", ""]
     lines += [
         "A matcher puts the records of different tools that describe the same algorithm in one repository into one "
-        "group. Two matchers are compared: `exact` (records whose names count as the same at the level, the ladder's "
-        "relation) and `raqun` (RaQuN: records whose sets of values are similar enough, Jaccard >= 0.75; a group "
-        "holds at most one value set per tool, a tool's records with the same values count as one). How many voter "
-        "groups end up together says how much the tools agree.",
-        "",
-        "RaQuN keeps all non-identity attributes fixed at their full normalised values from L0 onward; only the "
-        "algorithm identity varies across levels. Each level is matched independently, so groups can rearrange "
-        "and their count need not decrease. The parameter-agreement columns below still follow the ladder's "
-        "source-admission rules; those rules do not restrict RaQuN's matching inputs.",
+        "group; how many voter groups end up together says how much the tools agree. The instrument is `exact`, the "
+        "ladder's relation: records whose names count as the same algorithm at the level, with the call sites, the "
+        "agreement per dimension and the per-tool rates built on its groups. `raqun` is the cross-check in the "
+        "background: RaQuN, a published n-way matcher under its paper's configuration, groups records whose sets of "
+        "values are similar enough (Jaccard >= 0.75; at most one value set per tool in a group, so a terse report "
+        "stands alone next to a detailed one). Only its algorithm identity varies with the level, the other values are "
+        "the full normalised ones throughout, and each level is matched on its own, so its counts need not grow with "
+        "the level.",
         "",
     ]
     if levels:
@@ -1355,8 +1405,8 @@ def _timing(levels: list[dict]) -> list[str]:
 
 
 def _headline(levels: list[dict]) -> list[str]:
-    """RQ3b's headline: the share of items at least two voter groups agree on at the top level, RaQuN on whole
-    findings next to the exact matcher on the algorithm alone (matchlevels-run<k>.csv)."""
+    """RQ3b's headline: the share of items at least two voter groups agree on at the top level, the exact matcher on
+    the algorithm; RaQuN's share on whole findings follows as the cross-check (matchlevels-run<k>.csv)."""
     top = {r["matcher"]: r for r in levels if r["level"] == LEVEL_ORDER[-1] and _int(r["items"])}
     if "exact" not in top:
         return []
@@ -1365,19 +1415,15 @@ def _headline(levels: list[dict]) -> list[str]:
         return round(1 - _int(r["k1"]) / _int(r["items"]), 2)
 
     ex, n = confirmed(top["exact"]), _n(_int(top["exact"]["items"]))
-    if "raqun" not in top:
-        text = (
-            f"**Headline at {LEVEL_ORDER[-1]}**: of the {n} items, another voter group reports the same algorithm for "
-            f"a share of {_pct(ex)} (the exact matcher); RaQuN was not run (`--no-raqun`)."
-        )
-        return ["", text]
-    rq = confirmed(top["raqun"])
     text = (
-        f"**Headline at {LEVEL_ORDER[-1]}**: of the {n} items, another voter group reports the same finding with the "
-        f"same details for a share of {_pct(rq)} (RaQuN) and the same algorithm, details aside, for {_pct(ex)} (the "
-        "exact matcher)"
+        f"**Headline at {LEVEL_ORDER[-1]}**: of the {n} items, another voter group reports the same algorithm for a "
+        f"share of {_pct(ex)} (the exact matcher)."
     )
-    text += f"; the {_pct(ex - rq)} between the two is agreement that breaks on the details." if ex > rq else "."
+    if "raqun" not in top:
+        return ["", text + " RaQuN was not run (`--no-raqun`)."]
+    rq = confirmed(top["raqun"])
+    text += f" Cross-check: when a group must be the same finding with the same details, RaQuN confirms {_pct(rq)}"
+    text += f"; the {_pct(ex - rq)} in between is agreement that breaks on the details." if ex > rq else "."
     return ["", text]
 
 
@@ -1810,9 +1856,9 @@ def _rq3(info: dict, levels: list[dict], vocab: list[dict], matchlevels: list[di
         return []
     intro = (
         RQ3.question + " RQ3a: the deltas L0 -> L4 on fixed items (the ladder, shown for both matchers); the gap is "
-        "representational heterogeneity, what remains at L4 is substantive. RQ3b: the agreement at L4; RaQuN carries "
-        "the headline on whole findings, the exact matcher decomposes it per dimension and supplies the call sites "
-        "and the per-tool rates."
+        "representational heterogeneity, what remains at L4 is substantive. RQ3b: the agreement at L4 by the exact "
+        "matcher, which also decomposes it per dimension and supplies the call sites and the per-tool rates; RaQuN, an "
+        "external n-way matcher, cross-checks the headline in one sentence."
     )
     return [RQ3.heading(), "", intro, ""] + body
 
@@ -2120,6 +2166,7 @@ def render(analysis_dir: Path, *, run: int = 1) -> str:
     lines = ["## Preamble", "", "The terms the tables use, the questions they answer, and every stored run.", ""]
     lines += _reading() + _questions()
     lines += _runs(rows("runs.csv"))
+    lines += _repositories(spec or {})
     lines += _negatives(rows("runs.csv"), run)
     lines += _micro(rows("micro-run{k}.csv"), rows("micro-items-run{k}.csv"))
     lines += _rq1(rows("schema-run{k}.csv"), rows("meaningful-run{k}.csv"), rows("conformance-run{k}.csv"))

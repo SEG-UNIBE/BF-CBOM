@@ -319,7 +319,9 @@ make analysis ARGS="score stability-pilot"      # RQ3b: per-tool rates (confirma
 **`report <exp>`** normalises every CBOM once and writes the CSV tables for the analyses below, then
 `_ANALYSIS/_SUMMARY.md`: Markdown tables for a first look (runs per tool, the micro inclusion matrix and recall at two
 levels, who finds each micro asset, fill rates and spec issues, the L0-L4 ladder, how many voter groups report each
-algorithm per repository, LLM token counts, the list of files). The summary is rendered only from the CSV files, so
+algorithm per repository, LLM token counts, the list of files). Its Preamble ends with the repositories the record
+names, each linked to GitHub at its pinned commit, folded into one column per language, or flat with the size when
+the corpus builder recorded one. The summary is rendered from the CSV files and the record, so
 it never shows anything they don't hold; `python -m analysis.summary <exp>/_ANALYSIS/` rebuilds it from an export.
 Its numbers carry `'` between thousands (13'043); the CSVs keep plain numbers. Each report clears and rebuilds
 `_ANALYSIS/`. The standalone `micro` command also writes `micro-run<k>.json`; `report` writes its micro results

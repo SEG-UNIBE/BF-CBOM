@@ -268,7 +268,7 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert ("RQ3a: the L0-L4 deltas (the agreement ladder)", "rq3a-the-l0-l4-deltas-the-agreement-ladder") in links
     assert info["voters"]["cipherradar"] == {"voter_group": "cipherradar", "role": "voter", "engine": "opengrep-rules"}
     sections = ("## Preamble", "### How to read this summary", "### Research questions", "### Runs",
-                "## Bar exam: the micro projects", "## RQ1 Conformance",
+                "### Repositories", "## Bar exam: the micro projects", "## RQ1 Conformance",
                 "### Spec issues", "## RQ2 Volume", "### What the tools report, as written",
                 "### Units per tool", "### Traceable", "## RQ3 Agreement", "### Voter groups",
                 "### RQ3a: the L0-L4 deltas", "#### Spellings per identity", "### RQ3b: agreement at L4",
@@ -278,6 +278,8 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     positions = [summary.index(s) for s in sections]
     assert positions == sorted(positions)  # the sections come in the order of the questions
     assert "| cbomkit | ✅ 11 |" in summary and "| pqcheck | – |" in summary
+    # the record names one repository per language without a size: the folded table, one column per language
+    assert "| Java (1) |\n| --- |\n| [bfcbom/micro-java](https://github.com/bfcbom/micro-java) |" in summary
     assert "Per repository (`units-repo-run<k>.csv`)" in summary
     meaningful = summary.index("### Meaningful")
     assert meaningful < summary.index("#### Asset type `algorithm`", meaningful) < summary.index("### Traceable")
@@ -330,6 +332,36 @@ def test_report_is_identical_sequential_and_parallel(tmp_path, monkeypatch, old_
     groups = _read_csv(exp / "_ANALYSIS" / "groups-exact-run1.csv")
     assert {r["snapshot"] for r in groups} == {SNAPSHOT, PYTHON_SNAPSHOT}
     assert len(_read_csv(exp / "_ANALYSIS" / "schema-run1.csv")) == 4
+
+
+def test_repositories_section_links_pinned_commits_folds_by_language_or_lists_sizes():
+    from analysis.summary import _repositories
+
+    sha = "868cf4ab2ca5a0a39da40e5a14dd740b203662b2"
+    repos = [
+        {"full_name": "jpadilla/pyjwt", "language": "Python", "commit": sha},
+        {"full_name": "bfcbom/micro-go", "language": "Go", "commit": "74aa", "path": "/app/experiments/corpus/micro"},
+        {"full_name": "jwtk/jjwt", "language": "Java", "commit": "0df9"},
+        {"full_name": "golang-jwt/jwt", "language": "Go", "commit": "d4bd"},
+        {"full_name": "example/rusty", "language": "Rust", "git_url": "https://gitlab.com/example/rusty.git"},
+    ]
+    lines = _repositories({"repos": repos})
+    assert lines[0] == "### Repositories" and "The 5 repositories the stored runs cover" in lines[2]
+    header = next(line for line in lines if line.startswith("| Java"))
+    assert header == "| Java (1) | Python (1) | Go (2) | Rust (1) |"  # paper languages first, then the rest
+    rows = [line for line in lines if line.startswith("| ") and not line.startswith(("| Java", "| ---"))]
+    assert rows[0] == (
+        "| [jwtk/jjwt](https://github.com/jwtk/jjwt/tree/0df9) "
+        f"| [jpadilla/pyjwt](https://github.com/jpadilla/pyjwt/tree/{sha}) "
+        "| bfcbom/micro-go (fixture) | example/rusty |"
+    )
+    assert rows[1] == "|  |  | [golang-jwt/jwt](https://github.com/golang-jwt/jwt/tree/d4bd) |  |"  # sorted by name
+    sized = _repositories({"repos": [{**repos[0], "size_kb": 2048}, {**repos[2], "size_kb": 512}, repos[1]]})
+    assert "| repository | language | size MB |" in sized
+    assert "| [jwtk/jjwt](https://github.com/jwtk/jjwt/tree/0df9) | Java | 0.5 |" in sized
+    assert f"| [jpadilla/pyjwt](https://github.com/jpadilla/pyjwt/tree/{sha}) | Python | 2.0 |" in sized
+    assert "| bfcbom/micro-go (fixture) | Go |  |" in sized
+    assert _repositories({}) == [] and _repositories({"repos": []}) == []
 
 
 def test_spellings_per_identity_count_distinct_raw_values_per_tool():

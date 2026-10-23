@@ -252,13 +252,14 @@ records and items, never as assets, which depend on each tool's packaging (`anal
   information, and how much of their disagreement is representational rather than substantive? *RQ3a*, the deltas
   L0 -> L4 on fixed items, shown for both matchers: the gap is representational heterogeneity (naming, packaging,
   placement, spellings per identity), the residual at L4 is substantive (`levels-`, `matchlevels-`,
-  `units-run<k>.csv`, `vocab.csv`). *RQ3b*, the agreement at L4, two instruments with named roles: RaQuN carries the
-  headline on whole findings (a group = the same finding with the same details, grouped by a published external n-way
-  matcher under its paper's configuration) and the external-instrument argument; the exact matcher decomposes the gap
-  per dimension and supplies the call sites, the per-tool rates (confirmation, exclusivity, majority coverage; no
-  ranking claim) and the rater sample (items stratified by k, two raters, Cohen's kappa: precision per k on real
-  findings). The headline level is L4; k of n counts the eligible voters that ran on the repo (`items-`,
-  `agreement-`, `score-`, `grouping-run<k>.csv`).
+  `units-run<k>.csv`, `vocab.csv`). *RQ3b*, the agreement at L4: the exact matcher carries the headline (the share
+  of items another voter group reports, details aside), decomposes the gap per dimension and supplies the call sites,
+  the per-tool rates (confirmation, exclusivity, majority coverage; no ranking claim) and the rater sample (items
+  stratified by k, two raters, Cohen's kappa: precision per k on real findings). RaQuN, a published external n-way
+  matcher under its paper's configuration, is the cross-check in the background, one sentence in the summary and the
+  paper: the share that still holds when a group must be the same finding with the same details (roles swapped
+  2026-10-23; RaQuN carried the headline from 2026-10-22). The headline level is L4; k of n counts the eligible
+  voters that ran on the repo (`items-`, `agreement-`, `score-`, `grouping-run<k>.csv`).
 - **RQ4, effectiveness:** given calls and decoys planted into real code in equal counts, how well does
   each tool find the calls and ignore the decoys, and does the agreement of RQ3 predict that? Recall at the site,
   precision on the decoys, F1 per tool, language and style with CIs over repos, the micro F1 next to it, never
@@ -368,9 +369,10 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
   traceability (RQ2) per asset type, with `located_file` (names a file) and `located_line` (file and line) apart,
   weak and strong on the records with a line (refinement 4); key material gets its own rows so secrets in
   configuration files do not dominate.
-- **Match.** Two n-way matchers over the same records, with named roles in RQ3b (decided 2026-10-22): RaQuN carries
-  the headline agreement on whole findings and the external-instrument argument, the exact matcher the per-dimension
-  decomposition, the call sites, the per-tool rates and the rater sample. On the stability export at L4 the exact
+- **Match.** Two n-way matchers over the same records, with named roles in RQ3b (decided 2026-10-22, swapped
+  2026-10-23): the exact matcher carries the headline, the per-dimension decomposition, the call sites, the per-tool
+  rates and the rater sample; RaQuN is the external cross-check, kept in the background (a sentence and its rows in
+  the matcher x level table; the user wants no more attention on n-way matching). On the stability export at L4 the exact
   matcher has 269 items with 71 % at >= 2 voters, RaQuN 260 with 56 %: RaQuN's groups sit inside the exact clusters
   (it splits an algorithm cluster by detail), its parameter agreement is 100 % by construction (Jaccard >= 0.75 over
   few attributes), it has no call sites, and a terse tool ("AES" next to "AES-256-GCM") is "right alone" under it for
@@ -539,8 +541,8 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
     only in dependencies (the scope is first-party source), none exceeding a tool's timeout in the stability run
     (`experiments/corpus/exclusions.yaml`, `make corpus-prune`).
 12. **Minimum viable paper:** the exact matcher's ladder and rates, insertion mutants with decoys and the paper
-    languages with the independent engines already integrated; RaQuN's headline agreement and Dawid-Skene are
-    additions on top, removal mutants are out.
+    languages with the independent engines already integrated; RaQuN's cross-check and Dawid-Skene are additions on
+    top, removal mutants are out.
 13. **Benchmark-informed tools.** A tool adapted while looking at our results (CipherSift: `tailored_on` in
     `tools.yaml`) has inflated scores there by construction, also in agreement-based scoring. Its tailored (tool, repo)
     pairs are marked `tailored` and left out of the ladder, the matchers and the scores by default; the corpus builder excludes
