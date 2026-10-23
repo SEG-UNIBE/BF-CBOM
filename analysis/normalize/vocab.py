@@ -46,7 +46,13 @@ _MAX_WINDOW = 6
 _SEPARATORS = re.compile(r"[^A-Za-z0-9]+")
 _CAMEL = re.compile(r"(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|(?<=[A-Za-z])(?=[0-9])|(?<=[0-9])(?=[A-Za-z])")
 _UUID_SUFFIX = re.compile(r"@[0-9a-fA-F-]{8,}.*$")
+_UUID = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 _PARENS = re.compile(r"\([^)]*\)")
+_URI = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*://")
+_OID = re.compile(r"(?<!\d)\d+(?:\.\d+){3,}(?!\d)")  # four arcs or more (1.2.840.113549.1.1.1); a version 1.2.3 is none
+_SUITE_IANA = re.compile(r"^(?:TLS|SSL)_([A-Za-z0-9_]+)$")  # RFC 5246 A.5 / RFC 8446 B.4 (Java spells them SSL_ too)
+_SUITE_OPENSSL = re.compile(r"^[A-Z0-9]+(?:-[A-Z0-9]+)+$")  # openssl-ciphers(1): ECDHE-RSA-AES128-GCM-SHA256
+_PARAMETER_DIMS = ("key_size", "mode", "padding", "curve", "digest", "iterations")
 
 
 def fold(text) -> str:
@@ -133,6 +139,20 @@ class Vocabulary:
             ((self._api_key(k), dict(v or {})) for k, v in (data.get("apis") or {}).items()),
             key=lambda kv: -len(kv[0]),
         )
+        # OID -> what it names (`oids:`, each with its RFC; the registry's curve OIDs come with the curves), read in
+        # names (`OID(1.2.840.113549.1.1.1)`, `ec-1.2.840.10045.3.1.7.p12`) and from the `oid` field as a gap filler
+        self.oids: dict[str, dict] = dict(self.curve_oids)
+        for k, v in (data.get("oids") or {}).items():
+            self.oids[str(k)] = dict(v or {})
+        # family or group -> the key sizes a name may state for it (`key_sizes:`; plausible_key_size)
+        self.key_sizes: dict[str, object] = {str(k): v for k, v in (data.get("key_sizes") or {}).items()}
+        # primitive -> the parameters it has (`admits:`); a primitive without an entry admits every parameter
+        self.admits = {str(k): frozenset(str(d) for d in v or []) for k, v in (data.get("admits") or {}).items()}
+        suites = data.get("cipher_suites") or {}  # the grammar of TLS cipher-suite names (`_suite`)
+        self.suite_skip = {fold(t) for t in suites.get("skip") or []}
+        self.suite_mac = {fold(k): str(v) for k, v in (suites.get("mac") or {}).items()}
+        self.suite_ciphers = [(str(k), str(v)) for k, v in (suites.get("ciphers") or {}).items()]
+        self.cipher_groups = frozenset(str(g) for g in suites.get("cipher_groups") or [])
         self._build_token_index()
 
     # ----- loading -----
@@ -190,12 +210,14 @@ class Vocabulary:
                 else:
                     singles.append(name)
         self.curve_alias: dict[str, str] = {}
-        for members in by_oid.values():
+        self.curve_oids: dict[str, dict] = {}  # the registry's curve OIDs (RFC 5480, SEC 2, RFC 5639) -> {curve}
+        for oid, members in by_oid.items():
             ranked = sorted(
                 members,
                 key=lambda m: (_CURVE_CATEGORY_ORDER.index(m[0]) if m[0] in _CURVE_CATEGORY_ORDER else 99, m[1]),
             )
             canonical = ranked[0][1]
+            self.curve_oids[oid] = {"curve": canonical}
             for _, name in members:
                 self.curve_alias.setdefault(fold(name), canonical)
         for name in singles:
@@ -281,6 +303,43 @@ class Vocabulary:
     def curve_size(self, curve: str | None) -> int | None:
         return self.curve_sizes.get(curve) if curve else None
 
+    def oid(self, oid) -> dict:
+        """What an OID names (`oids:` plus the registry's curve OIDs): `algorithm` and its `family`, or a `family`, a
+        `digest`, a `curve`; empty for an unknown OID."""
+        entry = self.oids.get(str(oid).strip()) if oid else None
+        out: dict[str, str] = {}
+        for dim, value in (entry or {}).items():
+            v = str(value)
+            if dim == "curve":
+                out["curve"] = self.curve_alias.get(fold(v), v)
+            elif dim == "digest":
+                out["digest"] = v
+            elif v in self.algorithms:
+                out["algorithm"] = v
+                out["family"] = self.family_of_algorithm(v) or v
+            elif v in self.families:
+                out["family"] = v
+        return out
+
+    def plausible_key_size(self, family: str | None, n: int) -> bool:
+        """Whether a name may state `n` as the key size of `family` (`key_sizes:`, by family, else by its group): a
+        listed set (AES: 128, 192, 256) or a range with a step (the RSA group: 512..16384 by 8); a curve family takes
+        a registry curve's size; a keyed family without an entry takes a multiple of 8 between 8 and 16384 bits."""
+        rule = self.key_sizes.get(family or "") or self.key_sizes.get(self.group_of(family) or "")
+        if rule is None:
+            info = self.family_info(family)
+            if info is not None and info.param == "curve":
+                return n in set(self.curve_sizes.values())
+            return 8 <= n <= 16384 and n % 8 == 0
+        if isinstance(rule, list):
+            return n in {int(x) for x in rule}
+        return int(rule["min"]) <= n <= int(rule["max"]) and n % int(rule.get("step", 1)) == 0
+
+    def admitted(self, primitive: str | None, dim: str) -> bool:
+        """Whether a primitive has the parameter `dim` (`admits:`): a hash has no key size, mode, padding or curve."""
+        allowed = self.admits.get(primitive or "")
+        return True if allowed is None else dim in allowed
+
     def implied(self, values: dict) -> list[str]:
         """Algorithms a record implies besides the one it names (CLAUDE.md refinement 2): its `digest` (HMAC-SHA256
         -> SHA-256, SHA256withECDSA -> SHA-256) and the `implies` table entries of its algorithm and family
@@ -364,6 +423,9 @@ class Vocabulary:
             group = self.group_of(identity)
             families |= {f for f, info in self.families.items() if group and info.group == group}
         for fam in self.generic_over.get(identity, []):
+            if fam in self.algorithms and fam not in self.families:  # XDH -> X25519, X448: algorithms, not families
+                out.add(fam)
+                continue
             families.add(fam)
             families |= self.specifics(fam)
         out |= families - {identity}
@@ -435,13 +497,25 @@ class Vocabulary:
         return _parse_cached(self, str(text) if text is not None else "")
 
     def _parse(self, text: str) -> Parsed:
-        cleaned = _clean(text)
+        oids = _OID.findall(text)  # before `_clean` drops parentheses: qelens writes `OID(1.2.840.113549.1.1.1)`
+        cleaned = _clean(_OID.sub(" ", text) if oids else text)
+        if _URI.match(cleaned):  # an XML Security identifier (RFC 6931) names the algorithm in its fragment
+            cleaned = _clean(cleaned.split("#", 1)[1] if "#" in cleaned else cleaned.rstrip("/").rsplit("/", 1)[-1])
         if not cleaned:
-            return Parsed()
+            return self._parse_one("", oids) if oids else Parsed()
         whole = self.names.get(fold(cleaned))
         if whole is not None:
             vals = self._expand({k: v for k, v in whole.items() if k not in ENTRY_FLAGS})
             return Parsed(values=vals, raw={d: cleaned for d in vals}, known=True, kind=whole.get("kind"))
+        suite = self._suite(cleaned)
+        if suite is None and " " in cleaned:  # a suite inside a label: CipherRadar's `Weak cipher: DES-CBC3-SHA`
+            suites = [s for w in cleaned.split() if (s := self._suite(w.strip(":,;"))) is not None]
+            if len(suites) == 1:
+                suite = suites[0]
+                rest = self._parse_one(" ".join(w for w in cleaned.split() if self._suite(w.strip(":,;")) is None))
+                suite.unmapped += rest.unmapped
+        if suite is not None:
+            return suite
         parts = [p for p in re.split(r"\s*[,;]\s*", cleaned) if p] if re.search(r"[,;]", cleaned) else [cleaned]
         if len(parts) > 1:
             subs = [self._parse_one(p) for p in parts]
@@ -455,7 +529,46 @@ class Vocabulary:
                     merged.unmapped += s.unmapped
                 return merged
             return Parsed(candidates=fams, known=True, unmapped=[u for s in subs for u in s.unmapped])
-        return self._parse_one(cleaned)
+        return self._parse_one(cleaned, oids)
+
+    def _suite(self, text: str) -> Parsed | None:
+        """A TLS cipher-suite name: IANA `TLS_<kx>[_<auth>][_EXPORT]_WITH_<cipher>_<mac>` and TLS 1.3
+        `TLS_<aead>_<hash>` (RFC 5246 A.5, RFC 8446 B.4), or OpenSSL's `[<kx>-][<auth>-]<cipher>-<mac>`
+        (openssl-ciphers(1)). The record is the bulk cipher with its parameters and `protocol: TLS`; key exchange,
+        authentication and MAC are not values of it (CycloneDX models a suite as a protocol property referencing
+        algorithms); `SHA` is SHA-1 (RFC 5246 A.5); a NULL cipher leaves the MAC hash as the only algorithm. None when
+        `text` is no suite (`HMAC-SHA256`, `RSA-SHA256`)."""
+        m = _SUITE_IANA.match(text)
+        if m:
+            body = m.group(1)
+            tokens = body.split("_WITH_", 1)[1].split("_") if "_WITH_" in body else body.split("_")
+            sep = "_"
+        elif _SUITE_OPENSSL.match(text):
+            tokens, sep = text.split("-"), "-"
+        else:
+            return None
+        if len(tokens) < 2 or fold(tokens[-1]) not in self.suite_mac:
+            return None
+        mac = self.suite_mac[fold(tokens[-1])]
+        cipher = sep.join(t for t in tokens[:-1] if fold(t) not in self.suite_skip)
+        if not cipher:
+            return None  # `RSA-SHA256`: a signature, no cipher
+        for spelled, canonical in self.suite_ciphers:  # spellings the token parser lacks: CBC3, DES40, 3DES_EDE
+            cipher = re.sub(rf"(?<![A-Za-z0-9]){re.escape(spelled)}(?![A-Za-z0-9])", canonical, cipher, flags=re.I)
+        null = fold(cipher) == "null"
+        parsed = Parsed() if null else self._parse_one(cipher, loose=True)
+        family = parsed.values.get("family")
+        if not null and self.group_of(family) not in self.cipher_groups:
+            return None  # the part before the MAC is no cipher (`HMAC-SHA256`)
+        out = Parsed(known=True, unmapped=list(parsed.unmapped))
+        if null:
+            out.values = {"algorithm": mac, "family": self.family_of_algorithm(mac) or mac}
+        else:
+            out.values = dict(parsed.values)
+            out.values["mac"] = mac  # the suite's hash: never stored; it sharpens a tool's hash component (_admit)
+        out.values["protocol"] = "TLS"
+        out.raw = {d: text for d in out.values}
+        return out
 
     def _segment(self, token: str) -> list[str] | None:
         """Split a run-together word into known pieces ("HMACSHA" -> hmac, sha); None if it does not split fully."""
@@ -470,7 +583,10 @@ class Vocabulary:
             i += len(piece)
         return out if len(out) > 1 else None
 
-    def _parse_one(self, text: str) -> Parsed:
+    def _parse_one(self, text: str, oids: list[str] = (), *, loose: bool = False) -> Parsed:  # type: ignore[assignment]
+        """The token parser. `oids`: OIDs cut out of the text, read through `oid()`. A bare number is a key size only
+        next to the algorithm or family it belongs to (`AES256`, `RSA-2048`; `loose`: anywhere, inside a cipher-suite
+        name) and when `plausible_key_size` allows it; `number_keywords` announce one explicitly."""
         tokens: list[str] = []
         for tok in tokenize(text):
             f = fold(tok)
@@ -481,7 +597,8 @@ class Vocabulary:
                     continue
             tokens.append(tok)
         found: list[tuple[Term, str]] = []
-        numbers: list[tuple[int, str | None, str]] = []
+        spans: list[tuple[int, int, Term]] = []  # token positions of the terms found, for the numbers' adjacency
+        numbers: list[tuple[int, str | None, str, int]] = []  # (n, announcing keyword, token, token position)
         unmapped: list[str] = []
         pending: str | None = None
         i = 0
@@ -495,20 +612,39 @@ class Vocabulary:
                 term = self.token_index.get(key)
                 if term is not None and not (w == 1 and key.isdigit()):
                     found.append((term, "-".join(tokens[i : i + w])))
+                    spans.append((i, i + w, term))
                     i += w
                     break
             else:
                 tok = tokens[i]
                 f = fold(tok)
                 if f.isdigit():
-                    numbers.append((int(f), pending, tok))
+                    numbers.append((int(f), pending, tok, i))
                     pending = None
                 elif f in self.number_keywords:
                     pending = self.number_keywords[f]
                 elif f and f not in self.noise:
                     unmapped.append(tok)
                 i += 1
-        return self._assemble(found, numbers, unmapped)
+        meaningful = [k for k, t in enumerate(tokens) if fold(t) not in self.noise]  # noise words are transparent
+
+        def adjacent(pos: int) -> bool:
+            k = meaningful.index(pos)
+            before = meaningful[k - 1] if k else None
+            after = meaningful[k + 1] if k + 1 < len(meaningful) else None
+            return any(
+                t.kind in ("algorithm", "family") and (end - 1 == before or start == after) for start, end, t in spans
+            )
+
+        nums = [(n, kw, tok, loose or adjacent(pos)) for n, kw, tok, pos in numbers]
+        for oid in oids:
+            values = self.oid(oid)
+            if not values:
+                unmapped.append(oid)
+            terms = [Term("curve" if d == "curve" else "family" if d == "family" else "algorithm", v)
+                     for d, v in values.items() if d != "family" or "algorithm" not in values]  # fmt: skip
+            found = [(t, oid) for t in terms] + found
+        return self._assemble(found, nums, unmapped)
 
     def _assemble(self, found: list[tuple[Term, str]], numbers: list, unmapped: list[str]) -> Parsed:
         out = Parsed(unmapped=list(unmapped))
@@ -572,15 +708,22 @@ class Vocabulary:
         return out
 
     def _numbers(self, numbers: list, put, out: Parsed) -> None:
-        """Bare numbers: key size of a keyed family, the variant of SHA-2/SHA-3, else a parameter set."""
+        """Bare numbers: the key size of a keyed family when the number stands next to it and the family may have it
+        (`plausible_key_size`), the variant of SHA-2/SHA-3, else a parameter set; an announced number (`KeySize = 2048`)
+        needs no neighbour but a plausible value."""
         fam = out.values.get("family")
         info = self.family_info(fam)
         sem = info.param if info else "none"
-        for n, keyword, tok in numbers:
-            if keyword:
+        for n, keyword, tok, adjacent in numbers:
+            if keyword == "key_size" and not self.plausible_key_size(fam, n):
+                out.unmapped.append(tok)
+            elif keyword:
                 put(keyword, n, tok)
-            elif sem in ("key", "curve") and "key_size" not in out.values and 8 <= n <= 16384:
-                put("key_size", n, tok)
+            elif sem in ("key", "curve") and "key_size" not in out.values and adjacent:
+                if self.plausible_key_size(fam, n):
+                    put("key_size", n, tok)
+                else:
+                    out.unmapped.append(tok)
             elif fam in ("SHA-2", "SHA-3") and out.values.get("algorithm") in (None, "SHA-2", "SHA-3"):
                 name = f"SHA-{n}" if fam == "SHA-2" else f"SHA3-{n}"
                 if name in self.algorithms:
@@ -650,6 +793,7 @@ def clean_name(text: str) -> str:
 
 def _clean(text: str) -> str:
     t = _UUID_SUFFIX.sub("", str(text))
+    t = _UUID.sub(" ", t)  # a UUID anywhere (a component named by one) carries no algorithm and no key size
     t = _PARENS.sub(" ", t)
     return " ".join(t.split()).strip(" -_:")
 

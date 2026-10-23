@@ -39,7 +39,8 @@ FILES = {
     "items-run{k}.csv": "one row per (repo, tool, item) with the voter groups matching it at each level L0-L4; no "
     "locations",
     "levels-run{k}.csv": "share of each tool's items another voter group confirms, per level L0-L4",
-    "units-run{k}.csv": "per tool: assets, records, items and how they relate (records per asset, assets per item)",
+    "units-run{k}.csv": "per tool: assets, records, items and how they relate (records per asset, assets per item), "
+    "the kinds of place and the records outside code files of the repository's language",
     "units-repo-run{k}.csv": "per (tool, repo): assets, records, items",
     "coverage-run{k}.csv": "per tool and dimension: algorithm assets with a value (reported vs derived), and what "
     "their names are (resolution)",
@@ -49,7 +50,8 @@ FILES = {
     "traceability-run{k}.csv": "per (snapshot, tool, asset type), records with a file, with a file and line, "
     "existing at the commit, in range, strong",
     "vocab.csv": "what every raw value mapped to, per tool and source (the reviewable mapping table)",
-    "groups-exact-run{k}.csv": "exact matcher: one row per group (repo scope per item, site scope per call site)",
+    "groups-exact-run{k}.csv": "exact matcher: one row per group (repo scope per item, site scope per call site; "
+    "`member_voter_groups` = 0: no voter's own record, no item)",
     "members-exact-run{k}.csv": "exact matcher: one row per (group, record); `matched` = joined through a lower "
     "level, `implied` with --closure",
     "matchlevels-run{k}.csv": "per matcher and level, items by number of voter groups, the agreement per "
@@ -423,7 +425,7 @@ def _runs(rows: list[dict]) -> list[str]:
     by_tool: dict[str, list[dict]] = defaultdict(list)
     for r in rows:
         by_tool[r["tool"]].append(r)
-    statuses = ["ok", "error", "timeout", "unsupported"]
+    statuses = ["ok", "error", "timeout", "oom", "unsupported"]
     memory = any(r.get("peak_memory_mb") for r in rows)
     table, others = [], []
     for tool in sorted(by_tool):
@@ -456,8 +458,10 @@ def _runs(rows: list[dict]) -> list[str]:
         "",
         "Every stored run, all repetitions and variants: one row per tool.",
         "",
-        "- `ok`, `error`, `timeout`, `unsupported`: runs with that status (`unsupported`: the repository's language "
-        "is outside the tool's languages, so the tool was not run).",
+        "- `ok`, `error`, `timeout`, `oom`, `unsupported`: runs with that status (`oom`: the tool wrote output but its "
+        "container was OOM-killed meanwhile, so the CBOM may be partial: our memory cap, not the tool's result; such a "
+        "run is left out of every table below and `experiment run --retry-failed` redoes it; `unsupported`: the "
+        "repository's language is outside the tool's languages, so the tool was not run).",
         "- `median s`: the median duration of the ok runs, in seconds.",
     ]
     if memory:
@@ -467,7 +471,7 @@ def _runs(rows: list[dict]) -> list[str]:
         ]
     lines += ["- `tool version`: as the worker recorded it.", ""]
     lines += md_table([*header, "tool version"], table, "l" + "r" * (len(header) - 1) + "l")
-    failed = [r for r in rows if r["status"] not in ("ok", "unsupported")]
+    failed = [r for r in rows if r["status"] not in ("ok", "oom", "unsupported")]
     if failed:
         lines += ["", f"Runs without a result ({_n(len(failed))}):", ""]
         for r in failed[:25]:
@@ -487,12 +491,12 @@ def _runs(rows: list[dict]) -> list[str]:
             lines.append(f"- `{r['tool']}` on `{r['repo']}` ({r['variant']}, run {r['run']}): {r['workaround']}")
         if len(workarounds) > 25:
             lines.append(f"- ... and {_n(len(workarounds) - 25)} more (runs.csv)")
-    oomed = [r for r in rows if r["status"] == "ok" and _int(r.get("oom_kills")) > 0]
+    oomed = [r for r in rows if r["status"] == "oom"]
     if oomed:
         lines += [
             "",
-            f"Runs stored ok although the container was OOM-killed meanwhile ({_n(len(oomed))}; not clean results, "
-            "`experiment run --retry-failed` redoes them):",
+            f"Runs OOM-killed meanwhile, stored with the tool's output but counted as `oom` ({_n(len(oomed))}; our "
+            "memory cap, not the tool's result; left out of the tables, `experiment run --retry-failed` redoes them):",
             "",
         ]
         for r in oomed[:25]:
@@ -926,7 +930,9 @@ def _places(units: list[dict]) -> list[str]:
     for u in units:
         total = sum(_int(u.get(f"loc_{k}")) for k in LOCATION_KINDS)
         shares = [_pct(_int(u.get(f"loc_{k}")) / total if total else None) for k in LOCATION_KINDS]
-        table.append([_tool(u), total, *shares])
+        located = total - _int(u.get("loc_none"))
+        outside = _pct(_int(u.get("outside_code")) / located) if located and "outside_code" in u else ""
+        table.append([_tool(u), total, *shares, outside])
     unread = sum(_int(u.get("loc_unread")) for u in units)
     lines = [
         "**Places per tool**: where a tool's algorithm records point, as shares of its `records`:",
@@ -936,6 +942,11 @@ def _places(units: list[dict]) -> list[str]:
         "- `import`: one line holding an import statement.",
         "- `file`: a file without a line; `none`: no location.",
         "- `unread`: one line in a file that could not be read here, so its kind is unknown.",
+        "- `outside code`: of the records with a file, the share whose file is not a source file of the repository's "
+        "language (`.java`, `.kt`, `.scala`, `.groovy`; `.py`; `.go`): fixtures, test vectors, configuration, "
+        "documentation, other languages. The agreement analyses count these places like any other, since the tools "
+        "are benchmarked on the repositories as they are; the share says how much of a tool's places the discussion "
+        "must read in that light.",
         "",
         "A tool that points at the import or a window places the same use elsewhere than a tool that points at the "
         "call; the call-site matching window (±2 lines) absorbs only part of that.",
@@ -945,7 +956,7 @@ def _places(units: list[dict]) -> list[str]:
             f" {_n(unread)} records are `unread`: the snapshot files are on the VM's git mirror (`analysis report` "
             "there, or `--fetch` for a copied export)."
         )
-    lines += [""] + md_table(["tool", "records", *LOCATION_KINDS], table) + [""]
+    lines += [""] + md_table(["tool", "records", *LOCATION_KINDS, "outside code"], table) + [""]
     return lines
 
 
@@ -1991,9 +2002,10 @@ def _overlap(groups: list[dict]) -> list[str]:
 
     def line(label: str, rows: list[dict]) -> list:
         best: dict[tuple, int] = {}  # (snapshot, variant, unit) -> voter groups of its largest group
+        # a group whose only non-attached records are observers' is no item of the voters, however many of their
+        # generic records hang on it (the rule of tables.matchlevel_row, so `all` equals the matcher x level table)
+        rows = [g for g in rows if _int(g.get("member_voter_groups", g.get("voter_groups")))]
         for g in rows:
-            if not _int(g["voter_groups"]):
-                continue  # only observers report it: no voter group, not counted
             for unit in (g.get("units") or g["key"]).split(";"):  # the L4 identities inside the group
                 key = (g["snapshot"], g.get("variant"), unit)
                 best[key] = max(best.get(key, 0), _int(g["voter_groups"]))

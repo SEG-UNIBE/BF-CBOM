@@ -171,6 +171,18 @@ def test_generic_reports_attach_without_merging_and_bridges_do_not_merge():
     assert [identity(rec, lv) for lv in LEVELS] == ["hmac.new", "hmacnew", "SHA-2", "HMAC", "SHA-2"]
 
 
+def test_xdh_attaches_to_x25519_and_x448_without_merging_them():
+    # Java's `XDH` (5 voter groups write it on corpus-pilot-medium) is X25519 or X448 (vocabulary 2026-10-23.2)
+    items = level_matches(_records("a", "X25519") + _records("b", "XDH") + _records("c", "X448"))
+    l4 = {c.key: c for c in clusters_at(items, "L4")}
+    assert set(l4) == {"X25519", "XDH", "X448"}
+    assert [r.tool for r in l4["X25519"].attached] == ["b"] and l4["X448"].reason == {"b:0:0": "generic"}
+    assert l4["XDH"].attached == [] and [r.tool for r in l4["X25519"].members] == ["a"]
+    voters = {"a": "a", "b": "b", "c": "c"}
+    assert items["X25519"].confirmed_at("L4", "a", voters) and items["X448"].confirmed_at("L4", "c", voters)
+    assert not items["X25519"].confirmed_strictly_at("L4", "a", voters)
+
+
 def test_observers_get_ladder_rows_but_confirm_nobody():
     from common.tools_registry import VoterMap, voter_groups
 

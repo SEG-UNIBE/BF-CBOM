@@ -65,7 +65,9 @@ normalisation, analysis outputs),
   `results:<name>`; the coordinator ingests via `coordinator/redis_io.py:ingest_worker_results`; experiment jobs are
   routed to `results:exp:<name>`.
 - **Job states:** held, queued, running, completed, failed, timeout, cancelled, unsupported; one table
-  (`common/utils.py:_STATUS_META`) feeds every page. `unsupported` = the repo's language is outside the tool's
+  (`common/utils.py:_STATUS_META`) feeds every page. A stored `ok` run whose container was OOM-killed meanwhile reads
+  as `oom` for the runner and the analysis alike (`common/experiment.py:stored_status`; `--retry-failed` redoes it,
+  the report lists it and reads no CBOM from it). `unsupported` = the repo's language is outside the tool's
   `languages`, or outside the spec's `tool_languages` for it (`common/jobs.py:tool_supports`), decided at issue time in the UI or recorded as a meta file by the
   runner (`common/experiment.py:mark_unsupported`; `--run-unsupported` disables it).
 - **Batch experiments.** `make experiment EXP=experiments/<x>.yaml` runs `bf-cbom experiment run` in the runner
@@ -145,6 +147,11 @@ normalisation, analysis outputs),
     packages its findings (CipherRadar: one component per finding; CBOMkit: one per algorithm with its
     occurrences); the ladder and the scores count items.
   - `normalize/`: CBOM -> normalised records (below); `normalize` also writes `run<k>.norm.json` next to each CBOM.
+    Our reading of a name is bounded (vocabulary 2026-10-23.1): shapes first (a UUID carries nothing, an OID is read
+    through `oids:`, a URI through its fragment), a bare number is a key size only next to its family and within the
+    family's standard sizes (`key_sizes:`), a parsed or derived parameter the primitive does not have is dropped
+    (`admits:`; `engine.py:_admit`), a cipher-suite name yields its bulk cipher with `protocol: TLS`
+    (`cipher_suites:`). A tool's own field is never checked or dropped.
   - `schema.py`: RQ1 (whole-document validation, meaningful shares) and RQ2's traceability; `snapshots.py` reads a pinned
     commit's files from the git mirror or a cache fetched with `--fetch` (a fixture: published from its local directory).
   - `levels.py`: the L0-L4 ladder on a fixed unit (refinement 14): `level_matches` clusters a repo's records level
@@ -172,7 +179,11 @@ normalisation, analysis outputs),
   - `groundtruth.py`: micro recall at call sites and at repo level, precision (over the places a tool reports, decoys
     included) and F1, the entry bar (`ENTRY_BAR`: half the calls, lenient, in one language) and each tool's verdict
     (`passed`, `disqualified`, `not judged`: `entry_verdict`), field-by-field comparison with `expected`.
-  - `tables.py` (flat CSV tables), `summary.py` (`_SUMMARY.md`, rendered from the CSVs only).
+  - `tables.py` (flat CSV tables), `summary.py` (`_SUMMARY.md`, rendered from the CSVs only). RQ2's "Places per
+    tool" ends with `outside code`: the share of a tool's located algorithm records whose file is not a source file
+    of the repo's language (`in_scope`; fixtures, test vectors, configuration); the analyses count those places like
+    any other (decided 2026-10-23: the tools are benchmarked on the repositories as they are, no scope filter), the
+    share is for the discussion.
   - **In parallel** (2026-10-23): `report` normalises, validates and matches in a process pool, one CBOM or one
     repository per task (`misc/cli/parallel.py:pmap`, the tasks in `analysis/tasks.py`; `--jobs`, env `BF_CBOM_JOBS`;
     0 = auto, min(CPUs, 8) for a step with 16 or more items, else sequential). The workers are spawned, never forked
@@ -212,14 +223,14 @@ the rerun's verdicts.
 |---|---|---|---|
 | `cbomkit` | cbomkit | Java, Python, Go | CBOMkit server image, cloned through the git server over TLS; Python covers pyca only; modules need a build file and `src/`; large repos need ~45 min and a 16 GB heap |
 | `cbomkit-jar` | cbomkit | Java, Python, Go | cbomkit-action, source only, the same engine (packaging differences are measured); the indexing risk (build file without `src/`) is noted, `CBOMKIT_ENSURE_SRC=1` stays off |
-| `cdxgen` | cdxgen | Java, Python, JS, Go | `--include-crypto --evidence`, `-t python` / `-t go` for those repos (the `cbom` command finds nothing in Go, `--profile research` adds nothing; checked 2026-10-22); algorithms carry locations only for JS/TS (occurrences) and Go (property `cdx:golem:crypto:sourceLocation`, one per asset); Go analysis type-checks, so a module's imports resolve only with its `go.sum`, network and a writable module cache (a GOPATH per job: under `cap_drop` root cannot create the image's; until 2026-10-22 every Go repo with a dependency gave nothing); Java code yields none (atom has no crypto sinks); 16 GiB (OOM-killed at 8 on Chat2DB, bisq, bisq2, kafka) |
+| `cdxgen` | cdxgen | Java, Python, JS, Go | `--include-crypto --evidence`, `-t python` / `-t go` for those repos (the `cbom` command finds nothing in Go, `--profile research` adds nothing; checked 2026-10-22); algorithms carry locations only for JS/TS (occurrences) and Go (property `cdx:golem:crypto:sourceLocation`, one per asset); Go analysis type-checks, so a module's imports resolve only with its `go.sum`, network and a writable module cache (a GOPATH per job: under `cap_drop` root cannot create the image's; until 2026-10-22 every Go repo with a dependency gave nothing); Java code yields none (atom has no crypto sinks); 24 GiB (OOM-killed at 8 on Chat2DB, bisq, bisq2, kafka; at 16 on 8 of 60 pilot-medium repos, 2026-10-23) |
 | `cryptobomforge` | cryptobomforge | Python, C | CodeQL's crypto inventory queries, C with `--build-mode none`; writes IBM's draft `1.4-cbom-1.0`, not CycloneDX, also when CodeQL finds nothing (every stored CBOM is the tool's; the worker's placeholder for that case went 2026-10-20) |
 | `deepseek`, `chatgpt`, `claude` | one each, `merge_group: llm` | all five | `common/llm_cbom.py` (below), CycloneDX 1.7 assembled by us; `chatgpt` / `claude` need `make up-prod EXTRA_PROFILES=llm` and a key in `docker/env/worker-<provider>.env`; a request that fails after the provider's retries fails the job (no partial CBOMs), `LLM_MAX_CHUNKS` 1000, `LLM_CONCURRENCY` 4 |
 | `cryptoscan` | cryptoscan | eleven | always `--include-quantum-safe`; skips folders named demo, example, sample; 1.4.0 panics on specific files and the run fails (its `--exclude` cannot name one exact file, so no workaround; `docs/findings.md` "Interventions") |
 | `pqcheck` | pqcheck | Python, Go | |
 | `qdarpan` | qdarpan | Java, Go, C | the worker adapter moves `qdarpan:location.N` into `evidence.occurrences` |
 | `securin-xbom` | securin-xbom | Java, Python | the registry rule sets it fetches online, frozen unfiltered at a semgrep-rules commit |
-| `cipherradar` | cipherradar | Java, Python, Go, JS | runs outside the clone; Java files with its crash trigger pre-excluded via `.cradarignore` (recorded) |
+| `cipherradar` | cipherradar | Java, Python, Go, JS | runs outside the clone; Java files with its crash trigger pre-excluded via `.cradarignore` (recorded); 8 GiB (killed at 4 on pycryptodome, bunkerweb, pyca/cryptography, 2026-10-23) |
 | `scanoss` | scanoss | Go, C, JS, Rust | crypto-finder with the public open rules; Java/Python rules need an API key (research key requested) |
 | `ciphersift` | ciphersift | Java, Python, Go | benchmark-informed: `tailored_on` the micro projects and the pilot corpus (refinement 13) |
 | `xgrep` | xgrep | Java, Python, Go, JS | |
@@ -282,9 +293,13 @@ ones of corpus-main, ~10 calls and ~10 decoys each, sized after the corpus run's
 mutation harness); every other language (C, JavaScript/TypeScript, Rust, ...) is irrelevant for now: tools still run
 where they declare support, but no analysis, figure or tuning effort goes into those languages.
 
-## Status (updated 2026-10-22)
+## Status (updated 2026-10-23)
 - **Current experiment scope:** 15 CBOM generator tools in all current specs. LLM providers are excluded for now;
   the provider workers and their analysis support remain implemented for possible later use.
+- **corpus-pilot-medium reviewed (2026-10-23, `docs/findings.md` "Export review 2026-10-23"):** the vocabulary is at
+  2026-10-23.2 (parser bounds, then additions: XDH, ANSI-KDF spellings, DES3, OCB3, ISO7816-4, java-jwt names), cdxgen's
+  cap is 24 GiB and CipherRadar's 8 GiB, OOM-tainted runs count as `oom` in the report too; every pilot experiment is
+  rerun with these.
 - **Waiting for the VM:** `make up-prod`, then each experiment as a whole (the user's preference, 2026-10-20):
   `make experiment EXP=experiments/corpus-pilot-small.yaml ARGS="--overwrite-old" EXPERIMENT_MEMORY_BUDGET_GB=0`, the
   same for corpus-icpc, stability-pilot and bar-micro; `make experiment-delete NAME=<x>` for the former smoke

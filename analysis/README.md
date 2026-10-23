@@ -53,6 +53,12 @@ as 13,996).
   without a line, `none` no location, `unread` a single line whose file the snapshot files available to the
   analysis do not hold (the VM's mirror has them; `--fetch` for a copied export). A tool that reports the import
   line places the same use elsewhere than one that reports the call, which the ±2-line window absorbs only in part.
+  Next to the kind, every located record says whether its file is a source file of the repository's language
+  (`in_scope`; per tool `outside_code` in `units-run<k>.csv`, the share "outside code" of "Places per tool"): on
+  corpus-pilot-medium 83 % of CryptoScan's, 74 % of qScan's and 71 % of CipherRadar's places were fixtures, test
+  vectors, configuration or documentation (one DefectDojo scan fixture alone held 13'759 of CryptoScan's). The
+  analyses count these places like any other, because the tools are benchmarked on the repositories as they are
+  (decided 2026-10-23: no scope filter, no test-path heuristic); the share is for the discussion.
 - **Two more words.** A *unit* is an L4 identity: the identity of an item (the `unit` column of
   `items-run<k>.csv`) and the expected value of an RQ4 mutant (`expected.unit`). A *site* is a record's file and line
   (call-site level, refinement 1). The micro ground truth's entries are *expected items* at site level, a known
@@ -189,6 +195,17 @@ this, since two tools also agree when both are right.
 
 The shares of each tool's algorithm assets are RQ2 results (the summary's RQ2 section,
 `coverage-run<k>.csv`; per record in `records-run<k>.csv`). Only `mapped` records enter the ladder and the scores.
+
+**What our reading of a name may add** (vocabulary 2026-10-23.1, prompted by the corpus-pilot-medium review): the
+parser never invents a parameter. A UUID in a name carries nothing; an OID is read through the `oids:` table (RFC
+8017, 5480, 8410, ...); a URI names its algorithm in the fragment (RFC 6931); a bare number is a key size only next to
+the family it belongs to and when that family may have it (`key_sizes:`, each set from its standard: AES 128/192/256,
+the RSA group 512..16384 by 8), so `ISO7816-4Padding` is no AES key size and `issue_369_rsa_pem.pub` no RSA modulus; a
+parsed or derived parameter the record's primitive does not have is dropped (`admits:`: a hash has no key size, mode,
+padding or curve, so CipherSift's SHA-2 component named `TLS_AES_128_GCM_SHA256` keeps neither the 128 nor the GCM);
+a cipher-suite name yields its bulk cipher with `protocol: TLS` (`cipher_suites:`; key exchange, authentication and
+MAC are no values of that record, `SHA` is SHA-1 by RFC 5246 A.5). A tool's own field or label is never checked or
+dropped: CBOMkit's `AES-96` in `parameterSetIdentifier` stays its finding.
 
 ## The ladder, by example
 

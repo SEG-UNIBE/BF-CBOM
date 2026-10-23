@@ -5,6 +5,57 @@ refinement 14): they were developed on the pilot corpus (the development set); t
 change bumps `version` in `algorithms.yaml`, adds an entry here with the fingerprint `python -m analysis.freeze`
 prints and the reason, and the tests fail otherwise (`tests/test_vocab_frozen.py`). Newest entry first.
 
+## 2026-10-23.2 (2026-10-23) fingerprint `b4be7318db06f0f483d9e3d132680585ea9f6cc24f7b29f7a09ea20421f24907`
+Spellings the corpus-pilot-medium review found unmapped or misread, each traceable to a standard or an official API
+(the rule of this file); nothing added because it makes tools agree, nothing that folds what the registry keeps apart
+(Curve25519 and Ed25519 stay two curves; a tool's field values stay as written).
+- `XDH`, Java's standard algorithm name for Diffie-Hellman over Curve25519 or Curve448 (JDK 11 `KeyAgreement` /
+  `KeyPairGenerator`), unmapped before although 5 voter groups write it: an addition with primitive key-agree and a
+  generic marker (`generic_over`) over the algorithms X25519 and X448, which it attaches to without merging them
+  (`Vocabulary.specifics` now reads algorithms in `generic_over`, not only families).
+- `ANSI-KDF`: the spellings `X963KDF` (pyca `cryptography.hazmat.primitives.kdf.x963kdf.X963KDF`, also as an API
+  prefix), `X9.63-KDF`, `ANSI-X9.63-KDF`, `ANSI-KDF-X9.63` (CBOMkit; the registry's own pattern), `KDF-X9.63`.
+  `ECDH-X963KDF` gave ECDH with key size 963 before.
+- `3DES`: `DES3`, pycryptodome's module name (`Crypto.Cipher.DES3`, until now an API prefix only); as a name it parsed
+  to single DES (qelens 32 records, CipherSift).
+- `OCB`: `OCB3` (RFC 7253 names the mode OCB3; pyca `AESOCB3`); `3` was left over before.
+- `ISO7816-4` padding: `ISO7816-4Padding` (JCA), `ISO7816d4Padding` (BouncyCastle), `ISO7816` (ISO/IEC 7816-4).
+- java-jwt's factory names (`com.auth0.jwt.algorithms.Algorithm`): `Algorithm.RSA256/384/512` (RSASSA-PKCS1 with the
+  digest), `Algorithm.ECDSA256/384/512` (ECDSA with the curve and digest, as JOSE ES256/384/512),
+  `Algorithm.HMAC256/384/512`; `Algorithm.RSA256` gave RSA with key size 256 before.
+- `NTRU-Prime`: `Streamlined NTRU Prime`, `sntrup` (the scheme's name in the NIST PQC round 3 submission; CBOMkit).
+
+## 2026-10-23.1 (2026-10-23) fingerprint `90d5164e6c48ae1efcc06a5c231667ed9b541e7a13810553c6eab3cc120d9db0`
+Four rules of the name parser, prompted by the review of corpus-pilot-medium (development set; `docs/findings.md`
+"Export review 2026-10-23"). The rules live in `analysis/normalize/vocab.py` and `engine.py` (not fingerprinted), their
+data in four new sections here; this entry is the record of the code change. Nothing a tool wrote is touched: every
+rule bounds what OUR reading of a name adds.
+- **Shapes before tokenising.** A UUID anywhere in a name carries nothing (a CryptobomForge component named by one
+  gave `EC` with key size 15); an OID is one token, read through the new `oids:` table (RFC 8017, 5480, 5758, 3279,
+  8410, 3370, 5754, 8018, 3565, 5084; the registry's curve OIDs come with the curves): qelens' `OID(1.2.840.113549.1.1.1)`
+  is RSA, cdxgen's `ec-1.2.840.10045.3.1.7.p12` has curve secp256r1 and no key size 840; a URI names its algorithm in
+  the fragment (RFC 6931: `http://www.w3.org/2001/04/xmldsig-more#rsa-sha256`), so 2001 is no key size. The `oid`
+  field fills gaps the same way (`derived:oid`); `oid` joins the noise words.
+- **A key size from a name must be plausible.** New `key_sizes:` per family or group, each with its standard (AES
+  128/192/256 by FIPS 197, the RSA group 512..16384 by 8, DES 40/56/64, ...; a curve family takes a registry curve's
+  size; a keyed family without an entry a multiple of 8 up to 16384), and the number must stand next to the family it
+  belongs to: `ISO7816-4Padding` gives AES no key size 7816, `issue_369_rsa_pem.pub` RSA none, `Algorithm.RSA256`
+  none, `rsa signpkcs1v15` none (40 of 292 key-size disagreements on pilot-medium were such artefacts). A tool's own
+  parameterSetIdentifier is never checked (CBOMkit's `AES-96` stays its finding).
+- **Parameters a primitive has.** New `admits:` per CycloneDX primitive: a value our own reading (a name parse, an
+  API context, a derivation) gives a record for a parameter its primitive does not have is dropped
+  (`engine.py:_admit`); a tool's field or label never is. CipherSift writes one component per part of
+  `TLS_AES_128_GCM_SHA256` (families SHA-2 and AES); its SHA-2 component carried key size 128 and mode GCM, `ES512`
+  under SHA-2 a curve and a derived key size 521 (on pilot-medium 396 key sizes, 356 curves, 39 paddings and 21 modes
+  on hash records). On a hash, a parsed digest that refines the algorithm is the algorithm (SHA-2 + SHA-256 -> SHA-256).
+- **Cipher-suite names** (new `cipher_suites:`): IANA `TLS_<kx>[_<auth>][_EXPORT]_WITH_<cipher>_<mac>`, TLS 1.3
+  `TLS_<aead>_<hash>` (RFC 5246 A.5, RFC 8446 B.4) and OpenSSL's `[<kx>-][<auth>-]<cipher>-<mac>` (openssl-ciphers(1))
+  yield the bulk cipher with its parameters and `protocol: TLS`; key exchange, authentication and MAC are no values of
+  that record (CycloneDX models a suite as a protocol property referencing algorithms), `SHA` is SHA-1 (RFC 5246
+  A.5), a NULL cipher leaves the MAC hash. Before, `TLS_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA` gave FFDH with key size 40,
+  mode CBC and digest SHA (CryptoScan's "Weak Cipher Suite", 228 pilot-medium records) and `TLS_RSA_WITH_3DES_EDE_CBC_SHA`
+  RSASSA-PKCS1 without the 3DES.
+
 ## 2026-10-20.2 (2026-10-20) fingerprint `fb39aefee3a5a878efbca29fef7e47839caaec8fcc2f3f99795c0d582d867476`
 - `cryptobomforge.yaml` (version 2): declares IBM's draft `1.4-cbom-1.0` only. The CycloneDX entry (1.6, then 1.7 in
   2026-10-20.1) covered the worker's own empty placeholder CBOM for a CodeQL run without results; that placeholder is

@@ -574,6 +574,136 @@ def test_parse_names_added_2026_10_19(name, expected):
     assert {k: got.get(k) for k in expected} == expected
 
 
+@pytest.mark.parametrize(
+    "name, expected, unmapped",
+    [
+        # shapes: a UUID, a URI, an OID, a file name carry no key size (corpus-pilot-medium review, 2026-10-23)
+        ("15ec45c2-75c0-4a1a-a634-3adf648ce763", {}, []),
+        ("http://www.w3.org/2001/04/xmldsig-more#rsa-sha256", {"family": "RSASSA-PKCS1", "digest": "SHA-256"}, []),
+        ("http://www.w3.org/2001/04/xmlenc#aes128-cbc", {"family": "AES", "key_size": 128, "mode": "CBC"}, []),
+        ("OID(1.2.840.113549.1.1.1)", {"family": "RSA", "key_size": None}, []),
+        ("ec-1.2.840.10045.3.1.7.p12", {"family": "EC", "curve": "secp256r1", "key_size": None}, []),
+        ("1.2.3.4.5.6.7.8", {}, ["1.2.3.4.5.6.7.8"]),
+        ("issue_369_rsa_pem.pub", {"family": "RSA", "key_size": None}, ["issue", "369"]),
+        # a number is a key size only next to its family and when the family may have it (`key_sizes`)
+        ("AES/CBC/ISO10126-2Padding", {"family": "AES", "mode": "CBC", "padding": "ISO10126", "key_size": None}, ["2"]),
+        ("AES-512", {"family": "AES", "key_size": None}, ["512"]),
+        ("RSA256", {"family": "RSA", "key_size": None}, ["256"]),
+        ("ECDSA-384", {"family": "ECDSA", "key_size": 384}, []),
+        ("ALG_KEY_ECC_X962_DER", {"family": "EC", "key_size": None}, ["X", "962"]),
+        ("2048-bit RSA", {"family": "RSA", "key_size": 2048}, []),
+        ("Blowfish 56", {"family": "Blowfish", "key_size": 56}, []),
+        ("KeySize = 15", {"key_size": None}, ["15"]),
+        # cipher suites: the record is the bulk cipher; SHA is SHA-1 (RFC 5246 A.5); NULL leaves the MAC hash
+        (
+            "TLS_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA",
+            {"family": "DES", "key_size": 40, "mode": "CBC", "protocol": "TLS", "digest": None},
+            [],
+        ),
+        ("TLS_RSA_WITH_3DES_EDE_CBC_SHA", {"family": "3DES", "mode": "CBC", "protocol": "TLS"}, []),
+        ("TLS_AES_128_GCM_SHA256", {"family": "AES", "key_size": 128, "mode": "GCM", "digest": None}, []),
+        ("TLS_AES_128_CCM_8_SHA256", {"family": "AES", "key_size": 128, "mode": "CCM"}, []),
+        ("TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256", {"algorithm": "ChaCha20-Poly1305", "protocol": "TLS"}, []),
+        ("TLS_KRB5_EXPORT_WITH_RC2_CBC_40_SHA", {"family": "RC2", "key_size": 40, "mode": "CBC"}, []),
+        ("SSL_RSA_WITH_RC4_128_MD5", {"family": "RC4", "key_size": 128, "protocol": "TLS"}, []),
+        ("TLS_RSA_WITH_NULL_SHA256", {"algorithm": "SHA-256", "protocol": "TLS"}, []),
+        ("ECDHE-RSA-AES128-GCM-SHA256", {"family": "AES", "key_size": 128, "mode": "GCM", "protocol": "TLS"}, []),
+        ("DES-CBC3-SHA", {"family": "3DES", "mode": "CBC", "protocol": "TLS"}, []),
+        ("Weak cipher: DES-CBC3-SHA", {"family": "3DES", "mode": "CBC", "protocol": "TLS"}, []),
+        ("ADH-AES128-SHA", {"family": "AES", "key_size": 128, "protocol": "TLS"}, []),
+        (
+            "TLS_EMPTY_RENEGOTIATION_INFO_SCSV",
+            {"protocol": "TLS", "family": None},
+            ["EMPTY", "RENEGOTIATION", "INFO", "SCSV"],
+        ),
+        # no suites: the RSA refinement and the composites stay as they were
+        ("SHA256withRSA", {"family": "RSASSA-PKCS1", "digest": "SHA-256", "protocol": None}, []),
+        ("HMAC-SHA256", {"family": "HMAC", "digest": "SHA-256", "protocol": None}, []),
+        ("RSA-SHA256", {"family": "RSASSA-PKCS1", "digest": "SHA-256", "protocol": None}, []),
+        ("ChaCha20-Poly1305-256", {"algorithm": "ChaCha20-Poly1305", "key_size": 256}, []),
+    ],
+)
+def test_parse_names_2026_10_23(name, expected, unmapped):
+    p = V.parse(name)
+    assert {k: p.values.get(k) for k in expected} == expected
+    assert p.unmapped == unmapped
+
+
+@pytest.mark.parametrize(
+    "name, expected",
+    [
+        ("XDH", {"algorithm": "XDH", "family": "XDH"}),
+        ("X963KDF", {"family": "ANSI-KDF"}),
+        ("ECDH-X963KDF", {"family": "ECDH", "key_size": None}),
+        ("ANSI-KDF-X9.63", {"family": "ANSI-KDF"}),
+        ("DES3", {"family": "3DES"}),
+        ("AES-OCB3", {"family": "AES", "mode": "OCB"}),
+        ("AESOCB3", {"family": "AES", "mode": "OCB"}),
+        ("AES-CBC/ISO7816-4Padding", {"family": "AES", "mode": "CBC", "padding": "ISO7816-4", "key_size": None}),
+        ("Algorithm.RSA256", {"family": "RSASSA-PKCS1", "digest": "SHA-256", "key_size": None}),
+        ("Algorithm.ECDSA512", {"family": "ECDSA", "curve": "secp521r1", "digest": "SHA-512"}),
+        ("Algorithm.HMAC256", {"family": "HMAC", "digest": "SHA-256"}),
+        ("Streamlined NTRU Prime", {"family": "NTRU-Prime"}),
+    ],
+)
+def test_parse_names_added_2026_10_23(name, expected):
+    p = V.parse(name)
+    assert {k: p.values.get(k) for k in expected} == expected and not p.unmapped
+
+
+def test_xdh_is_a_generic_marker_over_x25519_and_x448_only():
+    assert V.generic("XDH") and V.specifics("XDH") == {"X25519", "X448"}
+    assert V.relation("algorithm", "XDH", "X25519") == "refines" and V.relation("algorithm", "XDH", "ECDH") is None
+
+
+def test_parsed_parameters_are_admitted_by_the_records_primitive():
+    # CipherSift writes one component per part of `TLS_AES_128_GCM_SHA256` (algorithmFamily SHA-2 and AES); the
+    # name's 128 and GCM belong to the AES part only (corpus-pilot-medium: 396 key sizes and 21 modes on hashes)
+    comps = [
+        _comp("TLS_AES_128_GCM_SHA256", ap={"algorithmFamily": "SHA-2"}),
+        _comp("TLS_AES_128_GCM_SHA256", ap={"algorithmFamily": "AES"}),
+        _comp("ES512", ap={"algorithmFamily": "SHA-2"}),
+        _comp("SHA256-CBC"),
+    ]
+    sha, aes, es, cbc = normalize_cbom(_bom(*comps, version="1.7"), "ciphersift").records
+    assert (sha.values["algorithm"], sha.values.get("key_size"), sha.values.get("mode")) == ("SHA-256", None, None)
+    assert (aes.values["family"], aes.values["key_size"], aes.values["mode"], aes.values.get("digest")) == (
+        "AES", 128, "GCM", None)  # fmt: skip
+    assert (es.values["algorithm"], es.values.get("curve"), es.values.get("key_size")) == ("SHA-512", None, None)
+    assert (cbc.values["algorithm"], cbc.values.get("mode")) == ("SHA-256", None)
+    # JOSE `A128CBC-HS256` under CipherSift's HMAC component: the name's AES primitive (ae) and mode go, the MAC key
+    # size and digest stay (RFC 7518 5.2.3: a 128-bit MAC key, HMAC-SHA-256); under its AES component everything stays
+    comps = [
+        _comp("A128CBC-HS256", ap={"algorithmFamily": "HMAC"}),
+        _comp("A128CBC-HS256", ap={"algorithmFamily": "AES"}),
+    ]
+    hmac, aes = normalize_cbom(_bom(*comps, version="1.7"), "ciphersift").records
+    assert (hmac.values["family"], hmac.values["primitive"], hmac.values.get("mode")) == ("HMAC", "mac", None)
+    assert (hmac.values["key_size"], hmac.values["digest"]) == (128, "SHA-256")
+    assert (aes.values["primitive"], aes.values["mode"], aes.values["digest"]) == ("ae", "CBC", "SHA-256")
+    # a tool's own field is never dropped: a hash with a padding field keeps it (CryptobomForge's draft)
+    (rec,) = normalize_cbom(_bom(_comp("SHA-256", ap={"padding": "pkcs7"}), version="1.7"), "ciphersift").records
+    assert rec.values["padding"] == "PKCS7" and rec.via["padding"] == "field"
+
+
+def test_the_oid_field_fills_gaps_and_a_name_that_is_an_oid_resolves():
+    def with_oid(name, oid):
+        c = _comp(name)
+        c["cryptoProperties"]["oid"] = oid
+        return c
+
+    bom = _bom(
+        with_oid("key-pair", "1.2.840.113549.1.1.11"),
+        _comp("OID(1.2.840.10045.4.3.2)"),
+        with_oid("AES-256-GCM", "1.2.840.113549.1.1.1"),  # the name wins; the OID fills nothing
+    )
+    sig, ecdsa, aes = normalize_cbom(bom, "qelens").records
+    assert (sig.values["family"], sig.values["digest"], sig.via["family"]) == ("RSASSA-PKCS1", "SHA-256", "derived")
+    assert sig.src["family"] == "derived:oid" and sig.resolution == "mapped"
+    assert (ecdsa.values["family"], ecdsa.values["digest"], ecdsa.resolution) == ("ECDSA", "SHA-256", "mapped")
+    assert (aes.values["family"], aes.values["oid"]) == ("AES", "1.2.840.113549.1.1.1") and not aes.conflicts
+
+
 def test_a_list_in_a_field_is_ambiguous_not_unknown():
     comp = _comp("Hash160", props={"bf-cbom:digest": "SHA-256, RIPEMD-160"})
     r = normalize_cbom(_bom(comp), "deepseek").records[0]
@@ -606,3 +736,7 @@ def test_coverage_and_units_count_assets_records_and_items():
     ]
     (w,) = unit_rows([n, m])
     assert (w["cboms"], w["assets"], w["records"], w["items"]) == (2, 5, 9, 3)  # the repositories' rows summed
+    assert w["outside_code"] == 0  # no language given: every file counts as code
+    fixture = _comp("AES", occ=[{"location": "test/vectors.json", "line": 3}, {"location": "src/a.java", "line": 9}])
+    (x,) = unit_rows([normalize_cbom(_bom(fixture), "cbomkit", language="java")])
+    assert (x["records"], x["outside_code"]) == (2, 1)  # the JSON fixture is no Java source file

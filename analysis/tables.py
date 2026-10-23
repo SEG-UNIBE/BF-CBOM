@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from common.experiment import iter_results, repo_full_name
+from common.experiment import iter_results, repo_full_name, stored_status
 from common.tools_registry import votes
 
 from .costs import cost_usd, load_prices
@@ -60,6 +60,7 @@ GROUP_COLUMNS = GROUP_KEY_COLUMNS + [
     "key",
     "voters",
     "voter_groups",
+    "member_voter_groups",
     "n_records",
     "n_sites",
     "units",
@@ -92,6 +93,7 @@ LOCATION_KINDS = ("line", "window", "import", "file", "none", "unread")  # analy
 UNIT_COLUMNS = [
     "tool", "role", "cboms", "assets", "records", "items", "records_per_asset_median", "records_per_asset_max",
     "multi_occurrence_share", "assets_per_item", "unlocated_share", *[f"loc_{k}" for k in LOCATION_KINDS],
+    "outside_code",
 ]  # fmt: skip
 UNIT_REPO_COLUMNS = ["tool", "role", "repo", "language", "assets", "records", "items"]
 MICRO_COLUMNS = [
@@ -275,7 +277,7 @@ def run_rows(
             "tool": tool,
             "run": meta.get("run_index"),
             "tailored": repo in tailored.get(tool, ()),
-            "status": meta.get("status"),
+            "status": stored_status(meta),
             "duration_sec": meta.get("duration_sec"),
             "size_bytes": meta.get("size_bytes"),
             "error": error_line(meta.get("error")) or _timeout_text(meta),
@@ -350,6 +352,10 @@ def group_rows(
     g_rows, m_rows, a_rows = [], [], []
     for g in groups:
         voters = g.voters(voter_of)
+        # the voter groups whose own records are in the group (not attached by vocabulary knowledge): a group with
+        # none is no item of the voters (matchlevel_row skips it), however many generic records hang on it
+        members = {(voter_of or {}).get(r.tool, r.tool) for r in g.members
+                   if r.record_id not in g.attached and votes(voter_of, r.tool)}  # fmt: skip
         g_rows.append(
             {
                 **base,
@@ -363,6 +369,7 @@ def group_rows(
                 "key": g.key,
                 "voters": voters,
                 "voter_groups": len(voters),
+                "member_voter_groups": len(members),
                 **g.extra,
             }
         )
@@ -487,15 +494,20 @@ def unit_rows(
     run's CBOMs of the original variants): per tool its assets (CBOM components), their records (occurrences) and its
     items (distinct L4 identities of its `mapped` records per CBOM, i.e. per repository, as the ladder counts them,
     tailored repositories included), with the records per asset, the share of assets listed at more than one place,
-    the assets per item (above 1: one component per finding), the share of assets without a file, and the
-    algorithm records per location kind (`loc_<kind>`; `location_kinds`: one {record id: kind} per CBOM)."""
+    the assets per item (above 1: one component per finding), the share of assets without a file, the
+    algorithm records per location kind (`loc_<kind>`; `location_kinds`: one {record id: kind} per CBOM) and the
+    records whose file is not a source file of the repository's language (`outside_code`: `NormRecord.in_scope`
+    False; fixtures, test vectors, configuration, documentation, other languages)."""
     acc: dict[str, dict] = {}
     for i, n in enumerate(cboms):
-        t = acc.setdefault(n.tool, {"cboms": 0, "per_asset": [], "items": 0, "unlocated": 0, "kinds": Counter()})
+        t = acc.setdefault(
+            n.tool, {"cboms": 0, "per_asset": [], "items": 0, "unlocated": 0, "kinds": Counter(), "outside": 0}
+        )
         t["cboms"] += 1
         assets, units = _packaging(n)
         kinds = location_kinds[i] if location_kinds else {}
         t["kinds"].update(kinds.get(r.record_id) or "unread" for rs in assets for r in rs)
+        t["outside"] += sum(r.in_scope is False for rs in assets for r in rs)
         t["per_asset"] += [len(rs) for rs in assets]
         t["unlocated"] += sum(not any(r.file for r in rs) for rs in assets)
         t["items"] += len(units)
@@ -516,6 +528,7 @@ def unit_rows(
                 "assets_per_item": round(n_assets / t["items"], 2) if t["items"] else None,
                 "unlocated_share": round(t["unlocated"] / n_assets, 3) if n_assets else None,
                 **{f"loc_{k}": t["kinds"][k] for k in LOCATION_KINDS},
+                "outside_code": t["outside"],
             }
         )
     return rows

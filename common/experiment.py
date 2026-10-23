@@ -715,16 +715,22 @@ class PlannedJob:
 OOM = "oom"  # a stored `ok` run whose container was OOM-killed meanwhile: not a clean result (refinement 15)
 
 
-def _stored_status(meta_path: Path) -> str | None:
-    """The stored run's status, with `ok` demoted to `oom` when the cgroup recorded an OOM kill during the run."""
-    try:
-        meta = json.loads(meta_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
+def stored_status(meta: dict) -> str | None:
+    """A stored run's status as the runner and the analysis read it: `ok` is demoted to `oom` when the cgroup recorded
+    an OOM kill during the run (the kernel killed a child such as Gradle and the tool wrote what it had: our cap, not
+    the tool's result). `--retry-failed` redoes such runs; the analysis reads no CBOM from them and lists them."""
     status = meta.get("status")
     if status == "ok" and (meta.get("oom_kills") or 0) > 0:
         return OOM
     return status
+
+
+def _stored_status(meta_path: Path) -> str | None:
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return stored_status(meta)
 
 
 def plan_jobs(

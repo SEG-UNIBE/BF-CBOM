@@ -43,8 +43,9 @@ _IDENTITY_TYPES = frozenset({"certificate", "protocol", "related-crypto-material
 CONTEXT_MAX = 300
 _AE_MODES = frozenset({"GCM", "CCM", "OCB", "SIV", "GCM-SIV", "EAX"})
 _WRAP_MODES = frozenset({"KW", "KWP"})
+_OURS = ("parse", "api", "derived")  # `via` values of our own reading, as opposed to a tool's field or label
 _REPO_MARKERS = ("/repo/",)
-_PSEUDO = frozenset({"param", "ref", "size"})  # resolved once family and material are known
+_PSEUDO = frozenset({"param", "ref", "size", "mac"})  # resolved once family and material are known; never stored
 _KEY_MATERIAL = frozenset({None, "private-key", "public-key", "secret-key", "key"})
 # A field value the vocabulary does not know is parsed as a name ("OAEPWithSHA-256AndMGF1Padding"); which other
 # dimensions such a parse may add depends on the field it came from.
@@ -508,6 +509,8 @@ class _Reader:
                 if v.dim not in merged and v.dim not in _PSEUDO and v.dim != "ambiguous" and v.raw is not None:
                     rec.raw.setdefault(v.dim, _jsonable(v.raw))
                     rec.src.setdefault(v.dim, v.src)
+        mac = next((v.value for vals in partials for v in vals if v.dim == "mac" and v.value), None)
+        self._admit(rec, mac, family_conflict="family" in conflicts)
         self._derive(rec)
         flat = [v for vals in partials for v in vals]
         rec.name_kind = next((v.kind for v in flat if v.kind and v.src == "name"), None)
@@ -561,6 +564,50 @@ class _Reader:
             out.append(new)
         return out
 
+    def _primitive_of(self, rec: NormRecord) -> str | None:
+        """The primitive that says which parameters the record may carry (`admits`): the record's own `primitive`
+        when a source gave one, else the vocabulary's for its algorithm or family (AES with an AE mode: ae)."""
+        vals = rec.values
+        prim = vals.get("primitive")
+        if prim is None and vals.get("family"):
+            info = self.vocab.family_info(vals["family"])
+            algo = self.vocab.algorithms.get(vals.get("algorithm") or "", {})
+            prim = algo.get("primitive") or (info.primitive if info else None)
+            if vals["family"] == "AES" and vals.get("mode") in _AE_MODES:
+                prim = "ae"
+            elif vals["family"] == "AES" and vals.get("mode") in _WRAP_MODES:
+                prim = "key-wrap"
+        return None if prim in NO_INFO else prim
+
+    def _admit(self, rec: NormRecord, mac: str | None = None, *, family_conflict: bool = False) -> None:
+        """Drop the parameters our own reading (a name parse, an API context, a derivation) gave the record but its
+        primitive does not have (`admits:` in the vocabulary): a hash has no key size, mode, padding or curve, so the
+        `128` and `GCM` of `TLS_AES_128_GCM_SHA256` stay off a tool's SHA-2 component. A tool's own field or label is
+        never dropped. On a hash, a parsed digest or a cipher suite's MAC hash (`mac`) that refines the algorithm
+        (SHA-2 next to SHA-256) is the algorithm. A primitive the parse gave describes the parse's family: when that
+        family lost to the tool's (`family_conflict`: CipherSift's HMAC component named `A128CBC-HS256`), it goes
+        too, and the identity's primitive decides (mac: the key size and digest stay, the mode does not)."""
+        vals, src, via = rec.values, rec.src, rec.via
+        if family_conflict and via.get("primitive", "").startswith(_OURS):
+            vals.pop("primitive"), src.pop("primitive", None), via.pop("primitive", None)
+        prim = self._primitive_of(rec)
+        if prim is None:
+            return
+        if prim == "hash":
+            current = vals.get("algorithm") or vals.get("family")
+            digest = vals["digest"] if vals.get("digest") and via.get("digest", "").startswith(_OURS) else None
+            refines = [h for h in (digest, mac) if h and self.vocab.relation("algorithm", current, h) == "refines"]
+            sharper = refines[0] if refines else None
+            if sharper:
+                origin = "digest" if sharper == digest else "name"
+                vals["algorithm"], src["algorithm"], via["algorithm"] = sharper, src.get(origin, "name"), "parse"
+                vals["family"] = self.vocab.family_of_algorithm(sharper) or vals.get("family")
+        for dim in ("key_size", "mode", "padding", "curve", "digest", "iterations"):
+            if dim in vals and via.get(dim, "").startswith(_OURS) and not self.vocab.admitted(prim, dim):
+                vals.pop(dim)
+                src.pop(dim, None)
+                via.pop(dim, None)
+
     def _derive(self, rec: NormRecord) -> None:
         vals, src, via = rec.values, rec.src, rec.via
 
@@ -570,25 +617,18 @@ class _Reader:
                 src[dim] = origin
                 via[dim] = how
 
+        for dim, value in self.vocab.oid(vals.get("oid")).items():  # the `oid` field fills gaps, never overrides
+            put(dim, value, "derived:oid")
         if vals.get("algorithm") and not vals.get("family"):
             put("family", self.vocab.family_of_algorithm(vals["algorithm"]), src["algorithm"], via["algorithm"])
         if vals.get("curve") and not vals.get("family"):
             put("family", "EC", "derived:curve")
         if vals.get("family") and not vals.get("algorithm"):
             put("algorithm", vals["family"], src["family"], via["family"])
-        if vals.get("curve") and not vals.get("key_size"):
+        if vals.get("curve") and not vals.get("key_size") and self.vocab.admitted(self._primitive_of(rec), "key_size"):
             put("key_size", self.vocab.curve_size(vals["curve"]), "derived:curve")
         if vals.get("family") and not vals.get("primitive"):
-            info = self.vocab.family_info(vals["family"])
-            algo = self.vocab.algorithms.get(vals.get("algorithm") or "", {})
-            prim = algo.get("primitive") or (info.primitive if info else None)
-            if prim in NO_INFO:
-                prim = None
-            if vals["family"] == "AES" and vals.get("mode") in _AE_MODES:
-                prim = "ae"
-            elif vals["family"] == "AES" and vals.get("mode") in _WRAP_MODES:
-                prim = "key-wrap"
-            put("primitive", prim, "derived:family")
+            put("primitive", self._primitive_of(rec), "derived:family")
         if "group" in vals:  # a whole-name entry (JKS -> CERT) set the group directly
             rec.group = vals.pop("group")
             for d in (src, via, rec.raw):

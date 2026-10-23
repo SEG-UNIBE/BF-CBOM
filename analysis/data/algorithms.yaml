@@ -12,13 +12,13 @@
 # API (registry, RFC 7518 JOSE, RFC 4253/8332 SSH, JCA standard names, OS and library APIs) stays, however many tools
 # use it; a label a tool invented (rule names, category labels) goes into that tool's spec, where `interpretive: true`
 # marks mappings that are judgements rather than spellings (they count at L4 only, analysis/levels.py).
-version: "2026-10-20.2"
+version: "2026-10-23.2"
 
 # Coarse groups (the family names of analysis/data/families.yaml, used by the call-site matcher and the micro ground
 # truth) -> the registry families and additions they contain. Every registry family must appear exactly once.
 groups:
   RSA: [RSA, RSASSA-PKCS1, RSASSA-PSS, RSA-X931, RSAES-PKCS1, RSAES-OAEP]
-  EC: [EC, ECDSA, EdDSA, ECDH, ECIES, MQV, SM2, SM9, BLS, X3DH, HPKE]
+  EC: [EC, ECDSA, EdDSA, ECDH, ECIES, MQV, SM2, SM9, BLS, X3DH, HPKE, XDH]
   DSA: [DSA]
   DH: [FFDH, ElGamal, SRP, J-PAKE, SPAKE2, SPAKE2PLUS, OPAQUE]
   PQC: [ML-KEM, ML-DSA, SLH-DSA, XMSS, LMS, FN-DSA, NTRU-Prime, Hybrid-KEM]
@@ -49,6 +49,7 @@ additions:
   Hybrid-KEM: {primitive: kem, note: "a hybrid of a classical and a post-quantum key exchange"}
   crypt: {primitive: kdf, note: "Unix crypt(3) password hashing schemes (MD5-crypt, SHA-256-crypt, ...)"}
   SHA: {primitive: hash, note: "a bare SHA (CipherRadar `Algorithm reference: SHA`, `HMAC-SHA`): SHA-1, SHA-2 or SHA-3 unspecified; a generic marker (generic_over) that attaches to the specific algorithms' clusters and never merges them"}
+  XDH: {primitive: key-agree, note: "Java's standard algorithm name for Diffie-Hellman over Curve25519 or Curve448 (KeyAgreement / KeyPairGenerator `XDH`, JDK 11): X25519 or X448 unspecified; a generic marker (generic_over) over those two"}
 
 # What `parameterSetIdentifier` means per family (CycloneDX: "in AES128, '128' identifies the key length in bits, in
 # SHA256, '256' identifies the digest length"). Families not listed: kept as `param_set` (raw), never as key size.
@@ -58,6 +59,57 @@ param:
         ChaCha20, Salsa20]
   curve: [EC, ECDSA, ECDH, ECIES, SM2, MQV]
   digest: [SHA-1, SHA-2, SHA-3, MD2, MD4, MD5, RIPEMD, BLAKE2, BLAKE3, Whirlpool, SM3, SHA]
+
+# The key sizes a NAME may state for a family (Vocabulary.plausible_key_size): a set, or a range with a step, by family
+# or else by its group (RSA: the six RSA schemes; DH: FFDH, ElGamal, ...). A number next to a family token that is not
+# in its set is left unmapped (`ISO7816-4Padding` is no AES key size, `issue_369_rsa_pem.pub` no RSA modulus). A
+# keyed family without an entry takes any multiple of 8 between 8 and 16384 bits; a curve family a registry curve's
+# size. A tool's own parameterSetIdentifier is never checked: what it writes is its finding (CBOMkit's AES-96).
+key_sizes:
+  AES: [128, 192, 256]                       # FIPS 197
+  DES: [40, 56, 64]                          # FIPS 46-3 (64 with parity bits); 40: the export-grade DES40 of TLS suites (RFC 5246 A.5)
+  3DES: [112, 168, 192]                      # SP 800-67 (two- and three-key TDEA; 192 with parity bits)
+  Blowfish: {min: 32, max: 448, step: 8}     # Schneier 1993
+  RC2: {min: 8, max: 1024, step: 8}          # RFC 2268
+  RC4: {min: 40, max: 2048, step: 8}         # RFC 6229 (40 to 2048 bits)
+  RC5: {min: 0, max: 2040, step: 8}          # RFC 2040
+  RC6: [128, 192, 256]                       # AES candidate
+  IDEA: [128]                                # RFC 3058
+  CAST5: {min: 40, max: 128, step: 8}        # RFC 2144
+  CAST6: [128, 160, 192, 224, 256]           # RFC 2612
+  Twofish: [128, 192, 256]                   # AES candidate
+  Serpent: [128, 192, 256]                   # AES candidate
+  CAMELLIA: [128, 192, 256]                  # RFC 3713
+  ARIA: [128, 192, 256]                      # RFC 5794
+  SEED: [128]                                # RFC 4269
+  SM4: [128]                                 # GB/T 32907-2016
+  Skipjack: [80]                             # FIPS 185
+  ChaCha20: [256]                            # RFC 8439
+  Salsa20: [128, 256]                        # Bernstein 2008
+  ChaCha: [128, 256]                         # the group (ChaCha, Poly1305)
+  RSA: {min: 512, max: 16384, step: 8}       # the RSA group: a modulus length (FIPS 186-5 asks 2048 or more; 512 is the historic floor)
+  DSA: [512, 768, 1024, 2048, 3072]          # FIPS 186-2 (512..1024 by 64, the usual ones) and FIPS 186-4 (1024, 2048, 3072)
+  DH: {min: 512, max: 16384, step: 8}        # the DH group (FFDH, ElGamal, SRP, ...): a modulus length (RFC 7919 groups 2048..8192)
+
+# The parameters a primitive HAS (Vocabulary.admitted; CycloneDX 1.7 primitive names). A value our own reading gives
+# a record (a name parse, an API context, a derivation) for a parameter its primitive does not have is dropped
+# (analysis/normalize/engine.py:_admit): a hash takes no key size, mode, padding or curve, so the 128 and GCM of
+# `TLS_AES_128_GCM_SHA256` stay off a tool's SHA-2 component and `ES512` on one gives it no curve. A tool's own field
+# or label is never dropped (what it writes is its finding). Primitives not listed admit every parameter.
+admits:
+  hash: []
+  xof: []
+  drbg: []
+  mac: [digest, key_size]
+  kdf: [digest, key_size, iterations]        # key_size: the derived key's length
+  block-cipher: [key_size, mode, padding]
+  stream-cipher: [key_size]
+  ae: [key_size, mode, digest]               # digest: an encrypt-then-MAC composite (Fernet, JOSE A128CBC-HS256)
+  key-wrap: [key_size, mode]
+  signature: [key_size, curve, digest, padding]   # padding: the RSA signature schemes (PSS, PKCS1v15)
+  pke: [key_size, curve, padding, digest]         # digest: OAEP's hash; EC without a scheme: its curve
+  key-agree: [key_size, curve, digest]            # digest: ECDH with a KDF (`curve25519-sha256`)
+  kem: [key_size]
 
 # Specific variants inside a family. `aliases` are extra spellings (case and separators never matter);
 # `hash: true` marks hash functions, which become the `digest` of a composite (HMAC-SHA-256, SHA256withECDSA).
@@ -76,6 +128,7 @@ algorithms:
   SHA3-512: {family: SHA-3, hash: true, aliases: [SHA3_512]}
   SHA-3: {family: SHA-3, hash: true, aliases: [SHA3]}
   SHA: {family: SHA, hash: true}   # generic: which SHA is unspecified (never SHA-1 by default)
+  XDH: {family: XDH}               # generic: X25519 or X448 unspecified (Java standard name)
   SHAKE128: {family: SHA-3, hash: true, primitive: xof}
   SHAKE256: {family: SHA-3, hash: true, primitive: xof}
   SHAKE: {family: SHA-3, hash: true, primitive: xof}
@@ -114,7 +167,7 @@ algorithms:
 
 # Extra spellings of families (registry and addition names are recognised as themselves).
 families:
-  3DES: [DESede, TripleDES, TDEA, TDES, 3DES-EDE, DES-EDE3, DESede-EDE, Triple-DES]
+  3DES: [DESede, TripleDES, TDEA, TDES, 3DES-EDE, DES-EDE3, DESede-EDE, Triple-DES, DES3]   # DES3: pycryptodome's module Crypto.Cipher.DES3
   EC: [ECC, elliptic, EllipticCurve, elliptic-curve]
   FFDH: [DH, DHE, Diffie-Hellman, DiffieHellman, FFDHE]
   ECDH: [ECDHE, ECDH-ES]
@@ -139,6 +192,8 @@ families:
   SLH-DSA: [SLHDSA, SPHINCS, SPHINCS+, SPHINCSPlus]
   FN-DSA: [Falcon]
   Hybrid-KEM: [hybrid]
+  NTRU-Prime: [Streamlined NTRU Prime, sntrup]   # the scheme's name (NIST PQC round 3 submission); CBOMkit writes it
+  ANSI-KDF: [X963KDF, X9.63-KDF, ANSI-X9.63-KDF, ANSI-KDF-X9.63, KDF-X9.63]   # ANSI X9.63 KDF: pyca's x963kdf.X963KDF; CBOMkit's ANSI-KDF-X9.63; the registry's ANSI-KDF-X9.63 pattern
 
 # What a record implies about other algorithms (CLAUDE.md refinement 2): some tools expand such hierarchies (CBOMkit
 # lists SHA-256 next to HMAC-SHA256), others do not, so without this an expanding tool looks "exclusive" by
@@ -163,6 +218,51 @@ implies:
 # the same record refines it instead of conflicting (Vocabulary.relation).
 generic_over:
   SHA: [SHA-1, SHA-2, SHA-3]
+  XDH: [X25519, X448]   # algorithms, not families: XDH never stands for all of ECDH
+
+# OIDs read in names (`OID(1.2.840.113549.1.1.1)`, `ec-1.2.840.10045.3.1.7.p12`) and from the `oid` field (a gap
+# filler, `derived:oid`); the registry's curve OIDs are read from analysis/data/cyclonedx/cryptography-defs.json and
+# need no entry. Each line names its source.
+oids:
+  1.2.840.113549.1.1.1: {family: RSA}                            # rsaEncryption, RFC 8017 A.1
+  1.2.840.113549.1.1.5: {family: RSASSA-PKCS1, digest: SHA-1}    # sha1WithRSAEncryption, RFC 8017 A.2.4
+  1.2.840.113549.1.1.14: {family: RSASSA-PKCS1, digest: SHA-224} # sha224WithRSAEncryption
+  1.2.840.113549.1.1.11: {family: RSASSA-PKCS1, digest: SHA-256} # sha256WithRSAEncryption
+  1.2.840.113549.1.1.12: {family: RSASSA-PKCS1, digest: SHA-384} # sha384WithRSAEncryption
+  1.2.840.113549.1.1.13: {family: RSASSA-PKCS1, digest: SHA-512} # sha512WithRSAEncryption
+  1.2.840.113549.1.1.10: {family: RSASSA-PSS}                    # id-RSASSA-PSS, RFC 8017 A.2.3
+  1.2.840.113549.1.1.7: {family: RSAES-OAEP}                     # id-RSAES-OAEP, RFC 8017 A.2.1
+  1.2.840.10045.2.1: {family: EC}                                # id-ecPublicKey, RFC 5480 2.1.1
+  1.2.840.10045.4.1: {family: ECDSA, digest: SHA-1}              # ecdsa-with-SHA1, RFC 5480 / RFC 5758
+  1.2.840.10045.4.3.1: {family: ECDSA, digest: SHA-224}          # ecdsa-with-SHA224
+  1.2.840.10045.4.3.2: {family: ECDSA, digest: SHA-256}          # ecdsa-with-SHA256
+  1.2.840.10045.4.3.3: {family: ECDSA, digest: SHA-384}          # ecdsa-with-SHA384
+  1.2.840.10045.4.3.4: {family: ECDSA, digest: SHA-512}          # ecdsa-with-SHA512
+  1.2.840.10040.4.1: {family: DSA}                               # id-dsa, RFC 3279 2.3.2
+  1.2.840.10040.4.3: {family: DSA, digest: SHA-1}                # dsa-with-sha1, RFC 3279 2.2.2
+  1.2.840.10046.2.1: {family: FFDH}                              # dhpublicnumber, RFC 3279 2.3.3
+  1.3.101.110: {algorithm: X25519}                               # id-X25519, RFC 8410 3
+  1.3.101.111: {algorithm: X448}                                 # id-X448
+  1.3.101.112: {algorithm: Ed25519}                              # id-Ed25519
+  1.3.101.113: {algorithm: Ed448}                                # id-Ed448
+  1.3.14.3.2.26: {algorithm: SHA-1}                              # id-sha1, RFC 3370 2.1
+  1.2.840.113549.2.5: {algorithm: MD5}                           # md5, RFC 3370 2.2
+  2.16.840.1.101.3.4.2.4: {algorithm: SHA-224}                   # id-sha224, RFC 5754 2
+  2.16.840.1.101.3.4.2.1: {algorithm: SHA-256}                   # id-sha256
+  2.16.840.1.101.3.4.2.2: {algorithm: SHA-384}                   # id-sha384
+  2.16.840.1.101.3.4.2.3: {algorithm: SHA-512}                   # id-sha512
+  1.2.840.113549.2.7: {family: HMAC, digest: SHA-1}              # hmacWithSHA1, RFC 8018 B.1.1
+  1.2.840.113549.2.9: {family: HMAC, digest: SHA-256}            # hmacWithSHA256
+  1.2.840.113549.2.10: {family: HMAC, digest: SHA-384}           # hmacWithSHA384
+  1.2.840.113549.2.11: {family: HMAC, digest: SHA-512}           # hmacWithSHA512
+  2.16.840.1.101.3.4.1.2: {family: AES}                          # id-aes128-CBC, RFC 3565 (the key size is the name's: aes128)
+  2.16.840.1.101.3.4.1.6: {family: AES}                          # id-aes128-GCM, RFC 5084
+  2.16.840.1.101.3.4.1.22: {family: AES}                         # id-aes192-CBC
+  2.16.840.1.101.3.4.1.26: {family: AES}                         # id-aes192-GCM
+  2.16.840.1.101.3.4.1.42: {family: AES}                         # id-aes256-CBC
+  2.16.840.1.101.3.4.1.46: {family: AES}                         # id-aes256-GCM
+  1.2.840.113549.1.5.12: {family: PBKDF2}                        # id-PBKDF2, RFC 8018 A.2
+  1.2.840.113549.1.5.13: {family: PBES2}                         # id-PBES2, RFC 8018 A.4
 
 curves:   # extra spellings; the registry's OID-equal names are aliases already
   secp256r1: [nistp256, NIST-P-256, P256, prime-256-v1]
@@ -186,7 +286,7 @@ modes:
   CTS: []
   KW: [Wrap, KeyWrap]
   KWP: [KeyWrapPad, WrapPad]
-  OCB: []
+  OCB: [OCB3]   # RFC 7253 names the mode OCB3; pyca's AESOCB3
   SIV: []
   GCM-SIV: [GCMSIV]
   EAX: []
@@ -201,6 +301,7 @@ paddings:
   ISO10126: [ISO10126Padding]
   X923: [X9.23, X923Padding]
   ZERO: [ZeroPadding, ZeroBytePadding]
+  ISO7816-4: [ISO7816-4Padding, ISO7816d4Padding, ISO7816]   # ISO/IEC 7816-4 padding: JCA's ISO7816-4Padding, BouncyCastle's ISO7816d4Padding
 
 primitives:   # CycloneDX 1.7 enum values (1.6 lacks key-wrap); `other` and `unknown` carry no information
   drbg: []
@@ -292,6 +393,22 @@ protocol_versions:
   ssl3: [SSL, "3.0"]
   dtls12: [DTLS, "1.2"]
   dtls13: [DTLS, "1.3"]
+
+# TLS cipher-suite names (Vocabulary._suite): IANA `TLS_<kx>[_<auth>][_EXPORT]_WITH_<cipher>_<mac>` and TLS 1.3
+# `TLS_<aead>_<hash>` (RFC 5246 A.5, RFC 8446 B.4), OpenSSL's `[<kx>-][<auth>-]<cipher>-<mac>` (openssl-ciphers(1)).
+# The record is the bulk cipher with its parameters and `protocol: TLS`; `skip` are the key exchange and
+# authentication tokens, which are no values of that record; `mac` the MAC spellings, `SHA` being SHA-1 (RFC 5246 A.5);
+# `ciphers` rewrites the spellings the token parser cannot read; `cipher_groups` are the groups a bulk cipher may be in
+# (a name whose cipher part is none of them is no suite: `HMAC-SHA256`).
+cipher_suites:
+  skip: [RSA, DH, DHE, EDH, ADH, ECDH, ECDHE, AECDH, DSS, ECDSA, PSK, SRP, KRB5, anon, EXPORT, EXPORT1024, EXP, EXP1024, FIPS]
+  mac: {SHA: SHA-1, SHA1: SHA-1, SHA224: SHA-224, SHA256: SHA-256, SHA384: SHA-384, SHA512: SHA-512, MD5: MD5, GOSTR3411: GOST}
+  ciphers:
+    DES-CBC3: 3DES-CBC            # OpenSSL's Triple DES (`DES-CBC3-SHA`)
+    3DES_EDE: 3DES                # IANA `3DES_EDE_CBC`
+    DES40: DES-40                 # export-grade DES, a 40-bit key
+    CCM_8: CCM8                   # `AES_128_CCM_8`: CCM with an 8-byte tag
+  cipher_groups: [AES, DES, ChaCha, CIPHER-other]
 
 # Key and certificate containers: inside a name they set group CERT (when nothing names an algorithm).
 keystores: [JKS, JCEKS, BKS, PKCS12, PKCS#12, P12, PFX, keystore, truststore, key-store, trust-store]
@@ -413,6 +530,16 @@ names:
   RAND_status: {family: CSPRNG}
   OpenSSL RAND: {family: CSPRNG}   # the API module by name; a bare RAND/rand is ambiguous (C rand()) and unmapped
   /dev/urandom: {family: CSPRNG}
+  # java-jwt (com.auth0.jwt.algorithms.Algorithm): the factory methods name JOSE algorithms by key type and digest
+  Algorithm.RSA256: {family: RSASSA-PKCS1, digest: SHA-256}
+  Algorithm.RSA384: {family: RSASSA-PKCS1, digest: SHA-384}
+  Algorithm.RSA512: {family: RSASSA-PKCS1, digest: SHA-512}
+  Algorithm.ECDSA256: {family: ECDSA, curve: secp256r1, digest: SHA-256}
+  Algorithm.ECDSA384: {family: ECDSA, curve: secp384r1, digest: SHA-384}
+  Algorithm.ECDSA512: {family: ECDSA, curve: secp521r1, digest: SHA-512}
+  Algorithm.HMAC256: {family: HMAC, digest: SHA-256}
+  Algorithm.HMAC384: {family: HMAC, digest: SHA-384}
+  Algorithm.HMAC512: {family: HMAC, digest: SHA-512}
   # other identifiers
   Fernet: {family: AES, key_size: 128, mode: CBC, digest: SHA-256, primitive: ae}
   MD5-crypt: {family: crypt, algorithm: MD5-crypt, digest: MD5}
@@ -471,7 +598,7 @@ noise: [with, and, or, using, use, for, by, of, the, a, an, to, in, on, via, fro
         pinning, pinned, unpinned, request, signing, signed, self, revocation, expiration, alternative, subject,
         issuer, name, container, parsing, kx, install, prediction, resistance, support, utility, util, utils,
         helper, test, tests, example, sample, demo, foo, bar, internal, primitives, hazmat, asymmetric, symmetric,
-        kty]
+        kty, oid]
 
 # Tokens that announce a number: the next number becomes the dimension.
 number_keywords:
@@ -583,6 +710,7 @@ apis:
   cryptography.hazmat.primitives.kdf.pbkdf2: {family: PBKDF2}
   cryptography.hazmat.primitives.kdf.hkdf: {family: HKDF}
   cryptography.hazmat.primitives.kdf.scrypt: {family: scrypt}
+  cryptography.hazmat.primitives.kdf.x963kdf: {family: ANSI-KDF}
   cryptography.fernet: {family: AES, mode: CBC, key_size: 128, primitive: ae}
   cryptography.x509: {group: CERT}
   Crypto.Cipher.AES: {family: AES}

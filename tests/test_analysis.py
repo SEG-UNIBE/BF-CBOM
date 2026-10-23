@@ -231,6 +231,9 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert (out / "conformance-run1.csv").read_text(encoding="utf-8").startswith(",".join(CONFORMANCE_COLUMNS))
     units = {u["tool"]: u for u in _read_csv(out / "units-run1.csv")}
     assert units["cbomkit"]["assets"] == _read_csv(out / "coverage-run1.csv")[0]["assets"]  # the same CBOMs
+    assert units["cbomkit"]["outside_code"] == "0"  # micro-java: every place is in a .java file
+    groups = _read_csv(out / "groups-exact-run1.csv")
+    assert all(int(g["member_voter_groups"]) <= int(g["voter_groups"]) for g in groups)
     per_repo = _read_csv(out / "units-repo-run1.csv")
     assert sum(int(r["items"]) for r in per_repo if r["tool"] == "cbomkit") == int(units["cbomkit"]["items"])
     algos = _read_csv(out / "items-run1.csv")
@@ -278,6 +281,10 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     positions = [summary.index(s) for s in sections]
     assert positions == sorted(positions)  # the sections come in the order of the questions
     assert "| cbomkit | ✅ 11 |" in summary and "| pqcheck | – |" in summary
+    assert "| tool | records | line | window | import | file | none | unread | outside code |" in summary
+    # "Per language" counts the items of the matcher x level table (groups only observers are in are no items)
+    per_language = summary[summary.index("**Per language**") : summary.index("**exact vs raqun")]
+    assert re.search(r"^\| all \| ([\d']+) \|", per_language, flags=re.M).group(1) == exact[-1]["items"]
     # the record names one repository per language without a size: the folded table, one column per language
     assert "| Java (1) |\n| --- |\n| [bfcbom/micro-java](https://github.com/bfcbom/micro-java) |" in summary
     assert "Per repository (`units-repo-run<k>.csv`)" in summary
@@ -285,6 +292,55 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert meaningful < summary.index("#### Asset type `algorithm`", meaningful) < summary.index("### Traceable")
     assert "**RQ3 Agreement**" in summary[summary.index("## Files") :]  # files by question
     assert "| cbomkit | 11 / 11 · 11 |" in summary
+
+
+def test_per_language_table_skips_groups_only_observers_are_in():
+    # micro-java, 2026-10-22: qScan alone reported ECDH, the voters' generic EC records were attached to its cluster;
+    # matchlevels skipped it, the summary's "Per language" counted it with k = 2 (corpus-pilot-medium: 1'455 vs 1'425)
+    from analysis import summary as sm, tables as tbl
+    from analysis.matchers import ExactMatcher
+    from analysis.normalize import normalize_cbom
+    from common.tools_registry import VoterMap
+
+    def records(tool, *names):
+        comps = [{"type": "cryptographic-asset", "name": n, "cryptoProperties": {"assetType": "algorithm"}}
+                 for n in names]  # fmt: skip
+        return normalize_cbom({"bomFormat": "CycloneDX", "specVersion": "1.6", "components": comps}, tool).records
+
+    voter_of = VoterMap({}, observers={"o"})
+    recs = records("a", "EC") + records("b", "EC", "AES") + records("o", "ECDH", "AES")
+    groups = ExactMatcher(level="L3", voter_of=voter_of).match(recs)
+    row = tbl.matchlevel_row("exact", "L3", 1, {("s", "original"): groups}, voter_of)
+    g_rows, _, _ = tbl.group_rows("exact", groups, snapshot="s", variant="original", run=1, commit="c",
+                                  language="Java", voter_of=voter_of)  # fmt: skip
+    ecdh = next(g for g in g_rows if g["key"] == "ECDH")
+    assert (ecdh["voter_groups"], ecdh["member_voter_groups"]) == (2, 0)  # two voters attached, none of its own
+    as_csv = [{k: str(tbl._cell(v)) for k, v in g.items()} for g in g_rows]
+    lines = sm._overlap(as_csv)
+    (all_row,) = [ln for ln in lines if ln.startswith("| all |")]
+    assert all_row.split("|")[2].strip() == str(row["items"]) == "2"
+
+
+def test_an_oom_killed_run_is_listed_but_its_cbom_is_not_read(tmp_path, monkeypatch, old_truth):
+    from typer.testing import CliRunner
+
+    from misc.cli import analysis_cmd
+
+    exp = _fake_experiment(tmp_path)
+    meta_path = exp / SNAPSHOT / "original" / "cipherradar" / "run1.meta.json"
+    meta = json.loads(meta_path.read_text())
+    meta.update(oom_kills=1, peak_memory_mb=4096.0, memory_limit_mb=4096.0)
+    meta_path.write_text(json.dumps(meta))  # stored ok, yet the container was OOM-killed meanwhile
+    monkeypatch.setattr(analysis_cmd, "experiment_dir", lambda name: tmp_path / name)
+    result = CliRunner().invoke(analysis_cmd.analysis_app, ["report", "exp-tables"])
+    assert result.exit_code == 0, result.output
+    out = exp / "_ANALYSIS"
+    runs = {r["tool"]: r for r in _read_csv(out / "runs.csv")}
+    assert runs["cipherradar"]["status"] == "oom" and runs["cbomkit"]["status"] == "ok"
+    assert {u["tool"] for u in _read_csv(out / "units-run1.csv")} == {"cbomkit"}  # its CBOM was not normalised
+    summary = (out / "_SUMMARY.md").read_text(encoding="utf-8")
+    assert "| cipherradar |  |  |  | 1 |  |" in summary and "Runs OOM-killed meanwhile" in summary
+    assert "`cipherradar` on `bfcbom/micro-java` (original, run 1): 1 OOM kill(s) at 4.0 GiB" in summary
 
 
 def test_report_is_identical_sequential_and_parallel(tmp_path, monkeypatch, old_truth):
@@ -547,8 +603,8 @@ def test_summary_starts_with_when_how_long_and_how_much_ram(tmp_path, monkeypatc
         in summary
     )
     assert "| worker image ids | 1 recorded in `_run-log.json` (by content, per session) |" in summary
-    assert "| tool | ok | error | timeout | unsupported | median s | peak GiB | limit GiB | OOM kills |" in summary
-    assert "| cbomkit | 1 |  |  |  | 2 | 2.9 | 4.0 |  |" in summary
+    header = "| tool | ok | error | timeout | oom | unsupported | median s | peak GiB | limit GiB | OOM kills |"
+    assert header in summary and "| cbomkit | 1 |  |  |  |  | 2 | 2.9 | 4.0 |  |" in summary
     runs = {r["tool"]: r for r in _read_csv(exp / "_ANALYSIS" / "runs.csv")}
     assert runs["cbomkit"]["queue_sec"] == "90.0" and runs["cbomkit"]["bfcbom_commit"] == "abc123def456"
 

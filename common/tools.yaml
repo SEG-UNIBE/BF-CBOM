@@ -59,7 +59,7 @@ tools:
     # decides: at least 7/14 in one language on the generated projects keeps it a voter, else `role: observer`
     micro_2026-10-17: {java: 0/11, python: 0/11, go: 0/11, javascript: 4/11}
     engine: cdxgen
-    memory_gb: 16                   # 4 OOM-killed Gradle on bisq/bisq2 (2026-10-18); 8 still OOM-killed on Chat2DB, bisq, bisq2, kafka (2026-10-19)
+    memory_gb: 24                   # 4 OOM-killed Gradle on bisq/bisq2 (2026-10-18); 8 still on Chat2DB, bisq, bisq2, kafka (2026-10-19); 16 on 8 of 60 pilot-medium repos (2026-10-23)
     approach: dependency manifests + evidence (atom); crypto output is mostly libraries and certificates
     cbom_by: tool
     languages: [java, python, javascript, go]   # crypto locations: JS/TS occurrences and Go sourceLocation properties
@@ -152,7 +152,7 @@ tools:
   cipherradar:
     micro_2026-10-17: {java: 11/11, python: 8/11, go: 9/11, javascript: 9/11}   # its C families are guesses (C is outside its languages)
     engine: opengrep-rules          # github.com/nk-sentinel/cipherradar efa5d9d, opengrep rules + tree-sitter + YARA
-    memory_gb: 4
+    memory_gb: 8                    # 4 killed it (rc=-9) on pycryptodome, bunkerweb, pyca/cryptography (2026-10-23)
     approach: patterns (opengrep) + syntax tree
     cbom_by: tool                   # CycloneDX 1.7
     languages: [java, python, go, javascript]   # Java: nil-pointer crash on `new ECGenParameterSpec(<identifier>)` (jjwt, Keycloak) is worked around in the worker (files with the trigger pre-excluded via .cradarignore, recorded in the notes; the tool itself is not patched)

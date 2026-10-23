@@ -374,3 +374,58 @@ L4 identities per repository, CipherSift and observers left out).
   python` / `-t go` (without it, it never analysed Python or Go: our setup error of 2026-10-15); CipherRadar runs
   from a working directory outside the clone, so a `.cradar.yml` committed in a scanned repo cannot change the
   scan.
+
+## Export review 2026-10-23 (corpus-pilot-medium)
+The first full export of `corpus-pilot-medium` (60 repos, 15 tools, run 2026-10-22, exported 2026-10-23 after the
+report's co-membership comparison stopped listing pairs) was checked for anomalies before anyone cites it. The
+numbers below are from that export and its re-render with vocabulary 2026-10-23.2 (both on the laptop, so every place
+is `unread`: the mirror is on the VM); the runs are redone on the VM with the caps below, so this is a snapshot.
+- **Our setup killed tools (refinement 15).** CipherRadar died at its 4 GiB cap (rc -9, no CBOM) on pycryptodome,
+  bunkerweb and pyca/cryptography; cdxgen was OOM-killed at 16 GiB on 8 of 60 repos (DefectDojo, OctoBot, FairEmail,
+  bunkerweb, lnbits, scapy, xipki, zaproxy) with the runs stored `ok`, 5 of them with 0 assets. Caps now 8 and
+  24 GiB (the VM peaked at 40.3 of 60.5 GiB with every tool at once), and a stored `ok` run with OOM kills reads as
+  `oom` for the report as for `--retry-failed` (`common/experiment.py:stored_status`): not normalised, listed in the
+  summary. SCANOSS's timeout on casdoor (1'772 s at 0.8 GiB) stays a result.
+- **The name parser invented parameters (fixed, vocabulary 2026-10-23.1).** Numbers in UUIDs, OIDs, URIs and file
+  names became key sizes: a CryptobomForge component named by a UUID gave `EC` with key size 15, the W3C URI
+  `.../2001/04/xmldsig-more#rsa-sha256` 2001, `ISO7816-4Padding` 7816 on AES, `ec-1.2.840.10045.3.1.7.p12` 840 (that
+  OID is P-256), `issue_369_rsa_pem.pub` 369; 40 of the 292 groups disagreeing on key size held such an artefact.
+  Every parsed value landed on a record whatever its primitive: CipherSift writes one component per part of
+  `TLS_AES_128_GCM_SHA256` (families SHA-2 and AES) and `ES512`, so its hash records carried 396 key sizes, 356
+  curves, 39 paddings and 21 modes. `DES3` (pycryptodome) was single DES. A cipher-suite name gave the wrong part:
+  `TLS_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA` (CryptoScan "Weak Cipher Suite", 228 records) was FFDH with key size 40,
+  mode CBC and digest SHA; `TLS_RSA_WITH_3DES_EDE_CBC_SHA` RSASSA-PKCS1 without the 3DES. After the four parser rules
+  (shapes, plausible key sizes next to their family, parameters admitted by the primitive, the suite grammar;
+  `analysis/data/CHANGELOG.md`) no name-parsed key size is outside its family's standard set, no hash record carries a
+  parsed cipher parameter, and the suites are their bulk cipher (DES 40 CBC, 3DES CBC, RC4 128, AES 128 GCM) with
+  `protocol: TLS`. CBOMkit's `AES-96-GCM`, `AES-48`, `3DES-64` keep their sizes through its own
+  parameterSetIdentifier field (its finding), while the name parse no longer repeats them.
+- **Effect on the tables** (before -> after, exact matcher): items 1'425 -> 1'407 (the 8 `oom` CBOMs are out, xipki's
+  2'016 cdxgen assets among them), the L4 headline share 0.81 -> 0.81, RaQuN's cross-check 0.56 -> 0.58; key-size
+  agreement inside the groups 0.85 -> 0.89 at L4 and 0.74 -> 0.82 at L3; digest 0.74 -> 0.72 on fewer groups (92 ->
+  72: the suites' `SHA` digests are gone, the remaining HMAC disagreements are real: `SHA` vs SHA-256 vs SHA-512);
+  curve 0.61 -> 0.61 (179 groups split Curve25519 vs Ed25519, xgrep's `curve25519` on Ed25519 against the registry's
+  two curves: kept, folding them would be our judgement). CipherSift's parameter items: key size 262 -> 209, curve
+  298 -> 269, digest 319 -> 227, its rates within 0.01. `vocab.csv`: 787 -> 815 unmapped (the UUID names now map to
+  nothing instead of to EC), 172 -> 157 partial.
+- **Additions (vocabulary 2026-10-23.2),** each traceable to a standard or an official API: `XDH` (Java's standard name;
+  5 voter groups wrote it unmapped) as a generic marker over X25519 and X448; `X963KDF`/`ANSI-KDF-X9.63` -> ANSI-KDF;
+  `DES3` -> 3DES (63 records); `OCB3`; padding `ISO7816-4`; java-jwt's `Algorithm.RSA256`-style names; `Streamlined
+  NTRU Prime`. Not done, as judgements: Curve25519 = Ed25519, qelens' category labels (`HASHING (see usage)`, 436
+  records), qScan's `unknown (certificate)`, cdxgen's `hmacSHA` (its digest rate 0.00 is what it writes).
+- **Two report fixes.** The summary's "Per language" table counted 1'455 items where "Matcher x level" counted 1'425:
+  30 groups whose only non-attached records were observers' (voters' generic `EC` attached to qScan's `ECDH`); the
+  groups table now carries `member_voter_groups` and the two tables agree. RQ2's "Places per tool" ends with
+  `outside code`, the share of a tool's located algorithm records whose file is not a source file of the repo's
+  language: CryptoScan 0.83 (one DefectDojo scan fixture, `unittests/scans/jfrog_xray_unified/very_many_vulns.json`,
+  holds 13'759 of its places), qScan 0.74, CipherRadar 0.71, qelens 0.28, every other tool <= 0.04. Decided
+  2026-10-23: no scope filter and no test-path heuristic (the tools are benchmarked on the repositories as they are,
+  and test code cannot be told apart soundly); the share is for the discussion. 169 of the 4'795 voter items rest on
+  data files only, 541 more only on test or vendored paths; for CryptoScan 62 of its 128 unconfirmed items are data
+  files.
+- **Tool findings to keep as they are.** CryptoScan 1.4.0 panics on 9 of 60 repos (`slice bounds out of range`;
+  ayza, mina-sshd, ballcat, simple-java-mail, MaxKey, surpass, pyca/cryptography, scapy, xipki); CBOMkit's Python
+  parser fails on OctoBot and bandit (both packagings); cbomkit-jar on refinery (protobuf); cryptarium names 631 of
+  its 804 records `UNKNOWN`; CipherSift puts curve Ed25519 on Ed448; CBOMkit's two packagings agree on every repo
+  both ran. Peak VM RAM 40.3 GiB; wall time 2 h 26 min, queue wait median 532 s (cdxgen's and CBOMkit's serial
+  queues).

@@ -53,6 +53,7 @@ from common.experiment import (
     load_mutants,
     pinned_repos,
     spec_path,
+    stored_status,
 )
 from common.tools_registry import VoterMap, load_tools, role, tailored_map, voter_groups
 from misc.cli import progress
@@ -192,7 +193,7 @@ def _micro_entries(
         if project is None or cbom_path.name != f"run{run}.json" or cbom_path.parents[1].name != "original":
             continue
         tool = meta.get("worker") or cbom_path.parent.name
-        statuses[(project.name, tool)] = meta.get("status") or "?"
+        statuses[(project.name, tool)] = stored_status(meta) or "?"
         projects.setdefault(project.name, project)
         repo_of.setdefault(project.name, repo)
         if tool not in tools:
@@ -313,7 +314,7 @@ def _normalize_runs(
     stored = [
         (meta, cbom_path)
         for meta, cbom_path in iter_results(exp_dir)
-        if meta.get("status") == "ok"
+        if stored_status(meta) == "ok"
         and cbom_path.exists()
         and (run is None or cbom_path.name == f"run{run}.json")
         and (mutants or cbom_path.parents[1].name == ORIGINAL_VARIANT)
@@ -652,7 +653,7 @@ def _mutation_step(
     statuses: dict[tuple[str, str, str], dict[int, str]] = defaultdict(dict)
     for meta, cbom_path in iter_results(exp_dir):
         key = (cbom_path.parents[2].name, cbom_path.parents[1].name, meta.get("worker") or cbom_path.parent.name)
-        statuses[key][int(meta.get("run_index") or 1)] = str(meta.get("status") or "?")
+        statuses[key][int(meta.get("run_index") or 1)] = str(stored_status(meta) or "?")
     languages = _languages(exp_dir)
     with progress.step("RQ4: planted calls and decoys"):
         rows = mu.detection_rows(
