@@ -809,7 +809,10 @@ def export(
             try:
                 run_report(exp_dir, jobs=jobs)
             except Exception as e:  # incl. typer.Exit; an export must never fail because the analysis did
-                typer.secho(f"analysis report failed ({e!r}); exporting the stored files only", fg=typer.colors.YELLOW)
+                typer.secho(
+                    f"analysis report failed ({progress.reason(e)}); exporting the stored files only",
+                    fg=typer.colors.YELLOW,
+                )
         dest.mkdir(parents=True, exist_ok=True)
         out = dest / f"{name}.zip"
         files = [p for p in sorted(exp_dir.rglob("*")) if p.is_file()]

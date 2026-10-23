@@ -85,7 +85,9 @@ normalisation, analysis outputs),
   rich; a run's board has a line per tool with its count, the job it runs and for how long, the queue, the
   failures and its remaining time, `progress.forecast`: jobs left x mean duration, the slowest tool ends the batch;
   the stack board shows the same from `exp:<name>:tools`), with the per-result lines scrolling above; off a terminal
-  only plain lines.
+  only plain lines. A table of 50k rows or more is written on a counted line of its own. A step that fails gets a
+  red ✗ and a line naming the step, its item and the reason (a pool worker that died: most likely out of memory,
+  raise `RUNNER_MEMORY` or lower `--jobs`).
 - **Experiment folder:** `_experiment.yaml` (the record: the spec as run, every repo with its resolved branch and
   commit, written once the snapshots resolve; a resumed run keeps those commits, so it replaces a lock file; the one
   answer to which repos, tools and repetitions an experiment covers, and the overview and the analysis read only the

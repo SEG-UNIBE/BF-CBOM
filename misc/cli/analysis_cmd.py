@@ -336,11 +336,18 @@ def _normalize_runs(
     return done
 
 
+BIG_TABLE_ROWS = 50_000  # a table this long (about a second of writing for records-run<k>.csv) gets a line
+
+
 def _writer(out_dir: Path, counts: dict[str, int]) -> Writer:
-    """A CSV writer into `out_dir` that records row counts (for tables-run<k>.json) and echoes them."""
+    """A CSV writer into `out_dir` that records row counts (for tables-run<k>.json) and echoes them; a big table
+    is written on a counted line of its own instead, which also says its rows."""
     out_dir.mkdir(parents=True, exist_ok=True)
 
     def write(filename: str, rows: list[dict], columns: list[str]) -> None:
+        if len(rows) >= BIG_TABLE_ROWS:
+            counts[filename] = tbl.write_csv(out_dir / filename, progress.track(rows, filename, every=10_000), columns)
+            return
         counts[filename] = tbl.write_csv(out_dir / filename, rows, columns)
         typer.echo(f"{filename:<32} {counts[filename]:>7} rows")
 
@@ -513,23 +520,26 @@ def _tables_step(
         )
     write(f"records-run{run}.csv", norm_rows, tbl.RECORDS_COLUMNS)
     # one run of the original variants, like every table of the summary's RQ2 section
-    cboms = [n for _, _, n in normalized]
-    write(f"units-run{run}.csv", tbl.unit_rows(cboms, voter_of, location_kinds), tbl.UNIT_COLUMNS)
-    repos = [tbl.full_name(p.parents[2].name) for _, p, _ in normalized]
-    write(f"units-repo-run{run}.csv", tbl.unit_repo_rows(cboms, repos, languages, voter_of), tbl.UNIT_REPO_COLUMNS)
-    per_run = Report()
-    for n in cboms:
-        per_run.add(n)
-    write(f"coverage-run{run}.csv", per_run.coverage_rows(), COVERAGE_COLUMNS)
-    write(f"conformance-run{run}.csv", per_run.conformance_rows(), CONFORMANCE_COLUMNS)
+    with progress.step("units, coverage and conformance"):
+        cboms = [n for _, _, n in normalized]
+        write(f"units-run{run}.csv", tbl.unit_rows(cboms, voter_of, location_kinds), tbl.UNIT_COLUMNS)
+        repos = [tbl.full_name(p.parents[2].name) for _, p, _ in normalized]
+        units_repo = tbl.unit_repo_rows(cboms, repos, languages, voter_of)
+        write(f"units-repo-run{run}.csv", units_repo, tbl.UNIT_REPO_COLUMNS)
+        per_run = Report()
+        for n in cboms:
+            per_run.add(n)
+        write(f"coverage-run{run}.csv", per_run.coverage_rows(), COVERAGE_COLUMNS)
+        write(f"conformance-run{run}.csv", per_run.conformance_rows(), CONFORMANCE_COLUMNS)
     # both matchers at every level, one repository per task, feed matchlevels-run<k>.csv (RQ3, matcher x level); the
     # full group, member and agreement tables are written at the scoring level only
-    per_snapshot = _match_input(normalized, include_tailored)
-    if raqun is None:
-        raqun = rq.available()
-    if raqun and not rq.available():
-        typer.secho("RaQuN not importable (uv sync --extra raqun); skipped", fg="yellow")
-        raqun = False
+    with progress.step("matcher input"):  # the records per repository; PyQuN's import
+        per_snapshot = _match_input(normalized, include_tailored)
+        if raqun is None:
+            raqun = rq.available()
+        if raqun and not rq.available():
+            typer.secho("RaQuN not importable (uv sync --extra raqun); skipped", fg="yellow")
+            raqun = False
     groups_by_snapshot, matchlevel_rows = _match_step(
         run, per_snapshot, write, window=window, closure=closure, voter_of=voter_of, level=level, raqun=raqun,
         commits=commits, languages=languages, jobs=jobs,
@@ -559,7 +569,7 @@ def _match_step(
         (key, per_snapshot[key], lv.LEVELS, window, closure, voter_of, raqun) for key in keys
     ]
     name = "exact and RaQuN matcher, per repository" if raqun else "exact matcher, per repository"
-    matched = pmap(tasks.match_snapshot, items, jobs=jobs, name=name, item=lambda it: tbl.full_name(it[0][0]))
+    matched = pmap(tasks.match_snapshot, items, jobs=jobs, name=name, item=lambda it: _repo_of(it[0]))
     results = dict(zip(keys, matched, strict=True))
     exact_by_level = {lv_name: {key: results[key][0][lv_name] for key in keys} for lv_name in lv.LEVELS}
 
@@ -571,13 +581,11 @@ def _match_step(
             out.append(row)
         return out
 
-    rows = level_rows("exact", exact_by_level)
-
     def group_tables(matcher: str, by_key: dict[tuple[str, str], list]) -> None:
         g_rows: list[dict] = []
         m_rows: list[dict] = []
         a_rows: list[dict] = []
-        for snapshot, variant in keys:
+        for snapshot, variant in progress.track(keys, f"{matcher}: groups, members, agreement", item=_repo_of):
             g, m, a = tbl.group_rows(
                 matcher,
                 by_key[(snapshot, variant)],
@@ -596,6 +604,7 @@ def _match_step(
         write(f"agreement-{matcher}-run{run}.csv", a_rows, tbl.AGREEMENT_COLUMNS)
 
     group_tables("exact", exact_by_level[level])
+    raqun_by_level = None
     if raqun:
         raqun_by_level = {lv_name: {key: results[key][1][lv_name] for key in keys} for lv_name in lv.LEVELS}
         tools = sorted({r.tool for records in per_snapshot.values() for r in records})
@@ -604,7 +613,6 @@ def _match_step(
                 raqun_by_level[lv_name], level=lv_name, run=run, tools=tools
             )
             write(f"raqun-{lv_name}-run{run}.csv", inspection, columns)
-        rows += level_rows("raqun", raqun_by_level)
         cmp_rows = [
             {"repo": tbl.full_name(snapshot), "snapshot": snapshot, "variant": variant, "run": run, "level": lv_name,
              **results[(snapshot, variant)][2][lv_name],
@@ -616,7 +624,14 @@ def _match_step(
         group_tables("raqun", raqun_by_level[level])
         # the two timing columns are the report's measurement, not the comparison's
         write(f"matchers-run{run}.csv", cmp_rows, [*MATCHERS_COLUMNS, "exact_seconds", "raqun_seconds"])
+    with progress.step("matchers per level"):
+        rows = level_rows("exact", exact_by_level) + (level_rows("raqun", raqun_by_level) if raqun_by_level else [])
     return exact_by_level[level], rows
+
+
+def _repo_of(key: tuple[str, str]) -> str:
+    """A (snapshot, variant) key's repository, the item a per-repository line names."""
+    return tbl.full_name(key[0])
 
 
 def _mutation_step(

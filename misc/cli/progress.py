@@ -6,8 +6,9 @@ On a terminal every step gets a line on stderr: a spinner while it runs (a check
 on. The display redraws ten times a second from its own thread, so the spinner and the clock keep moving while one
 large item takes long, and what the commands print scrolls above it. The finished lines stay, which shows where the
 time went. `track` and `step` are steps that end by themselves; `line` is a line the caller keeps up to date (a
-batch's tools). Off a terminal (a pipe, a log file, the tests) a step prints one plain line when it ends and a `line`
-shows nothing.
+batch's tools). When an exception leaves a session, the lines it left unfinished get a red cross with the reason, and
+one line per unfinished step says above them what failed, where and why. Off a terminal (a pipe, a log file, the
+tests) a step prints one plain line when it ends or fails and a `line` shows nothing.
 """
 
 from __future__ import annotations
@@ -27,6 +28,8 @@ from rich.text import Text
 ETA_WINDOW_SEC = 1800  # the remaining time comes from the rate over this window (a batch's results come unevenly)
 
 _live: Progress | None = None  # the outermost session's display; None outside a session and off a terminal
+_open: dict[str, list] = {}  # the steps running: name -> [start, the item in work, "done/total" or ""] (`_fail`)
+_depth = 0  # the sessions open, nested ones included
 
 
 def count(n: int) -> str:
@@ -75,13 +78,27 @@ class _CountColumn(ProgressColumn):
         if task.fields.get("of") is None:
             return Text("")
         text = f"{count(task.fields['done'])}/{count(task.fields['of'])}"
-        if task.finished:
+        if task.finished or task.fields.get("failed"):
             return Text(text)
         if "eta" in task.fields:  # the caller's forecast (`update(eta=...)`), else rich's rate
             return Text(f"{text} eta {task.fields['eta']}" if task.fields["eta"] else text)
         if task.time_remaining is not None:
             text += f" eta {clock(task.time_remaining)}"
         return Text(text)
+
+
+class _StateColumn(SpinnerColumn):
+    """The spinner while a line runs, a check mark once done, a red cross when it failed (`_fail`)."""
+
+    def render(self, task: Task):
+        return Text("✗", style="red") if task.fields.get("failed") else super().render(task)
+
+
+class _ItemColumn(ProgressColumn):
+    """The item in work, dim; on a failed line the reason and where, in red."""
+
+    def render(self, task: Task) -> Text:
+        return Text(task.fields["item"], style="red" if task.fields.get("failed") else "dim")
 
 
 class _Proxy(FileProxy):
@@ -102,16 +119,17 @@ def session() -> Iterator[None]:
     global _live
     console = Console(stderr=True)
     if _live is not None or not console.is_terminal:
-        yield
+        with _failing():
+            yield
         return
     fixed = Column(no_wrap=True)
     _live = Progress(  # the item's name takes what the other columns leave and is cut first on a narrow terminal
-        SpinnerColumn(finished_text="[green]✓"),
+        _StateColumn(finished_text="[green]✓"),
         TextColumn("{task.description}", markup=False, table_column=fixed),
         BarColumn(bar_width=20, finished_style="green"),
         _CountColumn(table_column=fixed),
         TimeElapsedColumn(table_column=fixed),
-        TextColumn("{task.fields[item]}", style="dim", markup=False, table_column=Column(no_wrap=True, ratio=1)),
+        _ItemColumn(table_column=Column(no_wrap=True, ratio=1)),
         console=console,
         expand=True,
         refresh_per_second=10,
@@ -122,7 +140,7 @@ def session() -> Iterator[None]:
     streams = sys.stdout, sys.stderr
     sys.stdout, sys.stderr = _Proxy(console, sys.stdout), _Proxy(console, sys.stderr)
     try:
-        with _live:
+        with _live, _failing():  # the failed lines are marked before the display stops
             yield
     finally:
         sys.stdout, sys.stderr = streams
@@ -167,17 +185,25 @@ def end(task) -> None:
         _live.update(task, total=1, completed=1)
 
 
-def track(items: Iterable, name: str, *, total: int | None = None, item: Callable | None = None) -> Iterator:
-    """Yield `items` (sized, or with `total`), counting them on the step's line; `item(x)` names the one in work."""
+def track(
+    items: Iterable, name: str, *, total: int | None = None, item: Callable | None = None, every: int = 1
+) -> Iterator:
+    """Yield `items` (sized, or with `total`), counting them on the step's line; `item(x)` names the one in work.
+    `every` > 1 moves the line on every that many items only (a table's rows: a display update costs microseconds)."""
     of = len(items) if total is None else total  # type: ignore[arg-type]
     start = time.monotonic()
     task = line(name, total=of)
     done = 0
+    _open[name] = [start, "", f"0/{count(of)}"]
     for x in items:
-        update(task, item=item(x) if item else "")
+        if not done % every:
+            label = item(x) if item else ""
+            _open[name][1:] = [label, f"{count(done)}/{count(of)}"]
+            update(task, item=label)
         yield x
         done += 1
-        update(task, done=done)
+        if not done % every or done == of:
+            update(task, done=done)
     _finish(task, name, start, done)
 
 
@@ -186,14 +212,65 @@ def step(name: str) -> Iterator[None]:
     """A step without a count: a pulsing bar and the clock."""
     start = time.monotonic()
     task = line(name)
+    _open[name] = [start, "", ""]
     yield
     _finish(task, name, start)
 
 
 def _finish(task, name: str, start: float, done: int | None = None) -> None:
+    _open.pop(name, None)
     if _live is not None:
         update(task, item="")
         end(task)
         return
     counted = "" if done is None else f"{count(done)} in "
     typer.echo(f"{name}: {counted}{time.monotonic() - start:.1f} s", err=True)
+
+
+def reason(exc: BaseException) -> str:
+    """Why a step failed, in one line: `interrupted` (Ctrl-C), `exit code N`, else the exception's type and text."""
+    if isinstance(exc, KeyboardInterrupt):
+        return "interrupted"
+    if isinstance(exc, typer.Exit):
+        return f"exit code {exc.exit_code}"
+    return f"{type(exc).__name__}: {exc}" if str(exc) else type(exc).__name__
+
+
+def _fail(exc: BaseException) -> None:
+    """The steps `exc` left unfinished: one red line each (what, after how long, at which item, why) and, on the
+    display, a red cross on every unfinished line with the reason where its item was."""
+    why = reason(exc)
+    for name, (start, item, counted) in _open.items():
+        at = (f" at {counted}" if counted else "") + (f" ({item})" if item else "")
+        typer.secho(f"✗ {name} failed after {time.monotonic() - start:.1f} s{at}: {why}", fg=typer.colors.RED, err=True)
+    _open.clear()
+    if _live is None:
+        return
+    short = why.split(":", 1)[0]
+    for task in _live.tasks:
+        if task.finished or task.fields.get("failed"):
+            continue
+        item = task.fields.get("item", "")
+        fields = {"failed": True, "item": f"{short} at {item}" if item else short}
+        if task.total is None:
+            fields["total"] = 1  # a step's pulsing bar stops
+        _live.update(task.id, **fields)
+        _live.stop_task(task.id)
+
+
+@contextmanager
+def _failing() -> Iterator[None]:
+    """Mark what an exception leaving the session left unfinished (`_fail`); an exit with code 0 is no failure. The
+    outermost session starts with no steps open (one left by a caller outside any session, a test, is dropped)."""
+    global _depth
+    if not _depth:
+        _open.clear()
+    _depth += 1
+    try:
+        yield
+    except BaseException as exc:
+        if not (isinstance(exc, typer.Exit) and exc.exit_code == 0):
+            _fail(exc)
+        raise
+    finally:
+        _depth -= 1

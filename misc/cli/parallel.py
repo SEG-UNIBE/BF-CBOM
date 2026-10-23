@@ -17,6 +17,7 @@ import multiprocessing
 import os
 from collections.abc import Callable, Iterator
 from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 
 from misc.cli import progress
 
@@ -35,12 +36,20 @@ def resolve_jobs(jobs: int, n_items: int) -> int:
 def pmap(fn: Callable, items: list, *, jobs: int, name: str, item: Callable | None = None) -> list:
     """`fn` over `items`, results in input order, counted on the step line `name` (progress.track); in a spawned
     process pool of `resolve_jobs(jobs, len(items))` workers, or in this process when that is 1 or there is one item.
-    A worker's exception propagates (a worker killed by the memory cap raises BrokenProcessPool)."""
+    A worker's exception propagates; a worker that died (the kernel kills one at the memory cap) raises
+    BrokenProcessPool with what to change. On a failure the items still queued are dropped, not run to the end."""
     n = resolve_jobs(jobs, len(items))
     if n <= 1 or len(items) < 2:
         return [fn(x) for x in progress.track(items, name, item=item)]
     for var in _THREAD_CAPS:
         os.environ.setdefault(var, "1")  # inherited by the workers; numpy is not imported yet in the parent
-    with ProcessPoolExecutor(max_workers=n, mp_context=multiprocessing.get_context("spawn")) as pool:
+    pool = ProcessPoolExecutor(max_workers=n, mp_context=multiprocessing.get_context("spawn"))
+    try:
         results: Iterator = pool.map(fn, items, chunksize=1)
         return [next(results) for _ in progress.track(items, name, item=item)]
+    except BrokenProcessPool as exc:
+        raise BrokenProcessPool(
+            "a worker process died, most likely out of memory: raise RUNNER_MEMORY or lower --jobs (BF_CBOM_JOBS)"
+        ) from exc
+    finally:
+        pool.shutdown(cancel_futures=True)
