@@ -1,0 +1,50 @@
+# Compact mutation pilot: six crypto-rich repositories from corpus-pilot-medium, two per language.
+# Selected on 2026-10-23 for successful scans, algorithm diversity, first-party locations and runtime;
+# all supported tools completed with no OOM events on these pinned commits. Selection evidence and
+# preflight details: experiments/README.md, "Compact mutation pilot". This is a purposive pilot cohort.
+#
+# Each repo: original + 12 call mutants + 12 decoys = 25 variants. All 15 tools, one repetition:
+# 2250 planned results, of which 1800 are supported scans and 450 are unsupported (current registry).
+# Pilot-duration extrapolation: ~7 summed tool-hours; not a wall-clock guarantee.
+# Run on the VM after make up-prod:
+#   make experiment EXP=experiments/mutant.yaml EXPERIMENT_MEMORY_BUDGET_GB=0
+#   make experiment-status NAME=mutant
+#   make experiment-export NAME=mutant
+name: mutant
+description: compact mutation pilot on six crypto-rich, broadly processable repositories selected from pilot-medium
+tools: [cbomkit, cdxgen, cryptobomforge, cryptoscan, pqcheck, qdarpan, securin-xbom, cipherradar, xgrep, cbomkit-jar, ciphersift, scanoss, qelens, cryptarium, qscan]
+repetitions: 1
+mutation:
+  per_repo: 12
+  decoys: equal
+  styles: [direct, wrapper, indirect]
+  snippets: all
+  seed: 1
+repos:
+  # Java: SSH library and authenticator app; different contexts rather than two SSH libraries.
+  - full_name: mwiede/jsch
+    language: Java
+    branch: master
+    commit: 1a6f9395683e88bd7d20151be0a2b5c8f1e9465a
+  - full_name: beemdevelopment/Aegis
+    language: Java
+    branch: master
+    commit: d6f4e5925a97e4e91593f1542085eae03432a759
+  # Python: hardware-key management and SSH interception; both declare cryptography for the pyca snippets.
+  - full_name: Yubico/yubikey-manager
+    language: Python
+    branch: main
+    commit: 4ca60f706af930459138d8dc0f0f953480e1c7a4
+  - full_name: ssh-mitm/ssh-mitm
+    language: Python
+    branch: master
+    commit: f05db2ba99067c3924df40d7b18a686ba466a994
+  # Go: transport cryptography and WebAuthn; both support the selected PBKDF2 insertion.
+  - full_name: pion/dtls
+    language: Go
+    branch: main
+    commit: af014e35f1e2cdf3d787600a6b5c41953a7d9a39
+  - full_name: go-webauthn/webauthn
+    language: Go
+    branch: master
+    commit: ccb9f1ef4864e92f9fb942b62ab1c4ef735f534a

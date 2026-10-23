@@ -54,6 +54,7 @@ runs), `corpus-` (real repositories as they are), `mutation-` (real repositories
 | `corpus-pilot-medium.yaml` | the same 15, once | 60 manually selected projects, 20 each in Java, Python and Go (`experiments/corpus/pilot-2026-10-22.yaml`) | second pilot, pinned to default-branch HEADs on 2026-10-22; 900 tool/repository pairs |
 | `corpus-icpc.yaml` | the same 15 | 23 projects of the ICPC 2026 paper (`experiments/corpus/icpc-2026.yaml`, HEAD of 2026-10-18) | held-out counterpart of the pilot corpus: none of these repos was used to tune the vocabulary, the specs or CipherSift; six are marked `expect_crypto: low` (negative cases) |
 | `mutation-smoke.yaml` | all 15 tools | pyjwt, jjwt, golang-jwt (pilot), 3 mutants each | the mutation harness end to end: the RSA-2048 keygen inserted in each style; CBOMkit and CryptoScan should find the direct one at its line (`mutation.csv`) |
+| `mutation.yaml` | all 15 tools, once | 6 pinned pilot-medium repos, 2 per language | compact mutation pilot: 12 calls and 12 decoys per repo; 2250 planned results, currently 1800 supported scans |
 
 LLM providers are outside the current experiment scope; their implementation remains available for possible later use.
 The 15 tools include three observers: tools whose findings are analysed but do not confirm other tools' findings
@@ -72,6 +73,51 @@ make experiment-export NAME=corpus-pilot-medium   # generates the report and exp
 
 The corpus records the full repository names and commits. It is a manual selection, separate from the
 stratified corpus built by `make corpus`. Rerunning the command resumes this experiment at the pinned commits.
+
+**Compact mutation pilot (`mutation.yaml`, selected 2026-10-23).** Six repositories keep the 25-variant multiplier
+manageable while retaining two contexts per language. The evidence is the exported `corpus-pilot-medium/_ANALYSIS/`
+(`runs.csv`, `units-repo-run1.csv`, `items-run1.csv`, `records-run1.csv`; report generated 2026-10-23 08:32 UTC).
+Candidates were screened for successful supported scans, no OOM events, multiple tools reporting algorithms at
+first-party locations, algorithm diversity and low runtime. The smaller pilot was checked too; medium-pilot
+candidates already supplied a balanced cohort. These are purposively selected, favourable pilot cases, not a random
+or held-out sample. They do not replace the planned mutation-main corpus or support population-wide claims.
+
+| Repository | Language | Successful / supported tools | Tools reporting algorithm items | Distinct algorithm identities | Summed tool seconds |
+|---|---|---:|---:|---:|---:|
+| `mwiede/jsch` | Java | 11/11 | 10 | 44 | 289 |
+| `beemdevelopment/Aegis` | Java | 11/11 | 10 | 14 | 258 |
+| `Yubico/yubikey-manager` | Python | 13/13 | 13 | 34 | 135 |
+| `ssh-mitm/ssh-mitm` | Python | 13/13 | 13 | 23 | 132 |
+| `pion/dtls` | Go | 12/12 | 12 | 31 | 106 |
+| `go-webauthn/webauthn` | Go | 12/12 | 12 | 24 | 84 |
+
+Identities are the union of normalised L4 algorithm items reported by tools, not verified ground truth; repeated
+occurrences and cross-tool duplicates are not counted as extra identities. Successful tools have `status=ok`;
+unsupported tools are excluded from that denominator. No selected run recorded an OOM kill. Aegis adds an
+application context alongside JSch; SSHJ is a viable reserve but would duplicate the SSH-library context. Very large
+or troubled cases such as Vault, Keycloak, FairEmail and Scapy were not chosen: their cost or failures would be
+multiplied across variants. No tool is removed from the experiment on the basis of its pilot findings.
+
+Mutation preflight used source archives at exactly the six pinned pilot commits and the existing generator with
+`per_repo: 12`, `decoys: equal`, all snippets/styles, seed 1, catalog version `2026-10-22.1`. The generator's source
+tree was supplied from each archive and its commit-writing step was replaced with in-memory capture. All six
+produced 12 distinct snippet/style pairs (4 per style) and 12 decoys (3 per kind), across 24 distinct source files
+per repo, with no skipped-insertion notes. Host counts in the table's order were 1438, 1227, 597, 665, 1288 and 310.
+This checks dependency eligibility and insertion syntax/placement; it does not compile the complete projects or
+measure how the tools detect the inserted calls. Both Python projects admitted asymmetric/AES snippets, and both
+Go projects admitted PBKDF2. The actual VM run records the full patches in `mutants.json`.
+
+Budget: 6 x 25 variants x 15 tools = 2250 planned results; current language support means 1800 actual scans and
+450 unsupported results. Multiplying the original pilot durations by 25 gives about 7 summed tool-hours. The
+slowest worker lane (cdxgen) extrapolates to about 2.46 hours with one replica, before mutation preparation and
+resource contention; these are planning estimates, not measured mutant runtimes. Repetitions are 1, keeping the
+existing stability experiment responsible for repeatability checks.
+
+```sh
+make experiment EXP=experiments/mutation.yaml EXPERIMENT_MEMORY_BUDGET_GB=0
+make experiment-status NAME=mutation
+make experiment-export NAME=mutation
+```
 
 After a change to one worker, `make experiment EXP=experiments/mutation-smoke.yaml ARGS="--rerun <tool>"` redoes
 its runs on three small repos and their mutants, one repo per paper language; its micro check, the same on
