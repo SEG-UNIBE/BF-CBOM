@@ -39,13 +39,13 @@ from analysis.normalize import (
     NormalizedCbom,
     Report,
 )
-from analysis.normalize.locations import CODE_EXT
 from analysis.snapshots import SnapshotStore
 from analysis.stability import STABILITY_COLUMNS, stability_rows
 from analysis.tasks import write_json
 from common.experiment import (
     ORIGINAL_VARIANT,
     RESULTS_DIR,
+    SnapshotSize,
     analysis_dir,
     experiment_dir,
     fixture_dir,
@@ -56,6 +56,7 @@ from common.experiment import (
     spec_path,
     stored_status,
 )
+from common.languages import source_files
 from common.tools_registry import VoterMap, load_tools, role, tailored_map, voter_groups
 from misc.cli import progress
 from misc.cli.parallel import pmap
@@ -290,20 +291,31 @@ def _store(exp_dir: Path, *, fetch: bool = False) -> SnapshotStore:
     return store
 
 
-def _sizes(exp_dir: Path, store: SnapshotStore, languages: dict[str, str | None]) -> dict[str, tuple[int, int]]:
-    """{snapshot: (files, source files of the repository's language)} at the pinned commit, for the run-time table's
-    size columns; a snapshot the store does not hold (a copied export without `--fetch`) is left out."""
-    out: dict[str, tuple[int, int]] = {}
+SIZE_FIELDS = SnapshotSize._fields  # the record's size fields, runs.csv's `repo_` columns
+
+
+def _sizes(exp_dir: Path, store: SnapshotStore, languages: dict[str, str | None]) -> dict[str, dict[str, int]]:
+    """{snapshot: {files, source_files, checkout_bytes, source_bytes}} at the pinned commit, for runs.csv and the
+    run-time table's size columns: from the record when the runner counted them (every run since 2026-10-24, so an
+    export carries them), else the two counts from the snapshot store; a snapshot neither holds (an older record on
+    a copied export without `--fetch`) is left out."""
+    recorded = {
+        r["full_name"]: {k: int(r[k]) for k in SIZE_FIELDS if r.get(k) is not None}
+        for r in _spec(exp_dir).get("repos") or []
+        if r.get("files") is not None and r.get("source_files") is not None
+    }
+    out: dict[str, dict[str, int]] = {}
     for meta, cbom_path in iter_results(exp_dir):
         snapshot = cbom_path.parents[2].name
         if snapshot in out:
             continue
         full = tbl.full_name(snapshot)
-        files = store.files(full, meta.get("base_commit") or (meta.get("repo_info") or {}).get("commit"))
-        if files is None:
+        if full in recorded:
+            out[snapshot] = recorded[full]
             continue
-        exts = CODE_EXT.get((languages.get(full) or "").lower())
-        out[snapshot] = (len(files), sum(1 for f in files if exts is None or f.lower().endswith(exts)))
+        files = store.files(full, meta.get("base_commit") or (meta.get("repo_info") or {}).get("commit"))
+        if files is not None:
+            out[snapshot] = {"files": len(files), "source_files": source_files(files, languages.get(full))}
     return out
 
 

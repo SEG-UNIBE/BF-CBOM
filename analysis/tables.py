@@ -38,7 +38,7 @@ ASSET_COMPONENT_TYPES = ("cryptographic-asset", "crypto-asset")  # the latter: I
 
 RUNS_COLUMNS = [
     "repo", "snapshot", "commit", "variant", "variant_commit", "language", "expect_crypto", "repo_files",
-    "repo_source_files", "tool", "run", "tailored",
+    "repo_source_files", "repo_bytes", "repo_source_bytes", "tool", "run", "tailored",
     "status", "duration_sec", "size_bytes", "error", "workaround", "peak_memory_mb", "memory_limit_mb", "oom_kills",
     "enqueued_at", "started_at", "finished_at", "queue_sec", "received_at",
     "tool_version", "image_ref", "bfcbom_commit", "bom_format", "spec_version",
@@ -257,11 +257,12 @@ def run_rows(
     languages: dict[str, str | None] | None = None,
     tailored: dict[str, frozenset[str]] | None = None,
     expects: dict[str, str | None] | None = None,
-    sizes: dict[str, tuple[int, int]] | None = None,
+    sizes: dict[str, dict[str, int]] | None = None,
 ) -> list[dict]:
     """One row per stored meta file; CBOM counts only where the CBOM exists and parses. `tailored`: {tool: repos it
     was tuned on} (refinement 13) for the `tailored` column; `expects`: {repo: expect_crypto} from the spec; `sizes`:
-    {snapshot: (files, source files of its language)} from the snapshot store (empty without one)."""
+    {snapshot: {files, source_files, checkout_bytes, source_bytes}} at the pinned commit, from the record or the
+    snapshot store (missing keys stay empty)."""
     languages = languages or {}
     tailored = tailored or {}
     expects = expects or {}
@@ -279,8 +280,10 @@ def run_rows(
             "variant_commit": meta.get("variant_commit"),
             "language": meta.get("language") or languages.get(repo),
             "expect_crypto": expects.get(repo),
-            "repo_files": (sizes.get(snapshot) or (None, None))[0],
-            "repo_source_files": (sizes.get(snapshot) or (None, None))[1],
+            "repo_files": (sizes.get(snapshot) or {}).get("files"),
+            "repo_source_files": (sizes.get(snapshot) or {}).get("source_files"),
+            "repo_bytes": (sizes.get(snapshot) or {}).get("checkout_bytes"),
+            "repo_source_bytes": (sizes.get(snapshot) or {}).get("source_bytes"),
             "tool": tool,
             "run": meta.get("run_index"),
             "tailored": repo in tailored.get(tool, ()),

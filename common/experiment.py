@@ -30,11 +30,13 @@ import tempfile
 import time
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
+from typing import NamedTuple
 
 import yaml
 
 from .corpus import SIZE_CAP_RATIO, repo_size_cap_mb
 from .jobs import tool_supports
+from .languages import source_files
 from .models import JobInstruction, JobResult, RepoInfo
 from .tools_registry import load_tools, plan_waves  # noqa: F401  plan_waves re-exported for the runner and tests
 from .utils import resolve_remote_commit
@@ -72,6 +74,13 @@ class RepoSpec:
     path: str | None = None
     # Corpus metadata for the analysis, ignored by the runner: `low` marks a negative case (little crypto expected)
     expect_crypto: str | None = None
+    # Counted by the runner at the pinned commit and written into the record, never spec input (`snapshot_size`): the
+    # snapshot's files and the source files of its language (the size the run-time table scales by) and the bytes of
+    # the checkout and of those source files (the blobs at that commit, no history); an export carries them.
+    files: int | None = None
+    source_files: int | None = None
+    checkout_bytes: int | None = None
+    source_bytes: int | None = None
 
     @property
     def owner(self) -> str:
@@ -171,6 +180,10 @@ def _opt_str(value) -> str | None:
     return text or None
 
 
+def _opt_int(value) -> int | None:
+    return int(value) if value not in (None, "") else None
+
+
 def _as_repo_spec(item: dict, *, base_dir: Path | None = None) -> RepoSpec:
     full_name = str(item.get("full_name") or "").strip()
     if full_name.count("/") != 1:
@@ -201,6 +214,10 @@ def _as_repo_spec(item: dict, *, base_dir: Path | None = None) -> RepoSpec:
         variants=[str(v) for v in variants],
         path=path or None,
         expect_crypto=_opt_str(item.get("expect_crypto")),
+        files=_opt_int(item.get("files")),
+        source_files=_opt_int(item.get("source_files")),
+        checkout_bytes=_opt_int(item.get("checkout_bytes")),
+        source_bytes=_opt_int(item.get("source_bytes")),
     )
 
 
@@ -557,6 +574,40 @@ def snapshot_files(full_name: str, commit: str | None, *, mirror_dir: Path = GIT
     return frozenset(p for p in proc.stdout.split("\0") if p)
 
 
+class SnapshotSize(NamedTuple):
+    """A snapshot's size at its commit, for the record (the field names of `RepoSpec`)."""
+
+    files: int
+    source_files: int  # of the repository's language (common/languages.py)
+    checkout_bytes: int  # the blobs at that commit, no history
+    source_bytes: int
+
+
+def snapshot_size(
+    full_name: str, commit: str | None, language: str | None, *, mirror_dir: Path = GIT_MIRROR_DIR
+) -> SnapshotSize | None:
+    """The files at `commit` and their bytes, all and those of `language`, counted from the base mirror
+    (`git ls-tree -r -l`: blobs only, so a submodule is no file) for the record, so an exported experiment carries
+    the size the run-time table scales by; None without the mirror."""
+    bare = mirror_path(full_name, mirror_dir)
+    if not commit or not (bare / "HEAD").exists():
+        return None
+    try:
+        proc = _git(["-C", str(bare), "ls-tree", "-r", "-l", "-z", commit], timeout=120)
+    except ExperimentError:
+        return None
+    if proc.returncode != 0:
+        return None
+    blobs: dict[str, int] = {}
+    for entry in proc.stdout.split("\0"):
+        head, _, path = entry.partition("\t")
+        parts = head.split()
+        if len(parts) == 4 and parts[1] == "blob" and path:
+            blobs[path] = int(parts[3])
+    code = [p for p in blobs if source_files((p,), language)]
+    return SnapshotSize(len(blobs), len(code), sum(blobs.values()), sum(blobs[p] for p in code))
+
+
 def variant_commit(spec: RepoSpec, variant: str, base_commit: str, *, mirror_dir: Path = GIT_MIRROR_DIR) -> str:
     """Commit of a variant branch in the mirror (mutants are created there by the mutation harness)."""
     if variant == ORIGINAL_VARIANT:
@@ -641,7 +692,9 @@ def resolve_snapshots(
     the spec's repos (the CLI counts them on its progress line).
 
     Then the spec is written as the experiment's record, `_experiment.yaml`: the spec as run, every repo with the
-    branch and commit it was resolved to. Commits already in the record win over the spec, so a resumed experiment
+    branch and commit it was resolved to and its size at that commit (`files`, `source_files`, `checkout_bytes`,
+    `source_bytes`, counted from the mirror by `snapshot_size`; an export carries them). Commits already in the
+    record win over the spec, so a resumed experiment
     never silently moves to a newer upstream commit (`--overwrite-old` removes the record first, so the spec
     decides); a repo the spec no longer names leaves the record. Nothing is
     written when a repo fails to resolve. With a `mutation:` block the variants are the original plus the repo's
@@ -672,7 +725,9 @@ def resolve_snapshots(
                 f"  warning: mirror of {repo.full_name} is {size} MB, above the repo size cap {cap_mb} MB "
                 f"(GITSERVER_MEMORY / {SIZE_CAP_RATIO}); a full clone through the git server may be killed"
             )
-        resolved.append(replace(repo, branch=branch, commit=commit))
+        counted = snapshot_size(repo.full_name, commit, repo.language, mirror_dir=mirror_dir)
+        size = counted._asdict() if counted else {f: getattr(before, f) for f in SnapshotSize._fields if before}
+        resolved.append(replace(repo, branch=branch, commit=commit, **size))
         variants = repo.variants
         if spec.mutation is not None:
             from mutation.mutants import ensure_mutants  # the runner only: workers bake common/ without mutation/

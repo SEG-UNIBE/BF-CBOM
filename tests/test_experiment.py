@@ -199,6 +199,8 @@ def test_mirror_pin_plan_and_write(upstream, tmp_path: Path):
     assert _git("config", "uploadpack.allowAnySHA1InWant", cwd=bare) == "true"
     record = ex.pinned_repos(exp_dir)["own/repo"]  # _experiment.yaml, written once the snapshots resolved
     assert (record.branch, record.commit) == ("main", sha2)
+    size = (record.files, record.source_files, record.checkout_bytes, record.source_bytes)
+    assert size == (1, 1, 27, 27)  # a.py at sha2 (`import hashlib\nimport hmac\n`), counted into the record
 
     # a worker can fetch exactly that commit from the mirror
     co = clone_repo(str(scan), branch=snap.scan_branch, target_dir=str(tmp_path / "wt"), commit=sha2)
@@ -453,3 +455,11 @@ def test_the_record_pins_and_names_exactly_the_specs_repos(tmp_path: Path, upstr
         meta.write_text(json.dumps({"worker": tool, "status": "ok", "repo": repo}))
     # a dropped repo, a dropped tool and a repetition beyond the spec's are stored but never read
     assert [(m["repo"], m["worker"]) for m, _ in ex.iter_results(exp_dir)] == [("own/a", "t1")]
+
+
+def test_source_files_counts_the_languages_code_and_everything_without_a_language():
+    from common.languages import source_files
+
+    paths = ["src/A.java", "src/b.kt", "README.md", "x/y.py", "go.mod"]
+    assert (source_files(paths, "Java"), source_files(paths, "python"), source_files(paths, "go")) == (2, 1, 0)
+    assert source_files(paths, None) == 5

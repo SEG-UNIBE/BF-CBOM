@@ -15,7 +15,7 @@
   the standard. The asset-type set and the field sets are CycloneDX's, so the paper can cite them as such.
 - **Traceable:** per asset type: a record names a file (`located_file`) or a file and a line (`located_line`; a line
   is an addition to the file, so both are counted); a record with a line is traceable (weak) when its file exists at
-  the commit and the line is inside it; strong (refinement 4) when lines line±k also hold a token of the vocabulary
+  the commit and the line is inside it; strong (refinement 4) when lines line±w also hold a token of the vocabulary
   (algorithm and family spellings, curve names, whole-name and API identifiers). File contents come from a
   `SnapshotStore` (the VM's git mirror or a fetched snapshot cache); without one the traceability columns stay empty.
 """

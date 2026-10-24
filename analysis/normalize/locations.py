@@ -1,16 +1,9 @@
-"""Where a reported location points: repo-relative paths and the source-code extensions per language."""
+"""Where a reported location points: repo-relative paths, and the source-code extensions per language
+(`common/languages.py`, shared with the runner, which counts a snapshot's source files into the record)."""
 
 from __future__ import annotations
 
-# Primary-source extensions per language; a record in another file is "out of scope" (configs, PEM, docs).
-CODE_EXT: dict[str, tuple[str, ...]] = {
-    "java": (".java", ".kt", ".scala", ".groovy"),
-    "python": (".py",),
-    "go": (".go",),
-    "c": (".c", ".h", ".cc", ".cpp", ".hpp"),
-    "javascript": (".js", ".ts", ".mjs", ".cjs", ".jsx", ".tsx"),
-}
-CODE_EXT["typescript"] = CODE_EXT["javascript"]
+from common.languages import CODE_EXT  # noqa: F401  re-exported for the normaliser and the analysis CLI
 
 
 def relative_location(location: str, *, repo_markers: tuple[str, ...] = ("/repo/",)) -> str:

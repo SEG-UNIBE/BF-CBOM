@@ -388,8 +388,10 @@ def _repo_cell(repo: dict) -> str:
 
 
 def _repositories(spec: dict) -> list[str]:
-    """The repositories the record names, each at its pinned commit: flat with the size when the corpus builder
-    recorded one (`size_kb`), else folded into one column per language so a corpus of hundreds stays readable."""
+    """The repositories the record names, each at its pinned commit: flat with their sizes when the runner counted
+    them into the record (`files`, `source_files`, `checkout_bytes`, `source_bytes`), flat with GitHub's size when
+    only the corpus builder recorded one (`size_kb`), else folded into one column per language so a corpus of
+    hundreds stays readable."""
     repos = [r for r in spec.get("repos") or [] if r.get("full_name")]
     if not repos:
         return []
@@ -408,6 +410,27 @@ def _repositories(spec: dict) -> list[str]:
         "Mutants are variants of these repositories and are not listed.",
         "",
     ]
+    if any(r.get("files") is not None for r in repos):
+        lines += [
+            "- `files`, `source files`: the files at the pinned commit, and those of the repository's language "
+            "(`.java .kt .scala .groovy`, `.py`, `.go`); `MiB`, `source MiB`: the bytes of the checkout at that commit "
+            "and of its source files (the blobs, no history). The run-time table scales by the source files.",
+            "",
+        ]
+
+        def count(v) -> str:
+            return _n(_int(v)) if v not in (None, "") else ""
+
+        def mib(b) -> str:
+            return f"{_int(b) / 1024**2:.1f}" if b not in (None, "") else ""
+
+        table = [
+            [_repo_cell(r), r.get("language") or "", count(r.get("files")), count(r.get("source_files")),
+             mib(r.get("checkout_bytes")), mib(r.get("source_bytes"))]
+            for r in repos
+        ]  # fmt: skip
+        header = ["repository", "language", "files", "source files", "MiB", "source MiB"]
+        return lines + md_table(header, table, "llrrrr") + [""]
     if any(r.get("size_kb") for r in repos):
         table = [
             [_repo_cell(r), r.get("language") or "", f"{_int(r['size_kb']) / 1024:.1f}" if r.get("size_kb") else ""]

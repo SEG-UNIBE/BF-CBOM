@@ -95,9 +95,10 @@ normalisation, analysis outputs),
   red ✗ and a line naming the step, its item and the reason (a pool worker that died: most likely out of memory,
   raise `RUNNER_MEMORY` or lower `--jobs`).
 - **Experiment folder:** `_experiment.yaml` (the record: the spec as run, every repo with its resolved branch and
-  commit, written once the snapshots resolve; a resumed run keeps those commits, so it replaces a lock file; the one
-  answer to which repos, tools and repetitions an experiment covers, and the overview and the analysis read only the
-  stored runs it names, `iter_results`), `_run-log.json` (runner sessions: times, VM RAM and CPUs, budget, waves,
+  commit and its size at it (`files`, `source_files`, `checkout_bytes`, `source_bytes`, counted from the mirror, so
+  an export carries the run-time table's size), written once the snapshots resolve; a resumed run keeps those commits, so it replaces a lock file;
+  the one answer to which repos, tools and repetitions an experiment covers, and the overview and the analysis read
+  only the stored runs it names, `iter_results`), `_run-log.json` (runner sessions: times, VM RAM and CPUs, budget, waves,
   peak VM RAM, worker image IDs), `_ANALYSIS/` (with `_SUMMARY.md`; emptied and rebuilt by every `report`),
   `mutants.json` (with a `mutation:` block: every mutant's snippet, style, host, lines, inserts and
   patch), then `<owner>__<repo>@<sha12>/<variant>/<tool>/run<i>.json` plus `run<i>.meta.json`. A folder without
@@ -548,7 +549,7 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
 
 ## Method refinements (pitch review 2026-10-15; numbers are cited from code)
 1. **Unit of analysis.** Every RQ is reported at **repo level** (the items per repo; all tools take part) and at
-   **call-site level** ((item, file, line ±k); only tools with locations). The micro check follows the same split
+   **call-site level** ((item, file, line ±w); only tools with locations). The micro check follows the same split
    (`analysis/groundtruth.py:score_records`): call-site recall (the expected call found in its own function; the
    entry bar) and repo-level recall (the call's group anywhere in the project), side by side, never pooled. The micro projects are not changed to suit a tool: plain constant algorithm
    strings are the common real-world pattern, and a tool's blindness to them is a finding.
@@ -560,7 +561,7 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
    `cbom_by: bf-cbom` in `tools.yaml` (the LLM workers) splits the RQ1 tables; the format is read from each document
    (CryptobomForge writes IBM's draft itself: `tool`, no schema).
 4. **Traceability, weak and strong.** Weak: the file exists at the commit and the line is in range. Strong: lines
-   line±k also contain a token from the alias table (algorithm name, provider string, crypto API identifier).
+   line±w also contain a token from the alias table (algorithm name, provider string, crypto API identifier).
 5. **Third insertion style** (Phase 4): indirection through a variable or constant separates pattern tools from
    data-flow tools.
 6. **Reachable insertions** (Phase 4): only into methods with a caller or an entry point, never under tests; the

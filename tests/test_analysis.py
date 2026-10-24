@@ -108,7 +108,8 @@ def _fake_experiment(root: Path, *, python: bool = False) -> Path:
     exp.mkdir()
     (exp / "_experiment.yaml").write_text(
         "name: exp-tables\ntools: [cbomkit, cipherradar, pqcheck]\nrepos:\n"
-        "  - full_name: bfcbom/micro-java\n    language: Java\n"
+        "  - full_name: bfcbom/micro-java\n    language: Java\n    files: 3\n    source_files: 2\n"
+        "    checkout_bytes: 3145728\n    source_bytes: 1048576\n"
         + ("  - full_name: bfcbom/micro-python\n    language: Python\n" if python else ""),
         encoding="utf-8",
     )
@@ -286,8 +287,8 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     # "Per language" counts the items of the matcher x level table (groups only observers are in are no items)
     per_language = summary[summary.index("**Per language**") : summary.index("**exact vs raqun")]
     assert re.search(r"^\| all \| ([\d']+) \|", per_language, flags=re.M).group(1) == exact[-1]["items"]
-    # the record names one repository per language without a size: the folded table, one column per language
-    assert "| Java (1) |\n| --- |\n| [bfcbom/micro-java](https://github.com/bfcbom/micro-java) |" in summary
+    # the record carries the repository's size, so the Repositories table is flat (no commit in it: no /tree link)
+    assert "| [bfcbom/micro-java](https://github.com/bfcbom/micro-java) | Java | 3 | 2 | 3.0 | 1.0 |" in summary
     assert "Per repository (`units-repo-run<i>.csv`)" in summary
     meaningful = summary.index("### Meaningful")
     assert meaningful < summary.index("#### Asset type `algorithm`", meaningful) < summary.index("### Traceable")
@@ -338,6 +339,8 @@ def test_an_oom_killed_run_is_listed_but_its_cbom_is_not_read(tmp_path, monkeypa
     out = exp / "_ANALYSIS"
     runs = {r["tool"]: r for r in _read_csv(out / "runs.csv")}
     assert runs["cipherradar"]["status"] == "oom" and runs["cbomkit"]["status"] == "ok"
+    assert (runs["cbomkit"]["repo_files"], runs["cbomkit"]["repo_source_files"]) == ("3", "2")  # from the record
+    assert (runs["cbomkit"]["repo_bytes"], runs["cbomkit"]["repo_source_bytes"]) == ("3145728", "1048576")
     assert {u["tool"] for u in _read_csv(out / "units-run1.csv")} == {"cbomkit"}  # its CBOM was not normalised
     summary = (out / "_SUMMARY.md").read_text(encoding="utf-8")
     assert "| cipherradar |  |  |  | 1 |  |" in summary and "Runs OOM-killed meanwhile" in summary
@@ -418,6 +421,13 @@ def test_repositories_section_links_pinned_commits_folds_by_language_or_lists_si
     assert "| [jwtk/jjwt](https://github.com/jwtk/jjwt/tree/0df9) | Java | 0.5 |" in sized
     assert f"| [jpadilla/pyjwt](https://github.com/jpadilla/pyjwt/tree/{sha}) | Python | 2.0 |" in sized
     assert "| bfcbom/micro-go (fixture) | Go |  |" in sized
+    counted = _repositories({"repos": [
+        {**repos[2], "files": 1200, "source_files": 980, "checkout_bytes": 7 * 1024**2, "source_bytes": 3 * 1024**2},
+        {**repos[0], "size_kb": 2048},
+    ]})  # fmt: skip
+    assert "| repository | language | files | source files | MiB | source MiB |" in counted
+    assert "| [jwtk/jjwt](https://github.com/jwtk/jjwt/tree/0df9) | Java | 1'200 | 980 | 7.0 | 3.0 |" in counted
+    assert f"| [jpadilla/pyjwt](https://github.com/jpadilla/pyjwt/tree/{sha}) | Python |  |  |  |  |" in counted
     assert _repositories({}) == [] and _repositories({"repos": []}) == []
 
 

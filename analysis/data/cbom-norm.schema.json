@@ -64,7 +64,7 @@
       "additionalProperties": false,
       "properties": {
         "record_id": {"type": "string", "description": "<tool>:<component index>:<occurrence index>; stable for a stored CBOM"},
-        "site_id": {"type": "string", "description": "<tool>:<file>:<line>; joins sites-run<i>.csv"},
+        "site_id": {"type": "string", "description": "<tool>:<file>:<line>"},
         "component": {"type": "string", "description": "bom-ref of the component"},
         "component_index": {"type": "integer", "minimum": 0},
         "occurrence_index": {"type": "integer", "minimum": 0},
