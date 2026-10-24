@@ -698,7 +698,9 @@ def _mutation_step(
             voter_of=_voter_of(merge_llm, observers_vote),
         )
         rates = mu.rate_rows(rows, samples=samples)
-        scores = mu.score_rows(rows, samples=samples)
+        # tuned on a micro project (<owner>/micro-<language>): the mutants' snippets are the same catalog
+        on_catalog = frozenset(t for t, repos in tailored_map().items() if any("/micro-" in r for r in repos))
+        scores = mu.score_rows(rows, samples=samples, tailored=on_catalog)
     write("mutants.csv", mu.mutant_rows(manifest, languages=languages), mu.MUTANTS_COLUMNS)
     write("mutation.csv", rows, mu.MUTATION_COLUMNS)
     write("mutation-rates.csv", rates, mu.RATE_COLUMNS)

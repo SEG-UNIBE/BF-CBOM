@@ -15,11 +15,19 @@ from pathlib import Path
 
 import typer
 
-from common.experiment import ExperimentError, expected_jobs, iter_results, load_run_log, load_spec, spec_path
+from common.experiment import (
+    ExperimentError,
+    expected_jobs,
+    iter_results,
+    load_run_log,
+    load_spec,
+    spec_path,
+    stored_status,
+)
 
 # statuses in display order; anything else a worker reports is appended after these
-STATUS_ORDER = ("ok", "error", "timeout", "cancelled", "unsupported")
-NOT_OK = ("error", "timeout", "cancelled")
+STATUS_ORDER = ("ok", "error", "timeout", "oom", "cancelled", "unsupported")
+NOT_OK = ("error", "timeout", "oom", "cancelled")
 MAX_PROBLEMS = 15
 ERROR_WIDTH = 90
 
@@ -98,7 +106,7 @@ def build(exp_dir: Path) -> Overview:
     for meta, _ in iter_results(exp_dir, spec) if spec is not None else ():  # unreadable spec copy: nothing to read
         tool = meta.get("worker") or "?"
         row = rows.setdefault(tool, ToolRow(tool))
-        status = meta.get("status") or "?"
+        status = stored_status(meta) or "?"  # an ok run OOM-killed meanwhile reads as oom, as in the report
         row.counts[status] += 1
         if status not in ("unsupported",) and isinstance(meta.get("duration_sec"), int | float):
             row.durations.append(float(meta["duration_sec"]))
@@ -192,7 +200,7 @@ def when(value) -> str:
 
 def _style(text: str, status: str | None = None, *, bold: bool = False, dim: bool = False) -> str:
     colour = {"ok": typer.colors.GREEN, "timeout": typer.colors.YELLOW, "unsupported": None}.get(status or "")
-    if status in ("error", "cancelled", "?"):
+    if status in ("error", "oom", "cancelled", "?"):
         colour = typer.colors.RED
     dim = dim or status == "unsupported"
     if colour is None and not bold and not dim:

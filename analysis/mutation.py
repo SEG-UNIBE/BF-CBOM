@@ -53,7 +53,7 @@ MUTATION_COLUMNS = [
 SCORE_COLUMNS = [
     "tool", "voter_group", "role", "language", "style", "repos", "calls", "found_site", "found_group", "decoys",
     "decoys_hit", "recall_site", "recall_low", "recall_high", "recall_group", "precision", "f1", "f1_low", "f1_high",
-    "supported",
+    "supported", "tailored",
 ]  # fmt: skip
 BRIDGE_COLUMNS = ["language", "tool", "confirmation", "f1", "n", "spearman", "kendall_tau"]
 RATE_COLUMNS = [
@@ -402,11 +402,15 @@ def _bootstrap_scores(
     return ci(recalls) or (0.0, 0.0), ci(f1s)
 
 
-def score_rows(rows: list[dict], *, samples: int = 200, seed: int = BOOTSTRAP_SEED) -> list[dict]:
+def score_rows(
+    rows: list[dict], *, samples: int = 200, seed: int = BOOTSTRAP_SEED, tailored: frozenset[str] = frozenset()
+) -> list[dict]:
     """mutation-scores.csv: per (tool, language, style or `all`) the pooled recall on the planted calls (at the
     site: strict; by group: lenient), the precision over the planted items (calls found / (calls found + decoys
     hit); the decoys, style-less, count for every style) and F1, with bootstrap CIs over repositories. Precision and
-    F1 are empty without decoys. `supported` as in score.py (repositories and calls)."""
+    F1 are empty without decoys. `supported` as in score.py (repositories and calls). `tailored`: tools tuned on the
+    micro projects, which come from the same snippet catalog as the mutants (refinement 13), so their scores here are
+    inflated by construction."""
     calls: dict[tuple, dict[str, list[bool]]] = defaultdict(lambda: defaultdict(list))
     grouped: dict[tuple, dict[str, list[bool]]] = defaultdict(lambda: defaultdict(list))
     decoys: dict[tuple, dict[str, list[bool]]] = defaultdict(lambda: defaultdict(list))
@@ -455,6 +459,7 @@ def score_rows(rows: list[dict], *, samples: int = 200, seed: int = BOOTSTRAP_SE
                 "f1_low": None if not f1_ci else round(f1_ci[0], 4),
                 "f1_high": None if not f1_ci else round(f1_ci[1], 4),
                 "supported": ok,
+                "tailored": tool in tailored,
             }
         )
     return out

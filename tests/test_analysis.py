@@ -718,6 +718,9 @@ def test_runtime_rows_count_each_repository_once_with_spread_ci_and_size():
     assert "size_rho" not in fast and "rerun_cv" not in fast  # no sizes, no repetitions
     assert "median_ci_low" not in rows[("slow", "Python")]  # one repository: no interval
     assert runtime_rows(runs) == runtime_rows(runs)  # the bootstrap is seeded
+    micro = [_run("one", r, t, source=1) for r, t in (("a", 1.0), ("b", 2.0), ("c", 3.0))]  # one file each
+    one = next(r for r in runtime_rows(micro) if r["language"] == "all")
+    assert "size_rho" not in one and "sec_per_1k_source_files" not in one  # one size: nothing to scale by
 
 
 def test_runtime_section_lists_the_slowest_tool_first_with_its_languages():

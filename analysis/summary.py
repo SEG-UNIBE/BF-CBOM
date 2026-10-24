@@ -1162,10 +1162,14 @@ def _runtime(rows: list[dict]) -> list[str]:
         lines += [
             "- `s / 1k files`: the median over repositories of seconds per thousand source files of the repository's "
             "language; `ρ size`: Spearman between a repository's time and its source files (near 1: the time grows "
-            "with the code; near 0: something else, such as start-up or dependency resolution, dominates).",
+            "with the code; near 0: something else, such as start-up or dependency resolution, dominates); both only "
+            f"with {RUNTIME_MIN_REPOS} or more repositories whose sizes differ.",
         ]
     else:
-        lines += ["- The size columns are empty: the snapshot files were not available (rerun with `--fetch`)."]
+        lines += [
+            f"- The size columns are empty: they need {RUNTIME_MIN_REPOS} or more repositories whose sizes are "
+            "known and differ (sizes come from the record, else from the snapshot files: `--fetch`)."
+        ]
     header = ["tool", "repos", "median s", "95 % CI", "p90 s", "max s", "spread", "rerun", "timeouts", "hours",
               "s / 1k files", "ρ size"]  # fmt: skip
     lines += [""] + md_table(header, table) + [""]
@@ -1797,10 +1801,14 @@ def _mutation(
         )
     if any(r.get("role") == "observer" for r in rows):
         lines += ["", OBSERVER_NOTE]
-    failed = [r for r in rows if r.get("status") != "ok"]
+    failed = Counter(r.get("status") or "missing" for r in rows if r.get("status") != "ok")
     if failed:
-        lines += ["", f"Not judged ({_n(len(failed))} mutant × tool): the run on the mutant or on the original is "
-                  "missing or not ok (`status` in `mutation.csv`)."]  # fmt: skip
+        why = "; ".join(
+            f"{_n(n)} {'unsupported (the language is outside the tool’s)' if st == 'unsupported' else st}"
+            for st, n in sorted(failed.items(), key=lambda kv: (-kv[1], kv[0]))
+        )
+        lines += ["", f"Not judged ({_n(sum(failed.values()))} planted call × tool, by the status of the run on the "
+                  f"mutant, `original <status>` for the original's; `status` in `mutation.csv`): {why}."]  # fmt: skip
     lines += _mutation_scores(scores or [], role)
     lines += _bridge(bridge or [])
     lines += ["", f"### Mutant patches (first {min(MUTANT_PATCHES, len(mutants))} of {_n(len(mutants))})", ""]
@@ -1808,6 +1816,12 @@ def _mutation(
         lines += [f"`{m['variant']}` in `{m['repo']}`, `{m['file']}:{m['call_line']}` ({m['host']}):", ""]
         lines += ["```diff", m.get("patch") or "", "```", ""]
     return lines
+
+
+TAILORED_CATALOG_NOTE = (
+    "`*` = tuned on the micro projects (`tailored_on` in tools.yaml, refinement 13), which come from the same snippet "
+    "catalog as these mutants: its scores here may be inflated by construction."
+)
 
 
 def _mutation_scores(scores: list[dict], role: dict) -> list[str]:
@@ -1852,7 +1866,7 @@ def _mutation_scores(scores: list[dict], role: dict) -> list[str]:
         table.append(
             [
                 s["language"],
-                _tool({"tool": s["tool"], "role": role.get(s["tool"])}),
+                _tool({"tool": s["tool"], "role": role.get(s["tool"])}) + (r"\*" if _true(s.get("tailored")) else ""),
                 s["calls"],
                 ci(_float(s["recall_site"]), _float(s.get("recall_low")), _float(s.get("recall_high"))),
                 _pct(s["recall_group"]),
@@ -1865,6 +1879,8 @@ def _mutation_scores(scores: list[dict], role: dict) -> list[str]:
     header = ["language", "tool", "calls", "recall site [95 % CI]", "recall group", "decoys", "hit", "precision",
               "F1 [95 % CI]"]  # fmt: skip
     lines += md_table(header, table, "ll" + "r" * (len(header) - 2))
+    if any(_true(s.get("tailored")) for s in rows):
+        lines += ["", TAILORED_CATALOG_NOTE]
     eg = next((row for row in table if row[8]), None) or next((row for row in table if row[3]), None)
     if eg:
         what = (

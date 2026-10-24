@@ -350,7 +350,8 @@ def runtime_rows(runs: list[dict], *, seed: int = 20261023) -> list[dict]:
     ok runs of one snapshot and variant with several runs (run-to-run noise; empty without repetitions); `hours` the
     wall time of every run that ran (ok, error, timeout, oom); `timeout_share` of those; `sec_per_1k_source_files`
     the median over repositories of time per thousand source files of the repository's language; `size_rho`
-    Spearman between a repository's time and its source files. Unsupported runs never ran and are left out."""
+    Spearman between a repository's time and its source files; both only where `size_rho` exists (RUNTIME_MIN_REPOS
+    repositories whose sizes differ). Unsupported runs never ran and are left out."""
     from .score import spearman
 
     ran = [r for r in runs if r.get("status") not in (None, "", "unsupported")]
@@ -400,12 +401,12 @@ def runtime_rows(runs: list[dict], *, seed: int = 20261023) -> list[dict]:
         if reruns:
             row["rerun_cv"] = round(statistics.median(reruns), 2)
             row["rerun_pairs"] = len(reruns)
-        rates = [1000 * repo_sec[s] / n for s, n in source.items() if n]
-        if rates:
-            row["sec_per_1k_source_files"] = round(statistics.median(rates), 1)
         sized = {s: float(n) for s, n in source.items()}
         if len(sized) >= RUNTIME_MIN_REPOS and (rho := spearman(repo_sec, sized)) is not None:
             row["size_rho"] = round(rho, 2)
+            # only where sizes vary: over projects of one size (the micro projects: one file) it is start-up cost
+            rates = [1000 * repo_sec[s] / n for s, n in sized.items() if n]
+            row["sec_per_1k_source_files"] = round(statistics.median(rates), 1) if rates else None
         out.append(row)
     return out
 

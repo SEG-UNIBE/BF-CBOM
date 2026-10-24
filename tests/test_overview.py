@@ -80,3 +80,13 @@ def test_list_rows(tmp_path):
     rows = [click.unstyle(r) for r in overview.list_rows([overview.build(_experiment(tmp_path))])]
     assert rows[0].split()[:3] == ["experiment", "stored", "expected"]
     assert rows[1].split()[:7] == ["e-view", "5", "6", "2", "2", "1", "–"]
+
+
+def test_an_ok_run_oom_killed_meanwhile_counts_as_oom(tmp_path):
+    exp_dir = _experiment(tmp_path)
+    _meta(exp_dir, "o/b", "llm", "ok", duration_sec=60, oom_kills=1)
+    ov = overview.build(exp_dir)
+    assert dict(ov.counts) == {"ok": 2, "error": 1, "timeout": 1, "unsupported": 1, "oom": 1}
+    assert ("oom", "llm") in [(p.status, p.tool) for p in ov.problems]
+    text = "\n".join(click.unstyle(line) for line in overview.render(ov))
+    assert "ok 2   error 1   timeout 1   oom 1   unsupported 1" in text
