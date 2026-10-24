@@ -43,9 +43,9 @@ FILES = {
     "items-run{k}.csv": "one row per (repo, tool, item) with the voter groups matching it at each level L0-L4; no "
     "locations",
     "levels-run{k}.csv": "share of each tool's items another voter group confirms, per level L0-L4",
-    "units-run{k}.csv": "per tool: assets, records, items and how they relate (records per asset, assets per item), "
-    "the kinds of place and the records outside code files of the repository's language",
-    "units-repo-run{k}.csv": "per (tool, repo): assets, records, items",
+    "units-run{k}.csv": "per tool: algorithm assets, records, items and how they relate (records per asset, assets "
+    "per item), the kinds of place and the records outside code files of the repository's language",
+    "units-repo-run{k}.csv": "per (tool, repo): algorithm assets, records, items",
     "coverage-run{k}.csv": "per tool and dimension: algorithm assets with a value (reported vs derived), and what "
     "their names are (resolution)",
     "conformance-run{k}.csv": "spec issues per tool and kind (assets: field, enum, type, deprecated; documents)",
@@ -602,7 +602,7 @@ def _reported(rows: list[dict], run: int) -> list[str]:
         "- `components`: every component of the CBOMs, the dependency listings of inventory tools included.",
         "- `crypto assets`: the components typed as cryptographic assets, then split by the CycloneDX `assetType` "
         "they declare (`algorithm`, `certificate`, `protocol`, `related-crypto-material`; `other`: a value outside "
-        "these four).",
+        'these four); the `algorithm` column is what "Units per tool" below counts as `algorithm assets`.',
         "- `file`, `file+line`: the share of the crypto assets that name a file, and a file and a line "
         "(`evidence.occurrences`, or `detectionContext` in IBM's draft).",
         "- `empty`: ok runs that reported no crypto asset; `median`: crypto assets per repository.",
@@ -982,9 +982,9 @@ def _units_per_repo(unit_repos: list[dict]) -> list[str]:
     totals = {t: {k: sum(_int(r[k]) for r in unit_repos if r["tool"] == t) for k in counts} for t in tools}
     matrix.append(["all", ""] + [cell(totals[t]) for t in tools])
     lines = [
-        "Per repository (`units-repo-run<k>.csv`), one row per repository, one column per tool: `assets / records / "
-        "items` of the tool's CBOM there; empty = no ok run (the RQ2 table above says why), `all` sums each column. "
-        "The matchers, the ladder and the scores compare the items one repository at a time.",
+        "Per repository (`units-repo-run<k>.csv`), one row per repository, one column per tool: `algorithm assets / "
+        "records / items` of the tool's CBOM there; empty = no ok run (the RQ2 table above says why), `all` sums "
+        "each column. The matchers, the ladder and the scores compare the items one repository at a time.",
         "",
     ]
     header = ["repo", "language", *[_tool({"tool": t, "role": roles[t]}) for t in tools]]
@@ -1041,7 +1041,9 @@ def _rq2(
             "",
             "How each tool packages its findings: one row per tool (`units-run<k>.csv`), summed over the repositories.",
             "",
-            "- `CBOMs`: ok runs read; `assets`: its algorithm components.",
+            "- `CBOMs`: ok runs read; `algorithm assets`: its components of asset type `algorithm` (the `algorithm` "
+            "column above), not every crypto asset: certificates, protocols and key material are no algorithms and "
+            "never become items, so this number is below `crypto assets` wherever a tool reports those.",
             "- `records`: their places, one per place a component lists (a place listed under several components "
             "counts once for each).",
             "- `items`: the distinct algorithms its records name in each repository, summed over the repositories.",
@@ -1054,8 +1056,8 @@ def _rq2(
             "- `no location`: the share of components without a file.",
             "",
         ]
-        header = ["tool", "CBOMs", "assets", "records", "items", "records per asset (median / max)", "several places",
-                  "assets per item", "no location"]  # fmt: skip
+        header = ["tool", "CBOMs", "algorithm assets", "records", "items", "records per asset (median / max)",
+                  "several places", "assets per item", "no location"]  # fmt: skip
         lines += md_table(header, table) + [""]
         lines += _units_per_repo(unit_repos)
         lines += _places(units)
@@ -1078,7 +1080,7 @@ def _rq2(
             "### Names and values",
             "",
             "One row per tool (`coverage-run<k>.csv`); every share "
-            "is of its algorithm `assets`, as a reader of its CBOM finds them (a tool that writes one component per "
+            "is of its `algorithm assets`, as a reader of its CBOM finds them (a tool that writes one component per "
             "finding weighs an often-found algorithm more; the ladder and the scores compare per item instead).",
             "",
             "- What the asset's name is: `mapped` = an algorithm (only these become items), `ambiguous` = a list of "
@@ -1088,7 +1090,7 @@ def _rq2(
             "code context (values we derive are not counted).",
             "",
         ]
-        header = ["tool", "assets", *RESOLUTION_SHOWN, *[d.replace("_", " ") for d in COVERAGE_SHOWN]]
+        header = ["tool", "algorithm assets", *RESOLUTION_SHOWN, *[d.replace("_", " ") for d in COVERAGE_SHOWN]]
         lines += md_table(header, table, "lr" + "r" * (len(RESOLUTION_SHOWN) + len(COVERAGE_SHOWN))) + [""]
     if any(u.get("role") == "observer" for u in units):
         lines += [OBSERVER_NOTE, ""]

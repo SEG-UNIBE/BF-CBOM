@@ -282,6 +282,7 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert positions == sorted(positions)  # the sections come in the order of the questions
     assert "| cbomkit | ✅ 11 |" in summary and "| pqcheck | – |" in summary
     assert "| tool | records | line | window | import | file | none | unread | outside code |" in summary
+    assert "| tool | CBOMs | algorithm assets | records | items |" in summary  # algorithm components, not crypto assets
     # "Per language" counts the items of the matcher x level table (groups only observers are in are no items)
     per_language = summary[summary.index("**Per language**") : summary.index("**exact vs raqun")]
     assert re.search(r"^\| all \| ([\d']+) \|", per_language, flags=re.M).group(1) == exact[-1]["items"]
