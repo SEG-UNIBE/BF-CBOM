@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/SEG-UNIBE/BF-CBOM/analysis/data/cbom-norm.schema.json",
   "title": "BF-CBOM normalised CBOM (CBOM^norm), version bf-cbom-norm/1",
-  "description": "One file per stored CBOM (run<k>.norm.json next to run<k>.json), the same shape for every tool. Written by analysis/normalize (adapter spec per tool in analysis/adapters/). Canonical values come from analysis/data/algorithms.yaml and the CycloneDX 1.7 registry; every value keeps its raw form and the path it was read from.",
+  "description": "One file per stored CBOM (run<i>.norm.json next to run<i>.json), the same shape for every tool. Written by analysis/normalize (adapter spec per tool in analysis/adapters/). Canonical values come from analysis/data/algorithms.yaml and the CycloneDX 1.7 registry; every value keeps its raw form and the path it was read from.",
   "type": "object",
   "required": ["schema", "tool", "adapter", "vocabulary", "source", "declared", "reader", "document_issues", "spec_issues", "stats", "records"],
   "additionalProperties": false,
@@ -64,7 +64,7 @@
       "additionalProperties": false,
       "properties": {
         "record_id": {"type": "string", "description": "<tool>:<component index>:<occurrence index>; stable for a stored CBOM"},
-        "site_id": {"type": "string", "description": "<tool>:<file>:<line>; joins sites-run<k>.csv"},
+        "site_id": {"type": "string", "description": "<tool>:<file>:<line>; joins sites-run<i>.csv"},
         "component": {"type": "string", "description": "bom-ref of the component"},
         "component_index": {"type": "integer", "minimum": 0},
         "occurrence_index": {"type": "integer", "minimum": 0},

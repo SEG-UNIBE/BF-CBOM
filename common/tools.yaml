@@ -5,7 +5,7 @@
 # groups"). `merge_group` names a coarser voter the sensitivity analysis can merge them into (`--merge-llm`: the LLM
 # workers, which share prompts and file selection, decided 2026-10-18); `engine_family` marks tools that share only a
 # pattern engine but run independently written rules (decided 2026-10-20 after the rule-overlap check): separate
-# voters, merged for the `engine-merged` ranking of grouping-run<k>.csv. `cbom_by` says who writes the CBOM document:
+# voters, merged for the `engine-merged` ranking of grouping-run<i>.csv. `cbom_by` says who writes the CBOM document:
 # `tool` (the tool itself; our worker adapter at most moves a tool's own values into standard fields) or `bf-cbom` (our
 # worker assembles it, the LLM workers), whose validity measures us, not the tool (refinement 3); the format is read
 # from each document (bomFormat, specVersion). `languages` is the tool's declared

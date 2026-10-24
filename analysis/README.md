@@ -24,9 +24,9 @@ as 13,996).
 
 | Unit | What it is | Identified by | Counted in |
 |---|---|---|---|
-| **asset** | one crypto asset component of a CBOM, as the tool wrote it | `component_index` in the CBOM | RQ2 (what the tools report), RQ1 meaningful, the RQ2 section (`units-run<k>.csv`, `coverage-run<k>.csv`, `conformance-run<k>.csv`), `normalize.json` |
-| **record** | one occurrence of an asset: an asset found at five lines gives five records, an asset without occurrences one record without a location | `record_id` = `<tool>:<component>:<occurrence>`, its location `site_id` = `<tool>:<file>:<line>` | `records-run<k>.csv`, `units-run<k>.csv`, RQ1 traceability, the matchers' clusters and call-site groups (`members-*.csv`) |
-| **item** | one algorithm in one repository (snapshot and variant): one distinct L4 identity, however many assets and records of a tool carry it; a tool reports the item when one of its `mapped` records has that identity | algorithm: (snapshot, unit); parameter: (snapshot, unit, value); location: (snapshot, unit, file:line) | the ladder (`levels-`, `items-run<k>.csv`), the scores, stability, the tools-per-item distribution, E4 |
+| **asset** | one crypto asset component of a CBOM, as the tool wrote it | `component_index` in the CBOM | RQ2 (what the tools report), RQ1 meaningful, the RQ2 section (`units-run<i>.csv`, `coverage-run<i>.csv`, `conformance-run<i>.csv`), `normalize.json` |
+| **record** | one occurrence of an asset: an asset found at five lines gives five records, an asset without occurrences one record without a location | `record_id` = `<tool>:<component>:<occurrence>`, its location `site_id` = `<tool>:<file>:<line>` | `records-run<i>.csv`, `units-run<i>.csv`, RQ1 traceability, the matchers' clusters and call-site groups (`members-*.csv`) |
+| **item** | one algorithm in one repository (snapshot and variant): one distinct L4 identity, however many assets and records of a tool carry it; a tool reports the item when one of its `mapped` records has that identity | algorithm: (snapshot, unit); parameter: (snapshot, unit, value); location: (snapshot, unit, file:line) | the ladder (`levels-`, `items-run<i>.csv`), the scores, stability, the tools-per-item distribution, E4 |
 
 - **Asset to record.** The normaliser writes one record per (component, occurrence) (`normalize/record.py`), and
   the values sit on the record, since occurrence evidence has the highest precedence. A component's records nearly
@@ -37,7 +37,7 @@ as 13,996).
 - **Packaging.** How a tool splits its findings into assets and records is its output format, not what it found:
   CBOMkit lists an algorithm once with its occurrences, CipherRadar writes one component per finding. Asset and
   record counts therefore describe a tool's output, item counts what it reports. Every tool's format: "Packaging per
-  tool" below; an experiment's numbers: its `units-run<k>.csv`.
+  tool" below; an experiment's numbers: its `units-run<i>.csv`.
 - **Harmonised packaging.** Nothing that compares tools sees their packaging: every comparison first collapses a
   tool's records into one canonical unit, so 800 occurrences or 800 components of one algorithm count once. The
   ladder, the exact matcher's repo-level groups and the scores count items, (item, value) pairs and (item, site)
@@ -45,24 +45,24 @@ as 13,996).
   a tool's distinct attribute sets per repository, over the exact matcher's records (`matchers/raqun.py`: records
   with the same canonical values are one element, so AES-128 and AES-256 are two). Packaging shows only where a table describes the tool's own document:
   RQ2's asset counts as written, RQ1's meaningful shares, RQ2's names and values (shares of
-  components, as a reader of the CBOM finds them), and, by design, `units-run<k>.csv`, which measures it.
+  components, as a reader of the CBOM finds them), and, by design, `units-run<i>.csv`, which measures it.
 - **Kinds of place.** Tools also differ in what a place is, and every record says which kind it names
-  (`location_kind` in `records-run<k>.csv`, per tool in `units-run<k>.csv` and the summary's "Places per tool";
+  (`location_kind` in `records-run<i>.csv`, per tool in `units-run<i>.csv` and the summary's "Places per tool";
   `schema.py:location_kind`): `line` a single line of code that is not an import (in practice the call or the
   declaration), `window` a span of several lines, `import` a single line holding an import statement, `file` a file
   without a line, `none` no location, `unread` a single line whose file the snapshot files available to the
   analysis do not hold (the VM's mirror has them; `--fetch` for a copied export). A tool that reports the import
   line places the same use elsewhere than one that reports the call, which the ±2-line window absorbs only in part.
   Next to the kind, every located record says whether its file is a source file of the repository's language
-  (`in_scope`; per tool `outside_code` in `units-run<k>.csv`, the share "outside code" of "Places per tool"): on
+  (`in_scope`; per tool `outside_code` in `units-run<i>.csv`, the share "outside code" of "Places per tool"): on
   corpus-pilot-medium 83 % of CryptoScan's, 74 % of qScan's and 71 % of CipherRadar's places were fixtures, test
   vectors, configuration or documentation (one DefectDojo scan fixture alone held 13'759 of CryptoScan's). The
   analyses count these places like any other, because the tools are benchmarked on the repositories as they are
   (decided 2026-10-23: no scope filter, no test-path heuristic); the share is for the discussion.
 - **Two more words.** A *unit* is an L4 identity: the identity of an item (the `unit` column of
-  `items-run<k>.csv`) and the expected value of an RQ4 mutant (`expected.unit`). A *site* is a record's file and line
+  `items-run<i>.csv`) and the expected value of an RQ4 mutant (`expected.unit`). A *site* is a record's file and line
   (call-site level, refinement 1). The micro ground truth's entries are *expected items* at site level, a known
-  crypto call in a function of its own (`micro-items-run<k>.csv`; `experiments/corpus/micro/ground_truth.yaml`, generated from
+  crypto call in a function of its own (`micro-items-run<i>.csv`; `experiments/corpus/micro/ground_truth.yaml`, generated from
   the snippet catalog, keeps the pilot's key `assets`).
 - **Where "algorithm" stays.** Only as the CycloneDX asset type (an *algorithm asset*), as the `algorithm`
   dimension (next to key size, mode, padding, curve, digest and location) and as the record field `algorithm`. What
@@ -73,7 +73,7 @@ as 13,996).
 What one CBOM component is for each tool, and where its places in the code are. This is the tool's output format,
 read as shipped (the adapter spec's `notes:` in `adapters/<tool>.yaml` say more), so this table changes only when a
 tool is added or its pinned version changes, together with its spec; `tests/test_analysis.py` checks that every
-integrated tool has a row. The numbers of an experiment are in its `units-run<k>.csv` and the summary's "Units per
+integrated tool has a row. The numbers of an experiment are in its `units-run<i>.csv` and the summary's "Units per
 tool": records per asset, assets per item, the share without a location.
 
 | Tool | One component is | Its places |
@@ -174,7 +174,7 @@ language, so they never meet. No rule set names another as its source, and Ciphe
 YARA-X pass besides its rules. Until 2026-10-20 the three were one voter group `grep-rules`, a conservative choice by
 the shared engine; the check showed that it rested on the engine alone, so they count apart since.
 
-**Sensitivity.** Every report ranks the tools again under other groupings (`grouping-run<k>.csv`, the summary's
+**Sensitivity.** Every report ranks the tools again under other groupings (`grouping-run<i>.csv`, the summary's
 "Other voter groupings", Kendall's tau against the declared ranking): `per-tool` (every tool its own voter, so
 CBOMkit and cbomkit-jar confirm each other), `llm-merged` (the LLM workers as one voter) and `engine-merged` (the
 tools of one pattern engine family as one voter: `engine_family` in `tools.yaml`, the former `grep-rules`); next to
@@ -194,7 +194,7 @@ this, since two tools also agree when both are right.
 | `undefined` | a name nobody can read | `0`, `UNKNOWN`, `Sig` | no |
 
 The shares of each tool's algorithm assets are RQ2 results (the summary's RQ2 section,
-`coverage-run<k>.csv`; per record in `records-run<k>.csv`). Only `mapped` records enter the ladder and the scores.
+`coverage-run<i>.csv`; per record in `records-run<i>.csv`). Only `mapped` records enter the ladder and the scores.
 
 **What our reading of a name may add** (vocabulary 2026-10-23.1, prompted by the corpus-pilot-medium review): the
 parser never invents a parameter. A UUID in a name carries nothing; an OID is read through the `oids:` table (RFC

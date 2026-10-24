@@ -100,7 +100,7 @@ normalisation, analysis outputs),
   stored runs it names, `iter_results`), `_run-log.json` (runner sessions: times, VM RAM and CPUs, budget, waves,
   peak VM RAM, worker image IDs), `_ANALYSIS/` (with `_SUMMARY.md`; emptied and rebuilt by every `report`),
   `mutants.json` (with a `mutation:` block: every mutant's snippet, style, host, lines, inserts and
-  patch), then `<owner>__<repo>@<sha12>/<variant>/<tool>/run<k>.json` plus `run<k>.meta.json`. A folder without
+  patch), then `<owner>__<repo>@<sha12>/<variant>/<tool>/run<i>.json` plus `run<i>.meta.json`. A folder without
   `_experiment.yaml` is ignored by every command (`experiment list` names it for deletion).
 - **Provenance.** `RepoInfo.commit` is resolved at inspection start (`coordinator/redis_io.py:enrich_repo`) and checked
   out exactly by `clone_repo`. `JobResult` carries `tool_version`, `image_ref` (env `BF_CBOM_IMAGE`), `bfcbom_commit`
@@ -163,7 +163,7 @@ normalisation, analysis outputs),
     repository, per dimension (unit, value) and (unit, file:line). Asset and record counts depend on how a tool
     packages its findings (CipherRadar: one component per finding; CBOMkit: one per algorithm with its
     occurrences); the ladder and the scores count items.
-  - `normalize/`: CBOM -> normalised records (below); `normalize` also writes `run<k>.norm.json` next to each CBOM.
+  - `normalize/`: CBOM -> normalised records (below); `normalize` also writes `run<i>.norm.json` next to each CBOM.
     Our reading of a name is bounded (vocabulary 2026-10-23.1): shapes first (a UUID carries nothing, an OID is read
     through `oids:`, a URI through its fragment), a bare number is a key size only next to its family and within the
     family's standard sizes (`key_sizes:`), a parsed or derived parameter the primitive does not have is dropped
@@ -183,7 +183,7 @@ normalisation, analysis outputs),
     order, so the groups are deterministic; matcher (c) numbers from before 2026-10-21 came from the unsorted
     candidates and are rerun, not compared. RaQuN per level costs five matchings per repository (`--no-raqun`
     skips it; running it at the scoring level only is not built). Each matcher's seconds per repository and level
-    are recorded (`matchers-`, `matchlevels-run<k>.csv`; the summary's "Matching time" table), measured around the
+    are recorded (`matchers-`, `matchlevels-run<i>.csv`; the summary's "Matching time" table), measured around the
     `match` call alone, so RaQuN's n-way matching and the exact matcher's clustering are compared on cost too.
   - `score.py`, `stability.py`, `costs.py`: RQ3b's per-tool rates (no ranking), run-to-run stability, LLM costs from
     `analysis/data/llm_prices.yaml`.
@@ -273,32 +273,32 @@ records and items, never as assets, which depend on each tool's packaging (`anal
 - **RQ1, conformance:** which CycloneDX version and CBOM extension do the tools declare, and do their documents
   conform to it? The declared `bomFormat` / `specVersion` (CryptobomForge: IBM's draft), whole-document validity and
   the error kinds, per-field spec issues, standard fields vs custom properties (`schema-`, `conformance-`,
-  `meaningful-run<k>.csv`).
+  `meaningful-run<i>.csv`).
 - **RQ2, volume:** how much do the tools report, and in what detail? Assets, records and items per tool
   and repo, the asset types, the fill rate per dimension (reported vs derived), locations and whether they hold at the
   commit (weak and strong traceability), names nobody can read (`resolution`); descriptive, more is not better
-  (`runs.csv`, `units-`, `coverage-`, `traceability-run<k>.csv`), and what a scan costs: per tool and language
+  (`runs.csv`, `units-`, `coverage-`, `traceability-run<i>.csv`), and what a scan costs: per tool and language
   the median time over repositories with a bootstrap CI, p90, max, the spread across repositories and between
   reruns, timeouts and the scaling with source files (`runtime.csv`, the summary's "Run time").
 - **RQ3, agreement:** how far do the tools agree on what is in a repository, per kind of
   information, and how much of their disagreement is representational rather than substantive? *RQ3a*, the deltas
   L0 -> L4 on fixed items, shown for both matchers: the gap is representational heterogeneity (naming, packaging,
   placement, spellings per identity), the residual at L4 is substantive (`levels-`, `matchlevels-`,
-  `units-run<k>.csv`, `vocab.csv`). *RQ3b*, the agreement at L4: the exact matcher carries the headline (the share
+  `units-run<i>.csv`, `vocab.csv`). *RQ3b*, the agreement at L4: the exact matcher carries the headline (the share
   of items another voter group reports, details aside), decomposes the gap per dimension and supplies the call sites,
   the per-tool rates (confirmation, exclusivity, majority coverage; no ranking claim) and the rater sample (items
   stratified by k, two raters, Cohen's kappa: precision per k on real findings). RaQuN, a published external n-way
   matcher under its paper's configuration, is the cross-check in the background, one sentence in the summary and the
   paper: the share that still holds when a group must be the same finding with the same details (roles swapped
   2026-10-23; RaQuN carried the headline from 2026-10-22). The headline level is L4; k of n counts the eligible
-  voters that ran on the repo (`items-`, `agreement-`, `score-`, `grouping-run<k>.csv`).
+  voters that ran on the repo (`items-`, `agreement-`, `score-`, `grouping-run<i>.csv`).
 - **RQ4, effectiveness:** given calls and decoys planted into real code in equal counts, how well does
   each tool find the calls and ignore the decoys, and does the agreement of RQ3 predict that? Recall at the site,
   precision on the decoys, F1 per tool, language and style with CIs over repos, the micro F1 next to it, never
   pooled; the bridge: Spearman between confirmation rate and F1 over tool x dimension x language cells, Kendall tau
   between the two rankings. The tools ranked by F1 is one line here. Caveats the paper states: planted calls are
   plain uses of the catalog's APIs, precision covers the decoy kinds and spurious delta reports, insertions are easier
-  than real findings (`mutation-`, `mutation-scores`, `bridge-run<k>.csv`).
+  than real findings (`mutation-`, `mutation-scores`, `bridge-run<i>.csv`).
 
 Decisions: a spec is a spec (repos, tools, repetitions, mutation) and its name says the kind (`bar-`, `stability-`,
 `corpus-`, `mutation-`; no numbers that could read as an RQ), the analysis is one code path on any spec, ground truth
@@ -337,7 +337,7 @@ where they declare support, but no analysis, figure or tuning effort goes into t
   sample of items stratified by k, two raters, Cohen's κ; a review of `vocab.csv` with κ is an option, not decided).
 - **Small open analysis items:** CryptobomForge's IBM-draft windows are CodeQL's `contextRegion` (finding ±2 lines),
   so the exact line could be read as the window centre (one over-credit on micro-python); Jaro-Winkler candidates
-  for curating the mapping table; per-field columns in `micro-run<k>.csv`; inferring `functions` from API names.
+  for curating the mapping table; per-field columns in `micro-run<i>.csv`; inferring `functions` from API names.
 - **Next:** the VM reruns above -> the verdicts into the specs by hand -> corpus-main built and pruned (enough Python repos
   that already depend on `cryptography`, for the pyca snippets) -> mutation-smoke -> the corpus-main run -> the rater
   study and mutation-main -> Phase 6. `experiments/mutation-pilot.yaml` (9 pilot-medium repos, 3 per language, every
@@ -372,7 +372,7 @@ stability run.
   (`voter_group`). The LLM workers are separate voters by default; merging them into one "LLM" voter (`--merge-llm`)
   is the sensitivity analysis, since they share prompts and file selection. The pattern-rule tools (securin-xbom,
   CipherRadar, SCANOSS) were one voter `grep-rules` until 2026-10-20; their rule sets share no rule
-  (`misc/rule_overlap.py`), so they count apart, and the `engine-merged` ranking of `grouping-run<k>.csv` shows the
+  (`misc/rule_overlap.py`), so they count apart, and the `engine-merged` ranking of `grouping-run<i>.csv` shows the
   former grouping next to `per-tool` and `llm-merged`.
 - **Blocked on access:** SCANOSS's Java/Python rules (API key) and IBM Cryptoscope (artifact), see the table above.
 
@@ -422,7 +422,7 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
     union-find let `hmac.new` merge HMAC with SHA-1 and `SHA-2` merge SHA-256 with SHA-512); a cluster whose members
     span several L4 identities is what the level declares "the same" (`units`, `multi_unit_clusters`); generic
     identities (SHA-2, EC, the bare `SHA` marker) are *attached* to the specific clusters and confirm without
-    merging; records without an L4 identity are never matched. Run at every level for `matchlevels-run<k>.csv`
+    merging; records without an L4 identity are never matched. Run at every level for `matchlevels-run<i>.csv`
     (RQ3: matcher × level); inside a group, located records are chained into call-site groups (same file, lines
     within `--window`); `--closure` adds implied memberships (attached too).
   - (c) **RaQuN** (`matchers/raqun.py`): PyQuN's n-way matching with a structured similarity (Jaccard over
@@ -449,13 +449,13 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
   EM without labels, seeded from the majority vote) and leave-one-voter-out with Kendall τ as sensitivity checks. Tailored (tool, repo) pairs are excluded (`--include-tailored`).
   Observers (`role: observer`) get rates and CIs, confirmed by the voters, but confirm nobody and get no rank; the
   rule is `common/tools_registry.py:votes` on the voter map, used by the ladder, the matchers' agreement and k, and
-  the scores; the `role` column marks them in `levels-`, `items-` and `score-run<k>.csv`.
+  the scores; the `role` column marks them in `levels-`, `items-` and `score-run<i>.csv`.
   `stability.py`: Jaccard across repeated runs and majority consensus sets (`--consensus`).
 - **Tables** (`tables.py`), flat long-format CSVs in three layers, so new matchers only add files: **runs**
   (`runs.csv`, one row per stored run with status, timing, memory, provenance, LLM usage and `cost_usd`), **records**
-  (`records-run<k>.csv`), **matches** (`groups-`, `members-`, `agreement-<matcher>-run<k>.csv`, `matchers-run<k>.csv`).
-  Plus `micro-run<k>.csv`, `micro-items-run<k>.csv`, `items-run<k>.csv`, `units-run<k>.csv` (per repository `units-repo-run<k>.csv`), `levels-run<k>.csv`, `coverage-run<k>.csv`,
-  `conformance-run<k>.csv`, the RQ1, score and stability tables. Join keys: (snapshot, variant, run, record_id) and
+  (`records-run<i>.csv`), **matches** (`groups-`, `members-`, `agreement-<matcher>-run<i>.csv`, `matchers-run<i>.csv`).
+  Plus `micro-run<i>.csv`, `micro-items-run<i>.csv`, `items-run<i>.csv`, `units-run<i>.csv` (per repository `units-repo-run<i>.csv`), `levels-run<i>.csv`, `coverage-run<i>.csv`,
+  `conformance-run<i>.csv`, the RQ1, score and stability tables. Join keys: (snapshot, variant, run, record_id) and
   (snapshot, variant, run, group_id); group ids restart per snapshot and variant. Full list: `experiments/README.md`.
 - **Report** (`analysis/report/README.md`): plot recipes on the CSVs (UpSet of tools per item, fill-rate heatmaps,
   ladder, per-tool rates with CIs, the F1 ranking of RQ4, cost per confirmed item). The figures are built by the user later with a consistent,
@@ -492,7 +492,7 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
   SHA), `decoy` and the patch (Phase 6's mutant patches). mutation-main: ~30 repos per language among the smaller
   ones of corpus-main, ~10 calls and ~10 decoys each.
 - **Ground truth from mutation** (`analysis/mutation.py`; `mutation.csv`, `mutation-rates.csv`,
-  `mutation-scores.csv`, `bridge-run<k>.csv`): per (mutant, tool) against the same tool on the original, counting
+  `mutation-scores.csv`, `bridge-run<i>.csv`): per (mutant, tool) against the same tool on the original, counting
   only new records (an original finding moved by the inserted lines is not new). A planted call: found at the site
   (the line naming the algorithm ±2), on the inserted span, in the file, in the repo (`masked` when the original
   already has the unit), leniently by group; parameters on the inserted lines. A planted decoy: `false_positive` when
@@ -517,7 +517,7 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
 - **Ground truth exists in two places:** the micro projects (full: recall, precision, F1, the bar) and the mutants
   (planted calls and decoys: recall, precision and F1 on known items in real code). Everything else is agreement
   without ground truth. The rater study is not a spec: a hand-labelled sample drawn from the corpus run's
-  `items-run<k>.csv`, stratified by k, two raters, Cohen's κ, precision per k; the k = 1 stratum is the "right alone"
+  `items-run<i>.csv`, stratified by k, two raters, Cohen's κ, precision per k; the k = 1 stratum is the "right alone"
   check.
 - **The runs:** `bar-micro` (every tool once on the three micro projects: the verdicts; the bar-exam table shows all
   15 tools), `stability-pilot` (every tool 3× on the micro projects and ten small pilot repos:

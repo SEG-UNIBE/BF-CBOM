@@ -288,7 +288,7 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert re.search(r"^\| all \| ([\d']+) \|", per_language, flags=re.M).group(1) == exact[-1]["items"]
     # the record names one repository per language without a size: the folded table, one column per language
     assert "| Java (1) |\n| --- |\n| [bfcbom/micro-java](https://github.com/bfcbom/micro-java) |" in summary
-    assert "Per repository (`units-repo-run<k>.csv`)" in summary
+    assert "Per repository (`units-repo-run<i>.csv`)" in summary
     meaningful = summary.index("### Meaningful")
     assert meaningful < summary.index("#### Asset type `algorithm`", meaningful) < summary.index("### Traceable")
     assert "**RQ3 Agreement**" in summary[summary.index("## Files") :]  # files by question

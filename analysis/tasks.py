@@ -20,7 +20,7 @@ from analysis.normalize import normalize_cbom
 from analysis.normalize.record import NormalizedCbom, NormRecord
 from common.tools_registry import VoterMap
 
-# (meta, cbom path, tool, language, the snapshot's files or None, write run<k>.norm.json)
+# (meta, cbom path, tool, language, the snapshot's files or None, write run<i>.norm.json)
 NormalizeItem = tuple[dict, Path, str, str | None, frozenset[str] | None, bool]
 # (meta, cbom path, language, cbom_by)
 SchemaItem = tuple[dict, Path, str | None, str | None]
@@ -41,7 +41,7 @@ def write_json(path: Path, data, *, sort_keys: bool = False) -> None:
 
 
 def norm_path(cbom_path: Path) -> Path:
-    """`run<k>.json` -> `run<k>.norm.json` (the normalised CBOM sits next to the original)."""
+    """`run<i>.json` -> `run<i>.norm.json` (the normalised CBOM sits next to the original)."""
     return cbom_path.with_name(cbom_path.name[: -len(".json")] + ".norm.json")
 
 

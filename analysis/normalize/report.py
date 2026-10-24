@@ -2,7 +2,7 @@
 
 `normalize.json` (every run): per tool what was read (formats declared, records, asset types), where the values came
 from (standard field, tool property, occurrence, name, API context, ...), spec issues by kind, conflicts and the top
-unmapped values. `coverage_rows` and `conformance_rows` (one run, `coverage-run<k>.csv`, `conformance-run<k>.csv`):
+unmapped values. `coverage_rows` and `conformance_rows` (one run, `coverage-run<i>.csv`, `conformance-run<i>.csv`):
 how complete the algorithm assets are per dimension (reported by the tool vs derived by us), what their names
 resolve to, and the spec issues.
 
@@ -179,7 +179,7 @@ class Report:
         """Fill rates of the algorithm assets, long format: one row per (tool, dimension). `reported` counts assets
         with a value the tool gave (any source but derivation), `derived` assets with only a value we derived (key
         size from the curve, ...). `assets` and the assets per resolution (RESOLUTIONS) repeat on every row of a
-        tool; how the assets split into records and items is units-run<k>.csv (analysis/tables.py:unit_rows)."""
+        tool; how the assets split into records and items is units-run<i>.csv (analysis/tables.py:unit_rows)."""
         rows = []
         for tool, t in sorted(self.tools.items()):
             assets = t["counts"]["algorithm_assets"]

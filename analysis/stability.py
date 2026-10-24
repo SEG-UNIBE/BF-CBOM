@@ -4,7 +4,7 @@ For every (tool, snapshot, variant) with at least two stored ok runs: the Jaccar
 (identity at a ladder level, `analysis/levels.py`) between runs, the coefficient of variation of the record count,
 and the consensus set: the items (L4 identity, as in the ladder and the scores) present in more than half of the runs
 (an inserted snippet of Phase 4 counts as detected only when it is in most runs). Scoring uses the
-consensus sets instead of run k's sets when repetitions exceed one (`--consensus`, the default then).
+consensus sets instead of run i's sets when repetitions exceed one (`--consensus`, the default then).
 """
 
 from __future__ import annotations

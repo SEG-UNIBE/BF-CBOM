@@ -461,7 +461,7 @@ def score_rows(rows: list[dict], *, samples: int = 200, seed: int = BOOTSTRAP_SE
 
 
 def bridge_rows(confirmation: dict[tuple[str, str], float], scores: list[dict]) -> list[dict]:
-    """bridge-run<k>.csv (RQ4's bridge to RQ3, refinement 9): per language and over all cells, a tool's confirmation
+    """bridge-run<i>.csv (RQ4's bridge to RQ3, refinement 9): per language and over all cells, a tool's confirmation
     rate (RQ3b, the exact matcher at L4 on the experiment's original repositories of that language) against its F1 on
     the planted items (style `all`): the cells, then per language and `all` the Spearman correlation over the cells
     and Kendall's tau between the two rankings (`tool` = `all`; empty with fewer than three cells)."""

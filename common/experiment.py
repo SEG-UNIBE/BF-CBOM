@@ -12,8 +12,8 @@ Layout of one experiment (under RESULTS_DIR):
       _run-log.json            one entry per `experiment run` session: times, host RAM/CPUs, budget, waves, peak RAM
       _ANALYSIS/               derived tables and _SUMMARY.md (`analysis report`; regenerated, never input)
       mutants.json             with a `mutation:` block: every mutant (snippet, style, host, lines, inserts, patch)
-      <owner>__<repo>@<sha12>/<variant>/<tool>/run<k>.json        the CBOM
-      <owner>__<repo>@<sha12>/<variant>/<tool>/run<k>.meta.json   JobResult without the CBOM body
+      <owner>__<repo>@<sha12>/<variant>/<tool>/run<i>.json        the CBOM
+      <owner>__<repo>@<sha12>/<variant>/<tool>/run<i>.meta.json   JobResult without the CBOM body
 
 On the git server (GIT_MIRROR_DIR): `<owner>/<repo>.git` is the base mirror, `<owner>/<repo>--<sha12>.git`
 the per-snapshot repo workers actually scan (HEAD = snapshot branch, objects shared via alternates).
@@ -764,8 +764,8 @@ def plan_jobs(
     skipped = 0
     for snap in snapshots:
         for tool in spec.tools:
-            for k in range(1, spec.repetitions + 1):
-                cbom, meta = result_paths(exp_dir, snap.full_name, snap.commit, snap.variant, tool, k)
+            for i in range(1, spec.repetitions + 1):
+                cbom, meta = result_paths(exp_dir, snap.full_name, snap.commit, snap.variant, tool, i)
                 if meta.exists():
                     status = _stored_status(meta)
                     redo = (retry_failed and status not in ("ok", UNSUPPORTED)) or (
@@ -776,8 +776,8 @@ def plan_jobs(
                         continue
                     meta.unlink()
                     cbom.unlink(missing_ok=True)
-                    cbom.with_name(f"run{k}.norm.json").unlink(missing_ok=True)  # `analysis normalize`'s output
-                jobs.append(PlannedJob(job_id=new_id(), snapshot=snap, tool=tool, run_index=k))
+                    cbom.with_name(f"run{i}.norm.json").unlink(missing_ok=True)  # `analysis normalize`'s output
+                jobs.append(PlannedJob(job_id=new_id(), snapshot=snap, tool=tool, run_index=i))
     return jobs, skipped
 
 
@@ -790,7 +790,7 @@ def mark_unsupported(
     """Record (tool, repo) pairs outside the tool's language scope (common/tools.yaml `languages`, narrowed further
     by the spec's `tool_languages` for that tool, if given).
 
-    Writes a `run<k>.meta.json` with status `unsupported` and no CBOM for every repetition that has no stored
+    Writes a `run<i>.meta.json` with status `unsupported` and no CBOM for every repetition that has no stored
     run yet, so `plan_jobs` skips them (also with --retry-failed) and `summarize` counts them. Returns the
     (tool, full_name) pairs recorded this time.
     """
@@ -826,7 +826,7 @@ def mark_unsupported(
 
 
 def write_result(exp_dir: Path, job: PlannedJob, result: JobResult) -> Path:
-    """Persist one JobResult: the CBOM body as run<k>.json (pretty, sorted) and everything else as meta."""
+    """Persist one JobResult: the CBOM body as run<i>.json (pretty, sorted) and everything else as meta."""
     cbom_path, meta_path = job.paths(exp_dir)
     cbom_path.parent.mkdir(parents=True, exist_ok=True)
     body = result.json or "{}"

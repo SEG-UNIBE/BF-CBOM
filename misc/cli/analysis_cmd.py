@@ -2,8 +2,8 @@
 
 Reads RESULTS_DIR/<exp>/... written by `bf-cbom experiment run` and writes derived data next to
 it under RESULTS_DIR/<exp>/_ANALYSIS/: JSON reports (`micro`, `normalize`) and flat CSV tables (`tables`, `levels`,
-`schema`, see analysis/tables.py). `normalize` also writes the normalised CBOM `run<k>.norm.json` next to each stored
-`run<k>.json`. `report` does all of it in one pass and adds `_SUMMARY.md` (analysis/summary.py); `experiment export`
+`schema`, see analysis/tables.py). `normalize` also writes the normalised CBOM `run<i>.norm.json` next to each stored
+`run<i>.json`. `report` does all of it in one pass and adds `_SUMMARY.md` (analysis/summary.py); `experiment export`
 runs it first. Everything stays on the results-data volume; use `experiment export` to get it out.
 """
 
@@ -60,13 +60,13 @@ from common.tools_registry import VoterMap, load_tools, role, tailored_map, vote
 from misc.cli import progress
 from misc.cli.parallel import pmap
 
-# (meta, path of run<k>.json, its normalised CBOM)
+# (meta, path of run<i>.json, its normalised CBOM)
 Normalized = tuple[dict, Path, NormalizedCbom]
 Writer = Callable[[str, list[dict], list[str]], None]
 
 
 def _label(x: tuple) -> str:
-    """The run an item of a step is about, for the progress line: `<owner>/<repo>[@variant] · <tool> · run<k>`."""
+    """The run an item of a step is about, for the progress line: `<owner>/<repo>[@variant] · <tool> · run<i>`."""
     cbom_path = x[1]
     variant = cbom_path.parents[1].name
     where = tbl.full_name(cbom_path.parents[2].name) + ("" if variant == ORIGINAL_VARIANT else f"@{variant}")
@@ -89,7 +89,7 @@ analysis_app = typer.Typer(
 )
 
 EXP_ARG = typer.Argument(..., help="Experiment name (directory under RESULTS_DIR)")
-RUN_OPT = typer.Option(1, "--run", help="Which repetition to analyse (run<k>.json)")
+RUN_OPT = typer.Option(1, "--run", help="Which repetition to analyse (run<i>.json)")
 ALL_ASSETS_OPT = typer.Option(False, "--all-assets", help="Keep non-algorithm assets (keys, certificates, protocols)")
 MERGE_LLM_OPT = typer.Option(
     False, "--merge-llm", help="Count every LLM worker as one voter (tools.yaml merge_group; sensitivity analysis)"
@@ -98,7 +98,7 @@ CLOSURE_OPT = typer.Option(
     False,
     "--closure",
     help="Close every tool's algorithm set under the vocabulary's `implies` relation (refinement 2): the ladder and "
-    "items-run<k>.csv (implied rows marked) count HMAC-SHA256 as HMAC and SHA-256 for every tool",
+    "items-run<i>.csv (implied rows marked) count HMAC-SHA256 as HMAC and SHA-256 for every tool",
 )
 RAQUN_OPT = typer.Option(
     None,
@@ -111,7 +111,7 @@ CONSENSUS_OPT = typer.Option(
     True,
     "--consensus/--no-consensus",
     help="With repeated runs, score a tool's consensus set (items in more than half of its runs) instead of "
-    "run k's set (analysis/stability.py)",
+    "run i's set (analysis/stability.py)",
 )
 FETCH_OPT = typer.Option(
     False,
@@ -324,7 +324,7 @@ def _normalize_runs(
 ) -> list[Normalized]:
     """(meta, cbom path, NormalizedCbom) for every stored ok CBOM (all repetitions, or only `run`) of the original
     snapshots, with `mutants` also of the mutants, in the stored order. One CBOM per task in a process pool (`jobs`,
-    misc/cli/parallel.py; analysis/tasks.py:normalize_one); with `write_norm` the worker also writes run<k>.norm.json
+    misc/cli/parallel.py; analysis/tasks.py:normalize_one); with `write_norm` the worker also writes run<i>.norm.json
     next to its CBOM. The snapshot's file list comes from the store here, once per snapshot."""
     languages = _languages(exp_dir)
     store = store or SnapshotStore()
@@ -355,11 +355,11 @@ def _normalize_runs(
     return done
 
 
-BIG_TABLE_ROWS = 50_000  # a table this long (about a second of writing for records-run<k>.csv) gets a line
+BIG_TABLE_ROWS = 50_000  # a table this long (about a second of writing for records-run<i>.csv) gets a line
 
 
 def _writer(out_dir: Path, counts: dict[str, int]) -> Writer:
-    """A CSV writer into `out_dir` that records row counts (for tables-run<k>.json) and echoes them; a big table
+    """A CSV writer into `out_dir` that records row counts (for tables-run<i>.json) and echoes them; a big table
     is written on a counted line of its own instead, which also says its rows."""
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -376,10 +376,10 @@ def _writer(out_dir: Path, counts: dict[str, int]) -> Writer:
 def _normalize_step(
     exp_dir: Path, write: Writer, *, store: SnapshotStore | None = None, jobs: int = 0
 ) -> tuple[Report, list[Normalized]]:
-    """Normalise every stored ok CBOM (all repetitions, mutants included): run<k>.norm.json next to each, and over
+    """Normalise every stored ok CBOM (all repetitions, mutants included): run<i>.norm.json next to each, and over
     the original variants of every repetition normalize.json (the normaliser's diagnostics) and vocab.csv (the
     mapping table: every spelling any run used; a mutated repository would count once per mutant). The per-run
-    tables of what the tools' assets hold (coverage-run<k>.csv, conformance-run<k>.csv) are `_tables_step`'s.
+    tables of what the tools' assets hold (coverage-run<i>.csv, conformance-run<i>.csv) are `_tables_step`'s.
     Returns the report and the normalised CBOMs."""
     report = Report()
     done: list[Normalized] = []
@@ -404,8 +404,8 @@ def _normalize_step(
 def _schema_step(
     exp_dir: Path, run: int, normalized: list[Normalized], write: Writer, *, store: SnapshotStore, jobs: int = 0
 ):
-    """RQ1 (analysis/schema.py): schema-run<k>.csv (whole-document validation, one CBOM per task in the process pool),
-    meaningful-run<k>.csv and traceability-run<k>.csv (needs the snapshot files: the mirror on the VM or `--fetch`)."""
+    """RQ1 (analysis/schema.py): schema-run<i>.csv (whole-document validation, one CBOM per task in the process pool),
+    meaningful-run<i>.csv and traceability-run<i>.csv (needs the snapshot files: the mirror on the VM or `--fetch`)."""
     languages = _languages(exp_dir)
     cbom_by = {t: info.get("cbom_by") for t, info in load_tools().items()}
     items: list[tasks.SchemaItem] = [
@@ -465,8 +465,8 @@ def _levels_step(
     include_tailored: bool = False,
     closure: bool = False,
 ) -> list[lv.LevelRow]:
-    """The L0-L4 ladder (levels-run<k>.csv) and which items each tool reports (items-run<k>.csv).
-    (tool, repo) pairs the tool was tuned on (refinement 13) are marked in items-run<k>.csv and left out of
+    """The L0-L4 ladder (levels-run<i>.csv) and which items each tool reports (items-run<i>.csv).
+    (tool, repo) pairs the tool was tuned on (refinement 13) are marked in items-run<i>.csv and left out of
     the ladder unless `include_tailored`; `closure` adds the implied items (refinement 2)."""
     ladder_in: dict[tuple[str, str], list] = {}
     presence_in: dict[tuple[str, str, str], list] = {}
@@ -552,7 +552,7 @@ def _tables_step(
             per_run.add(n)
         write(f"coverage-run{run}.csv", per_run.coverage_rows(), COVERAGE_COLUMNS)
         write(f"conformance-run{run}.csv", per_run.conformance_rows(), CONFORMANCE_COLUMNS)
-    # both matchers at every level, one repository per task, feed matchlevels-run<k>.csv (RQ3, matcher x level); the
+    # both matchers at every level, one repository per task, feed matchlevels-run<i>.csv (RQ3, matcher x level); the
     # full group, member and agreement tables are written at the scoring level only
     with progress.step("matcher input"):  # the records per repository; PyQuN's import
         per_snapshot = _match_input(normalized, include_tailored)
@@ -580,9 +580,9 @@ def _match_step(
     voter_of: VoterMap, level: str, raqun: bool, commits: dict, languages: dict, jobs: int,
 ) -> tuple[dict[tuple[str, str], list], list[dict]]:  # fmt: skip
     """Both matchers at every level, one repository per task (analysis/tasks.py:match_snapshot, in the process pool):
-    groups/members/agreement-exact-run<k>.csv at the scoring level and, with RaQuN, the same -raqun tables and
-    matchers-run<k>.csv (RaQuN vs the exact matcher per repository and level, with each matcher's seconds there) and
-    raqun-<level>-run<k>.csv (RaQuN's groups to read, one column per tool). Returns the exact matcher's groups at
+    groups/members/agreement-exact-run<i>.csv at the scoring level and, with RaQuN, the same -raqun tables and
+    matchers-run<i>.csv (RaQuN vs the exact matcher per repository and level, with each matcher's seconds there) and
+    raqun-<level>-run<i>.csv (RaQuN's groups to read, one column per tool). Returns the exact matcher's groups at
     the scoring level and the matchlevels rows (exact per level, then RaQuN per level, each with the matcher's
     seconds summed over the repositories)."""
     keys = list(per_snapshot)  # sorted by _match_input; every table below follows this order
@@ -661,7 +661,7 @@ def _mutation_step(
 ) -> None:  # fmt: skip
     """RQ4 (analysis/mutation.py), for an experiment with mutants (mutants.json): mutants.csv, mutation.csv (one row
     per mutant and tool, majority over the repetitions), mutation-rates.csv, mutation-scores.csv (recall, precision,
-    F1 on the planted calls and decoys) and, with the scores' observations, bridge-run<k>.csv (RQ3b's confirmation
+    F1 on the planted calls and decoys) and, with the scores' observations, bridge-run<i>.csv (RQ3b's confirmation
     rate per language against F1)."""
     manifest = load_mutants(exp_dir)
     if not manifest.get("repos"):
@@ -731,9 +731,9 @@ def _score_step(
     samples: int,
     consensus: dict[tuple[str, str, str], set[str]] | None = None,
 ) -> sc.Observations:
-    """score-run<k>.csv, loo-run<k>.csv and grouping-run<k>.csv (analysis/score.py) from the exact matcher's groups;
+    """score-run<i>.csv, loo-run<i>.csv and grouping-run<i>.csv (analysis/score.py) from the exact matcher's groups;
     returns the observations under the declared voter groups (the bridge of the mutation step reads them).
-    grouping-run<k>.csv ranks the tools again with every tool its own voter group, with the LLM workers merged and
+    grouping-run<i>.csv ranks the tools again with every tool its own voter group, with the LLM workers merged and
     with the tools of one pattern engine family merged (the sensitivity checks of the declared voter groups;
     observers stay observers)."""
     voter_of = _voter_of(merge_llm, observers_vote)
@@ -819,7 +819,7 @@ def score_cmd(
 def _write_info(
     out_dir: Path, run: int, settings: dict, counts: dict[str, int], normalized: list[Normalized], voter_of: VoterMap
 ):
-    """tables-run<k>.json: settings, row counts, the vocabulary and adapter spec versions used, and the voter map the
+    """tables-run<i>.json: settings, row counts, the vocabulary and adapter spec versions used, and the voter map the
     numbers rest on (each spec tool's voter group, role and engine, after --merge-llm / --observers-vote)."""
     vocabulary = next((n.vocabulary for _, _, n in normalized), {})
     adapters = {n.tool: n.adapter.get("spec") for _, _, n in normalized}
@@ -843,7 +843,7 @@ def _write_info(
 def normalize(name: str = EXP_ARG, jobs: int = JOBS_OPT):
     """Normalise every stored CBOM with its tool's adapter spec (analysis/adapters/<tool>.yaml).
 
-    Writes run<k>.norm.json next to each run<k>.json, _ANALYSIS/normalize.json (per tool over every run: what was
+    Writes run<i>.norm.json next to each run<i>.json, _ANALYSIS/normalize.json (per tool over every run: what was
     read, value sources, spec issues, conflicts, unmapped values) and _ANALYSIS/vocab.csv (what every raw value
     mapped to). The per-run fill and conformance tables come with `tables` and `report`.
     """
@@ -853,7 +853,7 @@ def normalize(name: str = EXP_ARG, jobs: int = JOBS_OPT):
     typer.echo("algorithm assets (original variants, every run): mapped to an algorithm, with a value the tool gave:")
     for line in report.summary_lines():
         typer.echo("  " + line)
-    typer.echo(f"{len(done)} CBOMs normalised (run<k>.norm.json next to each), in {analysis_dir(exp_dir)}")
+    typer.echo(f"{len(done)} CBOMs normalised (run<i>.norm.json next to each), in {analysis_dir(exp_dir)}")
 
 
 @analysis_app.command("levels")
@@ -868,7 +868,7 @@ def levels(
 ):
     """How much agreement normalisation creates: share of each tool's items (per repository) that another
     voter group also reports, at levels L0 (raw names) to L4 (full adapter specs). See analysis/levels.py.
-    Also writes items-run<k>.csv: which items each tool reports per repository and level."""
+    Also writes items-run<i>.csv: which items each tool reports per repository and level."""
     exp_dir = _experiment(name)
     counts: dict[str, int] = {}
     rows = _levels_step(
@@ -1041,7 +1041,7 @@ def report(
     """Everything in one pass: normalised CBOMs, every CSV table (runs, records, RQ1 schema/meaningful/traceability,
     the exact matcher's groups/members/agreement, scores and leave-one-out, stability, micro at two levels,
     items per tool and level, ladder, coverage, conformance; with mutants the RQ4 tables mutants.csv,
-    mutation.csv, mutation-rates.csv, mutation-scores.csv and bridge-run<k>.csv,
+    mutation.csv, mutation-rates.csv, mutation-scores.csv and bridge-run<i>.csv,
     the agreement tables on the originals only) and _ANALYSIS/_SUMMARY.md with
     Markdown tables."""
     exp_dir = _experiment(name)

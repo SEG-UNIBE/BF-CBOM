@@ -1,6 +1,6 @@
 """_SUMMARY.md: Markdown tables of one experiment for a first look, e.g. in an exported zip (CLAUDE.md, Phase 3).
 
-Rendered only from what `analysis report` writes into `<exp>/_ANALYSIS/` (the CSV tables and `tables-run<k>.json`)
+Rendered only from what `analysis report` writes into `<exp>/_ANALYSIS/` (the CSV tables and `tables-run<i>.json`)
 plus the stored spec and run log (`_experiment.yaml`, `_run-log.json`), so it can be rebuilt from an export
 (`python -m analysis.summary <exp>/_ANALYSIS`) and never shows anything those files don't hold. The CSVs are the data
 for plots; this file is for reading.
@@ -36,45 +36,45 @@ FILES = {
     "runtime.csv": "per tool and language (and all): repositories, median seconds with a bootstrap CI over "
     "repositories, p90, max, spread across repositories and between reruns, timeouts, hours, seconds per 1k "
     "source files and Spearman against size",
-    "records-run{k}.csv": "one row per normalised record: every dimension with its raw value and source",
-    "micro-run{k}.csv": "one row per (micro project, tool): status, verdict, recall at call sites and repo level",
-    "micro-items-run{k}.csv": "one row per (micro project, tool, expected item): found at call site (strict, "
+    "records-run{i}.csv": "one row per normalised record: every dimension with its raw value and source",
+    "micro-run{i}.csv": "one row per (micro project, tool): status, verdict, recall at call sites and repo level",
+    "micro-items-run{i}.csv": "one row per (micro project, tool, expected item): found at call site (strict, "
     "lenient), repo",
-    "items-run{k}.csv": "one row per (repo, tool, item) with the voter groups matching it at each level L0-L4; no "
+    "items-run{i}.csv": "one row per (repo, tool, item) with the voter groups matching it at each level L0-L4; no "
     "locations",
-    "levels-run{k}.csv": "share of each tool's items another voter group confirms, per level L0-L4",
-    "units-run{k}.csv": "per tool: algorithm assets, records, items and how they relate (records per asset, assets "
+    "levels-run{i}.csv": "share of each tool's items another voter group confirms, per level L0-L4",
+    "units-run{i}.csv": "per tool: algorithm assets, records, items and how they relate (records per asset, assets "
     "per item), the kinds of place and the records outside code files of the repository's language",
-    "units-repo-run{k}.csv": "per (tool, repo): algorithm assets, records, items",
-    "coverage-run{k}.csv": "per tool and dimension: algorithm assets with a value (reported vs derived), and what "
+    "units-repo-run{i}.csv": "per (tool, repo): algorithm assets, records, items",
+    "coverage-run{i}.csv": "per tool and dimension: algorithm assets with a value (reported vs derived), and what "
     "their names are (resolution)",
-    "conformance-run{k}.csv": "spec issues per tool and kind (assets: field, enum, type, deprecated; documents)",
-    "schema-run{k}.csv": "one row per CBOM: declared format and version, schema validity, error count and kinds",
-    "meaningful-run{k}.csv": "per tool, asset type and dimension, assets with a value from standard fields / any",
-    "traceability-run{k}.csv": "per (snapshot, tool, asset type), records with a file, with a file and line, "
+    "conformance-run{i}.csv": "spec issues per tool and kind (assets: field, enum, type, deprecated; documents)",
+    "schema-run{i}.csv": "one row per CBOM: declared format and version, schema validity, error count and kinds",
+    "meaningful-run{i}.csv": "per tool, asset type and dimension, assets with a value from standard fields / any",
+    "traceability-run{i}.csv": "per (snapshot, tool, asset type), records with a file, with a file and line, "
     "existing at the commit, in range, strong",
     "vocab.csv": "what every raw value mapped to, per tool and source (the reviewable mapping table)",
-    "groups-exact-run{k}.csv": "exact matcher: one row per group (repo scope per item, site scope per call site; "
+    "groups-exact-run{i}.csv": "exact matcher: one row per group (repo scope per item, site scope per call site; "
     "`member_voter_groups` = 0: no voter's own record, no item)",
-    "members-exact-run{k}.csv": "exact matcher: one row per (group, record); `matched` = joined through a lower "
+    "members-exact-run{i}.csv": "exact matcher: one row per (group, record); `matched` = joined through a lower "
     "level, `implied` with --closure",
-    "matchlevels-run{k}.csv": "per matcher and level, items by number of voter groups, the agreement per "
+    "matchlevels-run{i}.csv": "per matcher and level, items by number of voter groups, the agreement per "
     "dimension inside the groups and the matcher's seconds",
-    "agreement-exact-run{k}.csv": "exact matcher: one row per (group, dimension): voters reporting, agreeing, majority",
-    "groups-raqun-run{k}.csv": "RaQuN: one row per group, with its attribute-set similarity",
+    "agreement-exact-run{i}.csv": "exact matcher: one row per (group, dimension): voters reporting, agreeing, majority",
+    "groups-raqun-run{i}.csv": "RaQuN: one row per group, with its attribute-set similarity",
     **{
-        f"raqun-{lv}-run{{k}}.csv": f"RaQuN at {lv}, to read: one row per group, per tool the names it reported, the "
+        f"raqun-{lv}-run{{i}}.csv": f"RaQuN at {lv}, to read: one row per group, per tool the names it reported, the "
         "attributes matched and the records behind them"
         for lv in LEVEL_ORDER
     },
-    "members-raqun-run{k}.csv": "RaQuN: one row per (group, record)",
-    "agreement-raqun-run{k}.csv": "RaQuN: one row per (group, dimension)",
-    "matchers-run{k}.csv": "per repository and level, exact vs RaQuN: common records, groups, co-membership pair "
+    "members-raqun-run{i}.csv": "RaQuN: one row per (group, record)",
+    "agreement-raqun-run{i}.csv": "RaQuN: one row per (group, dimension)",
+    "matchers-run{i}.csv": "per repository and level, exact vs RaQuN: common records, groups, co-membership pair "
     "Jaccard, each matcher's seconds",
-    "score-run{k}.csv": "per tool, dimension and level: items, confirmation (CI), exclusivity, coverage, rank, "
+    "score-run{i}.csv": "per tool, dimension and level: items, confirmation (CI), exclusivity, coverage, rank, "
     "Dawid-Skene",
-    "loo-run{k}.csv": "the order without each voter group and its Kendall tau against the full order",
-    "grouping-run{k}.csv": "the order with every tool its own voter group and with the LLM workers merged, and its "
+    "loo-run{i}.csv": "the order without each voter group and its Kendall tau against the full order",
+    "grouping-run{i}.csv": "the order with every tool its own voter group and with the LLM workers merged, and its "
     "Kendall tau against the declared voter groups",
     "stability.csv": "per (tool, snapshot) with repeated runs: Jaccard across runs, record-count CV, consensus set",
     "mutants.csv": "one row per mutant (mutants.json): the planted call or decoy, its file, lines, host and patch",
@@ -83,7 +83,7 @@ FILES = {
     "mutation-rates.csv": "per tool, language, style and dimension: detection rate (mean of per-repository rates, CI)",
     "mutation-scores.csv": "per tool, language and style: recall on the planted calls (site, group), precision over "
     "calls and decoys, F1, CIs over repositories",
-    "bridge-run{k}.csv": "the bridge to RQ3: per language, each tool's confirmation rate at L4 against its F1; "
+    "bridge-run{i}.csv": "the bridge to RQ3: per language, each tool's confirmation rate at L4 against its F1; "
     "Spearman over the cells and Kendall tau between the rankings",
 }
 
@@ -275,7 +275,7 @@ def _questions() -> list[str]:
     """The research questions (analysis/rqs.py), so the summary carries its own frame."""
     lines = ["### Research questions", "", "The sections below answer, in this order:", ""]
     for rq in RQS:
-        tables = ", ".join(f"`{t.replace('{k}', '<k>')}`" for t in rq.tables)
+        tables = ", ".join(f"`{t.replace('{i}', '<i>')}`" for t in rq.tables)
         lines.append(f"- **{rq.id}, {rq.title.lower()}:** {rq.question} ({tables})")
     return lines + ["", BAR_EXAM_NOTE + " " + STABILITY_NOTE, ""]
 
@@ -841,7 +841,7 @@ def _handover(rows: list[dict], tools: list[str], langs: list[str]) -> list[str]
 
 
 def _quality(cells: dict, langs: list[str], tools: list[str]) -> list[str]:
-    """Recall, precision and F1 of every scored (tool, micro project) (micro-run<k>.csv)."""
+    """Recall, precision and F1 of every scored (tool, micro project) (micro-run<i>.csv)."""
 
     def cell(r: dict | None) -> str:
         if r is None or r["verdict"] not in ("pass", "fail"):
@@ -875,7 +875,7 @@ def _quality(cells: dict, langs: list[str], tools: list[str]) -> list[str]:
 
 
 def _decoys(rows: list[dict], langs: list[str], tools: list[str]) -> list[str]:
-    """False positives with ground truth: the micro projects' decoys a tool reported crypto on (micro-run<k>.csv)."""
+    """False positives with ground truth: the micro projects' decoys a tool reported crypto on (micro-run<i>.csv)."""
     if not any(_int(r.get("decoys")) for r in rows):
         return []
     cells = {(r["tool"], r["language"]): r for r in rows}
@@ -927,7 +927,7 @@ LOCATION_KINDS = ("line", "window", "import", "file", "none", "unread")  # analy
 
 
 def _places(units: list[dict]) -> list[str]:
-    """What kind of place each tool's algorithm records name (units-run<k>.csv `loc_<kind>`)."""
+    """What kind of place each tool's algorithm records name (units-run<i>.csv `loc_<kind>`)."""
     if not units or f"loc_{LOCATION_KINDS[0]}" not in units[0]:
         return []
     table = []
@@ -965,7 +965,7 @@ def _places(units: list[dict]) -> list[str]:
 
 
 def _units_per_repo(unit_repos: list[dict]) -> list[str]:
-    """Each tool's assets / records / items per repository (units-repo-run<k>.csv), with the sums of the units table."""
+    """Each tool's assets / records / items per repository (units-repo-run<i>.csv), with the sums of the units table."""
     if not unit_repos:
         return []
     roles = {r["tool"]: r.get("role") for r in unit_repos}
@@ -982,7 +982,7 @@ def _units_per_repo(unit_repos: list[dict]) -> list[str]:
     totals = {t: {k: sum(_int(r[k]) for r in unit_repos if r["tool"] == t) for k in counts} for t in tools}
     matrix.append(["all", ""] + [cell(totals[t]) for t in tools])
     lines = [
-        "Per repository (`units-repo-run<k>.csv`), one row per repository, one column per tool: `algorithm assets / "
+        "Per repository (`units-repo-run<i>.csv`), one row per repository, one column per tool: `algorithm assets / "
         "records / items` of the tool's CBOM there; empty = no ok run (the RQ2 table above says why), `all` sums "
         "each column. The matchers, the ladder and the scores compare the items one repository at a time.",
         "",
@@ -1009,9 +1009,9 @@ def _rq2(
     trace: list[dict],
     runtime: list[dict] | None = None,
 ) -> list[str]:
-    """RQ2: what the tools wrote (as written), how each packages its findings (units-run<k>.csv, per repository
-    units-repo-run<k>.csv), what its assets' names are and which values they carry (coverage-run<k>.csv), and whether
-    its locations lead to real code (traceability-run<k>.csv); one run of the original variants throughout. Last,
+    """RQ2: what the tools wrote (as written), how each packages its findings (units-run<i>.csv, per repository
+    units-repo-run<i>.csv), what its assets' names are and which values they carry (coverage-run<i>.csv), and whether
+    its locations lead to real code (traceability-run<i>.csv); one run of the original variants throughout. Last,
     what a scan costs (runtime.csv: every run of every variant)."""
     if not reported and not units and not cov and not trace and not runtime:
         return []
@@ -1039,7 +1039,7 @@ def _rq2(
         lines += [
             "### Units per tool",
             "",
-            "How each tool packages its findings: one row per tool (`units-run<k>.csv`), summed over the repositories.",
+            "How each tool packages its findings: one row per tool (`units-run<i>.csv`), summed over the repositories.",
             "",
             "- `CBOMs`: ok runs read; `algorithm assets`: its components of asset type `algorithm` (the `algorithm` "
             "column above), not every crypto asset: certificates, protocols and key material are no algorithms and "
@@ -1079,7 +1079,7 @@ def _rq2(
         lines += [
             "### Names and values",
             "",
-            "One row per tool (`coverage-run<k>.csv`); every share "
+            "One row per tool (`coverage-run<i>.csv`); every share "
             "is of its `algorithm assets`, as a reader of its CBOM finds them (a tool that writes one component per "
             "finding weighs an often-found algorithm more; the ladder and the scores compare per item instead).",
             "",
@@ -1169,7 +1169,7 @@ def _runtime(rows: list[dict]) -> list[str]:
 
 
 def _spec_issues(conf: list[dict], tools: list[str]) -> list[str]:
-    """Standard-field values the declared CycloneDX version does not allow (conformance-run<k>.csv); `none` for a
+    """Standard-field values the declared CycloneDX version does not allow (conformance-run<i>.csv); `none` for a
     tool without any is a finding too, so the table always shows every tool."""
     if not tools and not conf:
         return []
@@ -1298,7 +1298,7 @@ def _rq1(schema: list[dict], meaningful: list[dict], conf: list[dict]) -> list[s
 
 
 def _traceability(trace: list[dict]) -> list[str]:
-    """RQ2: can a reader follow a record to the code it describes? (traceability-run<k>.csv)"""
+    """RQ2: can a reader follow a record to the code it describes? (traceability-run<i>.csv)"""
     if not trace:
         return []
     lines: list[str] = []
@@ -1479,7 +1479,7 @@ def _matching(levels: list[dict], groups: list[dict], matchers: list[dict]) -> l
 
 
 def _timing(levels: list[dict]) -> list[str]:
-    """The matchers' wall time per level, summed over the repositories (`seconds` in matchlevels-run<k>.csv)."""
+    """The matchers' wall time per level, summed over the repositories (`seconds` in matchlevels-run<i>.csv)."""
     by = {(r["matcher"], r["level"]): _float(r.get("seconds")) for r in levels}
     names = {"exact": "exact matcher", "raqun": "RaQuN"}
     matchers = [m for m in names if any(by.get((m, lv)) is not None for lv in LEVEL_ORDER)]
@@ -1500,7 +1500,7 @@ def _timing(levels: list[dict]) -> list[str]:
 
 def _headline(levels: list[dict]) -> list[str]:
     """RQ3b's headline: the share of items at least two voter groups agree on at the top level, the exact matcher on
-    the algorithm; RaQuN's share on whole findings follows as the cross-check (matchlevels-run<k>.csv)."""
+    the algorithm; RaQuN's share on whole findings follows as the cross-check (matchlevels-run<i>.csv)."""
     top = {r["matcher"]: r for r in levels if r["level"] == LEVEL_ORDER[-1] and _int(r["items"])}
     if "exact" not in top:
         return []
@@ -1630,7 +1630,7 @@ def _scores(rows: list[dict], loo: list[dict], grouping: list[dict] | None = Non
 
 
 def _groupings(rows: list[dict]) -> list[str]:
-    """The ranking under other voter groupings (grouping-run<k>.csv): the sensitivity check of the voter groups."""
+    """The ranking under other voter groupings (grouping-run<i>.csv): the sensitivity check of the voter groups."""
     others = [r for r in rows if r["grouping"] != "declared"]
     if not others:
         return []
@@ -1652,7 +1652,7 @@ def _groupings(rows: list[dict]) -> list[str]:
         "has. `per-tool`: every tool its own voter (tools sharing their detection logic then confirm each other); "
         "`llm-merged`: the LLM workers as one voter; `engine-merged`: the tools of one pattern engine family as one "
         "voter (semgrep and its fork opengrep, whatever their rules). The matcher's groups stay the same, so a "
-        "change is the grouping's effect alone (`grouping-run<k>.csv`).",
+        "change is the grouping's effect alone (`grouping-run<i>.csv`).",
         "",
     ]
     lines += md_table(["dimension", *names], table, "l" + "l" * len(names)) + [""]
@@ -1855,7 +1855,7 @@ def _mutation_scores(scores: list[dict], role: dict) -> list[str]:
 
 
 def _bridge(bridge: list[dict]) -> list[str]:
-    """RQ4 -> RQ3 (bridge-run<k>.csv): confirmation rate against F1, per language and over all cells."""
+    """RQ4 -> RQ3 (bridge-run<i>.csv): confirmation rate against F1, per language and over all cells."""
     summary = [r for r in bridge if r.get("tool") == "all"]
     if not summary:
         return []
@@ -1863,7 +1863,7 @@ def _bridge(bridge: list[dict]) -> list[str]:
     lines += [
         "Per language, each tool's confirmation rate on this experiment's original repositories (RQ3: the share of "
         "its algorithm items at L4 that another voter group confirms) is set against its F1 on the planted items "
-        "(`bridge-run<k>.csv`, one cell per tool and language): Spearman's rank correlation over the cells and "
+        "(`bridge-run<i>.csv`, one cell per tool and language): Spearman's rank correlation over the cells and "
         "Kendall's tau between the two rankings (1 = the same order, 0 = unrelated, −1 = reversed; empty with fewer "
         "than three cells). `all` pools the cells of every language.",
         "",
@@ -1958,7 +1958,7 @@ def _rq3(info: dict, levels: list[dict], vocab: list[dict], matchlevels: list[di
 
 
 def _voters(info: dict) -> list[str]:
-    """The voter groups the agreement numbers rest on (tables-run<k>.json `voters`, after --merge-llm)."""
+    """The voter groups the agreement numbers rest on (tables-run<i>.json `voters`, after --merge-llm)."""
     voters = info.get("voters") or {}
     if not voters:
         return []
@@ -2064,7 +2064,7 @@ def _ladder(all_rows: list[dict]) -> list[str]:
             "**Parameters**, pooled over the voters: one row per parameter. A pair is an item with one value of it "
             "(AES with key size 256); the cell is the share of the voters' pairs for which another voter group "
             "reports the same value for that item. A value counts at L2 when it sits in a standard field, from L3 "
-            "also when parsed from the name, at L4 from any source (per-tool rows in `levels-run<k>.csv`). `n/a`: "
+            "also when parsed from the name, at L4 from any source (per-tool rows in `levels-run<i>.csv`). `n/a`: "
             "the standard has no field for that value (CycloneDX carries no digest of a composite such as "
             "HMAC-SHA256), so the row starts where a name can be parsed. The last column counts the pairs.",
             "",
@@ -2218,7 +2218,7 @@ def _files(info: dict, run: int) -> list[str]:
               (STABILITY, ("stability.csv",))]  # fmt: skip
     listed: set[str] = set()
     for title, patterns in groups:
-        names = [p.format(k=run) for p in patterns if p.format(k=run) in counts]
+        names = [p.format(i=run) for p in patterns if p.format(i=run) in counts]
         if not names:
             continue
         lines += [f"**{title}**", ""]
@@ -2227,14 +2227,14 @@ def _files(info: dict, run: int) -> list[str]:
         lines.append("")
         listed |= set(names)
     rest = [
-        (p.format(k=run), m) for p, m in FILES.items() if p.format(k=run) in counts and p.format(k=run) not in listed
+        (p.format(i=run), m) for p, m in FILES.items() if p.format(i=run) in counts and p.format(i=run) not in listed
     ]
     if rest:
         lines += ["**Other**", ""] + [f"- `{n}` ({_n(counts[n])} rows): {m}" for n, m in rest] + [""]
     lines += [
         "- `normalize.json`: coverage per tool in full (sources, conflicts, top unmapped values)",
         "- `../_run-log.json`: one entry per runner session (times, host RAM and CPUs, budget, waves, peak RAM)",
-        "- `<snapshot>/<variant>/<tool>/run<k>.norm.json`: the normalised CBOM next to each stored one",
+        "- `<snapshot>/<variant>/<tool>/run<i>.norm.json`: the normalised CBOM next to each stored one",
     ]
     settings = info.get("settings") or {}
     if settings:
@@ -2256,38 +2256,38 @@ def render(analysis_dir: Path, *, run: int = 1) -> str:
     info = json.loads(info_path.read_text(encoding="utf-8")) if info_path.exists() else {}
 
     def rows(name: str) -> list[dict]:
-        return read_csv(analysis_dir / name.format(k=run))
+        return read_csv(analysis_dir / name.format(i=run))
 
     lines = ["## Preamble", "", "The terms the tables use, the questions they answer, and every stored run.", ""]
     lines += _reading() + _questions()
     lines += _runs(rows("runs.csv"))
     lines += _repositories(spec or {})
     lines += _negatives(rows("runs.csv"), run)
-    lines += _micro(rows("micro-run{k}.csv"), rows("micro-items-run{k}.csv"))
-    lines += _rq1(rows("schema-run{k}.csv"), rows("meaningful-run{k}.csv"), rows("conformance-run{k}.csv"))
+    lines += _micro(rows("micro-run{i}.csv"), rows("micro-items-run{i}.csv"))
+    lines += _rq1(rows("schema-run{i}.csv"), rows("meaningful-run{i}.csv"), rows("conformance-run{i}.csv"))
     lines += _rq2(
         _reported(rows("runs.csv"), run),
-        rows("units-run{k}.csv"),
-        rows("coverage-run{k}.csv"),
-        rows("units-repo-run{k}.csv"),
-        rows("traceability-run{k}.csv"),
+        rows("units-run{i}.csv"),
+        rows("coverage-run{i}.csv"),
+        rows("units-repo-run{i}.csv"),
+        rows("traceability-run{i}.csv"),
         rows("runtime.csv"),
     )
     lines += _rq3(
         info,
-        rows("levels-run{k}.csv"),
+        rows("levels-run{i}.csv"),
         rows("vocab.csv"),
-        rows("matchlevels-run{k}.csv"),
-        rows("groups-exact-run{k}.csv"),
-        rows("matchers-run{k}.csv"),
-        rows("score-run{k}.csv"),
-        rows("loo-run{k}.csv"),
-        rows("grouping-run{k}.csv"),
+        rows("matchlevels-run{i}.csv"),
+        rows("groups-exact-run{i}.csv"),
+        rows("matchers-run{i}.csv"),
+        rows("score-run{i}.csv"),
+        rows("loo-run{i}.csv"),
+        rows("grouping-run{i}.csv"),
     )
     lines += _mutation(rows("mutants.csv"), rows("mutation.csv"), rows("mutation-rates.csv"),
-                       rows("mutation-scores.csv"), rows("bridge-run{k}.csv"))  # fmt: skip
+                       rows("mutation-scores.csv"), rows("bridge-run{i}.csv"))  # fmt: skip
     lines += _stability(rows("stability.csv"))
-    lines += _llm(rows("runs.csv"), rows("score-run{k}.csv"))
+    lines += _llm(rows("runs.csv"), rows("score-run{i}.csv"))
     lines += _files(info, run)
     overview = _experiment(rows("runs.csv"), load_run_log(analysis_dir.parent), spec=spec or {}, info=info, run=run)
     lines = _header(spec or {}, info, run) + overview + _toc(lines) + lines

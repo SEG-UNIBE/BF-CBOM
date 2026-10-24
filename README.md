@@ -437,7 +437,7 @@ Every job of an inspection is in exactly one state, defined once in `common/util
 | 🚫 Cancelled | cancelled before completion |
 | ⏭️ Unsupported | not run: the tool does not list the repository's language in `common/tools.yaml` |
 
-Workers mark a job running the moment they take it (`common/jobs.py`), using the routing hash the coordinator and the runner maintain. Unsupported pairs are decided when jobs are issued, from the repository's main language and the tool's declared `languages`; a repository without a known language is always run. The batch runner records such pairs as `run<k>.meta.json` with status `unsupported` and no CBOM (`--run-unsupported` disables this), so they never count as failures or empty results.
+Workers mark a job running the moment they take it (`common/jobs.py`), using the routing hash the coordinator and the runner maintain. Unsupported pairs are decided when jobs are issued, from the repository's main language and the tool's declared `languages`; a repository without a known language is always run. The batch runner records such pairs as `run<i>.meta.json` with status `unsupported` and no CBOM (`--run-unsupported` disables this), so they never count as failures or empty results.
 
 ### Snapshot pinning and provenance
 
@@ -450,7 +450,7 @@ Each `JobResult` records `tool_version` (reported by the worker, e.g. `cdxgen 12
 Reproducible, resumable batch runs for the research agenda described in `CLAUDE.md`. Everything they produce stays inside Docker named volumes:
 
 - `gitserver`: a read-only smart-HTTP git server on the compose network. The runner mirrors every repo there at its pinned commit (volume `git-data`); mutants are branches `bfcbom/<variant>`. Each snapshot is served as its own small bare repo `<owner>/<repo>--<sha12>.git` (objects shared with the mirror, HEAD on the snapshot branch), which workers scan. CBOMkit insists on `https://` and drops `.git`, so the server also speaks TLS with a self-signed certificate (volume `git-certs`) that the CBOMkit worker trusts.
-- `runner`: an on-demand container running `bf-cbom experiment ...`. Results land in the `results-data` volume as `<exp>/<owner>__<repo>@<sha12>/<variant>/<tool>/run<k>.json` plus a `run<k>.meta.json` with status, duration, timing, tool version, image, the BF-CBOM commit the image was built from, the container's peak RAM and (LLM workers) the token usage; `_experiment.yaml`, `_run-log.json` (sessions, host RAM, peak RAM) and `_ANALYSIS/` sit on top of each experiment folder.
+- `runner`: an on-demand container running `bf-cbom experiment ...`. Results land in the `results-data` volume as `<exp>/<owner>__<repo>@<sha12>/<variant>/<tool>/run<i>.json` plus a `run<i>.meta.json` with status, duration, timing, tool version, image, the BF-CBOM commit the image was built from, the container's peak RAM and (LLM workers) the token usage; `_experiment.yaml`, `_run-log.json` (sessions, host RAM, peak RAM) and `_ANALYSIS/` sit on top of each experiment folder.
 
 ```bash
 make experiment EXP=experiments/mutation-smoke.yaml   # pin, mirror, enqueue, collect (resumable)

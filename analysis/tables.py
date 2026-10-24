@@ -1,7 +1,7 @@
 """Flat, long-format CSV tables of one experiment, for pandas/R (CLAUDE.md, Phase 3).
 
 Three layers, so that later steps (the normaliser, further n-way matchers) only add files:
-- runs:    one row per stored run (`run<k>.meta.json`), all repetitions;
+- runs:    one row per stored run (`run<i>.meta.json`), all repetitions;
 - records: one row per normalised record (`analysis/normalize/`) with a stable `record_id`
            (`<tool>:<component>:<occurrence>`; `site_id` = `<tool>:<file>:<line>` for located ones);
 - matches: per matcher (`analysis/matchers/`) a groups table, a long membership table (group_id <-> record_id) and
@@ -527,7 +527,7 @@ def raqun_inspection_rows(
 def matchlevel_row(
     matcher: str, level: str, run: int, groups_by_snapshot: dict, voter_of: dict[str, str] | None = None
 ) -> dict:
-    """One row of matchlevels-run<k>.csv (RQ3, matcher x level): over the repo groups of every snapshot, how many
+    """One row of matchlevels-run<i>.csv (RQ3, matcher x level): over the repo groups of every snapshot, how many
     items (algorithms, by their L4 identity: `extra.units` of the matchers' groups, else the group key) have
     1 / 2 / 3 / 4+ voter groups in their largest group at that level,
     and per dimension the share of the groups with at least two
