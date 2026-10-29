@@ -25,6 +25,10 @@ _TICK_SEC = 1.0
 _PUSH_ATTEMPTS = 6
 # Liveness key TTL; refreshed every BLPOP timeout while idle and every tick while busy.
 HEARTBEAT_TTL_SEC = max(30, BLPOP_TIMEOUT_SEC * 3)
+# A worker that cannot reach Redis for this long exits (non-zero), so the container's restart policy brings a fresh
+# process: a replaced redis container or a recreated network leaves a long-running process with a dead name
+# resolution and no heartbeat, which the board shows as `down` (misc-pyqun, 2026-10-29).
+REDIS_GIVE_UP_SEC = int(os.getenv("WORKER_REDIS_GIVE_UP_SEC", "300"))
 
 
 def _now_iso() -> str:
@@ -61,6 +65,20 @@ def publish_heartbeat(
         r.set(heartbeat_key(worker_name), payload, ex=HEARTBEAT_TTL_SEC)
     except redis.exceptions.RedisError:
         pass
+
+
+def redis_error(log: logging.Logger, err: Exception, since: float | None, *, now: float | None = None) -> float:
+    """A Redis error while waiting for jobs: log it, back off, and give up after REDIS_GIVE_UP_SEC of consecutive
+    failures (`since`: when they began, None on the first), exiting so the container restarts with a fresh process.
+    Returns `since` for the next call; the caller resets it to None after a success."""
+    now = time.monotonic() if now is None else now
+    since = now if since is None else since
+    if now - since >= REDIS_GIVE_UP_SEC:
+        log.error("no Redis for %d s (%s): exiting so the container restarts", int(now - since), err)
+        raise SystemExit(1)
+    log.error("Redis error while waiting for jobs: %s", err)
+    time.sleep(1)
+    return since
 
 
 def _job_process_entry(conn: Connection, handle_instruction: Callable, instr: JobInstruction, worker_name: str) -> None:
@@ -248,13 +266,14 @@ def run_worker(
     while True:
         log.info("awaiting new jobs...\n\n")
         item = None
+        failing_since: float | None = None
         while item is None:
             publish_heartbeat(r, name, "idle", last=last)
             try:
                 item = r.blpop(f"jobs:{name}", timeout=BLPOP_TIMEOUT_SEC)  # None on timeout -> keep waiting
+                failing_since = None
             except redis.exceptions.RedisError as err:
-                log.error("Redis error while waiting for jobs: %s", err)
-                time.sleep(1)
+                failing_since = redis_error(log, err, failing_since)
         _, raw = item
         try:
             instr = JobInstruction.from_json(raw)

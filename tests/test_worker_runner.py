@@ -118,3 +118,23 @@ def test_job_instruction_carries_run_index():
     assert JobInstruction.from_json(instr.to_json()).run_index == 3
     legacy = '{"job_id":"j","tool":"t","repo_info":' + RI.to_json() + "}"
     assert JobInstruction.from_json(legacy).run_index is None
+
+
+def test_worker_gives_up_on_redis_after_the_grace_period(monkeypatch):
+    """A worker that cannot reach Redis for REDIS_GIVE_UP_SEC exits non-zero, so the container's restart policy
+    brings a fresh process instead of a zombie without heartbeat (common/worker.py:redis_error)."""
+    import logging
+
+    import pytest
+
+    from common import worker
+
+    monkeypatch.setattr(worker.time, "sleep", lambda s: None)
+    log = logging.getLogger("test-worker")
+    err = RuntimeError("Temporary failure in name resolution")
+    since = worker.redis_error(log, err, None, now=100.0)
+    assert since == 100.0
+    assert worker.redis_error(log, err, since, now=100.0 + worker.REDIS_GIVE_UP_SEC - 1) == 100.0
+    with pytest.raises(SystemExit) as exit_info:
+        worker.redis_error(log, err, since, now=100.0 + worker.REDIS_GIVE_UP_SEC)
+    assert exit_info.value.code == 1

@@ -20,7 +20,7 @@ from sentence_transformers import SentenceTransformer
 
 from common.config import BLPOP_TIMEOUT_SEC, REDIS_HOST, REDIS_PORT, REDIS_SOCKET_TIMEOUT_SEC
 from common.models import ComponentMatchJobInstruction, ComponentMatchJobResult
-from common.worker import publish_heartbeat
+from common.worker import publish_heartbeat, redis_error
 
 NAME = "pyqun"
 JOB_QUEUE = f"jobs:{NAME}"
@@ -400,14 +400,15 @@ def main() -> None:
     )
     logger.info("%s listening for component match jobs... (queue: %s)", NAME, JOB_QUEUE)
 
+    failing_since: float | None = None
     try:
         while True:
             publish_heartbeat(redis_client, NAME, "idle")
             try:
                 item = redis_client.blpop(JOB_QUEUE, timeout=BLPOP_TIMEOUT_SEC)
+                failing_since = None
             except redis.exceptions.RedisError as err:
-                logger.error("Redis error while waiting for jobs: %s", err)
-                time.sleep(1)
+                failing_since = redis_error(logger, err, failing_since)  # exits after REDIS_GIVE_UP_SEC
                 continue
             if item is None:  # BLPOP timed out with no job; keep waiting
                 continue

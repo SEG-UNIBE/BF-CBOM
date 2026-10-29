@@ -6,6 +6,6 @@
 #   make analysis ARGS="report corpus-pilot-small"
 name: corpus-pilot-small
 description: pilot corpus rerun through BF-CBOM (location-aware agreement across tools), paper languages only
-tools: [cbomkit, cdxgen, cryptobomforge, cryptoscan, pqcheck, qdarpan, securin-xbom, cipherradar, xgrep, cbomkit-jar, ciphersift, scanoss, qelens, cryptarium, qscan]
+tools: [cbomkit, cbomkit-jar, cipherradar, ciphersift, cryptobomforge, cryptoscan, pqcheck, qdarpan, scanoss, securin-xbom, xgrep]  # the 11 that passed the bar exam of 2026-10-29 (bar-micro export); cdxgen, cryptarium, qelens, qscan disqualified
 repetitions: 1
 corpus: corpus/pilot-2026-10-08.yaml

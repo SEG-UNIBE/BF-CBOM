@@ -805,7 +805,7 @@ services:
       - REDIS_PORT=6379
       - CALC_TIMEOUT_SEC=300
     env_file: docker/env/misc-treesimilarity.env
-    restart: no
+    restart: on-failure:3  # the worker exits after WORKER_REDIS_GIVE_UP_SEC without Redis (common/worker.py)
     deploy:
       resources:
         limits:
@@ -834,7 +834,7 @@ services:
       - REDIS_PORT=6379
       - CALC_TIMEOUT_SEC=300
     env_file: docker/env/misc-pyqun.env
-    restart: no
+    restart: on-failure:3  # the worker exits after WORKER_REDIS_GIVE_UP_SEC without Redis (common/worker.py)
     deploy:
       resources:
         limits:

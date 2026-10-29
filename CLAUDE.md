@@ -336,9 +336,10 @@ where they declare support, but no analysis, figure or tuning effort goes into t
 
 ## Status (updated 2026-10-29)
 - **Current experiment scope:** 15 CBOM generator tools integrated; the bar exam of 2026-10-23 passes 11 of them
-  (`docs/findings.md` "Export review 2026-10-24"). The specs still list all 15: the user writes the 11 into every
-  spec but bar-micro by hand (no `tool_languages` needed: every passed tool passes in every language it was scored
-  in). LLM providers are excluded for now; the provider workers and their analysis support remain implemented.
+  (`docs/findings.md` "Export review 2026-10-24"), confirmed by the rerun with eight decoys (bar-micro export of
+  2026-10-29: the same 11 pass, the same 4 fail, the gap between the lowest pass and the highest fail is 8 vs 6 of
+  14). Every spec but bar-micro lists the 11 (no `tool_languages` needed: every passed tool passes in every language
+  it was scored in). LLM providers are excluded for now; the provider workers and their analysis support remain implemented.
 - **Exports of 2026-10-24 reviewed:** bar-micro, corpus-pilot-small, corpus-icpc, corpus-pilot-medium and
   mutation-pilot, rerun whole with vocabulary 2026-10-23.2 and the caps of 2026-10-23 (cdxgen 24 GiB, CipherRadar
   8 GiB), sizes recorded at pin time. Headline agreement at L4 0.78-0.81 (exact matcher) against RaQuN's 0.58-0.59;

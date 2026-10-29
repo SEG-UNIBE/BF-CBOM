@@ -106,8 +106,11 @@ up-all: export COMPOSE_PROFILES := all
 up-all: build-all
 	docker compose up
 
+# every profile, so no container of another profile stays behind on the old network (it could not reach the
+# recreated redis and would show as `down` on the board)
+down: export COMPOSE_PROFILES := all
 down:
-	docker compose down
+	docker compose down --remove-orphans
 
 # The live board of the running stack (misc/cli/stack_cmd.py): experiments, workers, queues; ARGS="--once" prints one
 # snapshot. BOARD_SERVICES: every container of the stack, running or exited, so a crashed worker shows as down.

@@ -4,8 +4,8 @@
 # out for time. Analysis: `make analysis ARGS="report stability-pilot"` writes stability.csv and scores the consensus sets.
 #   make experiment EXP=experiments/stability-pilot.yaml EXPERIMENT_MEMORY_BUDGET_GB=0
 name: stability-pilot
-description: "run-to-run stability: all tools, three repetitions, micro projects plus ten small pilot repositories"
-tools: [cbomkit, cdxgen, cryptobomforge, cryptoscan, pqcheck, qdarpan, securin-xbom, cipherradar, xgrep, cbomkit-jar, ciphersift, scanoss, qelens, cryptarium, qscan]
+description: "run-to-run stability: the 11 eligible tools, three repetitions, micro projects plus ten small pilot repositories"
+tools: [cbomkit, cbomkit-jar, cipherradar, ciphersift, cryptobomforge, cryptoscan, pqcheck, qdarpan, scanoss, securin-xbom, xgrep]  # the 11 that passed the bar exam of 2026-10-29 (bar-micro export); cdxgen, cryptarium, qelens, qscan disqualified
 repetitions: 3
 repos:
   - full_name: bfcbom/micro-java
