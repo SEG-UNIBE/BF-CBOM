@@ -231,3 +231,29 @@ def test_grouping_rows_rank_again_with_every_tool_its_own_voter():
     rows = {r["grouping"]: r for r in sc.grouping_rows({"declared": declared, "per-tool": per_tool}, **LOW)}
     assert (rows["declared"]["voter_groups"], rows["per-tool"]["voter_groups"]) == (3, 4)
     assert rows["declared"]["kendall_tau"] == 1.0 and rows["per-tool"]["ranking"][:2] == ["a", "a2"]
+
+
+def test_flux_counts_the_items_not_in_every_run_and_the_baseline_summarises_it_per_tool():
+    """RQ6's noise floor: `flux` per (tool, snapshot) is the share of items that come and go between repeated runs of
+    unchanged code; `baseline_flux` gives each tool's mean flux and the share of its snapshots whose runs differ."""
+    from analysis.stability import baseline_flux
+
+    runs = {
+        ("s1", "original", "t"): {
+            1: [_rec(0, "t", "AES", family="AES"), _rec(1, "t", "RSA", family="RSA")],
+            2: [_rec(0, "t", "AES", family="AES"), _rec(1, "t", "RSA", family="RSA")],
+            3: [_rec(0, "t", "AES", family="AES")],
+        },
+        ("s2", "original", "t"): {1: [_rec(0, "t", "AES", family="AES")], 2: [_rec(0, "t", "AES", family="AES")]},
+        ("s1", "original", "steady"): {
+            1: [_rec(0, "steady", "AES", family="AES")],
+            2: [_rec(0, "steady", "AES", family="AES")],
+        },
+    }
+    rows, _ = stability_rows(runs, level="L4")
+    flux = {(r["tool"], r["snapshot"]): r["flux"] for r in rows}
+    assert flux == {("t", "s1"): 0.5, ("t", "s2"): 0.0, ("steady", "s1"): 0.0}  # RSA is in 2 of 3 runs: it fluxes
+    assert baseline_flux(rows) == {"steady": {"flux": 0.0, "changed": 0.0}, "t": {"flux": 0.25, "changed": 0.5}}
+    assert baseline_flux([{"tool": "t", "flux": "0.5"}, {"tool": "t", "flux": ""}]) == {
+        "t": {"flux": 0.5, "changed": 1.0}
+    }

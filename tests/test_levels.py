@@ -1,5 +1,6 @@
 """The L0-L4 normalisation ladder (analysis/levels.py) on tiny hand-written CBOMs."""
 
+from analysis import levels as lv
 from analysis.levels import (
     LEVELS,
     PARAMETER_LEVELS,
@@ -216,3 +217,36 @@ def test_an_item_only_an_observer_reports_is_no_matchlevels_item():
         groups = ExactMatcher(level="L3", voter_of=voter_of).match(records)
         rows.append(matchlevel_row("exact", "L3", 1, {("s", "original"): groups}, voter_of))
     assert rows[0]["items"] == 2 and rows[1] == rows[0]
+
+
+def test_items_record_whether_their_family_is_the_registrys_and_the_delta_table_is_complete():
+    """RQ4: `registry` on every item (its family is a CycloneDX registry entry, not an addition of algorithms.yaml),
+    and registry-run<i>.csv lists every addition once with the items behind it, the units under no family and the
+    identifier layer's sizes."""
+    from analysis.normalize.vocab import load_vocabulary
+
+    vocab = load_vocabulary()
+    assert lv.unit_in_registry("AES", vocab) and lv.unit_in_registry("SHA-256", vocab)  # SHA-256 -> SHA-2
+    assert not lv.unit_in_registry("RSA", vocab) and not lv.unit_in_registry("SHA1PRNG", vocab)  # -> CSPRNG
+    items = [
+        {"unit": "RSA", "repo": "a/x", "tool": "t1"},
+        {"unit": "RSA", "repo": "a/y", "tool": "t2"},
+        {"unit": "SHA1PRNG", "repo": "a/x", "tool": "t1"},
+        {"unit": "AES", "repo": "a/x", "tool": "t1"},
+        {"unit": "WeirdThing", "repo": "a/y", "tool": "t2"},
+    ]
+    rows = lv.registry_rows(items, vocab)
+    additions = {r["name"]: r for r in rows if r["kind"] == "addition"}
+    assert set(additions) == {n for n, f in vocab.families.items() if not f.registry} and len(additions) == 11
+    rsa = additions["RSA"]
+    assert (rsa["gap"], rsa["count"], rsa["repos"], rsa["tools"]) == ("scheme-less", 2, 2, "t1;t2")
+    assert (additions["CSPRNG"]["count"], additions["CSPRNG"]["gap"]) == (1, "missing-family")
+    assert additions["FN-DSA"]["count"] == 0 and additions["FN-DSA"]["note"]  # the delta is complete
+    assert all(r["gap"] for r in additions.values()) and {r["gap"] for r in additions.values()} == {
+        "missing-family", "scheme-less", "generic-marker", "non-crypto"}  # fmt: skip
+    (unknown,) = [r for r in rows if r["kind"] == "unknown"]
+    assert (unknown["name"], unknown["count"], unknown["tools"]) == ("WeirdThing", 1, "t2")
+    layers = {r["name"]: r["count"] for r in rows if r["kind"] == "layer"}
+    assert set(layers) == set(lv.LAYERS) and layers["algorithms"] == len(vocab.algorithms) and layers["apis"] > 50
+    assert [r["kind"] for r in rows] == ["addition"] * 11 + ["unknown"] + ["layer"] * len(lv.LAYERS)
+    assert set(lv.REGISTRY_COLUMNS) == set(rows[0])

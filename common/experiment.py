@@ -72,8 +72,13 @@ class RepoSpec:
     # A plain directory (e.g. experiments/corpus/micro/java) published to the git server by the runner instead of
     # a remote repo; resolved to an absolute path at spec load time.
     path: str | None = None
-    # Corpus metadata for the analysis, ignored by the runner: `low` marks a negative case (little crypto expected)
+    # Corpus metadata for the analysis, ignored by the runner: `low` marks a negative case (little crypto expected);
+    # from the corpus builder (common/corpus.py) the sampling cell and two covariates never selected on, the crypto
+    # API families its pre-filter matched and the repository's GitHub topics
     expect_crypto: str | None = None
+    stratum: dict | None = None
+    crypto_apis: list[str] | None = None
+    topics: list[str] | None = None
     # Counted by the runner at the pinned commit and written into the record, never spec input (`snapshot_size`): the
     # snapshot's files and the source files of its language (the size the run-time table scales by) and the bytes of
     # the checkout and of those source files (the blobs at that commit, no history); an export carries them.
@@ -214,6 +219,9 @@ def _as_repo_spec(item: dict, *, base_dir: Path | None = None) -> RepoSpec:
         variants=[str(v) for v in variants],
         path=path or None,
         expect_crypto=_opt_str(item.get("expect_crypto")),
+        stratum=dict(item["stratum"]) if isinstance(item.get("stratum"), dict) else None,
+        crypto_apis=[str(x) for x in item.get("crypto_apis") or []] or None,
+        topics=[str(x) for x in item.get("topics") or []] or None,
         files=_opt_int(item.get("files")),
         source_files=_opt_int(item.get("source_files")),
         checkout_bytes=_opt_int(item.get("checkout_bytes")),

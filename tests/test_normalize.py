@@ -740,3 +740,27 @@ def test_coverage_and_units_count_assets_records_and_items():
     fixture = _comp("AES", occ=[{"location": "test/vectors.json", "line": 3}, {"location": "src/a.java", "line": 9}])
     (x,) = unit_rows([normalize_cbom(_bom(fixture), "cbomkit", language="java")])
     assert (x["records"], x["outside_code"]) == (2, 1)  # the JSON fixture is no Java source file
+
+
+def test_sources_rows_say_where_each_dimension_lives():
+    """RQ3's "where the information lives": per (tool, dimension, kind of source) the algorithm assets whose value came
+    from a standard field, the name, a property, ... and the share of the tool's algorithm assets
+    (sources-run<i>.csv)."""
+    from analysis import summary as sm
+    from analysis.normalize.report import SOURCES_COLUMNS
+
+    bom = _bom(
+        _comp("AES-128-GCM", ap={"primitive": "ae"}),  # mode and key size from the name, primitive from the field
+        _comp("RSA", ap={"primitive": "pke", "padding": "oaep"}),  # padding from the field
+        _comp("my-key", asset="related-crypto-material"),  # no algorithm asset: not counted
+    )
+    report = Report()
+    report.add(normalize_cbom(bom, "cbomkit"))
+    rows = report.sources_rows()
+    assert set(rows[0]) == set(SOURCES_COLUMNS) and all(r["assets"] == 2 for r in rows)
+    by = {(r["dimension"], r["kind"]): r for r in rows}
+    assert (by[("primitive", "field")]["count"], by[("primitive", "field")]["share"]) == (2, 1.0)
+    assert (by[("mode", "name")]["count"], by[("padding", "field")]["count"]) == (1, 1)
+    assert by[("family", "name")]["count"] == 2 and ("family", "field") not in by  # 1.6 has no algorithmFamily
+    text = "\n".join(sm._sources(rows))
+    assert "### Where the information lives" in text and "| cbomkit | 2 | 0.00 (name 1.00) | 1.00 |" in text

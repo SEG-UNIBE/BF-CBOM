@@ -855,7 +855,15 @@ def env():
 def corpus_build(
     out: Path = CORPUS_OUT_OPT,
     languages: str = typer.Option("Java,Python,Go", help="Comma-separated GitHub languages (the paper's three)"),
-    per_language: int = typer.Option(100),
+    per_cell: int = typer.Option(2, "--per-cell", help="Repos drawn per (language, stars, size) cell"),
+    star_bins: str = typer.Option(
+        "50-300,300-2000,2000-", "--star-bins", help="Star bins `lo-hi,...` ([lo, hi); an open last bin `2000-`)"
+    ),
+    size_bins: str = typer.Option(
+        "300-3000,3000-30000,30000-",
+        "--size-bins",
+        help="Size bins in KB (GitHub `size`, the packed repository) `lo-hi,...`; an open last bin ends at the cap",
+    ),
     pushed_within_days: int = typer.Option(365),
     no_crypto_filter: bool = typer.Option(False, "--no-crypto-filter", help="Skip the clone+grep crypto pre-filter"),
     exclude: str = typer.Option("", help="Extra comma-separated regexes on full_name to exclude"),
@@ -867,14 +875,21 @@ def corpus_build(
         f"GITSERVER_MEMORY / {corpus_mod.SIZE_CAP_RATIO} (the git server must serve a full clone); 0 = no cap",
     ),
 ):
-    """Sample a stratified corpus (stars x size cells per language), pre-filter for crypto usage, pin commits."""
-    params = corpus_mod.CorpusParams(
-        languages=[x.strip() for x in languages.split(",") if x.strip()],
-        per_language=per_language,
-        pushed_within_days=pushed_within_days,
-        crypto_filter=not no_crypto_filter,
-        seed=seed,
-    )
+    """Sample a stratified corpus: per language every (star bin x size bin) cell is enumerated completely and
+    `--per-cell` repos are drawn at random (seeded), pre-filtered for first-party crypto usage and pinned to commits;
+    the frame (every cell's population) is recorded in the file."""
+    try:
+        params = corpus_mod.CorpusParams(
+            languages=[x.strip() for x in languages.split(",") if x.strip()],
+            per_cell=per_cell,
+            star_bins=corpus_mod.parse_bins(star_bins),
+            size_bins_kb=corpus_mod.parse_bins(size_bins),
+            pushed_within_days=pushed_within_days,
+            crypto_filter=not no_crypto_filter,
+            seed=seed,
+        )
+    except ValueError as e:
+        _err(f"bins: {e}")
     if max_repo_size_mb is not None:
         params.max_repo_size_mb = max_repo_size_mb or None
     params.exclude_patterns += [x.strip() for x in exclude.split(",") if x.strip()]

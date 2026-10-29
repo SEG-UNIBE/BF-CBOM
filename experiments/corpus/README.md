@@ -14,7 +14,7 @@ sampled corpora live on the results volume.
 | `pilot-2026-10-08-all.yaml` | all 16 pilot projects as scanned then: the record of the pilot and of what CipherSift was tuned on (`tailored_on` in `common/tools.yaml` reads it); no experiment uses it |
 | `pilot-2026-10-22.yaml` | second pilot: 60 manually selected repositories, 20 each in Java, Python and Go, pinned to default-branch HEADs on 2026-10-22; used by `experiments/corpus-pilot-medium.yaml` |
 | `icpc-2026.yaml` | the 23 ICPC paper repositories pinned at their HEAD of 2026-10-18, held out from tuning; six are marked `expect_crypto: low` |
-| `corpus.yaml` (not in git) | the stratified corpus built by `make corpus`, by default 100 repos per language for Java, Python and Go; lives at `/data/results/corpus/corpus.yaml` in the runner (`make corpus-export` copies the corpus YAML files into `experiments/results/` on the host) |
+| `corpus.yaml` (not in git) | the stratified corpus built by `make corpus`: per language every (star bin x size bin) cell enumerated completely and `--per-cell` repos drawn at random (by default 3 x 3 cells x 2 = 18 per language for Java, Python and Go), each with its `stratum`, `crypto_apis` (the API families the pre-filter matched) and `topics`; the frame (`cells`: every cell's population and quota) and every excluded candidate with its reason are in the file (`experiments/README.md` "Corpus sampling"); lives at `/data/results/corpus/corpus.yaml` in the runner (`make corpus-export` copies the corpus YAML files into `experiments/results/` on the host) |
 
 Since 2026-10-22, `mutation/micro.py` generates both the micro source files and their ground truth from
 `mutation/catalog/{java,python,go}.yaml`. Edit the catalogs or generator, then run

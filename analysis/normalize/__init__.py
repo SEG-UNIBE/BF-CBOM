@@ -13,12 +13,13 @@ CycloneDX at scan time. The adapter specs here read CycloneDX into records, offl
 
 from .engine import normalize_cbom
 from .record import RECORD_COLUMNS, SCHEMA_ID, VALUE_DIMS, NormalizedCbom, NormRecord
-from .report import CONFORMANCE_COLUMNS, COVERAGE_COLUMNS, VOCAB_COLUMNS, Report
+from .report import CONFORMANCE_COLUMNS, COVERAGE_COLUMNS, SOURCES_COLUMNS, VOCAB_COLUMNS, Report
 from .specs import load_adapter
 from .vocab import load_vocabulary
 
 __all__ = [
     "CONFORMANCE_COLUMNS",
+    "SOURCES_COLUMNS",
     "COVERAGE_COLUMNS",
     "RECORD_COLUMNS",
     "SCHEMA_ID",

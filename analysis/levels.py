@@ -87,9 +87,11 @@ LEVEL_COLUMNS = [
     "multi_unit_clusters",
 ]  # fmt: skip
 ITEM_COLUMNS = [
-    "repo", "snapshot", "variant", "run", "language", "tool", "voter_group", "role", "tailored", "unit", "implied",
-    "records", "spellings", *[f"k_{lv}" for lv in LEVELS],
+    "repo", "snapshot", "variant", "run", "language", "tool", "voter_group", "role", "tailored", "unit", "registry",
+    "implied", "records", "spellings", *[f"k_{lv}" for lv in LEVELS],
 ]  # fmt: skip
+REGISTRY_COLUMNS = ["kind", "name", "gap", "primitive", "count", "repos", "tools", "note"]
+LAYERS = ("family aliases", "algorithms", "algorithm aliases", "names", "apis", "oids", "cipher suites")
 _FAMILY_FIELD = "cryptoProperties.algorithmProperties.algorithmFamily"
 _STANDARD_SRC = "cryptoProperties."
 
@@ -528,12 +530,98 @@ def item_rows(
                         "role": role(voter_of, tool),
                         "tailored": repo in tailored.get(tool, ()),
                         "unit": key,
+                        "registry": unit_in_registry(key, vocab),
                         "implied": all(r.record_id in item.implied for r in own),
                         "records": len(own),
                         "spellings": len({(r.name or "").strip() for r in own}),
                         **{f"k_{lv}": ks[lv] for lv in LEVELS},
                     }
                 )
+    return rows
+
+
+def unit_family(unit: str, vocab: Vocabulary) -> str:
+    """The family an item's unit (an L4 identity: an algorithm or a family) rests on."""
+    return vocab.family_of_algorithm(unit) or unit
+
+
+def unit_in_registry(unit: str, vocab: Vocabulary) -> bool:
+    """Whether the item's family is one of the CycloneDX registry's (`FamilyInfo.registry`), not an addition of
+    `algorithms.yaml` (RQ4: the share of items the registry alone would not name)."""
+    info = vocab.family_info(unit_family(unit, vocab))
+    return bool(info and info.registry)
+
+
+def layer_sizes(vocab: Vocabulary) -> dict[str, int]:
+    """The identifier layer the registry lacks and the vocabulary adds (RQ4), as the size of each table: family
+    aliases (spellings of families beyond the canonical names), algorithms (concrete algorithms under the families),
+    algorithm aliases, whole names (JOSE, SSH, JCA identifiers), API identifiers, OIDs (beyond the registry's curve
+    OIDs) and the cipher-suite grammar's cipher entries."""
+    canonical = {fold(n) for n in vocab.families}
+    return {
+        "family aliases": sum(1 for k in vocab.family_alias if k not in canonical),
+        "algorithms": len(vocab.algorithms),
+        "algorithm aliases": sum(1 for k in vocab.algorithm_alias if k not in {fold(n) for n in vocab.algorithms}),
+        "names": len(vocab.names),
+        "apis": len(vocab.apis),
+        "oids": len(vocab.oids) - len(vocab.curve_oids),
+        "cipher suites": len(vocab.suite_ciphers),
+    }
+
+
+def registry_rows(items: list[dict], vocab: Vocabulary | None = None) -> list[dict]:
+    """registry-run<i>.csv, the delta between the CycloneDX registry and what real CBOMs need (RQ4): one row per
+    addition of `algorithms.yaml` (`kind: addition`; every addition, also one no item rests on, so the table is the
+    complete delta) with its gap kind, primitive, the items of `items` (item_rows) resting on it, the repositories and
+    tools behind them and the addition's reason; one row per unit that rests on no known family at all (`kind:
+    unknown`: a tool's field value taken as written); then one row per table of the identifier layer (`kind: layer`,
+    `layer_sizes`) with its size as `count`."""
+    vocab = vocab or load_vocabulary()
+    per_family: dict[str, list[dict]] = defaultdict(list)
+    unknown: dict[str, list[dict]] = defaultdict(list)
+    for r in items:
+        fam = unit_family(str(r["unit"]), vocab)
+        info = vocab.family_info(fam)
+        if info is None:
+            unknown[str(r["unit"])].append(r)  # a tool's field value as written, or an algorithm under no family
+        elif not info.registry:
+            per_family[fam].append(r)
+    rows = []
+    for name, info in vocab.families.items():
+        if info.registry:
+            continue
+        rs = per_family.get(name, [])
+        rows.append(
+            {
+                "kind": "addition",
+                "name": name,
+                "gap": info.gap or "",
+                "primitive": info.primitive or "",
+                "count": len(rs),
+                "repos": len({r["repo"] for r in rs}),
+                "tools": ";".join(sorted({str(r["tool"]) for r in rs})),
+                "note": info.note or "",
+            }
+        )
+    rows.sort(key=lambda r: (r["gap"], -r["count"], r["name"]))
+    for name in sorted(unknown, key=lambda u: (-len(unknown[u]), u)):
+        rs = unknown[name]
+        rows.append(
+            {
+                "kind": "unknown",
+                "name": name,
+                "gap": "",
+                "primitive": "",
+                "count": len(rs),
+                "repos": len({r["repo"] for r in rs}),
+                "tools": ";".join(sorted({str(r["tool"]) for r in rs})),
+                "note": "no family: a tool's field value taken as written, or an algorithm the vocabulary places under "
+                "no family",
+            }
+        )
+    for layer, n in layer_sizes(vocab).items():
+        rows.append({"kind": "layer", "name": layer, "gap": "", "primitive": "", "count": n, "repos": "", "tools": "",
+                     "note": ""})  # fmt: skip
     return rows
 
 

@@ -1,7 +1,7 @@
 # Engine / rule-set families of the CBOM generators (BF-CBOM 2.0, Phase 2 "engine independence").
 #
 # Tools sharing their detection logic (an engine, or a rule set) have one `voter_group` and count as one voter in
-# the agreement-based rates (RQ3; default: the tool itself; evidence per group in analysis/README.md "Voter
+# the agreement-based rates (RQ5; default: the tool itself; evidence per group in analysis/README.md "Voter
 # groups"). `merge_group` names a coarser voter the sensitivity analysis can merge them into (`--merge-llm`: the LLM
 # workers, which share prompts and file selection, decided 2026-10-18); `engine_family` marks tools that share only a
 # pattern engine but run independently written rules (decided 2026-10-20 after the rule-overlap check): separate
@@ -13,7 +13,7 @@
 #   A spec narrows a tool further by hand (`tool_languages:` in experiments/<spec>.yaml, e.g. after reading the
 #   bar-micro report); nothing here is derived from the bar exam.
 # `status`: integrated (worker exists) | candidate (passed the pilot's inclusion bar, worker pending)
-#          | blocked (needs access, see CLAUDE.md) | excluded (failed the bar; kept for RQ1/RQ2 only)
+#          | blocked (needs access, see CLAUDE.md) | excluded (failed the bar; kept for RQ2/RQ3 only)
 #          | prepared (worker ready, but kept out of AVAILABLE_WORKERS and the specs until its source is public).
 # `role`: voter (default) | observer (transitional until the bar-micro rerun; decided 2026-10-19: tools that
 #   failed the colleague's pilot bar are run and
@@ -70,7 +70,7 @@ tools:
       The worker passes --include-crypto --evidence and -t python / -t go for those languages. Go analysis needs
       resolvable imports, network and a writable module cache; each job has its own GOPATH since 2026-10-22.
       Earlier Go runs need to be redone. See docs/findings.md for the fixture and worker setup fixes.
-    pilot: {java: fail, python: fail}   # no file/line for crypto findings; RQ1/RQ2 only
+    pilot: {java: fail, python: fail}   # no file/line for crypto findings; RQ2/RQ3 only
   cryptobomforge:
     micro_2026-10-17: {python: 8/11, c: 8/11}   # read from its IBM-draft windows since 2026-10-18 (before: 0/11, the call-site extraction did not read them)
     engine: codeql                  # Santander cryptobom-forge on CodeQL crypto queries
@@ -79,7 +79,7 @@ tools:
     cbom_by: tool                   # its own IBM pre-standard draft `1.4-cbom-1.0` (bomFormat CBOM, type crypto-asset), not CycloneDX
     languages: [python, c]          # upstream CodeQL crypto queries exist for Python and C/C++ only (no Java query)
     status: integrated              # runs experimental/cryptography/inventory/new_models (before 2026-10-17: CodeQL's default security suite by mistake)
-    pilot: {java: fail, python: fail}   # exact line lost, algorithms relabelled; RQ1 (non-conformance example) and RQ2 only
+    pilot: {java: fail, python: fail}   # exact line lost, algorithms relabelled; RQ3 (non-conformance example) and RQ2 only
   deepseek:
     micro_2026-10-17: {java: 11/11, python: 11/11, go: 11/11, javascript: 11/11, c: 9/11}
     engine: llm                     # provider adapters share prompts and file selection (common/llm_cbom.py, Phase 2)

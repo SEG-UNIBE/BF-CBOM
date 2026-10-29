@@ -531,7 +531,7 @@ def raqun_inspection_rows(
 def matchlevel_row(
     matcher: str, level: str, run: int, groups_by_snapshot: dict, voter_of: dict[str, str] | None = None
 ) -> dict:
-    """One row of matchlevels-run<i>.csv (RQ3, matcher x level): over the repo groups of every snapshot, how many
+    """One row of matchlevels-run<i>.csv (RQ4, matcher x level): over the repo groups of every snapshot, how many
     items (algorithms, by their L4 identity: `extra.units` of the matchers' groups, else the group key) have
     1 / 2 / 3 / 4+ voter groups in their largest group at that level,
     and per dimension the share of the groups with at least two

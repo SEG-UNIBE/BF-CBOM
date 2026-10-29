@@ -5,6 +5,12 @@ refinement 14): they were developed on the pilot corpus (the development set); t
 change bumps `version` in `algorithms.yaml`, adds an entry here with the fingerprint `python -m analysis.freeze`
 prints and the reason, and the tests fail otherwise (`tests/test_vocab_frozen.py`). Newest entry first.
 
+## 2026-10-29.1 (2026-10-29) fingerprint `187d6e58629d5e8c50edeb0fb16e97082bdcc7f934451d43873c4a65be544645`
+Metadata only, no reading changes: every entry of `additions:` (the families the CycloneDX registry lacks) carries a
+`gap:` kind for RQ4's delta table (`registry-run<i>.csv`): `missing-family` (CSPRNG, FN-DSA, NTRU-Prime, Hybrid-KEM,
+crypt), `scheme-less` (RSA, EC, PBE: the registry names schemes, tools report key types and uses without one),
+`generic-marker` (SHA, XDH), `non-crypto` (PRNG). `FamilyInfo.gap` and `.note` read them.
+
 ## 2026-10-23.2 (2026-10-23) fingerprint `b4be7318db06f0f483d9e3d132680585ea9f6cc24f7b29f7a09ea20421f24907`
 Spellings the corpus-pilot-medium review found unmapped or misread, each traceable to a standard or an official API
 (the rule of this file); nothing added because it makes tools agree, nothing that folds what the registry keeps apart

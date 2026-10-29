@@ -459,16 +459,16 @@ make board                                               # live board: running e
 make experiment-export NAME=mutation-smoke            # -> experiments/results/mutation-smoke.zip (runs the analysis report first), the only path to the host
 make experiment-list                                     # experiments stored on the volume
 make experiment-delete NAME=mutation-smoke            # remove one from the volume (asks first; ARGS=--yes skips)
-make corpus ARGS="--per-language 100"                    # stratified GitHub corpus with pinned commits
+make corpus ARGS="--per-cell 2"                          # stratified GitHub corpus with pinned commits (3 x 3 cells x 2 per language)
 make experiment EXP=experiments/bar-micro.yaml            # 15 tools on 3 generated micro projects: the voter bar
 make experiment EXP=experiments/stability-pilot.yaml        # every tool 3x on the micro projects and ten pilot repos
 make analysis ARGS="report stability-pilot"                 # everything below in one pass + _ANALYSIS/_SUMMARY.md (Markdown tables)
 make analysis ARGS="normalize stability-pilot"              # every CBOM -> normalised records, one adapter spec per tool (analysis/adapters/)
-make analysis ARGS="schema stability-pilot"                 # RQ1 (validity, meaningful shares) and RQ2 traceability (--fetch on a laptop)
+make analysis ARGS="schema stability-pilot"                 # RQ3 (validity, meaningful shares) and RQ2 traceability (--fetch on a laptop)
 make analysis ARGS="levels stability-pilot"                 # how much agreement normalisation creates (levels L0 raw to L4 tool specs)
 make analysis ARGS="micro bar-micro"                      # recall, precision, F1, decoy hits and entry-bar verdicts
 make analysis ARGS="tables stability-pilot"                 # flat CSV tables (runs, records, exact-matcher groups, micro) for pandas/R
-make analysis ARGS="score stability-pilot"                  # RQ3b: per-tool rates (confirmation, exclusivity, Dawid-Skene, leave-one-out, CIs); stability
+make analysis ARGS="score stability-pilot"                  # RQ5: per-tool rates (confirmation, exclusivity, Dawid-Skene, leave-one-out, CIs); stability
 ```
 
 #### Parallelism and Memory

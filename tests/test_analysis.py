@@ -209,6 +209,7 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     from analysis import levels as lv
     from analysis.matchers import raqun
     from analysis.normalize import CONFORMANCE_COLUMNS, COVERAGE_COLUMNS
+    from analysis.normalize.report import SOURCE_KINDS
     from misc.cli import analysis_cmd
 
     exp = _fake_experiment(tmp_path)
@@ -269,14 +270,14 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     headings = re.findall(r"^#{2,3} (.+)$", summary[len(toc) :], flags=re.M)
     assert [title for title, _ in links] == headings
     assert links[0] == ("Preamble", "preamble") and ("How to read this summary", "how-to-read-this-summary") in links
-    assert ("RQ3a: the L0-L4 deltas (the agreement ladder)", "rq3a-the-l0-l4-deltas-the-agreement-ladder") in links
+    assert ("The L0-L4 deltas (the agreement ladder)", "the-l0-l4-deltas-the-agreement-ladder") in links
     assert info["voters"]["cipherradar"] == {"voter_group": "cipherradar", "role": "voter", "engine": "opengrep-rules"}
     sections = ("## Preamble", "### How to read this summary", "### Research questions", "### Runs",
-                "### Repositories", "## Bar exam: the micro projects", "## RQ1 Conformance",
-                "### Spec issues", "## RQ2 Volume", "### What the tools report, as written",
-                "### Units per tool", "### Traceable", "## RQ3 Agreement", "### Voter groups",
-                "### RQ3a: the L0-L4 deltas", "#### Spellings per identity", "### RQ3b: agreement at L4",
-                "### RQ3b: per-tool rates")  # fmt: skip
+                "### Repositories", "## RQ1 Tool selection", "## RQ2 Volume", "### What the tools report, as written",
+                "### Units per tool", "### Traceable", "## RQ3 Conformity", "### Spec issues", "### Meaningful",
+                "### Where the information lives", "## RQ4 Normalisation", "### The registry and what it lacks",
+                "### The L0-L4 deltas", "#### Spellings per identity", "## RQ5 Agreement", "### Voter groups",
+                "### Agreement at L4", "### Per-tool rates")  # fmt: skip
     for section in (*sections, "## Files"):
         assert section in summary, section
     positions = [summary.index(s) for s in sections]
@@ -291,8 +292,15 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert "| [bfcbom/micro-java](https://github.com/bfcbom/micro-java) | Java | 3 | 2 | 3.0 | 1.0 |" in summary
     assert "Per repository (`units-repo-run<i>.csv`)" in summary
     meaningful = summary.index("### Meaningful")
-    assert meaningful < summary.index("#### Asset type `algorithm`", meaningful) < summary.index("### Traceable")
-    assert "**RQ3 Agreement**" in summary[summary.index("## Files") :]  # files by question
+    assert meaningful < summary.index("#### Asset type `algorithm`", meaningful) < summary.index("### Where the info")
+    assert "**RQ5 Agreement**" in summary[summary.index("## Files") :]  # files by question
+    sources = _read_csv(out / "sources-run1.csv")
+    assert sources and {r["kind"] for r in sources} <= set(SOURCE_KINDS) and all(r["dimension"] for r in sources)
+    registry = _read_csv(out / "registry-run1.csv")
+    additions = {r["name"]: r for r in registry if r["kind"] == "addition"}
+    assert {"RSA", "EC", "PRNG", "SHA"} <= set(additions) and additions["RSA"]["gap"] == "scheme-less"
+    assert {r["name"] for r in registry if r["kind"] == "layer"} == set(lv.LAYERS)
+    assert all(r["registry"] in ("true", "false") for r in algos)
     assert "| cbomkit | 11 / 11 · 11 |" in summary
 
 

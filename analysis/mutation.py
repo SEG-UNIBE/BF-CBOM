@@ -1,4 +1,4 @@
-"""RQ4, planted calls and decoys: did a tool pick up the crypto call a mutant inserted, and did it stay quiet on a
+"""RQ6, planted calls and decoys: did a tool pick up the crypto call a mutant inserted, and did it stay quiet on a
 planted decoy (mutation/, mutants.json)?
 
 Each (mutant, tool) is compared with the same tool on the original snapshot. A mutant record counts only if it is new:
@@ -18,14 +18,14 @@ the change (an LLM's memorised repository) is not credited.
   sides; read next to the tool's run-to-run instability on the original (stability.csv).
 Rates (`mutation-rates.csv`): per tool, language, style and dimension the mean of the per-repository detection rates
 (refinement 1), the pooled rate, and a bootstrap CI over repositories when the support suffices (score.py's
-thresholds). The bridge to RQ3b's rates is `bridge_rows`.
+thresholds). The bridge to RQ5's rates is `bridge_rows`.
 """
 
 from __future__ import annotations
 
 import random
 from collections import defaultdict
-from statistics import mean
+from statistics import mean, median
 
 from common.experiment import ORIGINAL_VARIANT, repo_dir_name
 from common.tools_registry import role, voter_groups
@@ -53,7 +53,8 @@ MUTATION_COLUMNS = [
 SCORE_COLUMNS = [
     "tool", "voter_group", "role", "language", "style", "repos", "calls", "found_site", "found_group", "decoys",
     "decoys_hit", "recall_site", "recall_low", "recall_high", "recall_group", "precision", "f1", "f1_low", "f1_high",
-    "supported", "tailored",
+    "supported", "tailored", "offedit_mutants", "offedit_share", "extra_units_median", "extra_sites_median",
+    "baseline_flux", "baseline_changed",
 ]  # fmt: skip
 BRIDGE_COLUMNS = ["language", "tool", "confirmation", "f1", "n", "spearman", "kendall_tau"]
 RATE_COLUMNS = [
@@ -402,24 +403,49 @@ def _bootstrap_scores(
     return ci(recalls) or (0.0, 0.0), ci(f1s)
 
 
+def _count(v) -> int:
+    """`extra_units` (a list, or its CSV text) or `extra_sites` (an int) as a count."""
+    if isinstance(v, int | float):
+        return int(v)
+    if isinstance(v, list | tuple | set):
+        return len(v)
+    text = str(v or "").strip()
+    if text.isdigit():
+        return int(text)
+    return len([x for x in text.strip("[]").split(",") if x.strip()])
+
+
 def score_rows(
-    rows: list[dict], *, samples: int = 200, seed: int = BOOTSTRAP_SEED, tailored: frozenset[str] = frozenset()
+    rows: list[dict],
+    *,
+    samples: int = 200,
+    seed: int = BOOTSTRAP_SEED,
+    tailored: frozenset[str] = frozenset(),
+    baseline: dict[str, dict[str, float]] | None = None,
 ) -> list[dict]:
     """mutation-scores.csv: per (tool, language, style or `all`) the pooled recall on the planted calls (at the
     site: strict; by group: lenient), the precision over the planted items (calls found / (calls found + decoys
     hit); the decoys, style-less, count for every style) and F1, with bootstrap CIs over repositories. Precision and
     F1 are empty without decoys. `supported` as in score.py (repositories and calls). `tailored`: tools tuned on the
     micro projects, which come from the same snippet catalog as the mutants (refinement 13), so their scores here are
-    inflated by construction."""
+    inflated by construction.
+    Changes off the edit (RQ6's side finding, never folded into recall, precision or F1): over the judged mutants of
+    the (tool, language), calls and decoys together and style-less like the decoys, `offedit_mutants` with any new
+    unit or new located site outside the inserted lines, `offedit_share` of the judged mutants, and the medians of
+    `extra_units` and `extra_sites` over those mutants (how much changes when something does); `baseline_flux` and
+    `baseline_changed` are the tool's noise floor
+    from a stability experiment (`stability.baseline_flux`, `report --baseline`), empty without one."""
     calls: dict[tuple, dict[str, list[bool]]] = defaultdict(lambda: defaultdict(list))
     grouped: dict[tuple, dict[str, list[bool]]] = defaultdict(lambda: defaultdict(list))
     decoys: dict[tuple, dict[str, list[bool]]] = defaultdict(lambda: defaultdict(list))
+    offedit: dict[tuple, list[tuple[int, int]]] = defaultdict(list)
     meta: dict[str, dict] = {}
     for r in rows:
         if r.get("status") != "ok":
             continue
         meta[r["tool"]] = {"voter_group": r["voter_group"], "role": r["role"]}
         key = (r["tool"], r["language"])
+        offedit[key].append((_count(r.get("extra_units")), _count(r.get("extra_sites"))))
         if r.get("kind") == "decoy":
             if r.get("false_positive") is not None:
                 decoys[key][r["repo"]].append(bool(r["false_positive"]))
@@ -438,6 +464,9 @@ def score_rows(
         ok = supported(len(per_repo), n, min_repos=MIN_REPOS, min_items=MIN_ITEMS)
         recall_ci, f1_ci = _bootstrap_scores(per_repo, negatives, samples, seed) if ok else ((None, None), None)
         precision = round(tp / (tp + fp), 4) if m and tp + fp else None
+        judged = offedit.get((tool, language), [])
+        changed = [u + s for u, s in judged if u or s]
+        floor = (baseline or {}).get(tool) or {}
         out.append(
             {
                 "tool": tool,
@@ -460,14 +489,20 @@ def score_rows(
                 "f1_high": None if not f1_ci else round(f1_ci[1], 4),
                 "supported": ok,
                 "tailored": tool in tailored,
+                "offedit_mutants": len(changed),
+                "offedit_share": round(len(changed) / len(judged), 4) if judged else None,
+                "extra_units_median": median(u for u, s in judged if u or s) if changed else None,
+                "extra_sites_median": median(s for u, s in judged if u or s) if changed else None,
+                "baseline_flux": floor.get("flux"),
+                "baseline_changed": floor.get("changed"),
             }
         )
     return out
 
 
 def bridge_rows(confirmation: dict[tuple[str, str], float], scores: list[dict]) -> list[dict]:
-    """bridge-run<i>.csv (RQ4's bridge to RQ3, refinement 9): per language and over all cells, a tool's confirmation
-    rate (RQ3b, the exact matcher at L4 on the experiment's original repositories of that language) against its F1 on
+    """bridge-run<i>.csv (RQ6's bridge to RQ5, refinement 9): per language and over all cells, a tool's confirmation
+    rate (RQ5, the exact matcher at L4 on the experiment's original repositories of that language) against its F1 on
     the planted items (style `all`): the cells, then per language and `all` the Spearman correlation over the cells
     and Kendall's tau between the two rankings (`tool` = `all`; empty with fewer than three cells)."""
     from .score import kendall_tau, spearman

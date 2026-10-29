@@ -3,7 +3,7 @@
 # Canonical names come from the CycloneDX 1.7 cryptography registry (analysis/data/cyclonedx/cryptography-defs.json):
 # `family` is a registry family (AES, RSAES-OAEP, ECDSA, SHA-2, ...) or one of the `additions` below, `curve` is a
 # registry curve name (OID-equal names are aliases: secp256r1 = P-256 = prime256v1). Everything here is reviewed by
-# hand and published with the paper (it is the per-field mapping table of RQ3). Rule: a spelling only one tool uses
+# hand and published with the paper (it is the per-field mapping table of RQ4). Rule: a spelling only one tool uses
 # goes into that tool's dictionary (analysis/adapters/<tool>.yaml); once two tools use it, it moves here.
 #
 # Seeded on 2026-10-16 from the distinct values of 124 CBOMs of 11 tools (experiment e1-pilot-corpus). Frozen since
@@ -12,7 +12,7 @@
 # API (registry, RFC 7518 JOSE, RFC 4253/8332 SSH, JCA standard names, OS and library APIs) stays, however many tools
 # use it; a label a tool invented (rule names, category labels) goes into that tool's spec, where `interpretive: true`
 # marks mappings that are judgements rather than spellings (they count at L4 only, analysis/levels.py).
-version: "2026-10-23.2"
+version: "2026-10-29.1"
 
 # Coarse groups (the family names of analysis/data/families.yaml, used by the call-site matcher and the micro ground
 # truth) -> the registry families and additions they contain. Every registry family must appear exactly once.
@@ -37,19 +37,22 @@ groups:
   KDF-other: [HKDF, Argon2, bcrypt, scrypt, yescrypt, ANSI-KDF, SSH-KDF, TLS-PRF, IKE-PRF, SP800-108, SP800-56C, crypt]
   RANDOM: [CTR_DRBG, Hash_DRBG, HMAC_DRBG, Fortuna, Yarrow, CSPRNG, PRNG]
 
-# Families the registry has no entry for, but tools report.
+# Families the registry has no entry for, but tools report (RQ4: the delta to the registry, registry-run<i>.csv).
+# `gap` names the kind of gap: missing-family (a scheme the registry lacks), scheme-less (a key type or use without
+# a scheme, which the registry names only as schemes), generic-marker (a name that covers several registry entries
+# and attaches to them without merging them), non-crypto (a non-cryptographic thing tools report as crypto).
 additions:
-  RSA: {primitive: pke, note: "an RSA key pair or RSA use without a scheme (keygen, `KeyPairGenerator.getInstance(\"RSA\")`)"}
-  EC: {primitive: pke, note: "an EC key pair or curve without a scheme (ECDSA, ECDH, ...)"}
-  CSPRNG: {primitive: drbg, note: "a cryptographically secure random generator without a named DRBG (SecureRandom, crypto/rand, os.urandom)"}
-  PRNG: {primitive: drbg, note: "a NON-cryptographic random generator (math/rand, java.util.Random, Math.random)"}
-  PBE: {primitive: other, note: "password-based encryption without a scheme"}
-  FN-DSA: {primitive: signature, note: "Falcon (FIPS 206 draft)"}
-  NTRU-Prime: {primitive: kem, note: "sntrup761 (OpenSSH hybrid key exchange)"}
-  Hybrid-KEM: {primitive: kem, note: "a hybrid of a classical and a post-quantum key exchange"}
-  crypt: {primitive: kdf, note: "Unix crypt(3) password hashing schemes (MD5-crypt, SHA-256-crypt, ...)"}
-  SHA: {primitive: hash, note: "a bare SHA (CipherRadar `Algorithm reference: SHA`, `HMAC-SHA`): SHA-1, SHA-2 or SHA-3 unspecified; a generic marker (generic_over) that attaches to the specific algorithms' clusters and never merges them"}
-  XDH: {primitive: key-agree, note: "Java's standard algorithm name for Diffie-Hellman over Curve25519 or Curve448 (KeyAgreement / KeyPairGenerator `XDH`, JDK 11): X25519 or X448 unspecified; a generic marker (generic_over) over those two"}
+  RSA: {gap: scheme-less, primitive: pke, note: "an RSA key pair or RSA use without a scheme (keygen, `KeyPairGenerator.getInstance(\"RSA\")`)"}
+  EC: {gap: scheme-less, primitive: pke, note: "an EC key pair or curve without a scheme (ECDSA, ECDH, ...)"}
+  CSPRNG: {gap: missing-family, primitive: drbg, note: "a cryptographically secure random generator without a named DRBG (SecureRandom, crypto/rand, os.urandom)"}
+  PRNG: {gap: non-crypto, primitive: drbg, note: "a NON-cryptographic random generator (math/rand, java.util.Random, Math.random)"}
+  PBE: {gap: scheme-less, primitive: other, note: "password-based encryption without a scheme"}
+  FN-DSA: {gap: missing-family, primitive: signature, note: "Falcon (FIPS 206 draft)"}
+  NTRU-Prime: {gap: missing-family, primitive: kem, note: "sntrup761 (OpenSSH hybrid key exchange)"}
+  Hybrid-KEM: {gap: missing-family, primitive: kem, note: "a hybrid of a classical and a post-quantum key exchange"}
+  crypt: {gap: missing-family, primitive: kdf, note: "Unix crypt(3) password hashing schemes (MD5-crypt, SHA-256-crypt, ...)"}
+  SHA: {gap: generic-marker, primitive: hash, note: "a bare SHA (CipherRadar `Algorithm reference: SHA`, `HMAC-SHA`): SHA-1, SHA-2 or SHA-3 unspecified; a generic marker (generic_over) that attaches to the specific algorithms' clusters and never merges them"}
+  XDH: {gap: generic-marker, primitive: key-agree, note: "Java's standard algorithm name for Diffie-Hellman over Curve25519 or Curve448 (KeyAgreement / KeyPairGenerator `XDH`, JDK 11): X25519 or X448 unspecified; a generic marker (generic_over) over those two"}
 
 # What `parameterSetIdentifier` means per family (CycloneDX: "in AES128, '128' identifies the key length in bits, in
 # SHA256, '256' identifies the digest length"). Families not listed: kept as `param_set` (raw), never as key size.

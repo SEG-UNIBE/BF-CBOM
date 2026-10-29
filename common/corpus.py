@@ -4,6 +4,15 @@ Produces the `repos:` list consumed by `common.experiment.load_spec` via `corpus
 Runs inside the `runner` container; needs network access to GitHub (a token raises the
 search rate limit from 10 to 30 requests per minute).
 
+Sampling design (2026-10-29): the cells are language x star bin x size bin, every cell gets the same quota
+(`per_cell`), so the sample covers the design space evenly (a comparison of tools across strata, not an estimate of
+the GitHub population). Every cell's population is enumerated completely before the draw: the search is paginated
+to the API's limit of 1000 results, and a cell above it is split by creation date until every part fits, so the draw
+(`random.Random(seed)` over the full, name-sorted population) is uniform over the cell. The frame is recorded in the
+corpus `params` (search date, bins, every cell with its population and quota), each sampled repo keeps its `stratum`,
+and two covariates are recorded but never selected on: `crypto_apis` (the API families the pre-filter matched) and
+`topics` (the repository's GitHub topics). No topic targeting: the crypto-use pre-filter is the one content criterion.
+
 Exclusions (CLAUDE.md refinement 11): name patterns (CBOM tooling, benchmarks), the reviewed list
 `experiments/corpus/exclusions.yaml` (the generators' own repos and test suites, with a reason each), and the repos
 a tool was tuned on (`tailored_on` in common/tools.yaml, refinement 13). The crypto pre-filter greps first-party
@@ -27,6 +36,7 @@ import subprocess
 import tempfile
 import time
 from dataclasses import dataclass, field
+from datetime import date, timedelta
 from pathlib import Path
 
 import requests
@@ -44,16 +54,32 @@ NON_FIRST_PARTY = (
 
 logger = logging.getLogger(__name__)
 
-# Import/usage patterns that make a repo interesting for CBOM generation (grep on a shallow clone).
-CRYPTO_PATTERNS: dict[str, str] = {
-    "java": r"javax\.crypto|java\.security\.(MessageDigest|KeyPairGenerator|Signature|SecureRandom|KeyFactory|KeyStore)"
-    r"|org\.bouncycastle|javax\.net\.ssl",
-    "python": r"^\s*(from|import)\s+(cryptography|hashlib|hmac|ssl|Crypto|Cryptodome|nacl|OpenSSL|ecdsa|rsa|bcrypt"
-    r"|passlib|jwt)\b",
-    # an import path in quotes (single or grouped imports); crypto/rand alone is not enough (IDs, nonces)
-    "go": r'"crypto/(aes|cipher|des|ecdh|ecdsa|ed25519|elliptic|hkdf|hmac|md5|mlkem|pbkdf2|rc4|rsa|sha1|sha256|sha3'
-    r'|sha512|tls|x509)"|"golang\.org/x/crypto/',
+# Import/usage patterns that make a repo interesting for CBOM generation (grep on a shallow clone), per API family:
+# the families a repo matches are recorded as the covariate `crypto_apis` (never selected on).
+CRYPTO_APIS: dict[str, dict[str, str]] = {
+    "java": {
+        "JCA": r"javax\.crypto|java\.security\.(MessageDigest|KeyPairGenerator|Signature|SecureRandom|KeyFactory"
+        r"|KeyStore)",
+        "BouncyCastle": r"org\.bouncycastle",
+        "JSSE": r"javax\.net\.ssl",
+    },
+    "python": {
+        "pyca": r"^\s*(from|import)\s+cryptography\b",
+        "hashlib": r"^\s*(from|import)\s+(hashlib|hmac)\b",
+        "ssl": r"^\s*(from|import)\s+ssl\b",
+        "pycryptodome": r"^\s*(from|import)\s+(Crypto|Cryptodome)\b",
+        "nacl": r"^\s*(from|import)\s+nacl\b",
+        "pyOpenSSL": r"^\s*(from|import)\s+OpenSSL\b",
+        "other": r"^\s*(from|import)\s+(ecdsa|rsa|bcrypt|passlib|jwt)\b",
+    },
+    "go": {
+        # an import path in quotes (single or grouped imports); crypto/rand alone is not enough (IDs, nonces)
+        "stdlib": r'"crypto/(aes|cipher|des|ecdh|ecdsa|ed25519|elliptic|hkdf|hmac|md5|mlkem|pbkdf2|rc4|rsa|sha1|sha256'
+        r'|sha3|sha512|tls|x509)"',
+        "x/crypto": r'"golang\.org/x/crypto/',
+    },
 }
+CRYPTO_PATTERNS: dict[str, str] = {lang: "|".join(fams.values()) for lang, fams in CRYPTO_APIS.items()}
 SOURCE_EXTENSIONS = {"java": "java", "python": "py", "go": "go"}
 # per language, first-party exclusions beyond NON_FIRST_PARTY directories (Go keeps tests next to the code)
 EXTRA_EXCLUDES = {"go": ["**/*_test.go", "**/testdata/**"]}
@@ -83,27 +109,62 @@ def repo_size_cap_mb(env: dict | None = None) -> int | None:
     return gitserver // SIZE_CAP_RATIO if gitserver else None
 
 
-def clamp_size_bins(bins: list[tuple[int, int]], cap_mb: int | None) -> list[tuple[int, int]]:
-    """The size cells (KB) cut at the cap: cells above it disappear, the cell containing it ends at the cap."""
+Bin = tuple[int, int | None]  # [lo, hi): hi None = open (up to the size cap for sizes)
+
+
+def parse_bins(text: str) -> list[Bin]:
+    """`"50-300,300-2000,2000-"` -> [(50, 300), (300, 2000), (2000, None)]: bins are [lo, hi), the last may be open."""
+    bins: list[Bin] = []
+    for part in (p.strip() for p in text.split(",") if p.strip()):
+        lo, dash, hi = part.partition("-")
+        if not dash or not lo.strip().isdigit() or (hi.strip() and not hi.strip().isdigit()):
+            raise ValueError(f"a bin is `lo-hi` or `lo-`: {part!r}")
+        bins.append((int(lo), int(hi) if hi.strip() else None))
+    if not bins:
+        raise ValueError("no bins")
+    for (_, hi), (lo, _) in zip(bins, bins[1:], strict=False):
+        if hi is None or lo != hi:
+            raise ValueError(f"bins must be adjacent: {text!r}")
+    return bins
+
+
+def clamp_size_bins(bins: list[Bin], cap_mb: int | None) -> list[Bin]:
+    """The size cells (KB) cut at the cap: cells above it disappear, the cell containing it (or the open last one)
+    ends at the cap."""
     if not cap_mb:
         return list(bins)
     cap_kb = cap_mb * 1024
-    return [(lo, min(hi, cap_kb)) for lo, hi in bins if lo < cap_kb]
+    return [(lo, cap_kb if hi is None else min(hi, cap_kb)) for lo, hi in bins if lo < cap_kb]
+
+
+def bin_query(lo: int, hi: int | None) -> str:
+    """The GitHub range qualifier of a [lo, hi) bin: `lo..hi-1`, or `>=lo` when open."""
+    return f">={lo}" if hi is None else f"{lo}..{hi - 1}"
+
+
+def bin_text(lo: int, hi: int | None) -> str:
+    return f"{lo}-" if hi is None else f"{lo}-{hi}"
 
 
 @dataclass
 class CorpusParams:
     languages: list[str] = field(default_factory=lambda: ["Java", "Python", "Go"])  # the paper's (2026-10-20)
-    per_language: int = 100
-    star_bins: list[tuple[int, int]] = field(
-        default_factory=lambda: [(50, 300), (300, 2000), (2000, 15000), (15000, 1_000_000)]
-    )
-    size_bins_kb: list[tuple[int, int]] = field(default_factory=lambda: [(300, 3000), (3000, 30000), (30000, 300000)])
+    per_cell: int = 2  # repos drawn per (language, stars, size) cell; 3 x 3 cells x 2 = 18 per language
+    star_bins: list[Bin] = field(default_factory=lambda: [(50, 300), (300, 2000), (2000, None)])
+    size_bins_kb: list[Bin] = field(default_factory=lambda: [(300, 3000), (3000, 30000), (30000, None)])
     pushed_within_days: int = 365
     crypto_filter: bool = True
     exclude_patterns: list[str] = field(default_factory=lambda: list(DEFAULT_EXCLUDE_PATTERNS))
     seed: int = 20261015
     max_repo_size_mb: int | None = field(default_factory=repo_size_cap_mb)  # see the module docstring
+
+    @property
+    def cells_per_language(self) -> int:
+        return len(self.star_bins) * len(clamp_size_bins(self.size_bins_kb, self.max_repo_size_mb))
+
+    @property
+    def per_language(self) -> int:
+        return self.cells_per_language * self.per_cell
 
 
 def _headers(token: str | None) -> dict:
@@ -113,36 +174,34 @@ def _headers(token: str | None) -> dict:
     return h
 
 
-def search_cell(
-    language: str,
-    stars: tuple[int, int],
-    size_kb: tuple[int, int],
-    pushed_since: str,
-    token: str | None,
-    *,
-    per_page: int = 100,
-) -> list[dict]:
-    """One GitHub search query for a (language, stars, size) cell; retries on rate limiting."""
-    q = (
-        f"language:{language} stars:{stars[0]}..{stars[1]} size:{size_kb[0]}..{size_kb[1]} "
-        f"pushed:>={pushed_since} archived:false fork:false"
-    )
-    url = "https://api.github.com/search/repositories"
+SEARCH_URL = "https://api.github.com/search/repositories"
+SEARCH_LIMIT = 1000  # GitHub returns at most 1000 results per query
+GITHUB_EPOCH = date(2008, 1, 1)
+
+
+def _repo(it: dict) -> dict:
+    return {
+        "full_name": it["full_name"],
+        "git_url": it["clone_url"],
+        "branch": it.get("default_branch") or "main",
+        "language": it.get("language"),
+        "stars": it.get("stargazers_count"),
+        "size_kb": it.get("size"),
+        "pushed_at": it.get("pushed_at"),
+        "created_at": it.get("created_at"),
+        "topics": sorted(it.get("topics") or []),  # a covariate, never a selection criterion
+    }
+
+
+def _search(q: str, token: str | None, *, page: int = 1, per_page: int = 100) -> tuple[list[dict], int]:
+    """One search request: the page's items and the query's total count; retries on rate limiting."""
     for attempt in range(6):
-        resp = requests.get(url, params={"q": q, "per_page": per_page}, headers=_headers(token), timeout=30)
+        resp = requests.get(
+            SEARCH_URL, params={"q": q, "per_page": per_page, "page": page}, headers=_headers(token), timeout=30
+        )
         if resp.status_code == 200:
-            return [
-                {
-                    "full_name": it["full_name"],
-                    "git_url": it["clone_url"],
-                    "branch": it.get("default_branch") or "main",
-                    "language": it.get("language"),
-                    "stars": it.get("stargazers_count"),
-                    "size_kb": it.get("size"),
-                    "pushed_at": it.get("pushed_at"),
-                }
-                for it in resp.json().get("items", [])
-            ]
+            data = resp.json()
+            return data.get("items", []), int(data.get("total_count") or 0)
         if resp.status_code in (403, 429):
             wait = int(resp.headers.get("Retry-After") or 0) or max(
                 5, int(resp.headers.get("X-RateLimit-Reset", "0") or 0) - int(time.time())
@@ -155,11 +214,74 @@ def search_cell(
     raise RuntimeError("GitHub search: giving up after repeated rate limiting")
 
 
-def has_crypto_usage(git_url: str, branch: str, language: str, *, timeout: float = 300) -> bool | None:
-    """Shallow-clone and grep for crypto APIs. None when the clone fails."""
-    pattern = CRYPTO_PATTERNS.get(language.lower())
-    if not pattern:
-        return True
+def cell_query(language: str, stars: Bin, size_kb: Bin, pushed_since: str) -> str:
+    return (
+        f"language:{language} stars:{bin_query(*stars)} size:{bin_query(*size_kb)} "
+        f"pushed:>={pushed_since} archived:false fork:false"
+    )
+
+
+def _enumerate(q: str, token: str | None, created: tuple[date, date], *, per_page: int, pause: float,
+               log=lambda m: None) -> tuple[list[dict], int]:  # fmt: skip
+    """Every repository matching `q` created within `created` (inclusive): paginated up to the API's limit; above it
+    the date range is halved and both halves enumerated, so the population is complete. Returns the repos and the
+    number of requests."""
+    lo, hi = created
+    query = f"{q} created:{lo.isoformat()}..{hi.isoformat()}"
+    items, total = _search(query, token, page=1, per_page=per_page)
+    requests_made = 1
+    if total > SEARCH_LIMIT and lo < hi:
+        mid = lo + (hi - lo) // 2
+        time.sleep(pause)
+        left, n1 = _enumerate(q, token, (lo, mid), per_page=per_page, pause=pause, log=log)
+        time.sleep(pause)
+        right, n2 = _enumerate(q, token, (mid + timedelta(days=1), hi), per_page=per_page, pause=pause, log=log)
+        return left + right, requests_made + n1 + n2
+    if total > SEARCH_LIMIT:
+        log(f"  ! {total} repos created on {lo}: the API returns {SEARCH_LIMIT} at most, the population is truncated")
+    repos = [_repo(it) for it in items]
+    page = 1
+    while len(repos) < min(total, SEARCH_LIMIT) and page * per_page < SEARCH_LIMIT:
+        page += 1
+        time.sleep(pause)
+        items, _ = _search(query, token, page=page, per_page=per_page)
+        requests_made += 1
+        if not items:
+            break
+        repos += [_repo(it) for it in items]
+    return repos, requests_made
+
+
+def search_cell(
+    language: str,
+    stars: Bin,
+    size_kb: Bin,
+    pushed_since: str,
+    token: str | None,
+    *,
+    per_page: int = 100,
+    pause: float = 2.1,
+    log=lambda m: None,
+) -> tuple[list[dict], int, int]:
+    """The complete population of a (language, stars, size) cell: every matching repository (deduplicated by full
+    name), the cell's total count as the API states it, and the requests it took. `pause` is the wait between
+    requests (30 per minute with a token)."""
+    q = cell_query(language, stars, size_kb, pushed_since)
+    repos, requests_made = _enumerate(q, token, (GITHUB_EPOCH, date.today()), per_page=per_page, pause=pause, log=log)
+    _, total = _search(q, token, page=1, per_page=1)  # the cell's own count, next to the enumeration
+    seen: dict[str, dict] = {}
+    for r in repos:
+        seen.setdefault(r["full_name"], r)
+    return list(seen.values()), total, requests_made + 1
+
+
+def has_crypto_usage(git_url: str, branch: str, language: str, *, timeout: float = 300) -> list[str] | None:
+    """Shallow-clone and grep first-party source for the crypto API families of `language` (CRYPTO_APIS). Returns the
+    families matched (empty: no first-party crypto usage, the repo is not sampled; the list is the covariate
+    `crypto_apis`), or None when the clone fails. A language without patterns matches `["unchecked"]`."""
+    families = CRYPTO_APIS.get(language.lower())
+    if not families:
+        return ["unchecked"]
     with tempfile.TemporaryDirectory(prefix="corpus-") as tmp:
         clone = subprocess.run(
             ["git", "clone", "--quiet", "--depth", "1", "-b", branch, git_url, tmp],
@@ -171,14 +293,18 @@ def has_crypto_usage(git_url: str, branch: str, language: str, *, timeout: float
         )
         if clone.returncode != 0:
             return None
-        grep = subprocess.run(
-            ["git", "-C", tmp, "grep", "-l", "-I", "-E", pattern, "--", *grep_pathspecs(language)],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            check=False,
-        )
-        return grep.returncode == 0 and bool(grep.stdout.strip())
+        matched = []
+        for family, pattern in families.items():
+            grep = subprocess.run(
+                ["git", "-C", tmp, "grep", "-l", "-I", "-E", pattern, "--", *grep_pathspecs(language)],
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                check=False,
+            )
+            if grep.returncode == 0 and grep.stdout.strip():
+                matched.append(family)
+        return matched
 
 
 def _excluded(full_name: str, patterns: list[str]) -> bool:
@@ -236,7 +362,10 @@ def build_corpus(
     exclusions: dict | None = None,
     tailored: dict[str, frozenset[str]] | None = None,
 ) -> dict:
-    """Stratified sample per language over stars x size cells, filtered and pinned to commits. Exclusions default to
+    """Stratified sample per language over stars x size cells, `per_cell` repos each, filtered and pinned to
+    commits. Every cell's population is enumerated and recorded, the draw is a seeded shuffle of the name-sorted
+    population, and the first `per_cell` candidates that pass the exclusions, the size cap and the crypto pre-filter
+    are taken (so the sample is uniform over the eligible repos of the cell). Exclusions default to
     experiments/corpus/exclusions.yaml and the registry's `tailored_on`; every excluded candidate is listed
     with its reason.
     `status(language, picked, now)` follows the search (the CLI's progress line): `now` is the cell searched or the
@@ -250,21 +379,33 @@ def build_corpus(
     if cap_mb:
         log(f"repo size cap {cap_mb} MB (git server memory / {SIZE_CAP_RATIO}); size cells (KB): {size_bins}")
     cells = [(s, z) for s in params.star_bins for z in size_bins]
-    quota = max(1, -(-params.per_language // len(cells)))  # ceil
+    quota = params.per_cell
+    log(
+        f"{len(params.star_bins)} star bins x {len(size_bins)} size bins = {len(cells)} cells x {quota} repos = "
+        f"{len(cells) * quota} per language, {len(cells) * quota * len(params.languages)} in all"
+    )
+    pause = 2.1 if token else 6.5  # 30 (10) search requests per minute
     chosen: list[dict] = []
     excluded: list[dict] = []
-    stats = {"searched": 0, "excluded": 0, "no_crypto": 0, "clone_failed": 0, "unresolved": 0}
+    frame: list[dict] = []
+    stats = {"searched": 0, "requests": 0, "excluded": 0, "no_crypto": 0, "clone_failed": 0, "unresolved": 0}
     for language in params.languages:
         picked_for_lang: list[dict] = []
         for stars, size in cells:
-            status(language, len(picked_for_lang), f"searching {stars[0]}-{stars[1]} stars, {size[0]}-{size[1]} KB")
-            candidates = search_cell(language, stars, size, pushed_since, token)
+            label = f"{bin_text(*stars)} stars, {bin_text(*size)} KB"
+            status(language, len(picked_for_lang), f"enumerating {label}")
+            candidates, population, n_requests = search_cell(
+                language, stars, size, pushed_since, token, pause=pause, log=log
+            )
             stats["searched"] += len(candidates)
+            stats["requests"] += n_requests
+            candidates.sort(key=lambda c: c["full_name"])  # the API's order varies; the seed decides the draw
             rng.shuffle(candidates)
-            taken = 0
+            taken = tried = 0
             for cand in candidates:
-                if taken >= quota or len(picked_for_lang) >= params.per_language:
+                if taken >= quota:
                     break
+                tried += 1
                 reason = exclusion_reason(
                     cand["full_name"], patterns=params.exclude_patterns, exclusions=exclusions, tailored=tailored
                 )
@@ -283,15 +424,16 @@ def build_corpus(
                     continue
                 if params.crypto_filter:
                     status(language, len(picked_for_lang), f"{cand['full_name']}: cloning for the crypto check")
-                    hit = has_crypto_usage(cand["git_url"], cand["branch"], language)
-                    if hit is None:
+                    apis = has_crypto_usage(cand["git_url"], cand["branch"], language)
+                    if apis is None:
                         stats["clone_failed"] += 1
                         excluded.append({"full_name": cand["full_name"], "reason": "clone failed"})
                         continue
-                    if not hit:
+                    if not apis:
                         stats["no_crypto"] += 1
                         excluded.append({"full_name": cand["full_name"], "reason": "no first-party crypto usage"})
                         continue
+                    cand["crypto_apis"] = apis
                 commit = resolve_remote_commit(cand["git_url"], cand["branch"])
                 if not commit:
                     stats["unresolved"] += 1
@@ -301,7 +443,21 @@ def build_corpus(
                 picked_for_lang.append(cand)
                 taken += 1
                 log(f"  + {cand['full_name']} ({language}, {cand['stars']}★, {cand['size_kb']} KB) {commit[:12]}")
-            time.sleep(2.5 if token else 6.5)  # stay under the search rate limit
+            frame.append(
+                {
+                    "language": language,
+                    "stars": list(stars),
+                    "size_kb": list(size),
+                    "population": population,
+                    "enumerated": len(candidates),
+                    "tried": tried,
+                    "sampled": taken,
+                    "quota": quota,
+                }
+            )
+            if taken < quota:
+                log(f"  ! {language} {label}: {taken} of {quota} (population {population}, {tried} tried)")
+            time.sleep(pause)
         status(language, len(picked_for_lang), None)
         log(f"{language}: {len(picked_for_lang)} repos")
         chosen.extend(picked_for_lang)
@@ -309,15 +465,18 @@ def build_corpus(
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "params": {
             "languages": params.languages,
-            "per_language": params.per_language,
+            "per_cell": quota,
+            "per_language": len(cells) * quota,
             "star_bins": [list(b) for b in params.star_bins],
             "size_bins_kb": [list(b) for b in size_bins],
             "max_repo_size_mb": cap_mb,
             "pushed_since": pushed_since,
+            "search_date": time.strftime("%Y-%m-%d", time.gmtime()),
             "crypto_filter": params.crypto_filter,
             "exclude_patterns": params.exclude_patterns,
             "seed": params.seed,
         },
+        "cells": frame,
         "stats": stats,
         "excluded": excluded,
         "repos": chosen,

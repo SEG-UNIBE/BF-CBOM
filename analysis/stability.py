@@ -5,6 +5,9 @@ For every (tool, snapshot, variant) with at least two stored ok runs: the Jaccar
 and the consensus set: the items (L4 identity, as in the ladder and the scores) present in more than half of the runs
 (an inserted snippet of Phase 4 counts as detected only when it is in most runs). Scoring uses the
 consensus sets instead of run i's sets when repetitions exceed one (`--consensus`, the default then).
+`flux` is the noise floor of RQ6's "changes off the edit": the share of the items (the consensus unit, L4) a tool
+reported on the unchanged snapshot in some run but not in every run; `baseline_flux` summarises it per tool for
+`mutation-scores.csv` (`report --baseline`).
 """
 
 from __future__ import annotations
@@ -19,7 +22,7 @@ from .normalize.vocab import Vocabulary, load_vocabulary
 
 STABILITY_COLUMNS = [
     "repo", "snapshot", "variant", "tool", "level", "runs", "records_mean", "records_cv", "items_mean",
-    "jaccard_mean", "jaccard_min", "consensus", "unstable",
+    "jaccard_mean", "jaccard_min", "flux", "consensus", "unstable",
 ]  # fmt: skip
 
 
@@ -51,6 +54,7 @@ def stability_rows(
                 seen[key] += 1
         majority = {key for key, n in seen.items() if n > len(by_run) / 2}
         consensus[(snapshot, variant, tool)] = majority
+        in_every = sum(1 for n in seen.values() if n == len(by_run))
         mean = statistics.mean(counts)
         rows.append(
             {
@@ -65,8 +69,25 @@ def stability_rows(
                 "items_mean": round(statistics.mean(len(s) for s in sets.values()), 1),
                 "jaccard_mean": round(statistics.mean(pairs), 3),
                 "jaccard_min": round(min(pairs), 3),
+                "flux": round((len(seen) - in_every) / len(seen), 3) if seen else 0.0,
                 "consensus": sorted(majority),
                 "unstable": sorted(set(seen) - majority),
             }
         )
     return rows, consensus
+
+
+def baseline_flux(rows: list[dict]) -> dict[str, dict[str, float]]:
+    """Per tool over a stability table's rows (stability.csv, read back or fresh): `flux`, the mean share of items
+    that come and go between repeated runs of unchanged code, and `changed`, the share of (snapshot, variant) pairs
+    whose repeated runs differ at all; the noise floor RQ6's off-edit changes are read against."""
+    by_tool: dict[str, list[float]] = defaultdict(list)
+    for r in rows:
+        f = r.get("flux")
+        if f in (None, ""):
+            continue
+        by_tool[str(r["tool"])].append(float(f))
+    return {
+        tool: {"flux": round(statistics.mean(fs), 3), "changed": round(sum(1 for f in fs if f > 0) / len(fs), 3)}
+        for tool, fs in sorted(by_tool.items())
+    }

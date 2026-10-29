@@ -160,7 +160,8 @@ experiment-export:
 	mkdir -p experiments/results
 	docker compose run --rm -v "$(CURDIR)/experiments/results:/export" runner experiment export $(NAME) --dest /export $(ARGS)
 
-# make corpus ARGS="--per-language 100"  -> results volume: corpus/corpus.yaml (export with experiment-export-corpus)
+# make corpus ARGS="--per-cell 2"  -> results volume: corpus/corpus.yaml (export with corpus-export); 3 star bins x
+# 3 size bins x 2 repos = 18 per language by default (--star-bins, --size-bins, --per-cell; common/corpus.py)
 corpus: ensure-env
 	docker compose run --rm runner experiment corpus build $(ARGS)
 

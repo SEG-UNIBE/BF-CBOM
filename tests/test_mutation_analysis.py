@@ -1,4 +1,4 @@
-"""RQ4 detection (analysis/mutation.py) on synthetic records, the rates, and the report on a micro-java mutant."""
+"""RQ6 detection (analysis/mutation.py) on synthetic records, the rates, and the report on a micro-java mutant."""
 
 import copy
 import csv
@@ -276,8 +276,9 @@ def test_report_judges_mutants_and_keeps_them_out_of_the_agreement_tables(tmp_pa
     assert len({r["variant"] for r in rows("runs.csv")}) == 3  # runs.csv lists every stored run
     assert (exp / snapshot / mid / "cbomkit" / "run1.norm.json").exists()  # mutants are normalised too
     summary = (out / "_SUMMARY.md").read_text()
-    assert "## RQ4 Effectiveness" in summary and "```diff" in summary and f"`{mid}`" in summary
-    assert "### Recall, precision and F1 on the planted items" in summary and "the bridge to RQ3" in summary
+    assert "## RQ6 Detection" in summary and "```diff" in summary and f"`{mid}`" in summary
+    assert "### Recall, precision and F1 on the planted items" in summary and "the bridge to RQ5" in summary
+    assert "### Changes off the edit" in summary
 
 
 def test_not_judged_counts_the_planted_calls_by_status():
@@ -289,3 +290,38 @@ def test_not_judged_counts_the_planted_calls_by_status():
     text = "\n".join(sm._mutation([mutant], rows, []))
     assert "Not judged (3 planted call × tool" in text
     assert "2 unsupported (the language is outside the tool’s); 1 original error." in text
+
+
+def test_changes_off_the_edit_are_counted_apart_from_detection_and_read_against_the_baseline():
+    """RQ6's side finding: mutants with any new unit or located site outside the inserted lines, their share and the
+    medians, never folded into recall or F1; the noise floor joins from a stability table (`--baseline`)."""
+
+    def row(repo, kind, tool, extra_units, extra_sites, **v):
+        return {"repo": repo, "language": "java", "tool": tool, "voter_group": tool, "role": "voter",
+                "status": "ok", "kind": kind, "style": "direct", "extra_units": extra_units,
+                "extra_sites": extra_sites, **v}  # fmt: skip
+
+    rows = [
+        row("r1", "call", "t", [], 0, found_site=True, found_group=True),
+        row("r2", "call", "t", ["RC4"], 2, found_site=True, found_group=True),
+        row("r1", "decoy", "t", [], 1, false_positive=False),
+        row("r2", "decoy", "t", [], 0, false_positive=False),
+        row("r1", "call", "quiet", [], 0, found_site=False, found_group=False),
+        {**row("r2", "call", "quiet", [], 0, found_site=True, found_group=True), "status": "original error"},
+    ]
+    baseline = {"t": {"flux": 0.1, "changed": 0.25}}
+    scores = {(s["tool"], s["style"]): s for s in mu.score_rows(rows, samples=0, baseline=baseline)}
+    t, quiet = scores[("t", "all")], scores[("quiet", "all")]
+    assert (t["offedit_mutants"], t["offedit_share"]) == (2, 0.5)  # 4 judged mutants, calls and decoys together
+    assert (t["extra_units_median"], t["extra_sites_median"]) == (0.5, 1.5)  # over the 2 mutants with changes
+    assert (t["baseline_flux"], t["baseline_changed"]) == (0.1, 0.25)
+    assert (t["recall_site"], t["precision"], t["f1"]) == (1.0, 1.0, 1.0)  # the off-edit changes do not touch them
+    assert (quiet["offedit_mutants"], quiet["offedit_share"], quiet["baseline_flux"]) == (0, 0.0, None)
+    assert scores[("t", "direct")]["offedit_mutants"] == 2  # style-less, like the decoys
+    text = "\n".join(sm._offedit(list(scores.values()), {}))
+    assert "### Changes off the edit" in text and "| java | t | 4 | 2 | 0.50 | 0.5 | 1.5 | 0.25 (0.10) |" in text
+    assert "| java | quiet | 1 | 0 | 0.00 |  |  |  |" in text
+    # read back from mutation.csv, the lists are text
+    csv_rows = [{**r, "extra_units": str(r["extra_units"]), "extra_sites": str(r["extra_sites"])} for r in rows]
+    again = {(s["tool"], s["style"]): s for s in mu.score_rows(csv_rows, samples=0)}
+    assert again[("t", "all")]["offedit_mutants"] == 2

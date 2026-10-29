@@ -8,7 +8,7 @@ Pure Python, no Redis, no UI. Reads the result tree written by the batch runner
                  of every value read against the CycloneDX version the CBOM declares
 - `levels`:      the L0-L4 normalisation ladder (how much agreement normalisation creates) and which algorithms
                  each tool reports per repository
-- `schema`:      RQ1: whole-document CycloneDX validation, meaningful shares; RQ2: traceability (`snapshots` reads the
+- `schema`:      RQ3: whole-document CycloneDX validation, meaningful shares; RQ2: traceability (`snapshots` reads the
                  files of a pinned commit from the git mirror or a fetched cache)
 - `matchers`:    n-way matchers over the records: `exact` (matcher (b), canonical identity, call-site subgroups)
 - `groundtruth`: scoring against the micro projects' ground truth (experiments/corpus/micro/ground_truth.yaml)

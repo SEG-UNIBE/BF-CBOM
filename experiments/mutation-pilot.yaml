@@ -2,7 +2,7 @@
 # bootstrap interval over repositories, analysis/score.py MIN_REPOS). Selected 2026-10-23 for clean scans (every
 # supported tool ok, no OOM kill at the pinned commits), algorithm diversity, first-party locations and runtime;
 # selection evidence and the preflight in experiments/README.md, "Mutation pilot". A purposive pilot cohort, not a
-# sample: it validates the harness and gives first per-language numbers; the paper's RQ4 numbers come from mutation-main.
+# sample: it validates the harness and gives first per-language numbers; the paper's RQ6 numbers come from mutation-main.
 #
 # Each repo: original + 15 call mutants (every catalog snippet once, five per style) + 15 decoys = 31 variants.
 # All 15 tools, one repetition: 9 x 31 x 15 = 4185 planned results, 3348 supported scans and 837 unsupported

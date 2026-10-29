@@ -76,6 +76,8 @@ class FamilyInfo:
     primitive: str | None
     registry: bool
     param: str  # key | curve | digest | none
+    gap: str | None = None  # an addition's kind of registry gap (`gap:` in algorithms.yaml); None for registry families
+    note: str | None = None  # an addition's reason (`note:`)
 
 
 @dataclass(frozen=True)
@@ -179,6 +181,8 @@ class Vocabulary:
                 (info or {}).get("primitive"),
                 False,
                 param_of.get(str(name), "none"),
+                gap=(info or {}).get("gap"),
+                note=(info or {}).get("note"),
             )
         self.registry_families = frozenset(n for n, f in self.families.items() if f.registry)
         self.family_alias: dict[str, str] = {fold(n): n for n in self.families}

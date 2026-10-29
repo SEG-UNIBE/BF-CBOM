@@ -6,12 +6,13 @@ unmapped values. `coverage_rows` and `conformance_rows` (one run, `coverage-run<
 how complete the algorithm assets are per dimension (reported by the tool vs derived by us), what their names
 resolve to, and the spec issues.
 
-Fill rates, resolutions, sources and spec issues count **assets** (CBOM components), the unit of the RQ1 and RQ2
-tables: a record is one occurrence of an asset, and counted per record a tool's few assets with hundreds of
-occurrences would dominate its shares (CryptoScan: 199 algorithm assets, 13996 records on the pilot corpus).
+Fill rates, resolutions, sources and spec issues count **assets** (CBOM components), the unit of the RQ2 and RQ3
+tables (`sources_rows`, `sources-run<i>.csv`: where the information lives, RQ3): a record is one occurrence of an
+asset, and counted per record a tool's few assets with hundreds of occurrences would dominate its shares (CryptoScan:
+199 algorithm assets, 13996 records on the pilot corpus).
 
 `vocab.csv`: one row per (tool, source, raw value) with what it mapped to. This is the reviewable mapping table of
-the paper (RQ3): rows with status `unmapped` or `partial` are curation gaps of analysis/data/algorithms.yaml or of the
+the paper (RQ4): rows with status `unmapped` or `partial` are curation gaps of analysis/data/algorithms.yaml or of the
 tool's spec (analysis/adapters/<tool>.yaml); `ambiguous` rows name several algorithms at once.
 """
 
@@ -28,6 +29,8 @@ COVERAGE_COLUMNS = [
     "tool", "cboms", "assets", *RESOLUTIONS, "dimension", "reported", "derived", "reported_share", "derived_share",
 ]  # fmt: skip
 CONFORMANCE_COLUMNS = ["tool", "cboms", "scope", "kind", "count"]
+SOURCES_COLUMNS = ["tool", "cboms", "assets", "dimension", "kind", "count", "share"]
+SOURCE_KINDS = ("field", "property", "name", "occurrence", "context", "ref", "dependency", "derived")
 FILL_DIMS = ("family", "algorithm", "primitive", "functions", "mode", "padding", "curve", "key_size", "digest")
 COVERAGE_DIMS = FILL_DIMS + ("protocol", "location")
 
@@ -204,6 +207,32 @@ class Report:
                 )
         return rows
 
+    def sources_rows(self) -> list[dict]:
+        """Where the information lives (RQ3), long format: one row per (tool, dimension, kind of source) with the
+        algorithm assets whose value of that dimension came from that kind (`field`: a standard CycloneDX field;
+        `property`: a tool's own property; `name`: parsed from the component's name; `occurrence`: evidence of an
+        occurrence; `context`: an API identifier; `ref`, `dependency`: another component; `derived`: implied by
+        another value) and the share of the tool's algorithm assets. An asset counts once per kind, so the kinds of
+        one dimension can sum above the assets with a value."""
+        rows = []
+        for tool, t in sorted(self.tools.items()):
+            assets = t["counts"]["algorithm_assets"]
+            for d in FILL_DIMS + ("protocol",):
+                kinds = t["sources"].get(d) or {}
+                for kind in sorted(kinds, key=lambda k: (SOURCE_KINDS.index(k) if k in SOURCE_KINDS else 99, k)):
+                    rows.append(
+                        {
+                            "tool": tool,
+                            "cboms": t["cboms"],
+                            "assets": assets,
+                            "dimension": d,
+                            "kind": kind,
+                            "count": kinds[kind],
+                            "share": round(kinds[kind] / assets, 3) if assets else 0.0,
+                        }
+                    )
+        return rows
+
     def conformance_rows(self) -> list[dict]:
         """Spec issues per tool and kind: `asset` scope counts assets with a value of that kind of issue (field, enum,
         type, deprecated), `document` scope counts CBOMs (dialect, version). Tools without issues have no row."""
@@ -279,6 +308,6 @@ class Report:
 
 
 __all__ = [
-    "ASSET_DIMS", "CONFORMANCE_COLUMNS", "COVERAGE_COLUMNS", "Report", "VOCAB_COLUMNS", "asset_resolution", "assets_of",
-    "source_kind",
+    "ASSET_DIMS", "CONFORMANCE_COLUMNS", "COVERAGE_COLUMNS", "SOURCES_COLUMNS", "Report", "VOCAB_COLUMNS",
+    "asset_resolution", "assets_of", "source_kind",
 ]  # fmt: skip

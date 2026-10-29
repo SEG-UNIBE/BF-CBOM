@@ -22,7 +22,7 @@ import yaml
 
 from common.experiment import load_run_log, spec_path
 
-from .rqs import BAR_EXAM, BAR_EXAM_NOTE, BAR_EXAM_TABLES, RQ1, RQ2, RQ3, RQ4, RQS, STABILITY, STABILITY_NOTE
+from .rqs import RQ1, RQ1_NOTE, RQ2, RQ3, RQ4, RQ5, RQ6, RQS, STABILITY, STABILITY_NOTE
 from .tables import RUNTIME_BOOTSTRAP, RUNTIME_MIN_REPOS
 
 SUMMARY_FILE = "_SUMMARY.md"
@@ -40,8 +40,11 @@ FILES = {
     "micro-run{i}.csv": "one row per (micro project, tool): status, verdict, recall at call sites and repo level",
     "micro-items-run{i}.csv": "one row per (micro project, tool, expected item): found at call site (strict, "
     "lenient), repo",
-    "items-run{i}.csv": "one row per (repo, tool, item) with the voter groups matching it at each level L0-L4; no "
-    "locations",
+    "items-run{i}.csv": "one row per (repo, tool, item) with whether its family is the CycloneDX registry's and the "
+    "voter groups matching it at each level L0-L4; no locations",
+    "registry-run{i}.csv": "the delta to the CycloneDX registry: one row per family added to it (gap kind, "
+    "primitive, items resting on it, repos, tools, reason), per unit no vocabulary names, and per table of the "
+    "identifier layer with its size",
     "levels-run{i}.csv": "share of each tool's items another voter group confirms, per level L0-L4",
     "units-run{i}.csv": "per tool: algorithm assets, records, items and how they relate (records per asset, assets "
     "per item), the kinds of place and the records outside code files of the repository's language",
@@ -49,6 +52,8 @@ FILES = {
     "coverage-run{i}.csv": "per tool and dimension: algorithm assets with a value (reported vs derived), and what "
     "their names are (resolution)",
     "conformance-run{i}.csv": "spec issues per tool and kind (assets: field, enum, type, deprecated; documents)",
+    "sources-run{i}.csv": "per tool, dimension and kind of source (standard field, property, name, occurrence, API "
+    "context, ref, dependency, derived): algorithm assets carrying the value from there, and their share",
     "schema-run{i}.csv": "one row per CBOM: declared format and version, schema validity, error count and kinds",
     "meaningful-run{i}.csv": "per tool, asset type and dimension, assets with a value from standard fields / any",
     "traceability-run{i}.csv": "per (snapshot, tool, asset type), records with a file, with a file and line, "
@@ -76,14 +81,16 @@ FILES = {
     "loo-run{i}.csv": "the order without each voter group and its Kendall tau against the full order",
     "grouping-run{i}.csv": "the order with every tool its own voter group and with the LLM workers merged, and its "
     "Kendall tau against the declared voter groups",
-    "stability.csv": "per (tool, snapshot) with repeated runs: Jaccard across runs, record-count CV, consensus set",
+    "stability.csv": "per (tool, snapshot) with repeated runs: Jaccard across runs, record-count CV, flux (the share "
+    "of items not in every run), consensus set",
     "mutants.csv": "one row per mutant (mutants.json): the planted call or decoy, its file, lines, host and patch",
     "mutation.csv": "per (mutant, tool): found at the site / span / file / repo, by group, parameters, "
     "`false_positive` on a decoy, extra and lost units and sites",
     "mutation-rates.csv": "per tool, language, style and dimension: detection rate (mean of per-repository rates, CI)",
     "mutation-scores.csv": "per tool, language and style: recall on the planted calls (site, group), precision over "
-    "calls and decoys, F1, CIs over repositories",
-    "bridge-run{i}.csv": "the bridge to RQ3: per language, each tool's confirmation rate at L4 against its F1; "
+    "calls and decoys, F1, CIs over repositories; the changes off the edit (mutants with any, share, medians) and the "
+    "noise floor from --baseline",
+    "bridge-run{i}.csv": "the bridge to RQ5: per language, each tool's confirmation rate at L4 against its F1; "
     "Spearman over the cells and Kendall tau between the rankings",
 }
 
@@ -181,7 +188,7 @@ def _false(v) -> bool:
     return str(v).strip().lower() == "false"
 
 
-VERDICT_MARK = {"pass": "✅", "fail": "⛔"}  # a micro project's verdict in the bar-exam table
+VERDICT_MARK = {"pass": "✅", "fail": "⛔"}  # a micro project's verdict in the entry-exam table (RQ1)
 ENTRY_MARK = {"passed": "✅", "disqualified": "⛔"}  # the tool's entry-bar verdict
 OBSERVER_NOTE = (
     "`°` = observer (tools.yaml `role`): confirmed by the voters like every tool, but it confirms nobody, is in no "
@@ -222,7 +229,7 @@ def _reading() -> list[str]:
         "",
         "- **Run**: one tool on one repository once; with several repetitions each pair runs several times, and a "
         "table then reads run 1 unless it says otherwise. A **variant** is the repository as pinned (`original`) or "
-        "a mutant of it with one planted crypto call or decoy (RQ4); a table reads the original variants unless it "
+        "a mutant of it with one planted crypto call or decoy (RQ6); a table reads the original variants unless it "
         "says otherwise.",
         "- **Asset**: one component of a tool's CBOM, as the tool wrote it. **Record**: one place an asset lists "
         "(an asset listed at three places gives three records). How a tool packages its findings decides these "
@@ -241,7 +248,7 @@ def _reading() -> list[str]:
         "- **Observer** (`°` after its name): a tool the registry marks `role: observer` (`common/tools.yaml`; a "
         "transitional role of the tools below the colleague's pilot bar). Its items are checked against the voters "
         "like everyone's, but it confirms nobody and counts in no k, so the voters' numbers are the same with and "
-        "without it. The bar exam's verdicts of this run stand in their own section and do not set the role.",
+        "without it. The entry exam's verdicts of this run (RQ1) do not set the role.",
         "- **Cells**: `–` = the repository's language is outside the tool's languages (not run), `×` = the run "
         "failed or timed out, empty = nothing to show; `1'234` = 1234; every share is a fraction with two decimals "
         "(`0.43` = 43 %, `1.00` = all). Cells that combine numbers (`a / b`, `x (y)`, `rate [low, high]`) are "
@@ -277,7 +284,7 @@ def _questions() -> list[str]:
     for rq in RQS:
         tables = ", ".join(f"`{t.replace('{i}', '<i>')}`" for t in rq.tables)
         lines.append(f"- **{rq.id}, {rq.title.lower()}:** {rq.question} ({tables})")
-    return lines + ["", BAR_EXAM_NOTE + " " + STABILITY_NOTE, ""]
+    return lines + ["", RQ1_NOTE + " " + STABILITY_NOTE, ""]
 
 
 def _eg(text: str) -> list[str]:
@@ -710,8 +717,11 @@ def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
 
     scored = [(t, lg, cells[(t, lg)]) for t in tools for lg in langs if (t, lg) in cells
               and cells[(t, lg)]["verdict"] in ("pass", "fail")]  # fmt: skip
-    lines = [f"## {BAR_EXAM}", ""]
+    lines = [RQ1.heading(), "", RQ1.question, ""]
     lines += [
+        "The tool search (the candidates, where and when they were looked for, the requirements and every exclusion "
+        "with its reason) is documented in `docs/tool-selection.md`; this section is the entry exam on the generated "
+        "micro projects. "
         f"Each micro project (`experiments/corpus/micro`, one per language) is a small program generated from the "
         f"snippet catalog (`mutation/micro.py`): {n_items} known crypto calls, each in a function of its own, "
         "plus decoys (code that names or resembles cryptography without using it). That is the ground truth "
@@ -745,6 +755,7 @@ def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
             f"functions, so it {'passes' if r['verdict'] == 'pass' else 'fails'} the bar of {bar}."
         )
     lines += _handover(rows, tools, langs)
+    lines += _decoys(rows, langs, tools)
     lines += [
         "",
         f"**Recall at two levels**: the same projects in detail, each cell out of {n_items}, written "
@@ -808,7 +819,6 @@ def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
             item, lg, cell = first
             f, n = cell.split("/")
             lines += _eg(f"`{cell}` for {item} in {lg}: {f} of the {n} tools scored on micro-{lg} found it.")
-    lines += _decoys(rows, langs, tools)
     return lines + [""]
 
 
@@ -1218,11 +1228,12 @@ def _spec_issues(conf: list[dict], tools: list[str]) -> list[str]:
     return lines + md_table(["tool", "spec issues"], table, "ll") + [""]
 
 
-def _rq1(schema: list[dict], meaningful: list[dict], conf: list[dict]) -> list[str]:
-    """Conformance, spec issues and meaningfulness per tool (analysis/schema.py)."""
-    if not schema and not meaningful:
+def _conformity(schema: list[dict], meaningful: list[dict], conf: list[dict], sources: list[dict]) -> list[str]:
+    """RQ3: conformance, spec issues and meaningfulness per tool (analysis/schema.py), then where the information
+    lives (sources-run<i>.csv)."""
+    if not schema and not meaningful and not sources:
         return []
-    lines = [RQ1.heading(), "", RQ1.question, ""]
+    lines = [RQ3.heading(), "", RQ3.question, ""]
     if schema:
         by_tool: dict[str, list[dict]] = defaultdict(list)
         for r in schema:
@@ -1323,7 +1334,84 @@ def _rq1(schema: list[dict], meaningful: list[dict], conf: list[dict]) -> list[s
             lines += _asset_type_heading(at) + md_table(header, table) + [""]
         if example:
             lines += _eg(example)[1:] + [""]
+    lines += _sources(sources)
     return lines
+
+
+SOURCE_DIMS = (
+    "family",
+    "primitive",
+    "mode",
+    "padding",
+    "curve",
+    "key_size",
+)  # the dimensions the standard has a field for
+SOURCE_KIND_TEXT = {
+    "field": "a standard CycloneDX field",
+    "property": "a property the tool defines",
+    "name": "the component's name, parsed",
+    "occurrence": "an occurrence's evidence",
+    "context": "an API identifier",
+    "ref": "a referenced component",
+    "dependency": "a dependency",
+    "derived": "implied by another value",
+}
+
+
+def _sources(rows: list[dict]) -> list[str]:
+    """RQ3: where each tool puts each kind of information (sources-run<i>.csv): the share of its algorithm assets
+    that carry the dimension in a standard field, and the other kind of place when that carries more."""
+    if not rows:
+        return []
+    by: dict[tuple[str, str], dict[str, dict]] = defaultdict(dict)
+    assets: dict[str, int] = {}
+    for r in rows:
+        by[(r["tool"], r["dimension"])][r["kind"]] = r
+        assets[r["tool"]] = _int(r["assets"])
+    tools = sorted(assets)
+    table, example = [], ""
+    for tool in tools:
+        cells = []
+        for d in SOURCE_DIMS:
+            kinds = by.get((tool, d), {})
+            if not kinds:
+                cells.append("")
+                continue
+            field = _float(kinds["field"]["share"]) if "field" in kinds else 0.0
+            others = [(k, _float(r["share"]) or 0.0) for k, r in kinds.items() if k != "field"]
+            top = max(others, key=lambda kv: kv[1], default=None)
+            cell = _pct(field)
+            if top and top[1] > field:
+                cell += f" ({top[0]} {_pct(top[1])})"
+                if not example:
+                    example = (
+                        f"`{cell}` for {tool} under `{d.replace('_', ' ')}`: a share of {_pct(field)} of its "
+                        f"{_n(assets[tool])} algorithm assets carry the {d.replace('_', ' ')} in a standard field, "
+                        f"{_pct(top[1])} carry it in {SOURCE_KIND_TEXT.get(top[0], top[0])}, which no consumer of "
+                        "the standard reads as that value."
+                    )
+            cells.append(cell)
+        table.append([tool, assets[tool], *cells])
+    lines = [
+        "### Where the information lives",
+        "",
+        "The same information can sit in the standard's own field, in a property the tool defines, in the "
+        "component's name or only in a code identifier the normaliser recognises. One row per tool, one column per "
+        "dimension (`sources-run<i>.csv`): the share of the tool's algorithm assets that carry the value in a standard "
+        "field; when another kind of place carries it for a larger share, that kind and its share follow in "
+        "brackets. The kinds: "
+        + "; ".join(f"`{k}` = {v}" for k, v in SOURCE_KIND_TEXT.items())
+        + ". Only dimensions with a field of their own have a column: the algorithm's name is the component's name "
+        "by design, and the standard has no field for the digest of a composite (both in `sources-run<i>.csv`); "
+        "`family` is `algorithmFamily`, which exists from CycloneDX 1.7 on, so a 1.6 document cannot carry it. A "
+        "value in a property or a name is information the tool has but a consumer of the standard does not read; it "
+        "is what RQ4's normalisation has to recover.",
+        "",
+    ]
+    lines += md_table(["tool", "assets", *[d.replace("_", " ") for d in SOURCE_DIMS]], table)
+    if example:
+        lines += _eg(example)
+    return lines + [""]
 
 
 def _traceability(trace: list[dict]) -> list[str]:
@@ -1435,11 +1523,11 @@ MATCH_DIMS = ("key_size", "mode", "padding", "curve", "digest", "location")
 
 
 def _matching(levels: list[dict], groups: list[dict], matchers: list[dict]) -> list[str]:
-    """RQ3 in one section: matcher x level (items by number of voter groups, agreement per dimension), the per-language
+    """RQ5 in one section: matcher x level (items by number of voter groups, agreement per dimension), the per-language
     distribution at the scoring level, and the matchers compared per level."""
     if not levels and not groups:
         return []
-    lines = ["### RQ3b: agreement at L4 (matching)", ""]
+    lines = ["### Agreement at L4 (matching)", ""]
     lines += [
         "A matcher puts the records of different tools that describe the same algorithm in one repository into one "
         "group; how many voter groups end up together says how much the tools agree. The instrument is `exact`, the "
@@ -1528,7 +1616,7 @@ def _timing(levels: list[dict]) -> list[str]:
 
 
 def _headline(levels: list[dict]) -> list[str]:
-    """RQ3b's headline: the share of items at least two voter groups agree on at the top level, the exact matcher on
+    """RQ5's headline: the share of items at least two voter groups agree on at the top level, the exact matcher on
     the algorithm; RaQuN's share on whole findings follows as the cross-check (matchlevels-run<i>.csv)."""
     top = {r["matcher"]: r for r in levels if r["level"] == LEVEL_ORDER[-1] and _int(r["items"])}
     if "exact" not in top:
@@ -1551,17 +1639,17 @@ def _headline(levels: list[dict]) -> list[str]:
 
 
 def _scores(rows: list[dict], loo: list[dict], grouping: list[dict] | None = None) -> list[str]:
-    """RQ3b: the per-tool rates per dimension (analysis/score.py); the orders are sensitivity rows."""
+    """RQ5: the per-tool rates per dimension (analysis/score.py); the orders are sensitivity rows."""
     if not rows:
         return []
     level = rows[0].get("level") or "?"
-    lines = ["### RQ3b: per-tool rates", ""]
+    lines = ["### Per-tool rates", ""]
     lines += [
         "Without a reference CBOM, a tool is scored by how much of what it reports other, independent tools report "
         f"too (the exact matcher's groups at {level}). One table per dimension (`algorithm`, then the parameters and "
         "`location`), one row per tool, in the order of its rate. The order is no ranking claim: a tool that reports "
         "little and only the obvious has a high rate, so `coverage` stands next to it, and the ranking by F1 is "
-        "RQ4's. The checks below (leave one voter out, other voter groupings) ask whether the order itself is "
+        "RQ6's. The checks below (leave one voter out, other voter groupings) ask whether the order itself is "
         "stable.",
         "",
         "- `repos`, `items`: where and what the tool reports. For `algorithm` an item is an algorithm in a "
@@ -1576,7 +1664,7 @@ def _scores(rows: list[dict], loo: list[dict], grouping: list[dict] | None = Non
         "items in total (`–`: too little; then no interval either).",
         "- `pooled`: the same share over all the tool's items at once (large repositories weigh more).",
         "- `exclusivity`: the share of its items no other voter group reports at all (pooled). Agreement cannot "
-        "tell whether these are findings the others miss or false positives (RQ4 can).",
+        "tell whether these are findings the others miss or false positives (RQ6 can).",
         "- `coverage`: of the repository's majority items (those at least half of the voter groups that ran there "
         "report), the share the tool reports, averaged over the repositories: a recall proxy next to `rate`'s "
         "precision proxy (empty for `location`, where call sites are compared by window, not by equality).",
@@ -1707,6 +1795,8 @@ def _stability(rows: list[dict]) -> list[str]:
                 f"{min(_float(r['jaccard_min']) or 0 for r in rs):.2f}",
                 f"{statistics.mean(_float(r['records_cv']) or 0 for r in rs):.2f}",
                 sum(len((r.get("unstable") or "").split(";")) if r.get("unstable") else 0 for r in rs),
+                _pct(statistics.mean(_float(r.get("flux")) or 0 for r in rs)),
+                _pct(sum(1 for r in rs if (_float(r.get("flux")) or 0) > 0) / len(rs)),
             ]
         )
     lines = [f"## {STABILITY}", "", STABILITY_NOTE, ""]
@@ -1720,12 +1810,17 @@ def _stability(rows: list[dict]) -> list[str]:
         "- `records CV`: how much the number of records varies between runs (standard deviation / mean; 0 = always "
         "the same count).",
         "- `unstable items`: items that appear in some runs but not in most.",
+        "- `flux`: the mean share of a tool's items on a repository that are not in every run (0.00 = every run "
+        "reports the same items); `repos changed`: the share of its repositories where the runs differ at all. Both "
+        "are the noise floor RQ6 reads its changes off the edit against (`report --baseline <this experiment>`).",
         "",
         "Where runs were repeated, the scores use each tool's consensus: the items present in more than half of its "
         "runs.",
         "",
     ]
-    lines += md_table(["tool", "repos", "Jaccard mean", "Jaccard min", "records CV", "unstable items"], table)
+    lines += md_table(
+        ["tool", "repos", "Jaccard mean", "Jaccard min", "records CV", "unstable items", "flux", "repos changed"], table
+    )
     return lines + [""]
 
 
@@ -1748,7 +1843,7 @@ def _mutation(
     per_lang = ", ".join(
         f"{lang} {_n(n)}" for lang, n in sorted(by_lang.items(), key=lambda kv: _lang_key(kv[0] or ""))
     )
-    lines = [RQ4.heading(), "", RQ4.question, ""]
+    lines = [RQ6.heading(), "", RQ6.question, ""]
     lines += [
         f"A mutant is a copy of a repository with one known piece of code inserted, so here there is ground truth: "
         f"{_n(len(mutants))} mutants in {_n(len({m['repo'] for m in mutants}))} repositories ({per_lang}): "
@@ -1815,6 +1910,7 @@ def _mutation(
         lines += ["", f"Not judged ({_n(sum(failed.values()))} planted call × tool, by the status of the run on the "
                   f"mutant, `original <status>` for the original's; `status` in `mutation.csv`): {why}."]  # fmt: skip
     lines += _mutation_scores(scores or [], role)
+    lines += _offedit(scores or [], role)
     lines += _bridge(bridge or [])
     lines += ["", f"### Mutant patches (first {min(MUTANT_PATCHES, len(mutants))} of {_n(len(mutants))})", ""]
     for m in mutants[:MUTANT_PATCHES]:
@@ -1898,14 +1994,74 @@ def _mutation_scores(scores: list[dict], role: dict) -> list[str]:
     return lines
 
 
+def _offedit(scores: list[dict], role: dict) -> list[str]:
+    """RQ6's side finding: the changes a tool reports outside the inserted lines (mutation-scores.csv, style `all`),
+    read against its run-to-run noise floor from a stability experiment (`--baseline`)."""
+    rows = [s for s in scores if s.get("style") == "all" and s.get("offedit_share") not in (None, "")]
+    if not rows:
+        return []
+    lines = ["", "### Changes off the edit", ""]
+    lines += [
+        "A mutant differs from its original by one inserted piece of code, so everything else a tool reports should "
+        "stay the same. It does not always: one row per language and tool over its judged mutants, calls and decoys "
+        "together (`mutation-scores.csv`):",
+        "",
+        "- `with changes`, `share`: mutants where the tool's report of the mutant has a new algorithm (`extra_units`: "
+        "besides the planted one and what it implies) or a new located finding outside the inserted lines "
+        "(`extra_sites`; the original's findings moved by the insertion are not new), and their share of the judged "
+        "mutants. Lost findings are in `mutation.csv` (`lost_units`, `lost_sites`).",
+        "- `extra units`, `extra sites`: the medians over the mutants with changes (how much changes when something "
+        "does; empty without any). A tool without locations has no sites, so it counts units only.",
+        "- `noise floor`: the same tool on unchanged code in a stability experiment (`--baseline`): the share of "
+        "repositories whose repeated runs differ at all, and in brackets the mean share of its items that come and go "
+        "between runs (`flux` in that experiment's `stability.csv`). Empty without a baseline. A share of changes "
+        "near the floor is the tool's own non-determinism; one far above it is an effect of the edit on untouched "
+        "code (a changed analysis, a different ranking of files, a time limit hit elsewhere).",
+        "",
+        "This is a finding about the tools, never folded into recall, precision or F1.",
+        "",
+    ]
+    table = []
+    for s in sorted(rows, key=lambda s: (_lang_key(s["language"] or ""), s["tool"])):
+        judged = _int(s.get("calls")) + _int(s.get("decoys"))
+        floor = ""
+        if s.get("baseline_changed") not in (None, ""):
+            floor = f"{_pct(s['baseline_changed'])} ({_pct(s.get('baseline_flux'))})"
+        table.append(
+            [
+                s["language"],
+                _tool({"tool": s["tool"], "role": role.get(s["tool"])}),
+                judged,
+                s["offedit_mutants"],
+                _pct(s["offedit_share"]),
+                _num(s.get("extra_units_median")),
+                _num(s.get("extra_sites_median")),
+                floor,
+            ]
+        )
+    header = ["language", "tool", "mutants", "with changes", "share", "extra units", "extra sites", "noise floor"]
+    lines += md_table(header, table, "ll" + "r" * 6)
+    eg = next((row for row in table if _int(row[3])), None) or table[0]
+    lines += _eg(
+        f"`{eg[4]}` for {eg[1]} in {eg[0]}: of its {_n(eg[2])} judged mutants, {_n(eg[3])} came back with "
+        "something new outside the inserted lines"
+        + (
+            f"; on unchanged code a share of {eg[7].split(' ')[0]} of its repositories vary between runs."
+            if eg[7]
+            else "."
+        )
+    )
+    return lines
+
+
 def _bridge(bridge: list[dict]) -> list[str]:
-    """RQ4 -> RQ3 (bridge-run<i>.csv): confirmation rate against F1, per language and over all cells."""
+    """RQ6 -> RQ5 (bridge-run<i>.csv): confirmation rate against F1, per language and over all cells."""
     summary = [r for r in bridge if r.get("tool") == "all"]
     if not summary:
         return []
-    lines = ["", "### Does agreement predict effectiveness? (the bridge to RQ3)", ""]
+    lines = ["", "### Does agreement predict detection? (the bridge to RQ5)", ""]
     lines += [
-        "Per language, each tool's confirmation rate on this experiment's original repositories (RQ3: the share of "
+        "Per language, each tool's confirmation rate on this experiment's original repositories (RQ5: the share of "
         "its algorithm items at L4 that another voter group confirms) is set against its F1 on the planted items "
         "(`bridge-run<i>.csv`, one cell per tool and language): Spearman's rank correlation over the cells and "
         "Kendall's tau between the two rankings (1 = the same order, 0 = unrelated, −1 = reversed; empty with fewer "
@@ -1934,7 +2090,7 @@ def _identity_of(mapped: str) -> str | None:
 
 
 def _spellings(vocab: list[dict]) -> list[str]:
-    """RQ3a: how many distinct spellings each tool uses per identity (vocab.csv), and the identities spelled the most
+    """RQ4: how many distinct spellings each tool uses per identity (vocab.csv), and the identities spelled the most
     ways across tools: the representational heterogeneity in names that L1-L4 of the ladder fold."""
     by_tool: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
     for r in vocab:
@@ -1986,21 +2142,116 @@ def _spellings(vocab: list[dict]) -> list[str]:
     return lines + [""]
 
 
-def _rq3(info: dict, levels: list[dict], vocab: list[dict], matchlevels: list[dict], groups: list[dict],
-         matchers: list[dict], scores: list[dict], loo: list[dict], grouping: list[dict]) -> list[str]:  # fmt: skip
-    """RQ3: the voter groups, then RQ3a (the ladder, both matchers; the spellings) and RQ3b (matching, the per-tool
-    rates)."""
-    body = (_voters(info) + _ladder(levels) + _spellings(vocab) + _matching(matchlevels, groups, matchers)
-            + _scores(scores, loo, grouping))  # fmt: skip
+def _normalisation(items: list[dict], registry: list[dict], levels: list[dict], vocab: list[dict]) -> list[str]:
+    """RQ4: the registry and what it lacks (items-run<i>.csv `registry`, registry-run<i>.csv), the L0-L4 ladder
+    (levels-run<i>.csv) and the spellings per identity (vocab.csv)."""
+    body = _registry(items, registry) + _ladder(levels) + _spellings(vocab)
     if not body:
         return []
     intro = (
-        RQ3.question + " RQ3a: the deltas L0 -> L4 on fixed items (the ladder, shown for both matchers); the gap is "
-        "representational heterogeneity, what remains at L4 is substantive. RQ3b: the agreement at L4 by the exact "
-        "matcher, which also decomposes it per dimension and supplies the call sites and the per-tool rates; RaQuN, an "
-        "external n-way matcher, cross-checks the headline in one sentence."
+        RQ4.question + " First the CycloneDX registry as the base vocabulary and the families that had to be added to "
+        "it; then the deltas L0 -> L4 on fixed items (the ladder, shown for both matchers): the gap is "
+        "representational heterogeneity, what remains at L4 is substantive; then the spellings behind it."
     )
-    return [RQ3.heading(), "", intro, ""] + body
+    return [RQ4.heading(), "", intro, ""] + body
+
+
+GAP_TEXT = {
+    "missing-family": "a scheme the registry has no entry for",
+    "scheme-less": "a key type or use without a scheme, which the registry names only as schemes",
+    "generic-marker": "a name that covers several registry entries and attaches to them without merging them",
+    "non-crypto": "a non-cryptographic thing tools report as crypto",
+}
+
+
+def _registry(items: list[dict], registry: list[dict]) -> list[str]:
+    """RQ4: the share of items that rest on a family the CycloneDX registry lacks (`registry` in items-run<i>.csv) and
+    the complete delta (registry-run<i>.csv): every addition with its gap kind and the items behind it, the units no
+    vocabulary names, and the size of the identifier layer."""
+    if not items and not registry:
+        return []
+    lines = ["### The registry and what it lacks", ""]
+    lines += [
+        "The vocabulary's canonical level is the CycloneDX 1.7 cryptography registry (`algorithmFamily`): L2 of the "
+        "ladder normalises to it alone. Real CBOMs name things the registry has no entry for; `algorithms.yaml` adds "
+        "those families (`additions:`, each with the kind of gap and its reason), and every item records whether its "
+        "family is the registry's (`registry` in `items-run<i>.csv`). One row per tool: its items, how many rest on an "
+        "addition, their share, and the additions they rest on the most.",
+        "",
+    ]
+    if items:
+        by_tool: dict[str, list[dict]] = defaultdict(list)
+        for r in items:
+            by_tool[r["tool"]].append(r)
+        table = []
+        for tool in [*sorted(by_tool), "all"]:
+            rs = items if tool == "all" else by_tool[tool]
+            off = [r for r in rs if _false(r.get("registry"))]
+            top = Counter(r["unit"] for r in off).most_common(3)
+            table.append(
+                [
+                    tool,
+                    len(rs),
+                    len(off),
+                    _pct(len(off) / len(rs)) if rs else "",
+                    ", ".join(f"{u} ({_n(n)})" for u, n in top),
+                ]
+            )
+        lines += md_table(["tool", "items", "on additions", "share", "most used additions (items)"], table, "lrrrl")
+        all_row = table[-1]
+        lines += _eg(
+            f"`{all_row[3]}` for all: of the {_n(all_row[1])} items the tools report, {_n(all_row[2])} rest on a "
+            "family the registry does not name, so a normalisation on the registry alone would leave them without an "
+            "identity."
+        )
+        lines.append("")
+    additions = [r for r in registry if r["kind"] == "addition"]
+    if additions:
+        lines += [
+            "**The delta.** Every family added to the registry's (`registry-run<i>.csv`), grouped by the kind of gap, "
+            "with the items of this experiment that rest on it (0: needed by another experiment or by the micro "
+            "projects), the repositories and tools behind them and the reason it is an addition:",
+            "",
+        ]
+        table = []
+        for r in additions:
+            table.append([r["gap"] or "", r["name"], r["primitive"] or "", _int(r["count"]), _int(r["repos"]),
+                          (r.get("tools") or "").replace(";", ", "), r.get("note") or ""])  # fmt: skip
+        lines += md_table(["gap", "family", "primitive", "items", "repos", "tools", "reason"], table, "lllrrll")
+        kinds = "; ".join(f"`{k}` = {v}" for k, v in GAP_TEXT.items() if any(r["gap"] == k for r in additions))
+        lines += ["", f"Kinds of gap: {kinds}.", ""]
+    unknown = [r for r in registry if r["kind"] == "unknown"]
+    if unknown:
+        shown = ", ".join(f"`{r['name']}` ({_n(_int(r['count']))}, {r['tools'].replace(';', ', ')})" for r in unknown)
+        lines += [
+            f"Units under no family at all (a tool's field value taken as written, never checked or dropped, or an "
+            f"algorithm the vocabulary lists under no family): {shown}.",
+            "",
+        ]
+    layers = [r for r in registry if r["kind"] == "layer"]
+    if layers:
+        sizes = ", ".join(f"{r['name']} {_n(_int(r['count']))}" for r in layers)
+        lines += [
+            "Below the families the registry has no identifier layer at all: the spellings, whole names (JOSE, SSH, "
+            f"JCA), API identifiers and OIDs that L2-L4 read come from the vocabulary's own tables ({sizes} entries; "
+            "`analysis/data/algorithms.yaml`).",
+            "",
+        ]
+    return lines
+
+
+def _agreement(info: dict, matchlevels: list[dict], groups: list[dict], matchers: list[dict], scores: list[dict],
+               loo: list[dict], grouping: list[dict]) -> list[str]:  # fmt: skip
+    """RQ5: the voter groups, the agreement at L4 (matching) and the per-tool rates."""
+    body = _voters(info) + _matching(matchlevels, groups, matchers) + _scores(scores, loo, grouping)
+    if not body:
+        return []
+    intro = (
+        RQ5.question + " The agreement at L4 by the exact matcher, which also decomposes it per dimension and supplies "
+        "the call sites and the per-tool rates; RaQuN, an external n-way matcher, cross-checks the headline in one "
+        "sentence. How much of this agreement normalisation creates is RQ4's ladder."
+    )
+    return [RQ5.heading(), "", intro, ""] + body
 
 
 def _voters(info: dict) -> list[str]:
@@ -2061,7 +2312,7 @@ def _ladder(all_rows: list[dict]) -> list[str]:
             + [_pct(by.get((t, lv), {}).get("share")) for lv in levels]
             + [first.get("items", "")]
         )
-    lines = ["### RQ3a: the L0-L4 deltas (the agreement ladder)", ""]
+    lines = ["### The L0-L4 deltas (the agreement ladder)", ""]
     lines += [
         "How much of the tools' agreement is created by normalisation? One row per tool: of its `items` (algorithms "
         "per repository, location ignored), the share another voter group also reports when names count as the same "
@@ -2260,8 +2511,7 @@ def _files(info: dict, run: int) -> list[str]:
     counts = info.get("rows") or {}
     lines = ["## Files", "", "The files in this folder behind the tables above, with their row counts, by the "
              "question they answer:", ""]  # fmt: skip
-    groups = [(BAR_EXAM, BAR_EXAM_TABLES), *((f"{rq.id} {rq.title}", rq.tables) for rq in RQS),
-              (STABILITY, ("stability.csv",))]  # fmt: skip
+    groups = [*((f"{rq.id} {rq.title}", rq.tables) for rq in RQS), (STABILITY, ("stability.csv",))]
     listed: set[str] = set()
     for title, patterns in groups:
         names = [p.format(i=run) for p in patterns if p.format(i=run) in counts]
@@ -2310,7 +2560,6 @@ def render(analysis_dir: Path, *, run: int = 1) -> str:
     lines += _repositories(spec or {})
     lines += _negatives(rows("runs.csv"), run)
     lines += _micro(rows("micro-run{i}.csv"), rows("micro-items-run{i}.csv"))
-    lines += _rq1(rows("schema-run{i}.csv"), rows("meaningful-run{i}.csv"), rows("conformance-run{i}.csv"))
     lines += _rq2(
         _reported(rows("runs.csv"), run),
         rows("units-run{i}.csv"),
@@ -2319,10 +2568,15 @@ def render(analysis_dir: Path, *, run: int = 1) -> str:
         rows("traceability-run{i}.csv"),
         rows("runtime.csv"),
     )
-    lines += _rq3(
+    lines += _conformity(
+        rows("schema-run{i}.csv"), rows("meaningful-run{i}.csv"), rows("conformance-run{i}.csv"),
+        rows("sources-run{i}.csv"),
+    )  # fmt: skip
+    lines += _normalisation(
+        rows("items-run{i}.csv"), rows("registry-run{i}.csv"), rows("levels-run{i}.csv"), rows("vocab.csv")
+    )
+    lines += _agreement(
         info,
-        rows("levels-run{i}.csv"),
-        rows("vocab.csv"),
         rows("matchlevels-run{i}.csv"),
         rows("groups-exact-run{i}.csv"),
         rows("matchers-run{i}.csv"),

@@ -2,6 +2,9 @@
 
 import json
 import re
+from datetime import date, timedelta
+
+import pytest
 
 from common import corpus
 
@@ -79,21 +82,139 @@ def test_size_cells_are_clamped_to_the_cap():
     assert corpus.clamp_size_bins(bins, 20) == [(300, 3000), (3000, 20480)]
 
 
+def _params(**kw) -> corpus.CorpusParams:
+    base = dict(languages=["Java"], per_cell=2, star_bins=[(1, None)], size_bins_kb=[(300, None)], crypto_filter=False,
+                max_repo_size_mb=1024)  # fmt: skip
+    return corpus.CorpusParams(**{**base, **kw})
+
+
+def _build(monkeypatch, params, population, **kw):
+    monkeypatch.setattr(corpus, "search_cell", lambda *a, **k: (list(population), len(population), 1))
+    monkeypatch.setattr(corpus, "resolve_remote_commit", lambda url, branch: "f" * 40)
+    monkeypatch.setattr(corpus.time, "sleep", lambda s: None)
+    return corpus.build_corpus(
+        params, None, log=lambda m: None, exclusions={"repos": {}, "patterns": []}, tailored={}, **kw
+    )
+
+
 def test_build_corpus_excludes_repos_above_the_cap(monkeypatch):
     big = {"full_name": "big/repo", "git_url": "u", "branch": "main", "size_kb": 2 * 1024 * 1024, "stars": 1}
     small = {"full_name": "small/repo", "git_url": "u", "branch": "main", "size_kb": 500, "stars": 1}
-    monkeypatch.setattr(corpus, "search_cell", lambda *a, **k: [big, small])
-    monkeypatch.setattr(corpus, "resolve_remote_commit", lambda url, branch: "f" * 40)
-    monkeypatch.setattr(corpus.time, "sleep", lambda s: None)
-    params = corpus.CorpusParams(
-        languages=["Java"],
-        per_language=2,
-        star_bins=[(1, 10)],
-        size_bins_kb=[(300, 3_000_000)],
-        crypto_filter=False,
-        max_repo_size_mb=1024,
-    )
-    out = corpus.build_corpus(params, None, log=lambda m: None, exclusions={"repos": {}, "patterns": []}, tailored={})
+    out = _build(monkeypatch, _params(size_bins_kb=[(300, 3_000_000)]), [big, small])
     assert [r["full_name"] for r in out["repos"]] == ["small/repo"]
     assert out["excluded"][0]["reason"] == "repo size 2048 MB > cap 1024 MB (GITSERVER_MEMORY)"
     assert out["params"]["max_repo_size_mb"] == 1024 and out["params"]["size_bins_kb"] == [[300, 1024 * 1024]]
+
+
+def test_bins_are_half_open_configurable_and_the_quota_is_per_cell():
+    assert corpus.parse_bins("50-300,300-2000,2000-") == [(50, 300), (300, 2000), (2000, None)]
+    assert corpus.bin_query(50, 300) == "50..299" and corpus.bin_query(2000, None) == ">=2000"
+    assert corpus.cell_query("Java", (50, 300), (300, None), "2025-10-29") == (
+        "language:Java stars:50..299 size:>=300 pushed:>=2025-10-29 archived:false fork:false"
+    )
+    for bad in ("", "50-300,400-", "50-300,300-2000,2000"):
+        with pytest.raises(ValueError):
+            corpus.parse_bins(bad)
+    p = corpus.CorpusParams(max_repo_size_mb=None)
+    assert (p.cells_per_language, p.per_cell, p.per_language) == (9, 2, 18)  # 3 x 3 cells x 2 = 18 per language
+    assert corpus.CorpusParams(per_cell=3, max_repo_size_mb=None).per_language == 27
+    assert corpus.clamp_size_bins([(300, 3000), (3000, None)], 20) == [
+        (300, 3000),
+        (3000, 20480),
+    ]  # the open bin ends at the cap
+
+
+class _FakeGitHub:
+    """A search API over a fixed population: `created:A..B` and `page` are honoured, at most 1000 results per query."""
+
+    def __init__(self, n: int, start=date(2015, 1, 1), per_day=1):
+        self.repos = [
+            {"full_name": f"o/r{i}", "clone_url": f"u{i}", "default_branch": "main", "language": "Java",
+             "stargazers_count": 10, "size_kb": 500, "size": 500, "pushed_at": "2026-01-01T00:00:00Z",
+             "created_at": (start + timedelta(days=i // per_day)).isoformat(), "topics": ["crypto", "a"]}
+            for i in range(n)
+        ]  # fmt: skip
+        self.calls: list[tuple[str, int, int]] = []
+
+    def __call__(self, q, token, *, page=1, per_page=100):
+        self.calls.append((q, page, per_page))
+        m = re.search(r"created:(\S+)\.\.(\S+)", q)
+        pool = self.repos
+        if m:
+            lo, hi = m.group(1), m.group(2)
+            pool = [r for r in pool if lo <= r["created_at"][:10] <= hi]
+        start = (page - 1) * per_page
+        return pool[start : min(start + per_page, corpus.SEARCH_LIMIT)], len(pool)
+
+
+def test_search_cell_enumerates_the_whole_population_by_pages_and_date_splits(monkeypatch):
+    gh = _FakeGitHub(2_500, per_day=4)  # 625 days, 2500 repos: above the API's 1000, so the dates are split
+    monkeypatch.setattr(corpus, "_search", gh)
+    monkeypatch.setattr(corpus.time, "sleep", lambda s: None)
+    repos, total, n_requests = corpus.search_cell("Java", (1, None), (300, None), "2025-01-01", None, pause=0)
+    assert total == 2_500 and len(repos) == 2_500 and len({r["full_name"] for r in repos}) == 2_500
+    assert repos[0]["topics"] == ["a", "crypto"] and repos[0]["created_at"].startswith("2015-")
+    assert n_requests == len(gh.calls) and all(
+        len(gh(q, None, page=p, per_page=pp)[0]) <= 100 for q, p, pp in gh.calls[:3]
+    )
+    assert max(p for _, p, _ in gh.calls) <= 10  # never past the limit of 1000 per query
+    small = _FakeGitHub(150)
+    monkeypatch.setattr(corpus, "_search", small)
+    repos, total, n_requests = corpus.search_cell("Java", (1, None), (300, None), "2025-01-01", None, pause=0)
+    assert (total, len(repos), n_requests) == (150, 150, 3)  # two pages plus the count query
+
+
+def test_the_draw_is_uniform_over_the_cell_reproducible_and_recorded(monkeypatch):
+    population = [
+        {"full_name": f"o/r{i}", "git_url": "u", "branch": "main", "size_kb": 500, "stars": 5, "topics": ["x"]}
+        for i in range(40)
+    ]
+    out = _build(monkeypatch, _params(per_cell=3, seed=7), population)
+    again = _build(monkeypatch, _params(per_cell=3, seed=7), list(reversed(population)))  # the API's order varies
+    other = _build(monkeypatch, _params(per_cell=3, seed=8), population)
+    names = [r["full_name"] for r in out["repos"]]
+    assert len(names) == 3 and names == [r["full_name"] for r in again["repos"]]
+    assert names != [r["full_name"] for r in other["repos"]]
+    (cell,) = out["cells"]
+    assert cell == {"language": "Java", "stars": [1, None], "size_kb": [300, 1024 * 1024], "population": 40,
+                    "enumerated": 40, "tried": 3, "sampled": 3, "quota": 3}  # fmt: skip
+    assert out["params"]["per_cell"] == 3 and out["params"]["per_language"] == 3 and out["params"]["search_date"]
+    assert out["repos"][0]["stratum"] == {"stars": [1, None], "size_kb": [300, 1024 * 1024]}
+    assert out["repos"][0]["topics"] == ["x"] and "crypto_apis" not in out["repos"][0]  # no crypto filter here
+    assert out["stats"]["requests"] == 1
+
+
+def test_the_crypto_prefilter_records_the_api_families_as_a_covariate(monkeypatch):
+    population = [{"full_name": "o/a", "git_url": "ua", "branch": "main", "size_kb": 500, "stars": 5},
+                  {"full_name": "o/b", "git_url": "ub", "branch": "main", "size_kb": 500, "stars": 5}]  # fmt: skip
+    families = {"ua": ["JCA", "BouncyCastle"], "ub": []}  # o/a matches two families, o/b none
+
+    def fake_usage(git_url, branch, language):
+        return families[git_url]
+
+    monkeypatch.setattr(corpus, "has_crypto_usage", fake_usage)
+    out = _build(monkeypatch, _params(per_cell=2, crypto_filter=True), population)
+    assert [r["full_name"] for r in out["repos"]] == ["o/a"] and out["repos"][0]["crypto_apis"] == [
+        "JCA",
+        "BouncyCastle",
+    ]
+    assert out["excluded"] == [{"full_name": "o/b", "reason": "no first-party crypto usage"}]
+    assert set(corpus.CRYPTO_APIS) == {"java", "python", "go"} and "pyca" in corpus.CRYPTO_APIS["python"]
+    assert re.search(corpus.CRYPTO_APIS["python"]["pyca"], "from cryptography.hazmat import x", flags=re.M)
+    assert not re.search(corpus.CRYPTO_APIS["python"]["pyca"], "import cryptography_tools", flags=re.M)
+
+
+def test_corpus_covariates_reach_the_experiment_record():
+    from common.experiment import RepoSpec, _as_repo_spec, spec_to_dict
+
+    item = {"full_name": "o/a", "git_url": "u", "branch": "main", "commit": "f" * 40, "language": "Java", "stars": 5,
+            "size_kb": 500, "stratum": {"stars": [50, 300], "size_kb": [300, 3000]}, "crypto_apis": ["JCA"],
+            "topics": ["crypto"], "created_at": "2020-01-01T00:00:00Z"}  # fmt: skip
+    spec = _as_repo_spec(item)
+    assert isinstance(spec, RepoSpec) and spec.stratum == {"stars": [50, 300], "size_kb": [300, 3000]}
+    assert spec.crypto_apis == ["JCA"] and spec.topics == ["crypto"]
+    assert _as_repo_spec({"full_name": "o/b"}).stratum is None and _as_repo_spec({"full_name": "o/b"}).topics is None
+    from common.experiment import ExperimentSpec
+
+    d = spec_to_dict(ExperimentSpec(name="x", repos=[spec], tools=["t"]))
+    assert d["repos"][0]["stratum"] == item["stratum"] and d["repos"][0]["topics"] == ["crypto"]
