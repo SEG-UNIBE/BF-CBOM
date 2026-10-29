@@ -22,12 +22,12 @@ from .catalog import Catalog, Snippet, load_catalog, placeholders, render
 ROOT = Path(__file__).resolve().parents[1]
 MICRO_DIR = ROOT / "experiments" / "corpus" / "micro"
 TRUTH_FILE = MICRO_DIR / "ground_truth.yaml"
-TRUTH_VERSION = "2026-10-22.2"
+TRUTH_VERSION = "2026-10-29.1"
 LANGUAGES = ("java", "python", "go")
 STYLE = {"ecdsa-p256-sign": "indirect"}  # every other item is `direct`; one call takes its algorithm from a variable
 SKIPPED = {"tls13-context"}  # a protocol: the micro scorer scores algorithm records
 FORM = 0  # Go's PBKDF2 has two forms; the first is the standard library's (Go 1.24), so the project needs no module
-DECOY_EVERY = 4  # a decoy after every fourth item, the rest at the end
+DECOY_EVERY = 2  # a decoy after every second item, the rest at the end
 FILES = {"java": "src/main/java/app/CryptoDemo.java", "python": "app/crypto_demo.py", "go": "main.go"}
 GO_MOD = "module example.com/microgo\n\ngo 1.24\n"
 

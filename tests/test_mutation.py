@@ -92,7 +92,8 @@ def test_catalog_snippets_are_complete_and_expect_vocabulary_identities(language
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_catalog_decoys_are_known_negatives(language):
     catalog = load_catalog(language)
-    assert [d.id for d in catalog.decoys] == ["comment", "log-message", "crc32", "base64"]
+    assert [d.id for d in catalog.decoys] == ["comment", "log-message", "crc32", "base64", "identifier", "hex-constant",
+                                              "url", "cert-path"]  # fmt: skip
     crypto_imports = {i for s in catalog.snippets for f in s.forms for i in f.imports}
     for d in catalog.decoys:
         assert d.decoy and d.expected == {} and d.what and d.supports("direct") and not d.supports("indirect")

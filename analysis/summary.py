@@ -929,7 +929,9 @@ def _decoys(rows: list[dict], langs: list[str], tools: list[str]) -> list[str]:
     lines = [
         "",
         "**Decoys**: false positives with ground truth. Each project holds decoys in functions of their own: a comment "
-        "and a log message naming algorithms, a CRC32 checksum and a Base64 encoding. None of them uses "
+        "and a log message naming algorithms, a CRC32 checksum, a Base64 encoding, a variable named after an "
+        "algorithm, a hex constant that looks like a key, a URL ending in `.sha256` and a path naming a certificate "
+        "file (the kinds: `experiments/corpus/README.md`). None of them uses "
         "cryptography, so any crypto record a tool reports on their lines is a false positive. One row per tool, one "
         "column per language: `hit/decoys` (`–` = the language is outside the tool's languages, so it did not run "
         "there); `decoys hit` = the kinds it reported crypto on, with the languages in brackets when not in every "
@@ -1754,7 +1756,10 @@ def _mutation(
         "first-party function that has a caller, in one style: `direct` names the algorithm in the call, `indirect` "
         "passes its name through a variable, `wrapper` puts the call into a helper) and "
         f"{_n(len(decoys))} *planted decoys* (code that names or resembles cryptography without using it: a comment "
-        "or a log message naming algorithms, a CRC32 checksum, a Base64 encoding; `mutants.csv`). Does the tool "
+        "or a log message naming algorithms, a CRC32 checksum, a Base64 encoding, a variable named after an "
+        "algorithm, a hex constant that looks like a key, a URL ending in `.sha256`, a path naming a certificate "
+        "file; "
+        "`mutants.csv`). Does the tool "
         "report the inserted call, and does it stay quiet on the decoy? Only records that its run on the original "
         "does not have count. First the planted calls, one row per language and tool:",
         "",
@@ -1833,7 +1838,7 @@ def _mutation_scores(scores: list[dict], role: dict) -> list[str]:
     lines += [
         "The planted calls are the positives, the planted decoys the negatives, both known exactly, so recall, "
         "precision and F1 are real here, with the caveats that the calls are plain uses of the catalog's APIs and the "
-        "negatives are the four decoy kinds (`mutation-scores.csv`, pooled over the judged mutants of the language):",
+        "negatives are the eight decoy kinds (`mutation-scores.csv`, pooled over the judged mutants of the language):",
         "",
         "- `calls`, `decoys`: judged planted calls and decoys (an ok run on the mutant and on the original).",
         "- `recall site`: the share of the calls with a new record of the expected algorithm at the inserted call "
@@ -1933,8 +1938,8 @@ def _spellings(vocab: list[dict]) -> list[str]:
     ways across tools: the representational heterogeneity in names that L1-L4 of the ladder fold."""
     by_tool: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
     for r in vocab:
-        if r.get("status") != "mapped":
-            continue
+        if r.get("status") != "mapped" or (r.get("asset_type") or "algorithm") != "algorithm":
+            continue  # a certificate or key named after its file is a spelling of the file, not of the algorithm
         ident = _identity_of(r.get("mapped") or "")
         if ident:
             by_tool[r["tool"]][ident].add(r["raw"])
@@ -1947,7 +1952,9 @@ def _spellings(vocab: list[dict]) -> list[str]:
         "The same algorithm written in different ways (`vocab.csv`: every raw value a tool wrote, with the identity it "
         "mapped to). One row per tool: `identities` = distinct algorithms or families its mapped values name, "
         "`spellings` = distinct raw values behind them, `per identity` = their ratio (1.00: one spelling per "
-        "algorithm), and the identity it spells the most ways, with the spellings.",
+        "algorithm), and the identity it spells the most ways, with the spellings. Only algorithm assets count (or "
+        "records without an asset type): a certificate or key named after its file (`CA_ecdsa.pem`) is a spelling of "
+        "the file, not of ECDSA (`asset_type` in vocab.csv).",
         "",
     ]
     table = []

@@ -7,7 +7,7 @@
 # The micro project experiments/corpus/micro/python is generated from this catalog (mutation/micro.py; AI-made, on the
 # human-review list before paper use). Imports are statements; `$name` refers to a name they bind. Locals carry a
 # prefix so that clashes (renamed) stay rare.
-version: "2026-10-22.1"
+version: "2026-10-29.1"
 language: python
 
 snippets:
@@ -231,3 +231,23 @@ decoys:
     direct: |
       $encoded = $base64.b64encode(b"data")
       print($encoded)
+  - id: identifier
+    what: a variable named after an algorithm, holding no cryptography
+    direct: |
+      $sha256_tag = f"checksum-{len('data')}"
+      print($sha256_tag)
+  - id: hex-constant
+    what: a 32-byte hex constant that looks like a key or a digest
+    direct: |
+      $expected_hex = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+      print(len($expected_hex))
+  - id: url
+    what: a URL whose file suffix names an algorithm
+    direct: |
+      $checksum_url = "https://example.org/downloads/app-1.0.tar.gz.sha256"
+      print($checksum_url)
+  - id: cert-path
+    what: a path string naming a certificate file (no such file exists)
+    direct: |
+      $cert_path = "config/certs/ca_ecdsa.pem"
+      print($cert_path.endswith(".pem"))

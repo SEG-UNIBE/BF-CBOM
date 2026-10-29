@@ -11,7 +11,7 @@
 # the algorithm in a variable (the indirect style). `decoys`: the catalog's decoys, code that names or resembles
 # cryptography without using it; any crypto record there is a false positive. The inclusion
 # bar: half of the items, lenient. AI-made like the catalogs; on the human-review list before paper use.
-version: 2026-10-22.2
+version: 2026-10-29.1
 assets:
 - {id: rsa-2048-keygen, group: RSA, keygen: true}
 - {id: ec-p256-keygen, group: EC, keygen: true}
@@ -33,24 +33,24 @@ projects:
     path: experiments/corpus/micro/java
     language: java
     file: src/main/java/app/CryptoDemo.java
-    catalog: 2026-10-22.1
+    catalog: 2026-10-29.1
     lines:
       rsa-2048-keygen: [21, 22, 23]
       ec-p256-keygen: [27, 28, 29]
-      ecdsa-p256-sign: [33, 34, 35, 36, 37, 38, 39]
-      ed25519-sign: [43, 44, 45, 46, 47]
-      aes-128-gcm: [60, 61, 62, 63, 64]
-      aes-256-gcm: [68, 69, 70, 71, 72]
-      aes-256-cbc: [76, 77, 78, 79, 80]
-      3des-cbc: [84, 85, 86, 87]
-      rsa-oaep-sha256: [95, 96, 97, 98, 99]
-      sha-1: [103, 104]
-      sha-256: [108, 109]
-      md5: [113, 114]
-      hmac-sha256: [124, 125, 126]
-      pbkdf2-hmac-sha256: [130, 131, 132]
-    calls: {rsa-2048-keygen: 21, ec-p256-keygen: 27, ecdsa-p256-sign: 36, ed25519-sign: 44, aes-128-gcm: 62, aes-256-gcm: 70,
-      aes-256-cbc: 78, 3des-cbc: 85, rsa-oaep-sha256: 97, sha-1: 103, sha-256: 108, md5: 113, hmac-sha256: 124, pbkdf2-hmac-sha256: 130}
+      ecdsa-p256-sign: [42, 43, 44, 45, 46, 47, 48]
+      ed25519-sign: [52, 53, 54, 55, 56]
+      aes-128-gcm: [64, 65, 66, 67, 68]
+      aes-256-gcm: [72, 73, 74, 75, 76]
+      aes-256-cbc: [86, 87, 88, 89, 90]
+      3des-cbc: [94, 95, 96, 97]
+      rsa-oaep-sha256: [106, 107, 108, 109, 110]
+      sha-1: [114, 115]
+      sha-256: [124, 125]
+      md5: [129, 130]
+      hmac-sha256: [139, 140, 141]
+      pbkdf2-hmac-sha256: [145, 146, 147]
+    calls: {rsa-2048-keygen: 21, ec-p256-keygen: 27, ecdsa-p256-sign: 45, ed25519-sign: 53, aes-128-gcm: 66, aes-256-gcm: 74,
+      aes-256-cbc: 88, 3des-cbc: 95, rsa-oaep-sha256: 108, sha-1: 114, sha-256: 124, md5: 129, hmac-sha256: 139, pbkdf2-hmac-sha256: 145}
     expected:
       rsa-2048-keygen: {unit: RSA, family: RSA, key_size: 2048}
       ec-p256-keygen: {unit: EC, family: EC, curve: secp256r1}
@@ -66,7 +66,7 @@ projects:
       md5: {unit: MD5, family: MD5}
       hmac-sha256: {unit: HMAC, family: HMAC, digest: SHA-256}
       pbkdf2-hmac-sha256: {unit: PBKDF2, family: PBKDF2, digest: SHA-256, iterations: 600000}
-    related: {33: 'the algorithm of ecdsa-p256-sign in a variable, used on line 36'}
+    related: {42: 'the algorithm of ecdsa-p256-sign in a variable, used on line 45'}
     accepted:
       3: [EC, RSA]
       4: [EC, RSA, SHA-2]
@@ -81,59 +81,71 @@ projects:
       15: [AES, DES]
       16: [PBKDF, SHA-2]
       17: [HMAC, SHA-2]
-      33: [SHA-2]
-      34: [SHA-2]
-      35: [SHA-2]
-      36: [SHA-2]
-      37: [SHA-2]
-      38: [SHA-2]
-      39: [SHA-2]
-      95: [SHA-2]
-      96: [SHA-2]
-      97: [SHA-2]
-      98: [SHA-2]
-      99: [SHA-2]
-      124: [SHA-2]
-      125: [SHA-2]
-      126: [SHA-2]
-      130: [SHA-2]
-      131: [SHA-2]
-      132: [SHA-2]
+      42: [SHA-2]
+      43: [SHA-2]
+      44: [SHA-2]
+      45: [SHA-2]
+      46: [SHA-2]
+      47: [SHA-2]
+      48: [SHA-2]
+      106: [SHA-2]
+      107: [SHA-2]
+      108: [SHA-2]
+      109: [SHA-2]
+      110: [SHA-2]
+      139: [SHA-2]
+      140: [SHA-2]
+      141: [SHA-2]
+      145: [SHA-2]
+      146: [SHA-2]
+      147: [SHA-2]
     decoys:
       comment:
-        lines: [51, 52, 53, 54, 55, 56]
+        lines: [33, 34, 35, 36, 37, 38]
         what: a comment naming algorithms
       log-message:
-        lines: [91]
+        lines: [60]
         what: a log message naming algorithms
       crc32:
-        lines: [118, 119, 120]
+        lines: [80, 81, 82]
         what: a non-cryptographic checksum (CRC32)
       base64:
-        lines: [136, 137]
+        lines: [101, 102]
         what: an encoding (Base64)
+      identifier:
+        lines: [119, 120]
+        what: a variable named after an algorithm, holding no cryptography
+      hex-constant:
+        lines: [134, 135]
+        what: a 32-byte hex constant that looks like a key or a digest
+      url:
+        lines: [151, 152]
+        what: a URL whose file suffix names an algorithm
+      cert-path:
+        lines: [156, 157]
+        what: a path string naming a certificate file (no such file exists)
   micro-python:
     path: experiments/corpus/micro/python
     language: python
     file: app/crypto_demo.py
-    catalog: 2026-10-22.1
+    catalog: 2026-10-29.1
     lines:
       rsa-2048-keygen: [16, 17]
       ec-p256-keygen: [21, 22]
-      ecdsa-p256-sign: [26, 27, 28]
-      ed25519-sign: [32, 33]
-      aes-128-gcm: [43, 44]
-      aes-256-gcm: [48, 49]
-      aes-256-cbc: [53, 54, 55]
-      sha3-256: [59]
-      rsa-oaep-sha256: [67, 68, 69, 70, 71]
-      sha-1: [75]
-      sha-256: [79]
-      md5: [83]
-      hmac-sha256: [92]
-      pbkdf2-hmac-sha256: [96]
-    calls: {rsa-2048-keygen: 16, ec-p256-keygen: 21, ecdsa-p256-sign: 28, ed25519-sign: 32, aes-128-gcm: 44, aes-256-gcm: 49,
-      aes-256-cbc: 53, sha3-256: 59, rsa-oaep-sha256: 70, sha-1: 75, sha-256: 79, md5: 83, hmac-sha256: 92, pbkdf2-hmac-sha256: 96}
+      ecdsa-p256-sign: [32, 33, 34]
+      ed25519-sign: [38, 39]
+      aes-128-gcm: [47, 48]
+      aes-256-gcm: [52, 53]
+      aes-256-cbc: [62, 63, 64]
+      sha3-256: [68]
+      rsa-oaep-sha256: [77, 78, 79, 80, 81]
+      sha-1: [85]
+      sha-256: [94]
+      md5: [98]
+      hmac-sha256: [107]
+      pbkdf2-hmac-sha256: [111]
+    calls: {rsa-2048-keygen: 16, ec-p256-keygen: 21, ecdsa-p256-sign: 34, ed25519-sign: 38, aes-128-gcm: 48, aes-256-gcm: 53,
+      aes-256-cbc: 62, sha3-256: 68, rsa-oaep-sha256: 80, sha-1: 85, sha-256: 94, md5: 98, hmac-sha256: 107, pbkdf2-hmac-sha256: 111}
     expected:
       rsa-2048-keygen: {unit: RSA, family: RSA, key_size: 2048}
       ec-p256-keygen: {unit: EC, family: EC, curve: secp256r1}
@@ -149,7 +161,7 @@ projects:
       md5: {unit: MD5, family: MD5}
       hmac-sha256: {unit: HMAC, family: HMAC, digest: SHA-256}
       pbkdf2-hmac-sha256: {unit: PBKDF2, family: PBKDF2, digest: SHA-256, iterations: 600000}
-    related: {26: 'the algorithm of ecdsa-p256-sign in a variable, used on line 28'}
+    related: {32: 'the algorithm of ecdsa-p256-sign in a variable, used on line 34'}
     accepted:
       2: [HMAC, MD5, PBKDF, RANDOM, SHA-1, SHA-2, SHA-3]
       3: [HMAC, SHA-2]
@@ -161,58 +173,70 @@ projects:
       10: [EC]
       11: [AES, RANDOM]
       12: [AES, RANDOM]
-      26: [SHA-2]
-      27: [SHA-2]
-      28: [SHA-2]
-      43: [RANDOM]
-      44: [RANDOM]
+      32: [SHA-2]
+      33: [SHA-2]
+      34: [SHA-2]
+      47: [RANDOM]
       48: [RANDOM]
-      49: [RANDOM]
+      52: [RANDOM]
       53: [RANDOM]
-      54: [RANDOM]
-      55: [RANDOM]
-      67: [SHA-2]
-      68: [SHA-2]
-      69: [SHA-2]
-      70: [SHA-2]
-      71: [SHA-2]
-      92: [SHA-2]
-      96: [RANDOM, SHA-2]
+      62: [RANDOM]
+      63: [RANDOM]
+      64: [RANDOM]
+      77: [SHA-2]
+      78: [SHA-2]
+      79: [SHA-2]
+      80: [SHA-2]
+      81: [SHA-2]
+      107: [SHA-2]
+      111: [RANDOM, SHA-2]
     decoys:
       comment:
-        lines: [37, 38, 39]
+        lines: [26, 27, 28]
         what: a comment naming algorithms
       log-message:
-        lines: [63]
+        lines: [43]
         what: a log message naming algorithms
       crc32:
-        lines: [87, 88]
+        lines: [57, 58]
         what: a non-cryptographic checksum (CRC32)
       base64:
-        lines: [100, 101]
+        lines: [72, 73]
         what: an encoding (Base64)
+      identifier:
+        lines: [89, 90]
+        what: a variable named after an algorithm, holding no cryptography
+      hex-constant:
+        lines: [102, 103]
+        what: a 32-byte hex constant that looks like a key or a digest
+      url:
+        lines: [115, 116]
+        what: a URL whose file suffix names an algorithm
+      cert-path:
+        lines: [120, 121]
+        what: a path string naming a certificate file (no such file exists)
   micro-go:
     path: experiments/corpus/micro/go
     language: go
     file: main.go
-    catalog: 2026-10-22.1
+    catalog: 2026-10-29.1
     lines:
-      rsa-2048-keygen: [23, 24, 25, 26, 27]
-      ec-p256-keygen: [31, 32, 33, 34, 35]
-      ecdsa-p256-sign: [39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49]
-      ed25519-sign: [53, 54, 55, 56, 57, 58]
-      aes-128-gcm: [71, 72, 73, 74, 75, 76, 77, 78, 79, 80]
-      aes-256-gcm: [84, 85, 86, 87, 88, 89, 90, 91, 92, 93]
-      aes-256-cbc: [97, 98, 99, 100, 101, 102, 103]
-      3des-cbc: [107, 108, 109, 110, 111, 112, 113]
-      rsa-oaep-sha256: [121, 122, 123, 124, 125, 126, 127, 128, 129]
-      sha-1: [133, 134]
-      sha-256: [138, 139]
-      md5: [143, 144]
-      hmac-sha256: [153, 154, 155, 156]
-      pbkdf2-hmac-sha256: [160, 161, 162, 163, 164]
-    calls: {rsa-2048-keygen: 23, ec-p256-keygen: 31, ecdsa-p256-sign: 45, ed25519-sign: 57, aes-128-gcm: 71, aes-256-gcm: 84,
-      aes-256-cbc: 97, 3des-cbc: 107, rsa-oaep-sha256: 125, sha-1: 133, sha-256: 138, md5: 143, hmac-sha256: 153, pbkdf2-hmac-sha256: 160}
+      rsa-2048-keygen: [24, 25, 26, 27, 28]
+      ec-p256-keygen: [32, 33, 34, 35, 36]
+      ecdsa-p256-sign: [49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59]
+      ed25519-sign: [63, 64, 65, 66, 67, 68]
+      aes-128-gcm: [76, 77, 78, 79, 80, 81, 82, 83, 84, 85]
+      aes-256-gcm: [89, 90, 91, 92, 93, 94, 95, 96, 97, 98]
+      aes-256-cbc: [107, 108, 109, 110, 111, 112, 113]
+      3des-cbc: [117, 118, 119, 120, 121, 122, 123]
+      rsa-oaep-sha256: [132, 133, 134, 135, 136, 137, 138, 139, 140]
+      sha-1: [144, 145]
+      sha-256: [154, 155]
+      md5: [159, 160]
+      hmac-sha256: [169, 170, 171, 172]
+      pbkdf2-hmac-sha256: [176, 177, 178, 179, 180]
+    calls: {rsa-2048-keygen: 24, ec-p256-keygen: 32, ecdsa-p256-sign: 55, ed25519-sign: 67, aes-128-gcm: 76, aes-256-gcm: 89,
+      aes-256-cbc: 107, 3des-cbc: 117, rsa-oaep-sha256: 136, sha-1: 144, sha-256: 154, md5: 159, hmac-sha256: 169, pbkdf2-hmac-sha256: 176}
     expected:
       rsa-2048-keygen: {unit: RSA, family: RSA, key_size: 2048}
       ec-p256-keygen: {unit: ECDSA, family: ECDSA, curve: secp256r1}
@@ -228,7 +252,7 @@ projects:
       md5: {unit: MD5, family: MD5}
       hmac-sha256: {unit: HMAC, family: HMAC, digest: SHA-256}
       pbkdf2-hmac-sha256: {unit: PBKDF2, family: PBKDF2, digest: SHA-256, iterations: 600000}
-    related: {39: 'the algorithm of ecdsa-p256-sign in a variable, used on line 45'}
+    related: {49: 'the algorithm of ecdsa-p256-sign in a variable, used on line 55'}
     accepted:
       4: [AES]
       5: [AES, DES]
@@ -243,61 +267,73 @@ projects:
       14: [RANDOM, RSA, SHA-2]
       15: [SHA-1]
       16: [EC, HMAC, PBKDF, RANDOM, RSA, SHA-2]
-      23: [RANDOM]
       24: [RANDOM]
       25: [RANDOM]
       26: [RANDOM]
       27: [RANDOM]
-      31: [RANDOM]
+      28: [RANDOM]
       32: [RANDOM]
       33: [RANDOM]
       34: [RANDOM]
       35: [RANDOM]
-      39: [RANDOM, SHA-2]
-      40: [RANDOM, SHA-2]
-      41: [RANDOM, SHA-2]
-      42: [RANDOM, SHA-2]
-      43: [RANDOM, SHA-2]
-      44: [RANDOM, SHA-2]
-      45: [RANDOM, SHA-2]
-      46: [RANDOM, SHA-2]
-      47: [RANDOM, SHA-2]
-      48: [RANDOM, SHA-2]
+      36: [RANDOM]
       49: [RANDOM, SHA-2]
-      53: [RANDOM]
-      54: [RANDOM]
-      55: [RANDOM]
-      56: [RANDOM]
-      57: [RANDOM]
-      58: [RANDOM]
-      121: [RANDOM, SHA-2]
-      122: [RANDOM, SHA-2]
-      123: [RANDOM, SHA-2]
-      124: [RANDOM, SHA-2]
-      125: [RANDOM, SHA-2]
-      126: [RANDOM, SHA-2]
-      127: [RANDOM, SHA-2]
-      128: [RANDOM, SHA-2]
-      129: [RANDOM, SHA-2]
-      153: [SHA-2]
-      154: [SHA-2]
-      155: [SHA-2]
-      156: [SHA-2]
-      160: [SHA-2]
-      161: [SHA-2]
-      162: [SHA-2]
-      163: [SHA-2]
-      164: [SHA-2]
+      50: [RANDOM, SHA-2]
+      51: [RANDOM, SHA-2]
+      52: [RANDOM, SHA-2]
+      53: [RANDOM, SHA-2]
+      54: [RANDOM, SHA-2]
+      55: [RANDOM, SHA-2]
+      56: [RANDOM, SHA-2]
+      57: [RANDOM, SHA-2]
+      58: [RANDOM, SHA-2]
+      59: [RANDOM, SHA-2]
+      63: [RANDOM]
+      64: [RANDOM]
+      65: [RANDOM]
+      66: [RANDOM]
+      67: [RANDOM]
+      68: [RANDOM]
+      132: [RANDOM, SHA-2]
+      133: [RANDOM, SHA-2]
+      134: [RANDOM, SHA-2]
+      135: [RANDOM, SHA-2]
+      136: [RANDOM, SHA-2]
+      137: [RANDOM, SHA-2]
+      138: [RANDOM, SHA-2]
+      139: [RANDOM, SHA-2]
+      140: [RANDOM, SHA-2]
+      169: [SHA-2]
+      170: [SHA-2]
+      171: [SHA-2]
+      172: [SHA-2]
+      176: [SHA-2]
+      177: [SHA-2]
+      178: [SHA-2]
+      179: [SHA-2]
+      180: [SHA-2]
     decoys:
       comment:
-        lines: [62, 63, 64, 65, 66, 67]
+        lines: [40, 41, 42, 43, 44, 45]
         what: a comment naming algorithms
       log-message:
-        lines: [117]
+        lines: [72]
         what: a log message naming algorithms
       crc32:
-        lines: [148, 149]
+        lines: [102, 103]
         what: a non-cryptographic checksum (CRC32)
       base64:
-        lines: [168, 169]
+        lines: [127, 128]
         what: an encoding (Base64)
+      identifier:
+        lines: [149, 150]
+        what: a variable named after an algorithm, holding no cryptography
+      hex-constant:
+        lines: [164, 165]
+        what: a 32-byte hex constant that looks like a key or a digest
+      url:
+        lines: [184, 185]
+        what: a URL whose file suffix names an algorithm
+      cert-path:
+        lines: [189, 190]
+        what: a path string naming a certificate file (no such file exists)

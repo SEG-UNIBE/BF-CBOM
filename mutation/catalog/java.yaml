@@ -9,7 +9,7 @@
 # marks the line naming the algorithm, `@related` the line holding it in a variable (both stripped). Four spaces are
 # one indentation level (re-indented to the file's own). `wrapper` is derived from `direct` (mutation/insert.py).
 # Changing a snippet bumps `version`: every mutant records the version it was made from (mutants.json).
-version: "2026-10-22.1"
+version: "2026-10-29.1"
 language: java
 wrap: |
   try {
@@ -283,3 +283,23 @@ decoys:
     direct: |
       String $encoded = $Base64.getEncoder().encodeToString("data".getBytes());
       System.out.println($encoded);
+  - id: identifier
+    what: a variable named after an algorithm, holding no cryptography
+    direct: |
+      String $sha256Tag = "checksum-" + "data".length();
+      System.out.println($sha256Tag);
+  - id: hex-constant
+    what: a 32-byte hex constant that looks like a key or a digest
+    direct: |
+      String $expectedHex = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08";
+      System.out.println($expectedHex.length());
+  - id: url
+    what: a URL whose file suffix names an algorithm
+    direct: |
+      String $checksumUrl = "https://example.org/downloads/app-1.0.tar.gz.sha256";
+      System.out.println($checksumUrl);
+  - id: cert-path
+    what: a path string naming a certificate file (no such file exists)
+    direct: |
+      String $certPath = "config/certs/ca_ecdsa.pem";
+      System.out.println($certPath.endsWith(".pem"));

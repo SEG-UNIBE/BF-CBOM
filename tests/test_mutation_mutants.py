@@ -47,7 +47,9 @@ def test_mutants_are_deterministic_single_file_commits(tmp_path, language):
     calls = [m for m in entry["mutants"] if not m["decoy"]]
     decoys = [m for m in entry["mutants"] if m["decoy"]]
     assert [m["style"] for m in calls] == ["direct", "wrapper", "indirect", "direct"]  # round-robin over the styles
-    assert sorted(m["snippet"] for m in decoys) == ["base64", "comment", "crc32", "log-message"]
+    kinds = {m["snippet"] for m in decoys}  # 4 distinct kinds of the catalog's 8, from a seeded shuffle
+    assert len(decoys) == 4 and len(kinds) == 4 and kinds <= {"base64", "comment", "crc32", "log-message", "identifier",
+                                                            "hex-constant", "url", "cert-path"}  # fmt: skip
     assert all(m["style"] == "direct" and m["expected"] == {} and m["also"] == [] for m in decoys)
     bare = mirror_path(repo.full_name, mirror)
     for m in entry["mutants"]:

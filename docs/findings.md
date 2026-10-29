@@ -462,3 +462,47 @@ columns. Read with the vocabulary of 2026-10-23.2:
   bootstrap interval), every catalog snippet once per repository, so the per-(tool, language, style) cells of RQ4 are
   all filled; the smoke's single snippet (RSA, present in every JWT library, hence `masked` for the repository level)
   says nothing about the other fourteen.
+
+## Export review 2026-10-24 (bar-micro, corpus-pilot-small, corpus-icpc, corpus-pilot-medium, mutation-pilot)
+The five experiments were rerun whole on the VM on 2026-10-23 with vocabulary 2026-10-23.2 and the caps above
+(cdxgen 24 GiB, CipherRadar 8 GiB, every tool at once; peak 44.8 of 60.5 GiB on pilot-medium) and exported on
+2026-10-24 with the repositories' sizes recorded at pin time, so every run-time table has `ρ size` and `s / 1k files`.
+stability-pilot and mutation-smoke were not part of this round.
+- **The bar (bar-micro: 14 calls and 4 decoys per language).** 11 of 15 tools pass, each in every language it was
+  scored in, so no `tool_languages:` narrowing follows: cbomkit, cbomkit-jar, cipherradar, ciphersift, cryptobomforge,
+  cryptoscan, pqcheck, qdarpan, scanoss, securin-xbom, xgrep. Disqualified: cdxgen (0 / 0 / 6 of 14: its Java and
+  Python CBOMs name no algorithm, Go exactly the throwaway run of 2026-10-22), cryptarium (0 everywhere: no
+  locations), qelens (5 of 14 in Python, on import lines), qscan (5 of 14 in every language: quantum-vulnerable
+  crypto only). The decoys catch one tool: CipherRadar reports crypto on the comment and the log message in every
+  language (2 of 4); nobody else hits one. CipherSift's precision below 1 (0.77 Java, 0.71 Go) comes from places off
+  the items' lines, not from decoys. The verdicts stand in the export's summary as the spec line to copy; the user
+  writes them into the specs by hand, nothing in code or the registry needs them (decided 2026-10-29: no
+  `micro_<date>` record for this run).
+- **cdxgen at 24 GiB.** OOM-killed 8 times (kafka on pilot-small; 2 ICPC repos; 5 pilot-medium repos), each stored
+  with output and now read as `oom`: listed in the summary, no CBOM read from it, `--retry-failed` redoes it. The
+  tool is disqualified anyway, so no cap is raised.
+- **Headline agreement at L4** (exact matcher / RaQuN cross-check): corpus-pilot-small 0.78 / 0.59 on 250 items,
+  corpus-icpc 0.78 / 0.58 on 162, corpus-pilot-medium 0.81 / 0.58 on 1'410, the mutation pilot's nine originals
+  0.91 / 0.72 on 226. On pilot-medium cbomkit's 342 items go from 0.71 confirmed under the identical name (L0) to
+  0.96 at L4. The summary's "Per language" `all` row now equals the matcher table's items (1'410; it counted 1'455
+  before the fix of 2026-10-23).
+- **Mutation pilot (RQ4 on real code):** 9 repositories, 270 mutants (135 planted calls, 135 decoys; 45 of each per
+  language), every run ok (4'185 runs; 405 call × tool cells unsupported by language). F1 per language (Java /
+  Python / Go): CipherSift 1.00 / 0.98 / 1.00, inflated by construction (tuned on the micro projects, the same
+  catalog; marked `*` in the table); xgrep 0.92 / 0.93 / 0.85; CryptoScan 0.89 / 0.89 / 0.86; cbomkit (both
+  packagings) 0.99 / 0.64 / 0.75 (Python: pyca only, as declared); SCANOSS 0.98 in Go; Q-DARPAN 0.78 Java, 0.82 Go;
+  securin-xbom 0.70 / 0.78; pqcheck 0.78 / 0.77 (Python / Go); CryptobomForge 0.62 Python. CipherRadar finds
+  0.84-0.87 of the calls (recall by group 0.91-1.00: the RSA keygen filed as RSASSA-PKCS1, as in the smoke) but hits
+  22-24 of 45 decoys in every language, precision 0.53-0.63, F1 0.56-0.73: the pattern tool's price. cdxgen 0.00 in
+  Java and Python, 0.55 in Go; the three observers 0.00-0.39. The bridge: Spearman between confirmation rate and F1
+  0.6 (Go, 12 cells), 0.6 (Java, 10), 0.3 (Python, 13), 0.4 pooled over 35 cells; Kendall τ 0.5 / 0.5 / 0.3 / 0.4.
+- **Fixed on review:** `experiment list` and `status` counted an OOM-killed `ok` run as ok (now `oom`, as in the
+  report); `s / 1k files` was computed over the micro projects (one file each) and read as start-up cost (now only
+  with `ρ size`, 3 or more repositories whose sizes differ); the RQ4 "Not judged" line gives the count per status;
+  `mutation-scores.csv` has a `tailored` column.
+- **Open:** the "Spellings per identity" table counts cdxgen's certificate file names as spellings (`CA_ecdsa.pem`,
+  `ca_ecdsa_256.pub`, ...: 118 of the 240 ECDSA spellings), because `vocab.csv` carries no asset type and the name
+  parser reads `ecdsa` in a file name. The records are right (a certificate asset whose name says ECDSA); the table
+  should count algorithm assets only, or show certificates apart.
+- **Decided 2026-10-29:** the observer role goes (the bar replaces it; `role: observer`, `--observers-vote`, the
+  `role` columns and the `°` mark are a cleanup); the specs other than bar-micro get the 11 tools by hand.

@@ -23,10 +23,10 @@ their exact lines. Tests check that the checked-in files match the generator.
 
 The entry bar is at least 7 of 14 calls found in their functions, leniently, in one paper language. The analysis
 also reports strict and repository-level recall, precision, F1 and decoy hits. The hit and accepted-location rules
-are stated in the ground truth's header. The catalogs and decoys are AI-made and **not yet human-reviewed**;
+are stated in the ground truth's header. The catalogs and decoys are AI-made (the last four decoy kinds added 2026-10-29) and **not yet human-reviewed**;
 review them before paper use.
 
-**The four decoys** (`decoys:` in each catalog; one function each in the micro projects, and the mutation harness
+**The eight decoys** (`decoys:` in each catalog; one function each in the micro projects, and the mutation harness
 plants the same ones as mutants, `decoys` in a spec's `mutation:` block) are known negatives, each aimed at one way a
 tool can be fooled:
 
@@ -36,6 +36,10 @@ tool can be fooled:
 | `log-message` | a print or log statement whose string names algorithms (`"RSA and ECDSA keys are rotated nightly"`) | the same names inside a string literal, which some pattern tools scan and some skip |
 | `crc32` | a CRC32 checksum (`zlib.crc32`, `java.util.zip.CRC32`, `hash/crc32`) | a hash-like API that is no cryptography; a tool that takes every checksum or `hash` package for a crypto asset reports it |
 | `base64` | a Base64 encoding (`base64.b64encode`, `java.util.Base64`, `encoding/base64`) | an encoding that sits next to keys and ciphertext in real code but is no cipher; a tool that lists encoders with ciphers reports it |
+| `identifier` | a variable named after an algorithm that holds plain text (`sha256Tag = "checksum-" + len`) | an algorithm name inside an identifier; a tool that matches names in code, not only in strings and comments, reports SHA-256 |
+| `hex-constant` | a 64-digit hex string constant (`expectedHex = "9f86d081…0a08"`, the length of a SHA-256 digest or an AES-256 key), only its length is used | a value shaped like a key or a digest; a tool that reports key material or secrets by shape lists it |
+| `url` | a download URL ending in `.sha256` (`https://example.org/downloads/app-1.0.tar.gz.sha256`) | an algorithm name as a file suffix inside a URL; the string-matching trap in its most common real-world form |
+| `cert-path` | a path string naming a certificate file (`config/certs/ca_ecdsa.pem`; no such file exists, only its suffix is checked) | a certificate or key file name carrying an algorithm; a tool that lists certificates by file name reports ECDSA (cdxgen names its certificate assets after their files) |
 
 Any crypto record on a decoy's lines is a false positive with ground truth (the micro check's `decoys` column; a
 mutant's `false_positive` in `mutation.csv`). A non-cryptographic PRNG (`math/rand`, `random`) is deliberately not a

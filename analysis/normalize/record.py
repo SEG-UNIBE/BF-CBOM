@@ -149,7 +149,7 @@ class NormalizedCbom:
     document_issues: list
     stats: dict
     records: list[NormRecord] = field(default_factory=list)
-    mappings: dict = field(default_factory=dict)  # (src, raw) -> what it mapped to; for the vocabulary report
+    mappings: dict = field(default_factory=dict)  # (src, raw, asset type) -> what it mapped to; vocab.csv
 
     def spec_issue_counts(self) -> dict[str, int]:
         counts: dict[str, int] = {}

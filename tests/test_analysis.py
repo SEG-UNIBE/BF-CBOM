@@ -40,7 +40,7 @@ def test_ground_truth_loads_and_maps_repo_names():
     truth = load_ground_truth()
     assert set(truth) == {"micro-java", "micro-python", "micro-go"}
     for p in truth.values():
-        assert len(p.assets) == 14 and len(p.decoys) == 4
+        assert len(p.assets) == 14 and len(p.decoys) == 8
     assert project_for_repo("bfcbom/micro-java").file == "src/main/java/app/CryptoDemo.java"
     assert project_for_repo("x/other") is None
 
@@ -434,8 +434,8 @@ def test_repositories_section_links_pinned_commits_folds_by_language_or_lists_si
 def test_spellings_per_identity_count_distinct_raw_values_per_tool():
     from analysis.summary import _spellings
 
-    def row(tool, raw, mapped, status="mapped"):
-        return {"tool": tool, "raw": raw, "mapped": mapped, "status": status}
+    def row(tool, raw, mapped, status="mapped", asset_type="algorithm"):
+        return {"tool": tool, "raw": raw, "mapped": mapped, "status": status, "asset_type": asset_type}
 
     rows = [
         row("a", "sha256", "algorithm=SHA-256;family=SHA-2"),
@@ -444,10 +444,12 @@ def test_spellings_per_identity_count_distinct_raw_values_per_tool():
         row("b", "SHA256", "algorithm=SHA-256;family=SHA-2"),
         row("b", "foo", "", status="unmapped"),
         row("b", "['digest']", "functions=digest"),  # no identity: not a spelling of an algorithm
+        row("b", "CA_ecdsa.pem", "algorithm=ECDSA;family=ECDSA", asset_type="certificate"),  # a file's name
+        row("b", "ecdsa", "algorithm=ECDSA;family=ECDSA", asset_type=""),  # no asset type: counts
     ]
     text = "\n".join(_spellings(rows))
     assert "| a | 2 | 3 | 1.50 | SHA-256 (2: SHA-256, sha256) |" in text
-    assert "| b | 1 | 1 | 1.00 | SHA-256 (1: SHA256) |" in text
+    assert "| b | 2 | 2 | 1.00 | SHA-256 (1: SHA256) |" in text  # `ecdsa` counted, the certificate's file name not
     assert "`SHA-256` 3 spellings by 2 tools" in text and _spellings([]) == []
 
 

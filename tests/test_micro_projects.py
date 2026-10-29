@@ -65,7 +65,7 @@ def test_keygen_items_take_key_records_and_decoys_count_as_false_positives():
         _rec(3, "MD5", truth.decoys["comment"][0]),  # a comment naming MD5: a false positive
     ]
     score = score_records(records, truth, "t")
-    assert score.hits_strict == ["rsa-2048-keygen"] and score.decoys_hit == ["comment"] and score.n_decoys == 4
+    assert score.hits_strict == ["rsa-2048-keygen"] and score.decoys_hit == ["comment"] and score.n_decoys == 8
     assert [f["line"] for f in score.false_sites] == [truth.decoys["comment"][0]]  # the SHA-2 record is a sub-use
     assert "hmac-sha256" not in score.hits_repo and "rsa-oaep-sha256" not in score.hits_strict
 

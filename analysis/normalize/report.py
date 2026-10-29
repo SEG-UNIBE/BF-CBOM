@@ -22,7 +22,8 @@ from collections import Counter, defaultdict
 from .engine import RESOLUTIONS
 from .record import ASSET_DIMS, NormalizedCbom, NormRecord, unmapped_text
 
-VOCAB_COLUMNS = ["tool", "source", "raw", "status", "mapped", "unmapped_tokens", "via", "interpretive", "kind", "count"]
+VOCAB_COLUMNS = ["tool", "source", "asset_type", "raw", "status", "mapped", "unmapped_tokens", "via", "interpretive",
+                 "kind", "count"]  # fmt: skip
 COVERAGE_COLUMNS = [
     "tool", "cboms", "assets", *RESOLUTIONS, "dimension", "reported", "derived", "reported_share", "derived_share",
 ]  # fmt: skip
@@ -68,7 +69,7 @@ def assets_of(n: NormalizedCbom) -> list[list[NormRecord]]:
 class Report:
     def __init__(self) -> None:
         self.tools: dict[str, dict] = defaultdict(self._empty)
-        self.vocab: dict[tuple[str, str, str], dict] = {}
+        self.vocab: dict[tuple[str, str, str, str], dict] = {}
 
     @staticmethod
     def _empty() -> dict:
@@ -146,8 +147,8 @@ class Report:
             t["fill_derived"][d] += 1
 
     def _add_mappings(self, n: NormalizedCbom) -> None:
-        for (src, raw), entry in n.mappings.items():
-            key = (n.tool, src, raw)
+        for (src, raw, asset_type), entry in n.mappings.items():
+            key = (n.tool, src, raw, asset_type)
             row = self.vocab.setdefault(key, {"mapped": {}, "via": set(), "tokens": (), "count": 0, "kind": None})
             for d, v in entry["mapped"].items():
                 row["mapped"].setdefault(d, v)
@@ -217,8 +218,11 @@ class Report:
         return rows
 
     def vocab_rows(self) -> list[dict]:
+        """One row per (tool, source, raw value, asset type of the record): what the value mapped to. The asset
+        type (the record's; empty when none) tells a name read off an algorithm from one read off a certificate or
+        key file, which the spellings table of the summary leaves out."""
         rows = []
-        for (tool, src, raw), e in sorted(self.vocab.items()):
+        for (tool, src, raw, asset_type), e in sorted(self.vocab.items()):
             mapped = e["mapped"]
             if e["tokens"] == ("*",):
                 status = "unmapped"
@@ -234,6 +238,7 @@ class Report:
                 {
                     "tool": tool,
                     "source": src,
+                    "asset_type": asset_type,
                     "raw": raw,
                     "status": status,
                     "mapped": ";".join(f"{d}={'|'.join(v) if isinstance(v, tuple) else v}" for d, v in mapped.items()),

@@ -1,5 +1,5 @@
 # The bar exam: every tool once on the micro projects (experiments/corpus/micro, Java, Python and Go: 14 known crypto calls and
-# 4 decoys each, generated from the snippet catalog by mutation/micro.py; experiments/corpus/micro/ground_truth.yaml). A tool
+# 8 decoys each, generated from the snippet catalog by mutation/micro.py; experiments/corpus/micro/ground_truth.yaml). A tool
 # passes in a language when it finds at least 7 of the 14 in their functions on that language's project (the entry bar);
 # below it in every language it is `disqualified`. The report's "Bar exam" section ends with the verdicts as a spec
 # writes them (`tools`, `tool_languages:`); a person copies them into the later specs by hand, no code reads them, and

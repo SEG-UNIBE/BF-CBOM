@@ -169,8 +169,10 @@ class _Reader:
                     self.rdeps[t].add(d["ref"])
         self._fields_cache: dict[int, list[Val]] = {}
         self._phase_a: dict[int, dict[str, object]] = {}
-        # (src, raw) -> mapped {dim: value}, how, leftover tokens, count: the per-field mapping table
-        self.mappings: dict[tuple[str, str], dict] = {}
+        # (src, raw, asset type) -> mapped {dim: value}, how, leftover tokens, count: the per-field mapping table;
+        # `_note` holds a component's values until its records exist, so the key carries the record's asset type
+        self.mappings: dict[tuple[str, str, str], dict] = {}
+        self._pending: list[tuple[list[Val], list[Unmapped]]] = []
 
     # ----- selection -----
 
@@ -282,7 +284,7 @@ class _Reader:
             return (rule_id_to_text(str(value)) if value else None), ("name" if key == "name" else f"properties[{key}]")
         return None, arg
 
-    def evaluate(self, sdef: SourceDef, ci: int, comp: dict, occ: dict | None, props: dict):
+    def evaluate(self, sdef: SourceDef, ci: int, comp: dict, occ: dict | None, props: dict, *, note: bool = True):
         kind = sdef.kind
         unmapped: list[Unmapped] = []
         if kind == "fields":
@@ -299,7 +301,8 @@ class _Reader:
                 return [], []  # read by the extractor, not a name to parse
             if str(sdef.arg).startswith("rule:") and self._non_crypto_rule(str(sdef.arg), comp, props):
                 vals = [Val("name", None, text, label, "taxonomy", known=True, kind="non-crypto")]
-                self._note(vals, [])
+                if note:
+                    self._note(vals, [])
                 return vals, []
             hit = self.spec.lookup("name", text)
             if hit is not None:
@@ -322,7 +325,8 @@ class _Reader:
             vals = []
         if sdef.only:
             vals = [v for v in vals if v.dim in sdef.only]
-        self._note(vals, unmapped)
+        if note:
+            self._note(vals, unmapped)
         return vals, unmapped
 
     def _non_crypto_rule(self, arg: str, comp: dict, props: dict) -> bool:
@@ -337,12 +341,23 @@ class _Reader:
         return len(parts) >= 3 and not any(p in segments for p in parts)
 
     def _note(self, vals: list[Val], unmapped: list[Unmapped]) -> None:
-        """Collect what each raw value mapped to (analysis/normalize/report.py turns this into vocab.csv)."""
+        """Hold what a component's raw values mapped to until `records` knows the component's asset type."""
+        self._pending.append((vals, unmapped))
+
+    def _flush(self, asset_type: str) -> None:
+        """Collect the held values under (source, raw, asset type) (analysis/normalize/report.py turns this into
+        vocab.csv): a certificate named after its file is a spelling of the file, not of the algorithm."""
+        pending, self._pending = self._pending, []
+        for vals, unmapped in pending:
+            self._collect(vals, unmapped, asset_type)
+
+    def _collect(self, vals: list[Val], unmapped: list[Unmapped], asset_type: str) -> None:
         for v in vals:
             if v.dim in _PSEUDO or v.raw is None or v.via in ("dependency", "ref"):
                 continue
             entry = self.mappings.setdefault(
-                (v.src, str(_jsonable(v.raw))), {"mapped": {}, "via": set(), "tokens": (), "count": 0, "kind": None}
+                (v.src, str(_jsonable(v.raw)), asset_type),
+                {"mapped": {}, "via": set(), "tokens": (), "count": 0, "kind": None},
             )
             if v.value is not None and v.dim != "ambiguous":
                 entry["mapped"].setdefault(v.dim, v.value)
@@ -353,7 +368,7 @@ class _Reader:
             entry["count"] += 1
         for src, raw, tokens in unmapped:
             entry = self.mappings.setdefault(
-                (src, raw), {"mapped": {}, "via": set(), "tokens": (), "count": 0, "kind": None}
+                (src, raw, asset_type), {"mapped": {}, "via": set(), "tokens": (), "count": 0, "kind": None}
             )
             entry["tokens"] = tokens or ("*",)
             entry["count"] += 1
@@ -370,7 +385,7 @@ class _Reader:
             for sdef in self.spec.sources:
                 if sdef.per_occurrence or sdef.kind in ("dependencies", "refs"):
                     continue
-                vals, _ = self.evaluate(sdef, ci, comp, None, props)
+                vals, _ = self.evaluate(sdef, ci, comp, None, props, note=False)
                 partials.append(vals)
             merged, *_ = merge(partials, self.vocab)
             out = {d: v.value for d, v in merged.items()}
@@ -477,6 +492,7 @@ class _Reader:
                 partials.append(vals)
                 unmapped += um
             out.append(self._build(ci, oi, comp, loc, partials, unmapped, comp_issues, props))
+        self._flush(str(next((r.values.get("asset_type") for r in out), None) or ""))
         return out
 
     def _build(self, ci, oi, comp, loc, partials, unmapped, comp_issues, props) -> NormRecord:

@@ -147,8 +147,8 @@ normalisation, analysis outputs),
   `_run-log.json`, and a note that run times measured with replicas include CPU contention (`runtime.csv`).
 - **Corpus and fixtures** (`experiments/corpus/`, mounted read-only into the runner): `micro/<language>/` the micro projects of
   Java, Python and Go with `micro/ground_truth.yaml`, both generated from the snippet catalog (`mutation/micro.py`,
-  checked in, a test keeps them equal; 14 expected calls, each in a function of its own, and 4 decoys per project; its
-  header states the hit rule, decided 2026-10-22); `pilot-2026-10-08.yaml` (12 pinned real
+  checked in, a test keeps them equal; 14 expected calls, each in a function of its own, and 8 decoys per project (4 kinds
+  added 2026-10-29); its header states the hit rule, decided 2026-10-22); `pilot-2026-10-08.yaml` (12 pinned real
   projects in Java, Python and Go, the development set; all 16 pilot projects in `pilot-2026-10-08-all.yaml`, read
   by CipherSift's `tailored_on`); `pilot-2026-10-22.yaml` (second pilot: 60 manually selected repos, 20 per paper
   language, default-branch HEADs pinned on 2026-10-22; `experiments/corpus-pilot-medium.yaml`);
@@ -265,7 +265,7 @@ the rerun's verdicts.
 The ICPC 2026 paper introduced BF-CBOM and showed that CBOM generators disagree strongly. The journal extension asks
 what the generators report on real code that has no reference CBOM, how far they agree once their reports are
 normalised, and how well they find what we know is there. The arc (decided 2026-10-22): the tools sit a **bar exam**
-on the generated micro projects (14 planted calls and 4 decoys per language; the bar is 7 of 14 in a language; recall,
+on the generated micro projects (14 planted calls and 8 decoys per language; the bar is 7 of 14 in a language; recall,
 precision and F1; the one filter, and it names the languages a tool is eligible in, which the user writes into the
 later specs by hand), the eligible tools generate
 CBOMs for the **corpus run** (~200 real repos, ~65 per language, the number open), and the paper asks four questions
@@ -313,25 +313,26 @@ ones of corpus-main, ~10 calls and ~10 decoys each, sized after the corpus run's
 mutation harness); every other language (C, JavaScript/TypeScript, Rust, ...) is irrelevant for now: tools still run
 where they declare support, but no analysis, figure or tuning effort goes into those languages.
 
-## Status (updated 2026-10-23)
-- **Current experiment scope:** 15 CBOM generator tools in all current specs. LLM providers are excluded for now;
-  the provider workers and their analysis support remain implemented for possible later use.
-- **corpus-pilot-medium reviewed (2026-10-23, `docs/findings.md` "Export review 2026-10-23"):** the vocabulary is at
-  2026-10-23.2 (parser bounds, then additions: XDH, ANSI-KDF spellings, DES3, OCB3, ISO7816-4, java-jwt names), cdxgen's
-  cap is 24 GiB and CipherRadar's 8 GiB, OOM-tainted runs count as `oom` in the report too; every pilot experiment is
-  rerun with these.
-- **Waiting for the VM:** `make up-prod`, then each experiment as a whole (the user's preference, 2026-10-20):
-  `make experiment EXP=experiments/corpus-pilot-small.yaml ARGS="--overwrite-old" EXPERIMENT_MEMORY_BUDGET_GB=0`, the
-  same for corpus-icpc, stability-pilot and bar-micro; `make experiment-delete NAME=<x>` for the former smoke
-  experiments e0-smoke, e0-cbomkit-smoke, e0-llm-smoke and e0-phase2-smoke (specs went 2026-10-21) and for the runs
-  under the old spec names e0-micro, e0-stability, e1-pilot-corpus, e1-icpc-corpus, e1-pilot-60 and
-  e4-mutation-smoke (renamed 2026-10-22); `make experiment EXP=experiments/mutation-smoke.yaml
-  EXPERIMENT_MEMORY_BUDGET_GB=0` (now with decoys); then build corpus-main (Java, Python and Go) with `GITHUB_TOKEN`
-  and prune it, check replicas.
-- **After the bar-micro rerun (the user, by hand):** the verdicts and `micro_<date>` go into `common/tools.yaml` as
-  the record, the specs get their `tool_languages` (cdxgen's Go among them: 6/11 in a throwaway run with the
-  module-cache fix, exactly the old bar; the history in `docs/findings.md` "cdxgen in Go" and "Micro ground truth
-  v2") and lose the disqualified tools; the observer role goes.
+## Status (updated 2026-10-29)
+- **Current experiment scope:** 15 CBOM generator tools integrated; the bar exam of 2026-10-23 passes 11 of them
+  (`docs/findings.md` "Export review 2026-10-24"). The specs still list all 15: the user writes the 11 into every
+  spec but bar-micro by hand (no `tool_languages` needed: every passed tool passes in every language it was scored
+  in). LLM providers are excluded for now; the provider workers and their analysis support remain implemented.
+- **Exports of 2026-10-24 reviewed:** bar-micro, corpus-pilot-small, corpus-icpc, corpus-pilot-medium and
+  mutation-pilot, rerun whole with vocabulary 2026-10-23.2 and the caps of 2026-10-23 (cdxgen 24 GiB, CipherRadar
+  8 GiB), sizes recorded at pin time. Headline agreement at L4 0.78-0.81 (exact matcher) against RaQuN's 0.58-0.59;
+  RQ4 F1 per tool and language filled with CIs; cdxgen OOM-killed 8 times at 24 GiB (read as `oom`), disqualified
+  anyway. stability-pilot and mutation-smoke were not in this round (the user runs them).
+- **Decided 2026-10-29, to build:** the observer role goes (`role: observer` in `tools.yaml`, `--observers-vote`,
+  `common/tools_registry.py:votes`, the `role` columns of `levels-`, `items-`, `score-run<i>.csv` and the `°` mark:
+  the bar exam is the one filter, the three observers are disqualified by it). The stale `micro_2026-10-17` lines
+  in `tools.yaml` go with it: the bar's verdicts are recorded in the bar-micro export, nothing in code reads them.
+- **Under consideration:** extending the micro projects (and so the shared snippet catalog, from which the mutants
+  come too): more APIs per language, more decoy kinds, a few more identities. The bar is the one filter on the
+  tools, so its rigor load is bounded; anything added after CipherSift's pinned release is held out for it.
+- **Open analysis item:** the "Spellings per identity" table counts cdxgen's certificate file names as spellings
+  (118 of 240 ECDSA spellings on pilot-medium); `vocab.csv` needs the asset type so the table counts algorithm
+  assets only.
 - **Waiting for the user:** human review of the snippet catalogs (the micro projects, their ground truth and the
   mutants are generated from them) and the decoys, the hand-check verdicts and the `languages` lists (all AI-made).
 - **External:** the SCANOSS research key, the Cryptoscope artifact; the rater study after the corpus-main run (a
@@ -339,11 +340,12 @@ where they declare support, but no analysis, figure or tuning effort goes into t
 - **Small open analysis items:** CryptobomForge's IBM-draft windows are CodeQL's `contextRegion` (finding ±2 lines),
   so the exact line could be read as the window centre (one over-credit on micro-python); Jaro-Winkler candidates
   for curating the mapping table; per-field columns in `micro-run<i>.csv`; inferring `functions` from API names.
-- **Next:** the VM reruns above -> the verdicts into the specs by hand -> corpus-main built and pruned (enough Python repos
-  that already depend on `cryptography`, for the pyca snippets) -> mutation-smoke -> the corpus-main run -> the rater
-  study and mutation-main -> Phase 6. `experiments/mutation-pilot.yaml` (9 pilot-medium repos, 3 per language, every
-  snippet once per repo plus as many decoys; selected 2026-10-23, `experiments/README.md` "Mutation pilot") runs after
-  mutation-smoke and before mutation-main.
+- **Next:** the 11 tools into the specs (the user) -> the observer cleanup -> on the VM: stability-pilot,
+  mutation-smoke, `make experiment-delete NAME=<x>` for the former smoke experiments e0-smoke, e0-cbomkit-smoke,
+  e0-llm-smoke, e0-phase2-smoke and the runs under the old spec names e0-micro, e0-stability, e1-pilot-corpus,
+  e1-icpc-corpus, e1-pilot-60, e4-mutation-smoke; corpus-main built with `GITHUB_TOKEN` and pruned (enough Python
+  repos that already depend on `cryptography`, for the pyca snippets), replicas checked -> the corpus-main run ->
+  the rater study and mutation-main -> Phase 6.
 
 ## Phases 1-3 (done 2026-10-15 to 2026-10-18)
 What exists and the decisions behind it. Numbers: `docs/findings.md`.
@@ -472,9 +474,10 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
   to the host plus one call) is derived. A snippet only goes where its library is already there (decided 2026-10-20):
   Java is JCA throughout, Python's pyca snippets need a declared `cryptography` (stdlib ones go anywhere), Go's PBKDF2
   needs `go >= 1.24` or a required `golang.org/x/crypto`; dependency files are never edited, so every mutant is one
-  edit of one file. **Decoys** (`decoys:` in each catalog, the one source of the micro projects' decoys too): four
-  kinds per language, a comment naming algorithms, a log message naming algorithms, a CRC32 checksum and a Base64
-  encoding, each one `direct` body with no expected record; a tool that reports one has produced a false positive on a
+  edit of one file. **Decoys** (`decoys:` in each catalog, the one source of the micro projects' decoys too): eight
+  kinds per language (the table in `experiments/corpus/README.md`): a comment and a log message naming algorithms,
+  a CRC32 checksum, a Base64 encoding, a variable named after an algorithm, a hex constant that looks like a key, a
+  URL ending in `.sha256` and a path naming a certificate file, each one `direct` body with no expected record; a tool that reports one has produced a false positive on a
   known negative.
 - **Insert** (`lang.py`, `insert.py`; tree-sitter for Java and Go, Python's `ast`): into a first-party method or
   function with a caller elsewhere in the repo (by name, `host_callers` recorded as a covariate) or a `main`, never in
