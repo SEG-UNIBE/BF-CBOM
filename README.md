@@ -13,6 +13,7 @@
   <strong>
     👋 <a href="#introduction">Introduction</a> &nbsp;&nbsp;| &nbsp;&nbsp; 
     🚀 <a href="#setup">Setup</a> &nbsp;&nbsp;|&nbsp;&nbsp; 
+    📚 <a href="#documentation">Documentation</a> &nbsp;&nbsp;|&nbsp;&nbsp; 
     🛠️ <a href="#developer-notes">Developer Notes</a> 
   </strong>
 </div>
@@ -50,18 +51,20 @@ It also offers **benchmarking capabilities** to orchestrate batch CBOM generatio
 
 ### CBOM Generators Under Scrutiny
 
-BF-CBOM integrates 15 CBOM generator tools for side-by-side comparisons.
-Each generator brings a unique methodology for detecting and cataloging cryptographic assets:
+BF-CBOM integrates 14 CBOM generator tools for side-by-side comparisons (15 workers: CBOMkit in both of its official distributions).
+Each generator brings a unique methodology for detecting and cataloging cryptographic assets.
+Every tool runs at a pinned version, the latest stable release of 30 October 2026 ([`docs/tool-versions.md`](docs/tool-versions.md)).
+An entry exam on generated micro projects decides which tools take part in the experiments: cdxgen, Cryptarium, qelens and qScan stay below its bar and run on the micro projects only ([`experiments/README.md`](experiments/README.md)).
 
-- **[`CBOMKit`](https://github.com/PQCA/cbomkit)**:
+- **[`CBOMKit`](https://github.com/cbomkit/cbomkit)**:
 IBM Research's dedicated CBOM generator for Java, Python and Go, now maintained by the Post-Quantum Cryptography Alliance.
-Uses SonarQube for static analysis and supports compliance policy checks.
+Uses SonarQube's sonar-cryptography plugin for static analysis and supports compliance policy checks; shipped as a server with a REST API.
 
-- **`CBOMKit` action jar** ([cbomkit-action](https://github.com/cbomkit/cbomkit-action)):
-the same sonar-cryptography engine packaged as a standalone jar, run without the server and database and with the languages (Java, Python, Go) chosen per repository. Kept as a second worker so differences between the two packagings are measured; in agreement-based scoring both count as one voter (`voter_group` in `common/tools.yaml`).
+- **`CBOMKit` GitHub Action** ([cbomkit-action](https://github.com/cbomkit/cbomkit-action)):
+the same sonar-cryptography engine packaged as a GitHub Action (a jar), run without the server. Both distributions passed the entry exam with identical scores; the experiments after it run the server, which failed on one repository fewer.
 
-- **[`cdxgen`](https://github.com/CycloneDX/cdxgen)**:
-CycloneDX's official generator, primarily for SBOMs but with CBOM extensions since April 2024. Its crypto output is mostly crypto libraries and key/certificate files; algorithms come with file and line only for JavaScript/TypeScript and Go. For Python and Go repos the worker passes `-t python` / `-t go`, since otherwise cdxgen's code analysis falls back to Java.
+- **[`cdxgen`](https://github.com/cdxgen/cdxgen)**:
+OWASP's CycloneDX generator, primarily for SBOMs but with CBOM extensions since April 2024. Its crypto output is mostly crypto libraries and key/certificate files; algorithms come with file and line only for JavaScript/TypeScript and Go. For Python and Go repos the worker passes `-t python` / `-t go`, since otherwise cdxgen's code analysis falls back to Java.
 
 - **[`CryptobomForge`](https://github.com/Santandersecurityresearch/cryptobom-forge)**:
 Santander Security Research's CLI tool that turns CodeQL SARIF output into a CBOM (IBM's pre-standard draft format). The worker runs CodeQL's experimental crypto queries, which exist for Python and C/C++ only.
@@ -82,23 +85,37 @@ semgrep-rule scanner for Java and Python (Apache-2.0), CycloneDX 1.6. Runs offli
 opengrep rules plus tree-sitter (`cradar` CLI, built from source), CycloneDX 1.7, many languages. Known crash on some Java EC parameter code is worked around automatically with `.cradarignore` and recorded in the result notes.
 
 - **[`xgrep`](https://mondoo.com/docs/xgrep/code-scanning/cbom)** (Mondoo):
-tree-sitter and data-flow scanner for Java, Python, Go and JS/TS, CycloneDX 1.6. Free of charge but proprietary: the worker fetches the pinned npm package (0.101.0, verified by its sha512) at build time.
+tree-sitter and data-flow scanner for Java, Python, Go and JS/TS, CycloneDX 1.6. Free of charge but proprietary: the worker fetches the pinned npm package (verified by its sha512) at build time.
 
 - **[`CipherSift`](https://github.com/SEG-UNIBE/ciphersift)** (Apache-2.0):
-tree-sitter and YAML-rule scanner for Java, Python and Go source and their dependency manifests, CycloneDX 1.7; a clean-room reimplementation of the approach of Crypsy ([Näther & Hirsch, 2026](https://arxiv.org/abs/2608.04857)). The worker builds the pinned release (v1.2.0, source archive verified by its sha256) with Maven, which runs the tool's test and conformance suite.
+tree-sitter and YAML-rule scanner for Java, Python and Go source and their dependency manifests, CycloneDX 1.7; a clean-room reimplementation of the approach of Crypsy ([Näther & Hirsch, 2026](https://arxiv.org/abs/2608.04857)). The worker builds the pinned release (source archive verified by its sha256) with Maven, which runs the tool's test and conformance suite.
 
 - **[`SCANOSS crypto-finder`](https://github.com/scanoss/crypto-finder)** (GPL-2.0-only):
-opengrep rules plus call-graph reachability, CycloneDX 1.7 with file and line per asset. Its full rule set comes from the SCANOSS API and needs a key; without one the worker runs the documented offline mode with the public open rules ([`open-crypto-rules`](https://github.com/scanoss/open-crypto-rules), GPL-3.0), which cover Go, C, JavaScript and Rust but not Java or Python. The image holds the unmodified release binary (0.37.1), the opengrep release SCANOSS's own image ships (1.22.0) and the rules at a pinned commit, all checksum- or commit-verified; the Dockerfile names their sources. A research key for the Java and Python rules has been requested.
+opengrep rules plus call-graph reachability, CycloneDX 1.7 with file and line per asset. Its full rule set comes from the SCANOSS API and needs a key; without one the worker runs the documented offline mode with the public open rules ([`open-crypto-rules`](https://github.com/scanoss/open-crypto-rules), GPL-3.0), which cover Go, C, JavaScript and Rust but not Java or Python. The image holds the unmodified release binary, the opengrep release SCANOSS's own image ships and the rules at a pinned commit, all checksum- or commit-verified; the Dockerfile names their sources. A research key for the Java and Python rules has been requested.
 
-- **[`qelens`](https://github.com/qelens/cbom)** (MPL-2.0): Rust/tree-sitter scanner for Python and JavaScript, crate `cbom` 0.1.2, CycloneDX 1.6 with file and line per asset.
+- **[`qelens`](https://github.com/qelens/cbom)** (MPL-2.0): Rust/tree-sitter scanner for Python and JavaScript (crate `cbom`), CycloneDX 1.6 with file and line per asset.
 
-- **[`cryptarium`](https://github.com/sgoveia/cryptarium)** (Apache-2.0): Go/tree-sitter scanner with embedded YAML rule packs for Java, Python, Go, JS/TS and C/C++ (v0.3.0), CycloneDX 1.6; its CBOM carries no locations (its JSON format does).
+- **[`cryptarium`](https://github.com/sgoveia/cryptarium)** (Apache-2.0): Go/tree-sitter scanner with embedded YAML rule packs for Java, Python, Go, JS/TS and C/C++, CycloneDX 1.6; its CBOM carries no locations (its JSON format does).
 
-- **[`qScan`](https://github.com/quantakrypto/pqc-tools)** (quantakrypto, Apache-2.0): TypeScript pattern scanner for quantum-vulnerable cryptography in many languages (npm 0.12.0), CycloneDX 1.6 with `file:line` locations; run offline, its optional LLM triage is never used.
+- **[`qScan`](https://github.com/quantakrypto/pqc-tools)** (quantakrypto, Apache-2.0): TypeScript pattern scanner for quantum-vulnerable cryptography in many languages (npm package), CycloneDX 1.6 with `file:line` locations; run offline, its optional LLM triage is never used.
 
 **Not yet integrated, blocked on access:**
 
 - **IBM Cryptoscope** ([Moffie et al., 2025](https://arxiv.org/abs/2503.19531)): a data-flow based CBOM generator for Java described in a paper; the implementation is not public. The artifact has been requested from the authors.
+
+## Documentation
+
+This page gets you started. The details live next to what they describe:
+
+| Read | For |
+|---|---|
+| [`experiments/README.md`](experiments/README.md) | running batch experiments: the specs, their format, corpus sampling, mutants, every `make` command, memory and parallelism, the analysis commands and the tables they write |
+| [`experiments/corpus/README.md`](experiments/corpus/README.md) | the repository lists, the generated micro projects, their ground truth and the decoys |
+| [`analysis/README.md`](analysis/README.md) | how the analysis reads CBOMs: units (asset, record, item), normalisation, the L0-L4 ladder, voter groups, packaging per tool |
+| [`analysis/report/README.md`](analysis/report/README.md) | plot recipes on the analysis tables |
+| [`analysis/data/CHANGELOG.md`](analysis/data/CHANGELOG.md) | the versions of the normalisation vocabulary |
+| [`docs/tool-versions.md`](docs/tool-versions.md) | every tool's pinned version, its date and how it is pinned |
+| [`docs/findings.md`](docs/findings.md) | results so far |
 
 ## Setup
 
@@ -362,7 +379,7 @@ For a new tool, create a separate spec under `experiments/` with a unique `name`
 
 Experiment commands run in Docker; Python and `uv` on the host are optional. Specs under `experiments/` are
 mounted into the runner, while worker and analysis code require rebuilding. `make down` stops the stack and
-keeps its data volumes. See the [experiment guide](experiments/README.md) for memory budgets and larger runs.
+keeps its data volumes. See the [experiment guide](experiments/README.md) for every command, memory budgets and larger runs.
 
 BF-CBOM follows a deliberately modular design as illustrated in the figure below.
 At its core, the `Coordinator` orchestrates all inspection activities through a message-driven architecture.
@@ -378,7 +395,7 @@ This design creates decoupled interactions that make the framework flexible for 
 3. Copy `docker/Dockerfile.worker-skeleton` to `docker/Dockerfile.worker-<mytool>` and update the worker paths, environment name and entrypoint. Install the tool or its client as needed.
 4. Register `worker-<mytool>` in `docker-compose.yml`, using an existing generator service as a template: image/build arguments, Redis settings, `env_file`, memory limit and `profiles: [prod, all]`.
 5. Append the worker name to the `AVAILABLE_WORKERS` list in the `Makefile` so shared targets pick it up.
-6. Add an entry in `common/tools.yaml` with the tool's languages, detection engine, role and `memory_gb` matching its Compose limit. Add an adapter spec under `analysis/adapters/` for offline analysis; follow the [adapter policy](analysis/README.md#what-an-adapter-spec-may-contain) and vocabulary versioning rules.
+6. Add an entry in `common/tools.yaml` with the tool's languages, engine and approach, vendor, URL, how it is shipped, its packaging and `memory_gb` matching its Compose limit. Add an adapter spec under `analysis/adapters/` for offline analysis; follow the [adapter policy](analysis/README.md#what-an-adapter-spec-may-contain) and vocabulary versioning rules.
 7. Add the tool to your experiment spec and rebuild with `make up-prod`. If its image is intended for release, also register its target and group membership in `docker-bake.hcl`.
 
 Closed-source tools use the same worker protocol. Their binaries or API clients can remain in the collaborator's
@@ -429,7 +446,7 @@ Every job of an inspection is in exactly one state, defined once in `common/util
 
 | State | Meaning |
 |---|---|
-| ⏸️ Held | created, but waits for a later memory-budget wave (see "Parallelism and memory") |
+| ⏸️ Held | created, but waits for a later memory-budget wave ([memory budget](experiments/README.md#running-an-experiment)) |
 | 💤 Queued | in the worker's Redis queue, no worker has taken it yet |
 | ⚙️ Running | a worker popped the job; the cell shows the elapsed time |
 | ✅ Completed | the worker returned a CBOM |
@@ -445,57 +462,22 @@ Every inspection resolves each repository's branch to a commit SHA when it start
 Workers that clone check out exactly that commit (`common/utils.py:clone_repo`), so re-executing or retrying an inspection scans the same bytes.
 Each `JobResult` records `tool_version` (reported by the worker, e.g. `cdxgen 13.5.0`), `image_ref` (the image it ran in), `bfcbom_commit` (the checkout used to build it) and `run_index`, plus timing, peak memory, OOM kills and run notes.
 
-### Batch experiments (journal extension)
+### Experiments
 
-Reproducible, resumable batch runs for the research agenda described in `CLAUDE.md`. Everything they produce stays inside Docker named volumes:
+Batch experiments run the generators over many repositories, reproducibly and resumably. They use two extra services
+of the stack and keep everything in Docker volumes:
 
-- `gitserver`: a read-only smart-HTTP git server on the compose network. The runner mirrors every repo there at its pinned commit (volume `git-data`); mutants are branches `bfcbom/<variant>`. Each snapshot is served as its own small bare repo `<owner>/<repo>--<sha12>.git` (objects shared with the mirror, HEAD on the snapshot branch), which workers scan. CBOMkit insists on `https://` and drops `.git`, so the server also speaks TLS with a self-signed certificate (volume `git-certs`) that the CBOMkit worker trusts.
-- `runner`: an on-demand container running `bf-cbom experiment ...`. Results land in the `results-data` volume as `<exp>/<owner>__<repo>@<sha12>/<variant>/<tool>/run<i>.json` plus a `run<i>.meta.json` with status, duration, timing, tool version, image, the BF-CBOM commit the image was built from, the container's peak RAM and (LLM workers) the token usage; `_experiment.yaml`, `_run-log.json` (sessions, host RAM, peak RAM) and `_ANALYSIS/` sit on top of each experiment folder.
+- `gitserver`: a read-only git server on the compose network. Every repository is mirrored there at its pinned commit
+  (volume `git-data`), and every tool clones from it, so all tools scan the same bytes; the mutation run serves its
+  mutants as branches. It also speaks TLS with a self-signed certificate, since CBOMkit insists on `https://`.
+- `runner`: an on-demand container running `bf-cbom experiment ...`; results land in the `results-data` volume and
+  reach the host only through an export.
 
 ```bash
-make experiment EXP=experiments/mutation-smoke.yaml   # pin, mirror, enqueue, collect (resumable)
-make experiment-status NAME=mutation-smoke
-make board                                               # live board: running experiments, every worker's job, RAM, queue and last result
-make experiment-export NAME=mutation-smoke            # -> experiments/results/mutation-smoke.zip (runs the analysis report first), the only path to the host
-make experiment-export-all                               # every complete experiment (no run missing), one ZIP each, overwriting the old ZIPs
-make experiment-list                                     # experiments stored on the volume
-make experiment-delete NAME=mutation-smoke            # remove one from the volume (asks first; ARGS=--yes skips)
-make corpus ARGS="--per-cell 2"                          # stratified GitHub corpus with pinned commits (3 x 3 cells x 2 per language); checks the GitHub API first
-                                                         #   writes corpus.yaml and corpus-frame.yaml (every cell's population, the crypto checks by commit)
-make corpus ARGS="--frame /data/results/corpus/corpus-frame.yaml --per-cell 3"   # redraw from a stored frame: no search, same population and search date
-make corpus-export                                       # corpus YAMLs (sample and frame) -> experiments/results/
-make experiment EXP=experiments/bar-micro.yaml            # 15 tools on 3 generated micro projects: the voter bar
-make experiment EXP=experiments/stability-pilot.yaml        # every tool 3x on the micro projects and ten pilot repos
-make analysis ARGS="report stability-pilot"                 # everything below in one pass + _ANALYSIS/_SUMMARY.md (Markdown tables)
-make analysis ARGS="normalize stability-pilot"              # every CBOM -> normalised records, one adapter spec per tool (analysis/adapters/)
-make analysis ARGS="schema stability-pilot"                 # RQ3 (validity, meaningful shares) and RQ2 traceability (--fetch on a laptop)
-make analysis ARGS="levels stability-pilot"                 # how much agreement normalisation creates (levels L0 raw to L4 tool specs)
-make analysis ARGS="micro bar-micro"                      # recall, precision, F1, decoy hits and entry-bar verdicts
-make analysis ARGS="tables stability-pilot"                 # flat CSV tables (runs, records, exact-matcher groups, micro) for pandas/R
-make analysis ARGS="score stability-pilot"                  # RQ5: per-tool rates (confirmation, exclusivity, Dawid-Skene, leave-one-out, CIs); stability
+make experiment EXP=experiments/bar-micro.yaml   # run a spec (resumable)
+make board                                          # watch it: experiments, workers, queues, memory
+make experiment-export NAME=bar-micro            # -> experiments/results/bar-micro.zip with bar-micro/_ANALYSIS/_SUMMARY.md
 ```
 
-#### Parallelism and Memory
-
-For the paper's runs, the laptop prepares code and analyses copied exports; the 64 GB VM runs the batches with
-`EXPERIMENT_MEMORY_BUDGET_GB=0`. The default budget remains 14 GiB for smaller Docker VMs.
-
-- **One job per worker container.** Each worker pops one job from its Redis queue, runs the tool in a subprocess, pushes the result and only then takes the next job. A batch therefore has as many jobs in flight as there are worker containers: with `make up-prod` that is one per generator, each working on a different repository. Queued jobs cost nothing but a Redis list entry, so the size of a batch never affects memory.
-- **More throughput: replicas.** Workers are stateless, so several containers can share a tool's queue. Replica startup uses Compose's `--scale` option and must retain the Makefile's exported image version and base-image settings; there is no dedicated Make target for scaling yet. Once replicas are running, `make experiment EXP=... EXPERIMENT_REPLICAS="cryptoscan=3"` counts that tool three times in the memory budget and records the replicas in `_run-log.json`; it does not start them. Untested beyond one replica per tool so far (verify on the VM).
-- **Memory limits are caps, not reservations.** Every worker has a memory limit in `docker-compose.yml`, mirrored by `memory_gb` in `common/tools.yaml` (currently 24 GiB for cdxgen, 16 GiB for CBOMkit, 8 GiB for cbomkit-jar and CipherRadar, 6 GiB for CryptobomForge). The sum depends on the selected tools and replicas. Idle workers use little, but large jobs can approach their caps; the VM also needs memory for the coordinator, Redis, git server and other services.
-- **Memory budget (waves).** `EXPERIMENT_MEMORY_BUDGET_GB` in the `Makefile` (default 14, meant for a Docker VM of about 20 GiB) groups tools into waves by their summed limits. The runner packs the tools largest first, runs one wave to completion, then starts the next; the plan is printed before anything is enqueued. A tool whose limit exceeds the budget runs alone with a warning (currently cdxgen at the default budget), so the budget is not a hard memory cap. On a machine with enough RAM set it to 0 (one wave, everything in parallel), either per call or once in the `Makefile`:
-
-  ```bash
-  make experiment EXP=experiments/corpus-pilot-small.yaml EXPERIMENT_MEMORY_BUDGET_GB=0
-  ```
-
-  The per-tool numbers come from `memory_gb` in `common/tools.yaml`, which a test keeps equal to the compose limits; adjust both when changing a limit. With `--scale`, set `EXPERIMENT_REPLICAS` so the budget counts each replica. Stored experiments can be browsed in the UI's Experiments page (read-only: summary, runs table, CSV downloads).
-- **Interactive batch inspection.** The Streamlit UI applies the same budget: the Setup page shows the wave plan for the selected workers, and when an inspection starts, jobs for workers outside the first wave are created as *held* (⏸️ in the grid) and queued only once every job of the current wave has finished. A background thread in the coordinator advances the waves, so the browser tab can be closed; it starts with the first page view after the coordinator (re)starts.
-- **The analysis report in parallel.** `analysis report` (and `experiment export`, which runs it first) normalises,
-  validates and matches in a process pool, one CBOM or one repository per task: `--jobs N`, env `BF_CBOM_JOBS`,
-  default auto (`min(CPUs, 8)` for a step with 16 or more items). Its results do not depend on the worker count. The
-  runner's memory cap bounds the pool: `RUNNER_MEMORY` (Makefile, default 8g). Both are Makefile variables, so on a
-  64 GB VM `make experiment-export NAME=<exp> BF_CBOM_JOBS=16 RUNNER_MEMORY=32g`; on the host
-  `RESULTS_DIR=experiments/results uv run bf-cbom analysis report <exp> --jobs 4`.
-
-See `experiments/README.md` for the spec format and `experiments/corpus/README.md` for the repository lists and fixtures (plain directories such as `experiments/corpus/micro/java` are published to the git server as deterministic commits). The offline analysis library lives in `analysis/`. `make clean-docker` keeps the volumes; `docker compose down -v` removes them.
+Everything else (the specs, the corpus, mutants, memory budgets and replicas, the analysis and its tables) is in the
+[experiment guide](experiments/README.md). `make clean-docker` keeps the volumes; `docker compose down -v` removes them.

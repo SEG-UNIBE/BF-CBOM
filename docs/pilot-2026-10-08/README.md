@@ -1,8 +1,8 @@
 # Pilot experiment of 2026-10-08
 
 This directory preserves a colleague's one-day pilot for the journal extension: a comparison of CBOM generators
-on pinned repositories and micro projects. These are historical results; current methodology and project status
-are documented in [CLAUDE.md](../../CLAUDE.md) and the [analysis guide](../../analysis/README.md).
+on pinned repositories and micro projects. These are historical results; the current methodology is documented
+in the [experiment guide](../../experiments/README.md) and the [analysis guide](../../analysis/README.md).
 
 The micro projects, ground truth and sample verdicts were produced with AI assistance and have not been
 human-reviewed. The pilot's grading rules were provided by A. Boll. Review these artifacts before paper use.

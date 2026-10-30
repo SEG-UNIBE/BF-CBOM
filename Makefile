@@ -123,7 +123,7 @@ board: ensure-env
 # make experiment EXP=experiments/mutation-smoke.yaml
 # EXPERIMENT_IMAGE_IDS: the worker images on this host by content (recorded per session in <exp>/_run-log.json).
 # EXPERIMENT_REPLICAS="cryptoscan=3,xgrep=2": replicas started with `docker compose up -d --scale worker-<tool>=N`;
-# the memory budget then counts each replica (README "Parallelism and memory").
+# the memory budget then counts each replica (experiments/README.md "Parallelism and memory").
 EXPERIMENT_REPLICAS ?=
 experiment: ensure-env
 	EXPERIMENT_IMAGE_IDS="$$(docker images --no-trunc --format '{{.Repository}}:{{.Tag}}={{.ID}}' --filter 'reference=bf-cbom/*:$(VERSION)' | paste -sd ',' -)" \

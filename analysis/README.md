@@ -3,9 +3,10 @@
 The analysis turns the tools' CBOMs into comparable records (`normalize/`), matches them (`levels.py`,
 `matchers/`) and scores the tools without ground truth (`score.py`). Every step of it is a place where we could
 make the tools look more alike than they are. This page states the policy that keeps us from doing so, shows the
-L0-L4 ladder on one example, and gives the argument for the two vocabulary layers the paper has to defend. The
-command reference, the file formats and the column lists are in `experiments/README.md`; the plot recipes in
-`report/README.md`; the numbers in `docs/findings.md`.
+L0-L4 ladder on one example, and gives the argument for the two vocabulary layers the paper has to defend. How a
+CBOM becomes records is in [Normalisation](#normalisation-from-a-cbom-to-records). The command reference, the file
+formats and the column lists are in [`experiments/README.md`](../experiments/README.md#analysis); the plot recipes
+in [`report/README.md`](report/README.md); the numbers in [`docs/findings.md`](../docs/findings.md).
 
 ## The principle
 
@@ -61,7 +62,7 @@ as 13,996).
   (decided 2026-10-23: no scope filter, no test-path heuristic); the share is for the discussion.
 - **Two more words.** A *unit* is an L4 identity: the identity of an item (the `unit` column of
   `items-run<i>.csv`) and the expected value of an RQ6 mutant (`expected.unit`). A *site* is a record's file and line
-  (call-site level, refinement 1). The micro ground truth's entries are *expected items* at site level, a known
+  (the call-site level, reported next to the repository level and never pooled with it). The micro ground truth's entries are *expected items* at site level, a known
   crypto call in a function of its own (`micro-items-run<i>.csv`; `experiments/corpus/micro/ground_truth.yaml`, generated from
   the snippet catalog, keeps the pilot's key `assets`).
 - **Where "algorithm" stays.** Only as the CycloneDX asset type (an *algorithm asset*), as the `algorithm`
@@ -111,6 +112,123 @@ Tools that write one component per finding (CipherRadar, pqcheck, qelens, securi
 have one record per asset and, wherever an algorithm is used more than once, several assets per item. CipherSift
 sits in between: one component per rule match combination, with occurrences. Hence: asset and record counts
 describe a tool's output format, items what it reports, and every cross-tool comparison counts items.
+
+## Normalisation: from a CBOM to records
+
+**Why.** Generators describe the same crypto asset in different ways, so their CBOMs cannot be compared as they are.
+The example of the paper figure (`context/fig-cbom-normalization_cyclonedx.pdf`): three tools report AES-CBC with a
+256-bit key in `src/KdbxFile.cs` line 120:
+
+| Tool | What it writes |
+|---|---|
+| tool 1 | name `AES-256-CBC`, primitive `block-cipher`, occurrence `src/KdbxFile.cs`, line 120 |
+| tool 2 | name `AES`, custom properties `t2:mode = CBC`, `t2:file = KdbxFile.cs`, `t2:line = 120` |
+| tool 3 | name `aes`, `parameterSetIdentifier: "256"`, occurrence `./src/KdbxFile.cs:121` |
+
+Compared raw, the three share almost nothing. Normalised, they agree on the family (AES), the file and partly on mode
+and key size, and differ by one line. Normalisation translates every CBOM into one record format (CBOM^norm), so that
+the n-way matchers compare like with like, per dimension (algorithm, parameters, location).
+
+**Three kinds of files.**
+
+| What | Where | Holds |
+|---|---|---|
+| one adapter spec per tool | `analysis/adapters/<tool>.yaml` | the format the tool declares, which components count as findings, where each dimension sits in the tool's output (sources in order of precedence), the tool's own spellings (dictionary), notes on its quirks. Specs inherit from `_cyclonedx.yaml` (standard CycloneDX 1.6/1.7 paths), `_ibm-cbom-draft.yaml`, `_cbomkit.yaml`, `_llm.yaml` and state only their differences. Every integrated tool needs one (a test enforces it). |
+| one shared vocabulary | `analysis/data/algorithms.yaml` + `analysis/data/cyclonedx/` | canonical names from the vendored CycloneDX 1.7 cryptography registry (families such as `AES`, `RSAES-OAEP`, `ECDSA`, `SHA-2`; curves with their OID-equal aliases, `secp256r1` = `P-256` = `prime256v1`), enum spellings, JOSE/SSH/JCA identifiers, an API table, the meaning of `parameterSetIdentifier` per family. Spellings traceable to standards or official APIs belong here regardless of how many tools use them; labels invented by a tool belong in its spec. |
+| one target format | `analysis/data/cbom-norm.schema.json` | the shape of a normalised file and record, the same for every tool; every output validates against it |
+
+*Worker adapters* (`common/cbom_adapters.py`, `workers/*`) are something else: they make a tool's raw output usable
+CycloneDX at scan time. Adapter specs read CycloneDX into records, offline.
+
+**From a CBOM to records.**
+
+1. *Findings.* The spec decides which components count: crypto assets always; libraries only when the tool marks
+   them as findings (CipherRadar's library imports); dependency inventories (cdxgen, pqcheck) are skipped.
+2. *Locations.* One record per (component, occurrence); `path:line`, `path#line`, absolute temp-clone paths and
+   IBM-draft line windows (`line` ... `line_end`) become a repo-relative file and line. A component without a
+   location gives one record without location.
+3. *Values.* The spec's sources are read in order of precedence: occurrence evidence (CryptoScan's matched `symbol`),
+   standard fields, tool properties, the component name, refs and dependencies between components, the API in an
+   occurrence's context. Each yields canonical values through the vocabulary; composite names are parsed
+   (`AES-256-GCM` -> AES, 256, GCM; `HmacSHA512` -> HMAC, digest SHA-512; `RSA/ECB/OAEPWithSHA-256AndMGF1Padding` ->
+   RSAES-OAEP, OAEP, digest SHA-256). What our reading of a name may add is bounded (vocabulary 2026-10-23.1): a UUID,
+   an OID (read through the `oids:` table) or a URI (its fragment, RFC 6931) in a name never yields a key size; a bare
+   number is a key size only next to its family and when the family may have it (`key_sizes:`, by standard: AES 128,
+   192 or 256); a parsed or derived parameter a record's primitive does not have is dropped (`admits:`: a hash takes no
+   key size, mode, padding or curve); a cipher-suite name (`TLS_..._WITH_<cipher>_<mac>`, OpenSSL's `DES-CBC3-SHA`)
+   yields the bulk cipher with `protocol: TLS` (`cipher_suites:`; `SHA` is SHA-1, RFC 5246 A.5). A tool's own field is
+   never checked or dropped: what it writes is its finding.
+4. *Merge.* The first value per dimension wins. A later, more specific value of the same kind refines it (EC -> ECDSA,
+   SHA-2 -> SHA-256); a different one is kept as a conflict (CipherRadar's `algorithmFamily` SHA-2 on a component named
+   SHA-1). Supporting evidence (API context, rule ids, dependencies) only fills gaps.
+5. *Nothing is guessed.* Unknown spellings and code fragments (`parseCsvMap`, `SHA-" + this.strength`) stay unmapped,
+   a name listing several algorithms (`RSA, ECC, AES`) is marked ambiguous, and our own derivations (group from
+   family, key size from curve, default primitive) are tagged `derived:<dim>`.
+
+**What a record keeps.** The canonical values (`group`, `family`, `algorithm`, `primitive`, `functions`, `mode`,
+`padding`, `curve`, `key_size`, `digest`, `param_set`, `iterations`, `oid`, `protocol`, `protocol_version`,
+`material`, `asset_type`, `purl`, `confidence`), the location (`file`, `line`, `line_end`, `in_scope`, and
+`file_exists` when the git mirror is mounted), the occurrence `context`, and per dimension `raw` (the value as found,
+or the whole text that was parsed), `src` (the exact JSON path) and `via` (field, parse, dictionary, api, dependency,
+ref, derived). So matchability can be measured with and without normalisation, and it stays visible where a tool puts
+its information (structured field, custom property, only the name).
+
+**Format conformance.** Reading is lenient (any version, the IBM draft, fields of later versions), but every value
+read from a standard field is checked against the official JSON schema of the CycloneDX version the CBOM declares.
+Deviations become `spec_issues` on the record: `field` (the version does not define the field, e.g. 1.7
+`algorithmFamily` in a 1.6 CBOM), `enum` (`padding: PSS`, `assetType: key`), `type`, `deprecated` (1.6 `curve` in a
+1.7 CBOM); per document `dialect` (not CycloneDX) and `version`. This feeds the RQ3 questions "which tool reports in
+what, and where does it violate its declared standard"; a full validation of whole documents is a separate step.
+
+**How much agreement does normalisation create?** A normaliser developed on the outputs it evaluates could manufacture
+agreement and work against our own hypothesis that tools report heterogeneous things. So agreement is reported as a
+ladder (the `levels` command, `experiments/README.md`). The ladder varies only *when two reports count as the same
+algorithm*; the unit stays fixed: an algorithm is its identity under the full normalisation (L4), so every level's
+share is a fraction of the same population. Two records match at a level when they are equal under any of the key
+functions up to that level (cumulative), so a match is never lost at a higher level, every tool's share can only grow
+from L0 to L4, and each step's gain is one normalisation step:
+
+| Level | Two reports match when ... |
+|---|---|
+| L0 | the component names are identical as reported |
+| L1 | ... or equal with case and separators ignored (`SHA-256` = `sha256`) |
+| L2 | ... or map to the same entry of the standard vocabulary: whole names and CycloneDX 1.7 `algorithmFamily` through the registry and JOSE/SSH/JCA identifiers (`DESede` -> 3DES, `HS256` -> HMAC) |
+| L3 | ... or parse to the same algorithm (`AES-256-GCM` -> AES) |
+| L4 | ... or get the same identity from everything tool-specific: spec sources (symbols, properties, refs, dependencies), the tool's own labels in its dictionary, API context |
+
+A worked example with one record per tool: [The ladder, by example](#the-ladder-by-example); the policy behind the
+specs: [What an adapter spec may contain](#what-an-adapter-spec-may-contain).
+
+The records of a repository fall into clusters at each level, one per key (the records whose identity at that level
+or below is the key; clusters never merge through a record that has several keys); a tool's algorithm is confirmed
+at a level when a cluster holding one of its records also holds a record of another voter group. The L0 share reads
+as "another tool uses a verbatim identical spelling". Hypotheses are tested at L2/L3, the L0 -> L4 gap is reported as
+representational heterogeneity, and rankings are checked for stability across levels. Parameters (key size, mode, padding, curve, digest) get the same
+ladder from L2 on over (algorithm, value) pairs with values from any source: a pair is confirmed when the tool's value
+is admitted at the level (L2 from a standard field, L3 also parsed from the name, L4 from any source) and a record of
+another voter group in the same cluster carries the same admitted value. `--closure` adds the
+algorithms a record implies (its digest, the `implies` table: HMAC-SHA256 -> HMAC and SHA-256, PBKDF2 -> HMAC) as
+items of the tool, matchable from L3 on (an implication is parsed knowledge; it never merges clusters), so tools that
+expand such hierarchies and tools that do not are compared on equal terms; the plain and the closed numbers are
+reported apart, never pooled. The per-tool and pooled numbers of the pilot and the ICPC corpus are in
+`docs/findings.md` ("Export review 2026-10-19"): most of the gain comes from the standard vocabulary and parsing, the
+tool specs add a few points.
+
+**Frozen.** The vocabulary and the adapter specs were developed on the pilot corpus (the development set); the main
+corpus is held out. Since 2026-10-18 they are frozen: every change bumps `version` in `analysis/data/algorithms.yaml`
+and adds an entry with the reason and the fingerprint (`python -m analysis.freeze`) to `analysis/data/CHANGELOG.md`;
+`tests/test_vocab_frozen.py` fails otherwise. The versions are recorded in every `.norm.json`; a two-rater review of
+`vocab.csv` (Cohen's κ) is an option for the paper, not decided.
+
+**Curating and extending.** After `normalize`, read the `unmapped` and `partial` rows of `_ANALYSIS/vocab.csv`. A
+spelling traceable to a standard or an official API (the registry, RFC 7518 JOSE, SSH, JCA names, OS and library
+APIs) goes into the shared vocabulary, however many tools use it; a label a tool invented (rule names, category
+labels) goes into the tool's dictionary, read as it says and with a comment naming its source; what a tool's own
+metadata already classifies is read structurally (`rule_crypto_segments`), never listed; code identifiers are
+recognised by shape (`api`); an ambiguous spelling (`rand`) and garbage stay unmapped (`undefined`). Judgements about
+what a label "really" means are not made (`interpretive: true` exists in the engine but no spec uses it, a test
+enforces this). Bump the version, add the changelog entry and rerun. A new tool gets `analysis/adapters/<tool>.yaml` (inherit `_cyclonedx`, state its quirks), a small fixture in
+`tests/fixtures/normalize/` (open-source tools only) and a test in `tests/test_normalize.py`.
 
 ## What an adapter spec may contain
 

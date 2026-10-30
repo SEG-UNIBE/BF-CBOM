@@ -1,6 +1,6 @@
 # Findings so far
 
-Results gathered while building BF-CBOM 2.0, moved out of `CLAUDE.md` on 2026-10-18. They come from the development
+Results gathered while building BF-CBOM 2.0. They come from the development
 set (the pilot corpus `experiments/corpus/pilot-2026-10-08.yaml`, the micro projects `experiments/corpus/micro`) and from runs that will be
 rerun before the paper's experiments; the date says which code produced a number. The micro projects are tiny and
 AI-written: their numbers are an inclusion check, not a ranking.
@@ -21,7 +21,7 @@ location-aware cross-matching with hand-checked samples. Reports and the landsca
 - **Formats:** CryptobomForge emits IBM's draft `1.4-cbom-1.0`, not CycloneDX (the ICPC paper's claim needs a
   correction). cdxgen reports no file or line for crypto findings outside JS/TS.
 - **Shared blind spot of all tools:** algorithm names passed through variables or constants (the third insertion style
-  of Phase 4).
+  of the mutation harness).
 - **CBOMkit:** module-indexing bug (needs a build file and `src/`; Kafka: 7 of 2,900 files scanned), invented key
   sizes, Python covers pyca only; large repos need about 45 minutes and a 16 GB heap.
 
@@ -35,7 +35,7 @@ CryptobomForge 0 everywhere. Precision 100 % except CryptoScan (7/11 Go) and Cip
 The CryptoScan, CryptobomForge and CBOMkit-server (Go) numbers were **our setup errors**, not the tools: CryptoScan
 without `--include-quantum-safe` and on a `demo/` folder it skips, CryptobomForge on CodeQL's security suite instead
 of the crypto queries, a CBOMkit image without Go (all fixed 2026-10-17). An example for the paper of why
-the audit matters (refinement 15).
+every tool needs a check of its invocation before a zero is accepted.
 
 ### 2026-10-17, after the hand-over fixes
 Lenient call-site recall out of 11; all runs ok.
@@ -69,7 +69,7 @@ Lenient call-site recall out of 11; all runs ok.
 
 ### 2026-10-18, scoring on the normalised records
 The `micro` scoring moved from the call-site extraction onto the normalised records (`score_records`) and added the
-repository level (refinement 1). Every call-site cell stayed equal except two, both explained:
+repository level, reported next to the call-site level. Every call-site cell stayed equal except two, both explained:
 - **CryptobomForge** 0 -> 8/11 on Python and C (lenient; strict 8 / 7): its IBM-draft windows are read now. One
   over-credit: on micro-python an AES report whose window is centred on the 3DES line also covers the AES-GCM line.
   The windows are CodeQL's `contextRegion` (the finding ±2 lines), so the exact line could be read as the window's
@@ -232,7 +232,7 @@ CryptoScan 52, CryptobomForge 50 %.
 
 ## Ladder and matching on the fixed unit (2026-10-18, evening)
 The ladder now keeps the unit fixed (an algorithm = its L4 identity) and varies only the matching relation, which is
-cumulative (`experiments/README.md` "How much agreement does normalisation create?"). Every tool's share is
+cumulative (`analysis/README.md` "How much agreement does normalisation create?"). Every tool's share is
 non-decreasing by construction. Pilot corpus, confirmed share of a tool's algorithms at L0 / L1 / L2 / L3 / L4lit /
 L4 (number of algorithms): pooled 56 / 60 / 67 / 73 / 77 / 77 % (937); CBOMkit server 27 / 60 / 60 / 67 / 67 / 67
 (15), cbomkit-jar 68 / 74 / 84 / 93 / 94 / 94 (68), CipherRadar 70 / 74 / 81 / 87 / 89 / 89 (115), CryptoScan 32 /
@@ -258,8 +258,8 @@ RaQuN comparison per level is produced when RaQuN is available (VM).
 ## Export review 2026-10-19
 The first VM exports (`e0-stability`, `e1-pilot-corpus`, `e1-icpc-corpus`, runs of 2026-10-18/19) were checked for
 plausibility before anyone cites them. The numbers below come from those exports and from the re-report with the
-code of 2026-10-19 (per-key clusters, `resolution`, macro rates); the runs themselves are to be redone on the VM
-(CLAUDE.md Status), so they are a snapshot, not results.
+code of 2026-10-19 (per-key clusters, `resolution`, macro rates); the runs themselves are to be redone on the VM,
+so they are a snapshot, not results.
 - **Runs that were not what they looked like.** DeepSeek's account ran out of credit on 2026-10-18 ~21:46 UTC: all 15
   pilot runs and 7 E0 runs failed with 402, and two E0 runs on MinerU were stored `ok` with 75 of 100 and 139 of 144
   requests failed, so E0's DeepSeek stability (Jaccard mean 0.86, min 0.25, 44 unstable algorithms) measured the
@@ -267,7 +267,7 @@ code of 2026-10-19 (per-key clusters, `resolution`, macro rates); the runs thems
   at its 8 GiB limit on Chat2DB, bisq, bisq2 and kafka with the runs stored `ok` (peaks at the limit). CBOMkit's two
   pilot errors (keycloak, ansible) were "Git clone from http://gitserver/... failed" in under a minute while
   cbomkit-jar scanned both: the git server's 256 MiB limit against a full JGit clone. All three are fixed in the
-  setup (CLAUDE.md, Status, "Export review of 2026-10-19").
+  setup.
 - **CBOMkit's two packagings agree exactly** wherever both ran: 130 of 130 (repo, tool) cells on ICPC and all 9 E0
   repos give identical algorithm sets; the server variant takes ~4.9 GB resident and is slower.
 - **Tool crashes to report, not fix:** CryptoScan 1.4.0 panics in `patterns.MatchWithContext` on allure2, bisq,
@@ -336,10 +336,10 @@ code of 2026-10-19 (per-key clusters, `resolution`, macro rates); the runs thems
   vs 9 % with a line): both are columns now. CipherRadar's traceability was dominated by 14,825 "Hardcoded secret"
   records (14,469 on bisq2, i18n keys): key material has its own rows now.
 - **Micro:** CryptoScan finds only EC and RSA of the 11 micro-c assets although C is in its languages (OpenSSL EVP
-  API): a refinement-15 check of its patterns is open.
+  API): a check of its invocation and patterns is open.
 
 ## Interventions in how the tools run, and their effects (e1-pilot-corpus, 2026-10-20)
-BF-CBOM runs every tool as shipped, with its documented best invocation (refinement 15). One intervention is allowed:
+BF-CBOM runs every tool as shipped, with its documented best invocation. One intervention is allowed:
 when a tool crashes on a specific file and the crash ends the whole scan, that file is left out through the tool's
 *own* exclusion mechanism, by its exact path, and the run records it (`workaround` column of `runs.csv`; the paper
 reports the crash). A tool that runs but finds less is never steered (that is a finding about the tool), and nothing
@@ -380,7 +380,7 @@ The first full export of `corpus-pilot-medium` (60 repos, 15 tools, run 2026-10-
 report's co-membership comparison stopped listing pairs) was checked for anomalies before anyone cites it. The
 numbers below are from that export and its re-render with vocabulary 2026-10-23.2 (both on the laptop, so every place
 is `unread`: the mirror is on the VM); the runs are redone on the VM with the caps below, so this is a snapshot.
-- **Our setup killed tools (refinement 15).** CipherRadar died at its 4 GiB cap (rc -9, no CBOM) on pycryptodome,
+- **Our setup killed tools.** CipherRadar died at its 4 GiB cap (rc -9, no CBOM) on pycryptodome,
   bunkerweb and pyca/cryptography; cdxgen was OOM-killed at 16 GiB on 8 of 60 repos (DefectDojo, OctoBot, FairEmail,
   bunkerweb, lnbits, scapy, xipki, zaproxy) with the runs stored `ok`, 5 of them with 0 assets. Caps now 8 and
   24 GiB (the VM peaked at 40.3 of 60.5 GiB with every tool at once), and a stored `ok` run with OOM kills reads as
@@ -440,7 +440,7 @@ columns. Read with the vocabulary of 2026-10-23.2:
   indirect insertion aside), securin-xbom (Java, Python), pqcheck (Python, Go), SCANOSS (Go), CryptobomForge (Python),
   Q-DARPAN (Go; Java direct and wrapper, not indirect), cdxgen (Go only: its Java and Python CBOMs name no algorithm,
   as in the pilots). Q-DARPAN's and qScan's miss of the Java *indirect* style (the algorithm name passed through a
-  variable) is the data-flow split refinement 5 was built for.
+  variable) is the data-flow split the indirect style was built for.
 - **qelens** finds the call on the span (the import line) but not at the call line, as in the pilots (0.59 of its
   places are import lines). **cryptarium** has no locations and the originals already contain RSA (JWT libraries), so
   nothing can be told (`masked`).

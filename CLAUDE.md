@@ -1,9 +1,11 @@
 # CLAUDE.md in BF-CBOM git repo
 
 Shared context for coworkers and for Claude Code (which loads this file automatically). Details live elsewhere:
-`README.md` (setup, starting the stack), `docs/findings.md` (results so far), `experiments/README.md` (spec format,
-normalisation, analysis outputs),
-`analysis/README.md` (what a spec may contain, the ladder by example, how family and group are argued),
+`README.md` (for newcomers: what BF-CBOM is, the tools, setup, a map of the other READMEs), `docs/findings.md`
+(results so far), `experiments/README.md` (running experiments: every make command, specs and their format, corpus
+sampling, mutants, memory and parallelism, the analysis commands and their tables),
+`analysis/README.md` (how the analysis reads CBOMs: units, normalisation, what a spec may contain, the ladder by
+example, voter groups, how family and group are argued),
 `analysis/report/README.md` (plot recipes), `analysis/data/CHANGELOG.md` (vocabulary versions),
 `docs/pilot-2026-10-08/` (the colleague's pilot).
 
@@ -136,8 +138,8 @@ normalisation, analysis outputs),
 - **Memory budget (waves):** `EXPERIMENT_MEMORY_BUDGET_GB` (laptop default 14, 0 = unlimited) caps the summed
   `memory_gb` of the tools fed at once; the rest run in later waves. Runner and UI plan waves with
   `common/tools_registry.py:plan_waves` (UI: held jobs, `release_due_waves`, `coordinator/scheduler.py`).
-  `EXPERIMENT_REPLICAS="tool=N,..."` counts replicas started with `docker compose up -d --scale` (README "Parallelism
-  and memory").
+  `EXPERIMENT_REPLICAS="tool=N,..."` counts replicas started with `docker compose up -d --scale` (`experiments/README.md`
+  "Parallelism and memory").
 - **Later: memory-gated scheduling** (noted 2026-10-19, not built; the user may move the stack to Kubernetes
   instead). Waves cap the *sum of limits*, so a 64 GB VM runs at ~21 GiB: each worker runs one job and most jobs use
   a fraction of their cap. The design to turn RAM into throughput: replace waves by an admission loop that dispatches

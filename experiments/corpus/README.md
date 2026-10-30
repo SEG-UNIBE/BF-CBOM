@@ -9,7 +9,7 @@ sampled corpora live on the results volume.
 |---|---|
 | `micro/<language>/` | generated micro projects for Java, Python and Go, each with 14 expected crypto calls in separate functions and four decoys; published to the local git server as fixture repos `bfcbom/micro-<language>` (`path:` in an experiment spec) |
 | `micro/ground_truth.yaml` | generated expected items, function-body lines, canonical records, accepted locations and decoys; read by `analysis/groundtruth.py` (`make analysis ARGS="micro <exp>"`) |
-| `exclusions.yaml` | reviewed repos and name patterns the corpus builder never samples (the generators' own repos and test suites, CBOM benchmarks, BF-CBOM itself), each with its reason; `tailored_on` repos of `common/tools.yaml` are excluded as well (refinements 11 and 13) |
+| `exclusions.yaml` | reviewed repos and name patterns the corpus builder never samples (the generators' own repos and test suites, CBOM benchmarks, BF-CBOM itself), each with its reason; `tailored_on` repos of `common/tools.yaml` are excluded as well |
 | `pilot-2026-10-08.yaml` | the 12 real projects of the pilot experiment in Java, Python and Go (of its 16; the TypeScript, C and JavaScript ones were removed 2026-10-20) pinned to the commits scanned then; use with `corpus: corpus/pilot-2026-10-08.yaml` |
 | `pilot-2026-10-08-all.yaml` | all 16 pilot projects as scanned then: the record of the pilot and of what CipherSift was tuned on (`tailored_on` in `common/tools.yaml` reads it); no experiment uses it |
 | `pilot-2026-10-22.yaml` | second pilot: 60 manually selected repositories, 20 each in Java, Python and Go, pinned to default-branch HEADs on 2026-10-22; used by `experiments/corpus-pilot-medium.yaml` |

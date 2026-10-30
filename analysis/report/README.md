@@ -32,7 +32,7 @@ m = pd.read_csv(f"{A}/meaningful-run1.csv").query("asset_type == 'algorithm'")
 pd.melt(m, id_vars=["tool", "dimension"], value_vars=["standard_share", "any_share"])   # grouped bars per dimension
 ```
 
-**The normalisation ladder (refinement 14).** Confirmed share per tool from L0 to L4; parameters from L2.
+**The normalisation ladder.** Confirmed share per tool from L0 to L4; parameters from L2.
 ```python
 lv = pd.read_csv(f"{A}/levels-run1.csv")
 ladder = lv.query("dimension == 'algorithm' and tool != 'all'").pivot(index="tool", columns="level", values="share")

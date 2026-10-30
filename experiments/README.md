@@ -1,7 +1,9 @@
 # Experiments
 
-Batch runs for the journal extension (see `CLAUDE.md`, Phase 1). Specs live here and are mounted
-read-only into the `runner` container; everything they produce stays in Docker volumes.
+How to run BF-CBOM's batch experiments and what they produce. Specs live here and are mounted read-only into the
+`runner` container; everything a run produces stays in Docker volumes until it is exported. Setting up the stack: the [root README](../README.md#setup); how the analysis
+reads the CBOMs (units, normalisation, the ladder, voter groups): [`analysis/README.md`](../analysis/README.md); the
+repository lists and fixtures: [`corpus/README.md`](corpus/README.md).
 
 ```
 experiments/
@@ -10,35 +12,29 @@ experiments/
 └── results/     # exported ZIPs and extracted results (ignored by Git)
 ```
 
+Every command runs inside the `runner` container through `make` (never plain `docker compose`):
+
 ```
-make experiment EXP=experiments/mutation-smoke.yaml   # pin commits, mirror to gitserver, run, persist
-make experiment-status NAME=mutation-smoke            # Redis progress + what is on disk
-make experiment-export NAME=mutation-smoke            # experiments/results/mutation-smoke.zip (only way data reaches the host)
-make experiment-list                                     # experiments stored on the volume
-make experiment-delete NAME=mutation-smoke            # remove one from the volume (asks first)
-make corpus ARGS="--per-cell 2"                          # stratified corpus -> results volume corpus/corpus.yaml
-make board                                               # live board of the stack: experiments, workers, queues
-make board ARGS=--once                                   # one snapshot of it, then exit
+make experiment EXP=experiments/bar-micro.yaml        # pin commits, mirror to the git server, enqueue, collect (resumable)
+make experiment EXP=... ARGS="--overwrite-old"          # the whole spec as if it had never run (ARGS: --retry-failed, --rerun <tools>)
+make experiment-status NAME=bar-micro                 # Redis progress + what is on disk
+make experiment-attach                                  # join the terminal of the running `make experiment` (detach Ctrl-P Ctrl-Q)
+make experiment-collect NAME=bar-micro                # collect results of jobs already queued (after ARGS=--no-wait)
+make experiment-cancel NAME=bar-micro                 # remove its queued jobs from the worker queues
+make experiment-list                                    # experiments stored on the volume
+make experiment-delete NAME=bar-micro                 # remove one from the volume (asks first; ARGS=--yes skips)
+make experiment-export NAME=bar-micro                 # -> experiments/results/bar-micro.zip (runs the analysis report first)
+make experiment-export-all                              # every complete experiment (no run missing), one ZIP each, overwriting
+make corpus ARGS="--per-cell 3"                         # stratified GitHub corpus -> results volume corpus/corpus.yaml + corpus-frame.yaml
+make corpus ARGS="--frame /data/results/corpus/corpus-frame.yaml --per-cell 2"   # redraw from a stored frame, no search
+make corpus-prune ARGS="--in /data/results/corpus/corpus.yaml --from stability-pilot"   # drop repos a tool timed out on
+make corpus-export                                      # corpus YAMLs (sample and frame) -> experiments/results/
+make analysis ARGS="report bar-micro"                 # the analysis alone (below), into <exp>/_ANALYSIS/
+make board                                              # live board of the stack: experiments, workers, queues (ARGS=--once: one snapshot)
 ```
 
-**Watching a run.** `make experiment` shows its own progress while it runs (a line per tool with its count, the job
-it runs and for how long). `make board`, in a second terminal, shows the whole stack (an experiment's bar counts the
-results the runner has stored, so after `ARGS=--no-wait` it moves once `make experiment-collect` runs):
-- every running experiment with a bar, results stored out of expected, its wave, the failures so far and the time
-  left (per tool its jobs left times its mean duration so far, less what its running job has taken; the slowest tool
-  ends the batch, `≥` while a tool has no result yet; the runner's own progress shows the same);
-- every worker: busy, idle or down, the job it runs (repo, run, experiment) and for how long, the container's RAM
-  against its limit, the jobs queued for it and its last result;
-- whether Redis, the git server and the UI answer, and the host's RAM.
-
-`Ctrl+C` closes the board; the experiment and the stack go on (`make up-prod` opens the board by itself once the
-stack is up; `make logs` shows the containers' raw logs, `make down` stops the stack).
-
-When a run ends it prints an overview (`misc/cli/overview.py`): runs stored out of expected, per tool the counts per
-status, median and longest duration, peak RAM against the limit and OOM kills, the LLM token usage with an estimated
-cost, every run that is not ok with its most telling error line, and the commands to retry, resume or export.
-`make experiment-status` shows the same plus the live progress from Redis, `make experiment-list` one line per
-experiment.
+Exports are the only way results reach the host. An unzipped export is analysed there without Docker:
+`RESULTS_DIR=experiments/results uv run bf-cbom analysis report <exp>` ([Analysis](#analysis)).
 
 ## Specs in this folder
 
@@ -132,7 +128,7 @@ make experiment-export NAME=mutation-pilot
 After a change to one worker, `make experiment EXP=experiments/mutation-smoke.yaml ARGS="--rerun <tool>"` redoes
 its runs on three small repos and their mutants, one repo per paper language; its micro check, the same on
 `bar-micro.yaml` (3 jobs). The corpus run on the full corpus (Java, Python and Go) and the mutation run on its
-subset (see `CLAUDE.md`, Phases 4 and 5) have no specs yet; the corpus spec needs the corpus from `make corpus`
+subset have no specs yet; the corpus spec needs the corpus from `make corpus`
 first, pruned with
 `make corpus-prune ARGS="--in /data/results/corpus/corpus.yaml --from stability-pilot"` to drop repos a tool
 timed out on.
@@ -179,7 +175,7 @@ for their own sake: the spec pins every repo's commit (the corpus files and the 
 without a commit gets the branch head of the day) and the mutants are deterministic, so a rerun scans the same
 snapshots and repeats the results.
 
-**Mutants (`mutation:`, Phase 4).** For every repo of a spec with a `mutation:` block the runner makes `per_repo`
+**Mutants (`mutation:`).** For every repo of a spec with a `mutation:` block the runner makes `per_repo`
 insertion mutants before anything is enqueued (`mutation/mutants.py`): one catalog snippet (`mutation/catalog/
 {java,python,go}.yaml`, by the repo's `language`) in one style, inserted into a first-party method or function that
 has a caller (or a `main`), committed on the pinned commit as the branch `bfcbom/ins-<snippet>-<style>-<hash>` of the
@@ -245,154 +241,67 @@ model ids the provider answered with; kept on failed runs). `_run-log.json` also
 image ids of the workers (by content) per session. There is no backward compatibility with experiments stored before
 these fields existed: rerun them.
 
-**Memory budget (waves).** Every worker takes one job at a time, so a batch needs at most the sum of the
-compose memory limits of the workers that have jobs queued (`memory_gb` in `common/tools.yaml`, kept equal
-to `docker-compose.yml` by a test). `EXPERIMENT_MEMORY_BUDGET_GB` (Makefile, default 14 for a laptop whose
-Docker Desktop VM has ~20 GiB) caps that sum: the runner packs the tools into waves (largest first), feeds
-one wave, collects it, then feeds the next; workers of later waves sit idle meanwhile. The wave count depends on
-the selected tools, their limits and replicas; the runner prints the plan. A tool above the budget runs alone
-with a warning, so the budget is not a hard cap. For the paper's runs on the 64 GB VM, use 0 (one wave,
-everything in parallel):
-
-```
-make experiment EXP=experiments/corpus-pilot-small.yaml EXPERIMENT_MEMORY_BUDGET_GB=0   # per call
-```
-
-or change the default in the Makefile once per machine. The wave plan is printed before anything is
-enqueued and stored in the experiment's Redis status (`waves`, `wave`).
+## Running an experiment
 
 **Watching a run.** On a terminal `run` and `collect` keep a live board at the bottom (`misc/cli/progress.py`): one
 line for all results (done/total, remaining time, elapsed time, the wave and the statuses so far), then one per tool
 with its count and remaining time (`progress.forecast`: its jobs left times its mean duration so far; the batch ends
-with its slowest tool), the job it runs now and for how long (the longest-running one first, from the start times the workers
-write to Redis), how many wait and what failed; tools of a later wave wait with their clock still. Every stored
-result still prints its own line above the board (status, tool, snapshot, run, duration, path). Pinning and
-mirroring count the repos the same way (a line announces the two slow cases, a mirror cloned on first use and a
-fetch for a pinned commit the mirror lacks; everything else is local), and so does `corpus build` per language (repos
+with its slowest tool), the job it runs now and for how long (the longest-running one first, from the start times the
+workers write to Redis), how many wait and what failed; tools of a later wave wait with their clock still. Every
+stored result still prints its own line above the board (status, tool, snapshot, run, duration, path). Pinning and
+mirroring count the repos the same way (a line announces the two slow cases, a mirror cloned on first use and a fetch
+for a pinned commit the mirror lacks; everything else is local), and so does `corpus build` per language (repos
 picked out of the quota, the cell searched or the repo cloned for the crypto check). Off a terminal only the lines
 print. The display belongs to the terminal `make experiment` runs in; `make experiment-attach` joins it from another
-shell (tmux window, second ssh session) and shows the board and the result lines from then on. Detach with
-Ctrl-P Ctrl-Q: Ctrl-C there interrupts the run exactly as in its own terminal, and `make experiment-collect` resumes it. `--no-wait` enqueues only the
-first wave; after `make experiment-collect NAME=<exp>` rerun `run` for the next one. Jobs left pending by an interrupted
-run are already in the queues and are collected in wave 1 regardless of the budget.
+shell (tmux window, second ssh session) and shows the board and the result lines from then on. Detach with Ctrl-P
+Ctrl-Q: Ctrl-C there interrupts the run exactly as in its own terminal, and `make experiment-collect` resumes it.
+`--no-wait` enqueues only the first wave; after `make experiment-collect NAME=<exp>` rerun `run` for the next one.
+Jobs left pending by an interrupted run are already in the queues and are collected in wave 1 regardless of the
+budget.
 
-## Normalisation
+`make board`, in a second terminal, shows the whole stack (an experiment's bar counts the results the runner has
+stored, so after `ARGS=--no-wait` it moves once `make experiment-collect` runs):
+- every running experiment with a bar, results stored out of expected, its wave, the failures so far and the time
+  left (the same forecast as the runner's board; `≥` while a tool has no result yet);
+- every worker: busy, idle or down, the job it runs (repo, run, experiment) and for how long, the container's RAM
+  against its limit, the jobs queued for it and its last result;
+- whether Redis, the git server and the UI answer, and the host's RAM.
 
-**Why.** Generators describe the same crypto asset in different ways, so their CBOMs cannot be compared as they are.
-The example of the paper figure (`context/fig-cbom-normalization_cyclonedx.pdf`): three tools report AES-CBC with a
-256-bit key in `src/KdbxFile.cs` line 120:
+`Ctrl+C` closes the board; the experiment and the stack go on (`make up-prod` opens the board by itself once the
+stack is up; `make logs` shows the containers' raw logs, `make down` stops the stack).
 
-| Tool | What it writes |
-|---|---|
-| tool 1 | name `AES-256-CBC`, primitive `block-cipher`, occurrence `src/KdbxFile.cs`, line 120 |
-| tool 2 | name `AES`, custom properties `t2:mode = CBC`, `t2:file = KdbxFile.cs`, `t2:line = 120` |
-| tool 3 | name `aes`, `parameterSetIdentifier: "256"`, occurrence `./src/KdbxFile.cs:121` |
+When a run ends it prints an overview (`misc/cli/overview.py`): runs stored out of expected, per tool the counts per
+status, median and longest duration, peak RAM against the limit and OOM kills, the LLM token usage with an estimated
+cost, every run that is not ok with its most telling error line, and the commands to retry, resume or export.
+`make experiment-status` shows the same plus the live progress from Redis, `make experiment-list` one line per
+experiment.
 
-Compared raw, the three share almost nothing. Normalised, they agree on the family (AES), the file and partly on mode
-and key size, and differ by one line. Normalisation translates every CBOM into one record format (CBOM^norm), so that
-the n-way matchers compare like with like, per dimension (algorithm, parameters, location).
-
-**Three kinds of files.**
-
-| What | Where | Holds |
-|---|---|---|
-| one adapter spec per tool | `analysis/adapters/<tool>.yaml` | the format the tool declares, which components count as findings, where each dimension sits in the tool's output (sources in order of precedence), the tool's own spellings (dictionary), notes on its quirks. Specs inherit from `_cyclonedx.yaml` (standard CycloneDX 1.6/1.7 paths), `_ibm-cbom-draft.yaml`, `_cbomkit.yaml`, `_llm.yaml` and state only their differences. Every integrated tool needs one (a test enforces it). |
-| one shared vocabulary | `analysis/data/algorithms.yaml` + `analysis/data/cyclonedx/` | canonical names from the vendored CycloneDX 1.7 cryptography registry (families such as `AES`, `RSAES-OAEP`, `ECDSA`, `SHA-2`; curves with their OID-equal aliases, `secp256r1` = `P-256` = `prime256v1`), enum spellings, JOSE/SSH/JCA identifiers, an API table, the meaning of `parameterSetIdentifier` per family. Spellings traceable to standards or official APIs belong here regardless of how many tools use them; labels invented by a tool belong in its spec. |
-| one target format | `analysis/data/cbom-norm.schema.json` | the shape of a normalised file and record, the same for every tool; every output validates against it |
-
-*Worker adapters* (`common/cbom_adapters.py`, `workers/*`) are something else: they make a tool's raw output usable
-CycloneDX at scan time. Adapter specs read CycloneDX into records, offline.
-
-**From a CBOM to records.**
-
-1. *Findings.* The spec decides which components count: crypto assets always; libraries only when the tool marks
-   them as findings (CipherRadar's library imports); dependency inventories (cdxgen, pqcheck) are skipped.
-2. *Locations.* One record per (component, occurrence); `path:line`, `path#line`, absolute temp-clone paths and
-   IBM-draft line windows (`line` ... `line_end`) become a repo-relative file and line. A component without a
-   location gives one record without location.
-3. *Values.* The spec's sources are read in order of precedence: occurrence evidence (CryptoScan's matched `symbol`),
-   standard fields, tool properties, the component name, refs and dependencies between components, the API in an
-   occurrence's context. Each yields canonical values through the vocabulary; composite names are parsed
-   (`AES-256-GCM` -> AES, 256, GCM; `HmacSHA512` -> HMAC, digest SHA-512; `RSA/ECB/OAEPWithSHA-256AndMGF1Padding` ->
-   RSAES-OAEP, OAEP, digest SHA-256). What our reading of a name may add is bounded (vocabulary 2026-10-23.1): a UUID,
-   an OID (read through the `oids:` table) or a URI (its fragment, RFC 6931) in a name never yields a key size; a bare
-   number is a key size only next to its family and when the family may have it (`key_sizes:`, by standard: AES 128,
-   192 or 256); a parsed or derived parameter a record's primitive does not have is dropped (`admits:`: a hash takes no
-   key size, mode, padding or curve); a cipher-suite name (`TLS_..._WITH_<cipher>_<mac>`, OpenSSL's `DES-CBC3-SHA`)
-   yields the bulk cipher with `protocol: TLS` (`cipher_suites:`; `SHA` is SHA-1, RFC 5246 A.5). A tool's own field is
-   never checked or dropped: what it writes is its finding.
-4. *Merge.* The first value per dimension wins. A later, more specific value of the same kind refines it (EC -> ECDSA,
-   SHA-2 -> SHA-256); a different one is kept as a conflict (CipherRadar's `algorithmFamily` SHA-2 on a component named
-   SHA-1). Supporting evidence (API context, rule ids, dependencies) only fills gaps.
-5. *Nothing is guessed.* Unknown spellings and code fragments (`parseCsvMap`, `SHA-" + this.strength`) stay unmapped,
-   a name listing several algorithms (`RSA, ECC, AES`) is marked ambiguous, and our own derivations (group from
-   family, key size from curve, default primitive) are tagged `derived:<dim>`.
-
-**What a record keeps.** The canonical values (`group`, `family`, `algorithm`, `primitive`, `functions`, `mode`,
-`padding`, `curve`, `key_size`, `digest`, `param_set`, `iterations`, `oid`, `protocol`, `protocol_version`,
-`material`, `asset_type`, `purl`, `confidence`), the location (`file`, `line`, `line_end`, `in_scope`, and
-`file_exists` when the git mirror is mounted), the occurrence `context`, and per dimension `raw` (the value as found,
-or the whole text that was parsed), `src` (the exact JSON path) and `via` (field, parse, dictionary, api, dependency,
-ref, derived). So matchability can be measured with and without normalisation, and it stays visible where a tool puts
-its information (structured field, custom property, only the name).
-
-**Format conformance.** Reading is lenient (any version, the IBM draft, fields of later versions), but every value
-read from a standard field is checked against the official JSON schema of the CycloneDX version the CBOM declares.
-Deviations become `spec_issues` on the record: `field` (the version does not define the field, e.g. 1.7
-`algorithmFamily` in a 1.6 CBOM), `enum` (`padding: PSS`, `assetType: key`), `type`, `deprecated` (1.6 `curve` in a
-1.7 CBOM); per document `dialect` (not CycloneDX) and `version`. This feeds the RQ3 questions "which tool reports in
-what, and where does it violate its declared standard"; a full validation of whole documents is a separate step.
-
-**How much agreement does normalisation create?** A normaliser developed on the outputs it evaluates could manufacture
-agreement and work against our own hypothesis that tools report heterogeneous things. So agreement is reported as a
-ladder (`levels`, below; CLAUDE.md method refinement 14). The ladder varies only *when two reports count as the same
-algorithm*; the unit stays fixed: an algorithm is its identity under the full normalisation (L4), so every level's
-share is a fraction of the same population. Two records match at a level when they are equal under any of the key
-functions up to that level (cumulative), so a match is never lost at a higher level, every tool's share can only grow
-from L0 to L4, and each step's gain is one normalisation step:
-
-| Level | Two reports match when ... |
-|---|---|
-| L0 | the component names are identical as reported |
-| L1 | ... or equal with case and separators ignored (`SHA-256` = `sha256`) |
-| L2 | ... or map to the same entry of the standard vocabulary: whole names and CycloneDX 1.7 `algorithmFamily` through the registry and JOSE/SSH/JCA identifiers (`DESede` -> 3DES, `HS256` -> HMAC) |
-| L3 | ... or parse to the same algorithm (`AES-256-GCM` -> AES) |
-| L4 | ... or get the same identity from everything tool-specific: spec sources (symbols, properties, refs, dependencies), the tool's own labels in its dictionary, API context |
-
-A worked example with one record per tool, and the policy behind the specs: `analysis/README.md`.
-
-The records of a repository fall into clusters at each level, one per key (the records whose identity at that level
-or below is the key; clusters never merge through a record that has several keys); a tool's algorithm is confirmed
-at a level when a cluster holding one of its records also holds a record of another voter group. The L0 share reads
-as "another tool uses a verbatim identical spelling". Hypotheses are tested at L2/L3, the L0 -> L4 gap is reported as
-representational heterogeneity, and rankings are checked for stability across levels. Parameters (key size, mode, padding, curve, digest) get the same
-ladder from L2 on over (algorithm, value) pairs with values from any source: a pair is confirmed when the tool's value
-is admitted at the level (L2 from a standard field, L3 also parsed from the name, L4 from any source) and a record of
-another voter group in the same cluster carries the same admitted value. `--closure` (refinement 2) adds the
-algorithms a record implies (its digest, the `implies` table: HMAC-SHA256 -> HMAC and SHA-256, PBKDF2 -> HMAC) as
-items of the tool, matchable from L3 on (an implication is parsed knowledge; it never merges clusters), so tools that
-expand such hierarchies and tools that do not are compared on equal terms; the plain and the closed numbers are
-reported apart, never pooled. The per-tool and pooled numbers of the pilot and the ICPC corpus are in
-`docs/findings.md` ("Export review 2026-10-19"): most of the gain comes from the standard vocabulary and parsing, the
-tool specs add a few points.
-
-**Frozen.** The vocabulary and the adapter specs were developed on the pilot corpus (the development set); the main
-corpus is held out. Since 2026-10-18 they are frozen: every change bumps `version` in `analysis/data/algorithms.yaml`
-and adds an entry with the reason and the fingerprint (`python -m analysis.freeze`) to `analysis/data/CHANGELOG.md`;
-`tests/test_vocab_frozen.py` fails otherwise. The versions are recorded in every `.norm.json`; a two-rater review of
-`vocab.csv` (Cohen's κ) is an option for the paper, not decided.
-
-**Curating and extending.** After `normalize`, read the `unmapped` and `partial` rows of `_ANALYSIS/vocab.csv`. A
-spelling traceable to a standard or an official API (the registry, RFC 7518 JOSE, SSH, JCA names, OS and library
-APIs) goes into the shared vocabulary, however many tools use it; a label a tool invented (rule names, category
-labels) goes into the tool's dictionary, read as it says and with a comment naming its source; what a tool's own
-metadata already classifies is read structurally (`rule_crypto_segments`), never listed; code identifiers are
-recognised by shape (`api`); an ambiguous spelling (`rand`) and garbage stay unmapped (`undefined`). Judgements about
-what a label "really" means are not made (`interpretive: true` exists in the engine but no spec uses it, a test
-enforces this). Bump the version, add the changelog entry and rerun. A new tool gets `analysis/adapters/<tool>.yaml` (inherit `_cyclonedx`, state its quirks), a small fixture in
-`tests/fixtures/normalize/` (open-source tools only) and a test in `tests/test_normalize.py`.
+**Parallelism and memory.** The laptop prepares code and analyses copied exports; the VM runs the batches with
+`EXPERIMENT_MEMORY_BUDGET_GB=0`.
+- *One job per worker container.* Each worker pops one job from its Redis queue, runs the tool in a subprocess,
+  pushes the result and only then takes the next. A batch has as many jobs in flight as there are worker containers
+  (with `make up-prod` one per generator, each on a different repository); queued jobs cost only a Redis entry.
+- *Memory limits are caps, not reservations.* Every worker has a memory limit in `docker-compose.yml`, mirrored by
+  `memory_gb` in `common/tools.yaml` (a test keeps them equal; adjust both). Idle workers use little, large jobs can
+  reach their caps, and the VM also needs memory for the coordinator, Redis and the git server.
+- *Memory budget (waves).* `EXPERIMENT_MEMORY_BUDGET_GB` (Makefile, default 14 for a laptop whose Docker Desktop VM
+  has ~20 GiB) caps the summed limits of the tools fed at once: the runner packs the tools into waves (largest
+  first), feeds one wave, collects it, then feeds the next; workers of later waves sit idle meanwhile. A tool above
+  the budget runs alone with a warning, so the budget is not a hard cap. The plan is printed before anything is
+  enqueued and stored in the experiment's Redis status (`waves`, `wave`). On the VM use 0 (one wave, everything in
+  parallel), per call (`make experiment EXP=... EXPERIMENT_MEMORY_BUDGET_GB=0`) or once in the Makefile. The UI
+  applies the same budget: jobs of later waves are created *held* (⏸️) and queued once the current wave is done.
+- *Replicas.* Workers are stateless, so several containers can share a tool's queue (`docker compose up -d --scale
+  worker-<tool>=N` with the Makefile's exported image settings; no make target yet). `EXPERIMENT_REPLICAS="<tool>=3"`
+  counts a tool three times in the budget and records the replicas in `_run-log.json`; it does not start them.
+  Untested beyond one replica per tool.
+- *The analysis report in parallel:* `--jobs` and `RUNNER_MEMORY`, see [Analysis](#analysis).
 
 ## Analysis
+
+The commands, the files they write and their columns. What the analysis counts and why (units, normalisation, the
+ladder, voter groups, family and group) is in [`analysis/README.md`](../analysis/README.md); plot recipes on these
+tables in [`analysis/report/README.md`](../analysis/report/README.md).
 
 The analysis (`analysis/`) works offline: it reads the stored CBOMs from the results volume and needs neither Redis
 nor running workers. It uses only runs with status `ok` (failed, timed-out and `unsupported` runs are skipped) and,
@@ -429,7 +338,7 @@ long step reads as working, like a run's board ("Watching a run"); off a termina
 ends.
 
 **`normalize <exp>`** reads every stored ok CBOM (all repetitions, including mutants) into normalised records with
-its tool's adapter spec, as described in [Normalisation](#normalisation). It writes the normalised files and the
+its tool's adapter spec, as described in [Normalisation](../analysis/README.md#normalisation-from-a-cbom-to-records). It writes the normalised files and the
 first two diagnostic tables below. `tables` (also part of `report`) writes the per-run coverage, units and
 conformance tables. The diagnostic tables aggregate original variants only, so mutants do not multiply counts.
 
@@ -457,7 +366,7 @@ fields and, where the normaliser reads such a value, from any source (the standa
 lower). `traceability-run<i>.csv` gives per (snapshot, tool, asset type) how
 many records name a file (`located_file`), a file and a line (`located_line`), how many of those with a line exist at
 the pinned commit with the line inside the file (weak) and how many also have a vocabulary token within ±2 lines
-(strong, refinement 4); `related-crypto-material` (keys, secrets) is kept apart from algorithms. In `_SUMMARY.md`
+(strong); `related-crypto-material` (keys, secrets) is kept apart from algorithms. In `_SUMMARY.md`
 every asset type has its own table under `#### Asset type`, CycloneDX's four in the standard's order (algorithm,
 certificate, protocol, related-crypto-material), then `unknown` for values outside them. The traceability check needs
 the snapshot's files: on the VM the git mirror; on a laptop with a copied export `--fetch` pulls each pinned commit once
@@ -523,7 +432,7 @@ consensus set (algorithms in more than half of the runs); with repetitions the s
 `analysis/data/llm_prices.yaml` (`cost_usd`, `priced_model`, `price_period`, `price_table_version` in `runs.csv`; the
 summary adds cost per repository, per item and per confirmed item).
 
-**`levels <exp>`** computes the normalisation ladder (L0-L4, see [Normalisation](#normalisation)): per repository the
+**`levels <exp>`** computes the normalisation ladder (L0-L4, see [the ladder](../analysis/README.md#normalisation-from-a-cbom-to-records)): per repository the
 items each tool reports (`analysis/README.md` "Units"), and the share that a tool of another voter group
 (`voter_group` in `common/tools.yaml`) also reports. It prints a tools x levels table and writes
 `_ANALYSIS/levels-run<i>.csv` (dimension, level, tool, voter_group, items, confirmed, share; tool `all` pools
@@ -534,7 +443,7 @@ whether the row is only implied (`implied`, with `--closure`), whether its famil
 rather than an addition of `algorithms.yaml` (`registry`, RQ4), the repo's language, the number of records and
 distinct spellings behind it, and per level the voter groups in the item's largest cluster (`k_L0` .. `k_L4`). That table is location-free, so every tool
 takes part; it is the basis for UpSet plots and the tools-per-item distribution. Options: `--run <i>` for another repetition, `--merge-llm` (every LLM worker one
-voter), `--include-tailored`, `--closure` (refinement 2).
+voter), `--include-tailored`, `--closure` (adds the algorithms a record implies).
 
 **`micro <exp>`** scores every tool on the micro projects (`experiments/corpus/micro`, repos named `<owner>/micro-<language>`)
 against `experiments/corpus/micro/ground_truth.yaml`, 14 expected items per project (a catalog snippet in a function of its own;
@@ -543,7 +452,7 @@ a log message naming algorithms, a CRC32 checksum, a Base64 encoding, a variable
 that looks like a key, a URL ending in `.sha256`, a path naming a certificate file; what each one tests: `corpus/README.md`). Projects and
 ground truth are generated from the snippet catalog by `uv run python -m mutation.micro` (never edited by hand; a test
 fails when they drift; the ground truth's header states the rules). Scored from the normalised records
-(`analysis/groundtruth.py:score_records`) at two levels (CLAUDE.md, refinement 1). It prints one row per project and
+(`analysis/groundtruth.py:score_records`) at two levels, call site and repository, side by side and never pooled. It prints one row per project and
 tool, including tools that did not run there (unsupported, failed):
 
 | Column | Meaning |
@@ -637,7 +546,7 @@ files and never change these:
 | `mutants.csv` | RQ6 | mutant (mutants.json) | repo, snapshot, commit, language, variant (the mutant id), variant_commit, snippet, style, catalog_version, unit (expected L4 identity, `protocol:TLS` for the TLS context), family, expected, also, file, call_line, related_lines, spans (`kind:start-end`), host, host_line, host_callers, host_entry, imports_added, qualified (Java types written fully qualified), patch |
 | `mutation.csv` | RQ6 | (mutant, tool) | repo, snapshot, language, variant, snippet, style, tool, voter_group, status (`ok`, or why it is not judged: the mutant's or the original's run missing or not ok), runs_mutant, runs_original, unit, masked (the original already has the unit: no repository-level value), found_repo, found_file, found_span (inserted lines ±2), found_site (call line ±2), found_group (lenient: same group at the site), key_size, mode, padding, curve, digest, iterations, protocol_version (the expected value on a new record of the unit on the inserted lines; empty = not judged), extra_units, lost_units, extra_sites, lost_sites (other changes; majority sets), new_records (per run: records absent from the original at the same place, the original's lines shifted into the mutant; a record is matched by its unit, or by its raw name when it has none, so a tool's identity-less import markers are not new on every mutant). Only new records count: an original finding moved by the insertion is not new; with repetitions a value holds in most of the mutant's runs |
 | `mutation-rates.csv` | RQ6 | (tool, language, style or `all`, dimension) | tool, voter_group, language, style, dimension, repos, mutants (judged), detected, rate (mean of per-repository rates), pooled, ci_low, ci_high (bootstrap over repositories, only when supported: score.py's MIN_REPOS and MIN_ITEMS), supported |
-| `mutation-scores.csv` | RQ6 | (tool, language, style or `all`) | tool, voter_group, language, style, repos, calls, found_site, found_group, decoys, decoys_hit, recall_site, recall_low, recall_high, recall_group, precision, f1, f1_low, f1_high, supported, tailored (the tool was tuned on the micro projects, which share the mutants' snippet catalog: inflated by construction, marked `*` in the summary), offedit_mutants and offedit_share (judged mutants, calls and decoys together, with a new unit or a new located site outside the inserted lines; never folded into recall, precision or F1), extra_units_median and extra_sites_median (over those mutants), baseline_flux and baseline_changed (the tool's noise floor from `report --baseline <stability experiment>`: its mean `flux` there and the share of its snapshots whose repeated runs differ; empty without one) |
+| `mutation-scores.csv` | RQ6 | (tool, language, style or `all`) | tool, voter_group, language, style, repos, calls, found_site, found_group, decoys, decoys_hit, recall_site, recall_low, recall_high, recall_group, precision, f1, f1_low, f1_high, supported, offedit_mutants and offedit_share (judged mutants, calls and decoys together, with a new unit or a new located site outside the inserted lines; never folded into recall, precision or F1), extra_units_median and extra_sites_median (over those mutants), baseline_flux and baseline_changed (the tool's noise floor from `report --baseline <stability experiment>`: its mean `flux` there and the share of its snapshots whose repeated runs differ; empty without one) |
 | `bridge-run<i>.csv` | RQ6 -> RQ5 | (language, tool) cells and per language `all` | language, tool, confirmation, f1, n, spearman, kendall_tau |
 | `agreement-exact-run<i>.csv` | matches | (group, dimension) | matcher, repo, snapshot, variant, run, group_id, scope, key, dimension (key_size, mode, padding, curve, digest; location for repo groups), reporting (voters with a value), agreeing (voters carrying the majority value), majority, values |
 | `matchlevels-run<i>.csv` | matches | (matcher, level) | matcher, level, run, repos, items (algorithms by L4 identity), records, k1, k2, k3, k4plus (items by the voter groups of their largest group at the level), share_k2plus, `<dim>_groups` and `<dim>_agree` for key_size, mode, padding, curve, digest (groups with 2+ voters reporting a value admitted at the level; share where all agree), location_groups, location_agree (groups with 2+ located voters; share with 2+ at one call site) |

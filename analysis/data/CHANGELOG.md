@@ -1,7 +1,6 @@
 # Vocabulary and adapter specs: change log
 
-The shared vocabulary (`algorithms.yaml`) and the adapter specs (`../adapters/*.yaml`) are frozen (CLAUDE.md
-refinement 14): they were developed on the pilot corpus (the development set); the main corpus is held out. Every
+The shared vocabulary (`algorithms.yaml`) and the adapter specs (`../adapters/*.yaml`) are frozen: they were developed on the pilot corpus (the development set); the main corpus is held out. Every
 change bumps `version` in `algorithms.yaml`, adds an entry here with the fingerprint `python -m analysis.freeze`
 prints and the reason, and the tests fail otherwise (`tests/test_vocab_frozen.py`). Newest entry first.
 
@@ -69,8 +68,8 @@ rule bounds what OUR reading of a name adds.
 ## 2026-10-20.2 (2026-10-20) fingerprint `fb39aefee3a5a878efbca29fef7e47839caaec8fcc2f3f99795c0d582d867476`
 - `cryptobomforge.yaml` (version 2): declares IBM's draft `1.4-cbom-1.0` only. The CycloneDX entry (1.6, then 1.7 in
   2026-10-20.1) covered the worker's own empty placeholder CBOM for a CodeQL run without results; that placeholder is
-  gone (cryptobom-forge writes its own empty draft document for that case, checked in the pinned image; refinement 15:
-  every stored CBOM is the tool's). Stored placeholder runs are redone with `--rerun cryptobomforge`. The notes drop a
+  gone (cryptobom-forge writes its own empty draft document for that case, checked in the pinned image; every stored
+  CBOM is the tool's). Stored placeholder runs are redone with `--rerun cryptobomforge`. The notes drop a
   stale sentence (the detectionContext windows are read, as line and line_end). The shared vocabulary is unchanged.
 
 ## 2026-10-20.1 (2026-10-20) fingerprint `0feb566720a73894da61d5dfc5f8fe9d369b0c4a9cbb8d8914641acb04608a7f`
@@ -83,8 +82,8 @@ choice of 1.6, 1.7 or IBM's draft is part of what it ships and what RQ1 measures
 - `cryptobomforge.yaml`: the worker's empty placeholder CBOM (CodeQL returned no results) is CycloneDX 1.7.
 - `cdxgen.yaml`: declared version and notes corrected for the pinned 12.8.5 (it writes 1.7; the spec still described
   11.7.0 and 1.6), and its Go locations are read: the property cdx:golem:crypto:sourceLocation (`property_locations`,
-  `<path>:<line>:<col>`) was ignored, so cdxgen's Go records had no location (refinement 15: our analysis reads every
-  location format a tool uses).
+  `<path>:<line>:<col>`) was ignored, so cdxgen's Go records had no location (our analysis reads every location
+  format a tool uses).
 
 ## 2026-10-19.2 (2026-10-19) fingerprint `d5276ebc4f7d58767ec86a5e75b1440a9b7263c18ba368e8cf068a7b0beeaaf3`
 Three new adapter specs for the observer tools (common/tools.yaml `role: observer`): `qelens.yaml`, `cryptarium.yaml`,
@@ -107,7 +106,7 @@ undefined) and only `mapped` records are algorithm items.
   API names in its spec; withdrawn the same day: it enumerated the development set and suppressed the real conflict
   between `hmac.new` and CipherSift's family field SHA-2). A name without family that nobody understands is
   `undefined`; such records never become algorithm items (before: the folded raw name was an item nobody could
-  confirm). Principle (CLAUDE.md Rules): nothing is forced into a "right" class; what a tool wrote is the finding.
+  confirm). Principle: nothing is forced into a "right" class; what a tool wrote is the finding.
 - securin-xbom: the name is read as a rule id (`rule:name`, module path dropped), so `use-of-sha1` parses; its
   generic audit rules are `non-crypto` by the registry's own taxonomy (`rule_crypto_segments: [cbom, crypto,
   cryptography]`: a rule whose module path has none of these segments), not by a list of ours (a first draft listed
@@ -134,7 +133,7 @@ undefined) and only `mapped` records are algorithm items.
   (asset type, API as supporting evidence, function); 324 pilot records were partially unmapped before.
 
 ## 2026-10-18.1 (2026-10-18) fingerprint `a88c46c9ad7e78cf21eddb03fcad46fcd5926704998efd4a7bf86b11c6c91ca2`
-- Frozen for the first time (WP2 of "Completing Phases 1-3").
+- Frozen for the first time.
 - Tool idioms out of the shared vocabulary into the tool specs (L4): CipherRadar's rule names `weak-rand` and
   `math-random-security`, pqcheck's `MATH-RAND`; `Weak PRNG` dropped (no tool emits it). Standard identifiers stay
   shared however few tools use them (JOSE, SSH, JCA, OS and library APIs).
@@ -144,7 +143,7 @@ undefined) and only `mapped` records are algorithm items.
   Validation Bypass, Weak Cipher Suite -> TLS; Subject Alternative Name, ACME/Let's Encrypt -> CERT; CipherRadar:
   cipher-spec-inventory, Certificate Validation Disabled -> TLS; LLM workers: Entropy -> seed). They count at L4
   only; the ladder reports L4lit (without them) next to L4.
-- `implies` table added (refinement 2): PBKDF2 -> HMAC, PBES2 -> PBKDF2 + HMAC, PBES1 -> PBKDF1, TOTP/HOTP -> HMAC,
+- `implies` table added (implied assets, applied as an optional closure): PBKDF2 -> HMAC, PBES2 -> PBKDF2 + HMAC, PBES1 -> PBKDF1, TOTP/HOTP -> HMAC,
   Ed25519 -> SHA-512, Ed448 -> SHAKE256, ECIES -> ECDH, X25519MLKEM768 -> X25519 + ML-KEM-768; the digest rule lives
   in the code (`Vocabulary.implied`). Applied only with `--closure`.
 

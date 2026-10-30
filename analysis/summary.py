@@ -623,8 +623,8 @@ def _runs(rows: list[dict]) -> list[str]:
     if workarounds:
         lines += [
             "",
-            f"Runs with a recorded setup workaround ({_n(len(workarounds))}; refinement 15: the tool is unchanged, the "
-            "input it crashes on is excluded and named):",
+            f"Runs with a recorded setup workaround ({_n(len(workarounds))}; the tool is unchanged, the input it "
+            "crashes on is excluded through its own mechanism and named):",
             "",
         ]
         for r in workarounds[:25]:
@@ -851,7 +851,7 @@ def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
     if tailored:
         lines += [
             "",
-            "`*` = the tool was developed with this project at hand (`tailored_on` in tools.yaml, refinement 13), so "
+            "`*` = the tool was developed with this project at hand (`tailored_on` in tools.yaml), so "
             "its number here says little about other code; the pair is left out of every agreement table below.",
         ]
     if scored:
@@ -1527,7 +1527,7 @@ def _conformity(schema: list[dict], meaningful: list[dict], conf: list[dict], so
             "declares (1.6 and 1.7 are vendored). One row per tool:",
             "",
             "- `CBOM by`: `tool` = the tool writes the document; `BF-CBOM` = our worker assembles it (the LLM "
-            "workers), so validity there measures BF-CBOM, not the tool (refinement 3).",
+            "workers), so validity there measures BF-CBOM, not the tool.",
             "- `CBOMs`: its stored CBOMs; `declares`: the format and versions they declare.",
             "- `checked`, `valid`, `invalid`: CBOMs validated, and how many passed and failed; `no schema`: another "
             "dialect or version, not validated (IBM's draft, 1.5 and older).",
@@ -1684,8 +1684,7 @@ def _traceability(trace: list[dict]) -> list[str]:
         "- `weak`: of the records with a file and a line, the share whose file exists at the pinned commit and "
         "has that line.",
         "- `strong`: of the same records, the share where the line or one of the two lines above or below it "
-        "holds a cryptographic word (an algorithm, family, curve, identifier or API spelling of the vocabulary), "
-        "refinement 4.",
+        "holds a cryptographic word (an algorithm, family, curve, identifier or API spelling of the vocabulary).",
         "",
         "Weak and strong are empty where the snapshot files were not available."
         + (
@@ -2548,7 +2547,7 @@ def _ladder(all_rows: list[dict]) -> list[str]:
         "per repository, location ignored), the share another voter group also reports when names count as the same "
         'at that level (L0-L4, "How to read this summary"). The items are the same at every level, so the shares '
         "are comparable: they only grow from left to right, and each step's gain is what one normalisation step "
-        "adds. The L0 to L4 gap is the agreement normalisation creates (refinement 14); the tool specs behind L4 "
+        "adds. The L0 to L4 gap is the agreement normalisation creates; the tool specs behind L4 "
         "hold the tools' own spellings and labels, never our judgements. `all` pools the voters' items. Pairs a "
         "tool was tuned on are left out.",
         "",
