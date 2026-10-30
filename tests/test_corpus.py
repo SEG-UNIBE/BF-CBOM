@@ -259,3 +259,13 @@ def test_a_frame_is_reused_without_searching_nests_the_draws_and_caches_crypto_c
     with pytest.raises(RuntimeError, match="has no cell"):
         corpus.build_corpus(_params(star_bins=[(1, 50), (50, None)]), None, log=lambda m: None,
                             exclusions={"repos": {}, "patterns": []}, tailored={}, frame=old)  # fmt: skip
+
+
+def test_a_frame_survives_writing_and_reading(tmp_path):
+    frame = {"search_date": "2026-10-30", "pushed_since": "2025-10-30",
+             "cells": [{"language": "Go", "stars": [50, 300], "size_kb": [300, 3000], "query": "q", "population": 1,
+                        "repos": [{"full_name": "a/b", "pushed_at": "2026-05-01T12:00:00Z", "topics": ["x"]}]}],
+             "crypto_checks": {"a/b": {"commit": "0" * 40, "apis": ["stdlib"]}}}  # fmt: skip
+    path = tmp_path / "corpus" / "c-frame.yaml"
+    corpus.write_frame(frame, path)
+    assert corpus.read_frame(path) == frame

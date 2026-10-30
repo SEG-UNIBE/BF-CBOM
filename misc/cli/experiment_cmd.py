@@ -932,11 +932,12 @@ def corpus_build(
         )
     frame_out = out.with_name(f"{out.stem}-frame.yaml")
     frame: dict = {}
-    if frame_in is not None:
-        if not frame_in.exists():
-            _err(f"no frame file {frame_in}")
-        frame = yaml.safe_load(frame_in.read_text(encoding="utf-8")) or {}
+    if frame_in is not None and not frame_in.exists():
+        _err(f"no frame file {frame_in}")
     with progress.session():
+        if frame_in is not None:
+            with progress.step(f"Reading the frame ({frame_in.stat().st_size / 1e6:.0f} MB)"):
+                frame = corpus_mod.read_frame(frame_in)
         with progress.step("GitHub API check"):
             try:
                 typer.echo(corpus_mod.github_check(token), err=True)
@@ -959,8 +960,8 @@ def corpus_build(
             )
         finally:  # an interrupted build keeps what it searched and checked
             if frame.get("cells") or frame.get("crypto_checks"):
-                frame_out.parent.mkdir(parents=True, exist_ok=True)
-                frame_out.write_text(yaml.safe_dump(frame, sort_keys=False), encoding="utf-8")
+                with progress.step("Writing the frame"):
+                    corpus_mod.write_frame(frame, frame_out)
     corpus["frame_file"] = frame_out.name
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(yaml.safe_dump(corpus, sort_keys=False), encoding="utf-8")

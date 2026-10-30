@@ -56,6 +56,24 @@ NON_FIRST_PARTY = (
 
 logger = logging.getLogger(__name__)
 
+# libyaml when PyYAML has it, else the pure-Python classes; the same YAML either way. A frame of ~78k repos (22 MB)
+# reads in 6 s instead of 26 and writes in 4 s instead of 14.
+_FRAME_LOADER = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+_FRAME_DUMPER = getattr(yaml, "CSafeDumper", yaml.SafeDumper)
+
+
+def read_frame(path: Path) -> dict:
+    """A frame file (`<corpus>-frame.yaml`) as `write_frame` wrote it."""
+    with path.open(encoding="utf-8") as f:
+        return yaml.load(f, Loader=_FRAME_LOADER) or {}
+
+
+def write_frame(frame: dict, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as f:
+        yaml.dump(frame, f, Dumper=_FRAME_DUMPER, sort_keys=False)
+
+
 # Import/usage patterns that make a repo interesting for CBOM generation (grep on a shallow clone), per API family:
 # the families a repo matches are recorded as the covariate `crypto_apis` (never selected on).
 CRYPTO_APIS: dict[str, dict[str, str]] = {
