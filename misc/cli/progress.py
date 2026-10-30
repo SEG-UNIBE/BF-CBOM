@@ -42,12 +42,18 @@ def clock(seconds: float) -> str:
 
 
 def forecast(
-    left: dict[str, int], mean: dict[str, float], running: dict[str, float], waves: list[list[str]]
+    left: dict[str, int],
+    mean: dict[str, float],
+    running: dict[str, list[float]],
+    waves: list[list[str]],
+    *,
+    slots: dict[str, int] | None = None,
 ) -> tuple[float | None, bool]:
-    """The remaining time of a batch whose tools work their own queues in parallel, one job at a time: per tool, its
-    jobs left times its mean duration so far, less what its running job has taken (at most one mean); the slowest
-    tool ends a wave and the waves follow each other. Returns (seconds, whether it is a lower bound: a tool with jobs
-    left and no result yet counts as 0), or (None, True) when no tool with jobs left has a result yet."""
+    """The remaining time of a batch whose tools work their own queues in parallel: per tool, its jobs left times its
+    mean duration so far, less what its running jobs have taken (each at most one mean), shared by its containers
+    (`slots`, the replicas; default 1) that still have a job (at most its jobs left); the slowest tool ends a wave and
+    the waves follow each other. Returns (seconds, whether it is a lower bound: a tool with jobs left and no result yet
+    counts as 0), or (None, True) when no tool with jobs left has a result yet."""
     total, lower, known = 0.0, False, False
     for wave in waves:
         worst = 0.0
@@ -58,7 +64,9 @@ def forecast(
                 lower = True
                 continue
             known = True
-            worst = max(worst, left[t] * mean[t] - min(running.get(t, 0.0), mean[t]))
+            work = left[t] * mean[t] - sum(min(s, mean[t]) for s in running.get(t, ()))
+            share = max(min((slots or {}).get(t, 1), left[t]), 1)
+            worst = max(worst, max(work, 0.0) / share)
         total += worst
     return (total, lower) if known else (None, True)
 

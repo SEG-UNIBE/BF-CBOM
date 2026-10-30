@@ -707,6 +707,29 @@ def test_runtime_rows_count_each_repository_once_with_spread_ci_and_size():
     assert "size_rho" not in one and "sec_per_1k_source_files" not in one  # one size: nothing to scale by
 
 
+def test_runtime_rows_report_peak_memory_per_repository_and_runs_at_the_limit():
+    from analysis.summary import _runtime
+    from analysis.tables import RUNTIME_COLUMNS, runtime_rows
+
+    def mem(snapshot, peak, *, hits=0, oom=0, status="ok"):
+        return {**_run("t", snapshot, 10.0, status=status), "peak_memory_mb": peak, "memory_limit_mb": 4096.0,
+                "limit_hits": hits, "oom_kills": oom}  # fmt: skip
+
+    runs = [mem("a", 1000.0), mem("a", 3000.0), mem("b", 2000.0), mem("c", 4096.0, hits=5, oom=1, status="oom")]
+    row = next(r for r in runtime_rows(runs) if r["language"] == "all")
+    # a repository's peak is its largest run: a 3000, b 2000, c 4096
+    assert (row["peak_median_mb"], row["peak_max_mb"], row["limit_mb"]) == (3000.0, 4096.0, 4096.0)
+    assert (row["at_limit"], row["oom"]) == (1, 1)
+    older = [{k: v for k, v in r.items() if k != "limit_hits"} for r in runs]  # workers that did not record it
+    assert "at_limit" not in next(r for r in runtime_rows(older) if r["language"] == "all")
+    assert row["peak_ci_low"] <= 3000.0 <= row["peak_ci_high"] and row["peak_spread_cv"] > 0  # as for time
+    text = "\n".join(_runtime([{c: ("" if row.get(c) is None else str(row[c])) for c in RUNTIME_COLUMNS}]))
+    assert "| tool | repos | median s | 95 % CI s |" in text and "| median GiB | 95 % CI GiB |" in text  # one table
+    line = next(x for x in text.splitlines() if x.startswith("| t |"))
+    assert "| 2.9 | " in line and line.endswith("| 4.0 | 1 | 1 |")  # median GiB; limit, at limit, OOM
+    assert f"| {row['peak_ci_low'] / 1024:.1f} - {row['peak_ci_high'] / 1024:.1f} |" in line
+
+
 def test_runtime_section_lists_the_slowest_tool_first_with_its_languages():
     from analysis.summary import _rq1
     from analysis.tables import RUNTIME_COLUMNS, runtime_rows

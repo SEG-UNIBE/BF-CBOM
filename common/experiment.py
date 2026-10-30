@@ -34,7 +34,7 @@ from typing import NamedTuple
 
 import yaml
 
-from .corpus import SIZE_CAP_RATIO, repo_size_cap_mb
+from .corpus import repo_size_cap_mb
 from .jobs import tool_supports
 from .languages import source_files
 from .models import JobInstruction, JobResult, RepoInfo
@@ -730,8 +730,8 @@ def resolve_snapshots(
         bare = ensure_mirror(repo, commit, mirror_dir=mirror_dir, log=log)
         if cap_mb and (size := mirror_size_mb(bare)) > cap_mb:
             log(
-                f"  warning: mirror of {repo.full_name} is {size} MB, above the repo size cap {cap_mb} MB "
-                f"(GITSERVER_MEMORY / {SIZE_CAP_RATIO}); a full clone through the git server may be killed"
+                f"  warning: mirror of {repo.full_name} is {size} MB, above the corpus size cap {cap_mb} MB; a full "
+                "clone through the git server may run out of its memory (GITSERVER_MEMORY)"
             )
         counted = snapshot_size(repo.full_name, commit, repo.language, mirror_dir=mirror_dir)
         size = counted._asdict() if counted else {f: getattr(before, f) for f in SnapshotSize._fields if before}

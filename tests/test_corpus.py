@@ -65,13 +65,11 @@ def test_prune_corpus_drops_repos_with_timeouts(tmp_path):
     assert [r["full_name"] for r in both["repos"]] == ["b/y"]
 
 
-def test_repo_size_cap_follows_the_git_server_memory():
-    assert corpus.parse_size_mb("4g") == 4096 and corpus.parse_size_mb("512m") == 512
-    assert corpus.parse_size_mb("2GiB") == 2048 and corpus.parse_size_mb("1048576") == 1
-    assert corpus.parse_size_mb("") is None and corpus.parse_size_mb("lots") is None
-    assert corpus.repo_size_cap_mb({"GITSERVER_MEMORY": "4g"}) == 1024
-    assert corpus.repo_size_cap_mb({"GITSERVER_MEMORY": "4g", "CORPUS_MAX_REPO_SIZE_MB": "300"}) == 300
-    assert corpus.repo_size_cap_mb({}) is None
+def test_repo_size_cap_is_fixed_unless_set():
+    assert corpus.repo_size_cap_mb({}) == corpus.DEFAULT_MAX_REPO_SIZE_MB == 1536
+    assert corpus.repo_size_cap_mb({"GITSERVER_MEMORY": "4g"}) == 1536  # the git server's memory does not move it
+    assert corpus.repo_size_cap_mb({"CORPUS_MAX_REPO_SIZE_MB": "300"}) == 300
+    assert corpus.repo_size_cap_mb({"CORPUS_MAX_REPO_SIZE_MB": "0"}) is None
 
 
 def test_size_cells_are_clamped_to_the_cap():
@@ -102,7 +100,7 @@ def test_build_corpus_excludes_repos_above_the_cap(monkeypatch):
     small = {"full_name": "small/repo", "git_url": "u", "branch": "main", "size_kb": 500, "stars": 1}
     out = _build(monkeypatch, _params(size_bins_kb=[(300, 3_000_000)]), [big, small])
     assert [r["full_name"] for r in out["repos"]] == ["small/repo"]
-    assert out["excluded"][0]["reason"] == "repo size 2048 MB > cap 1024 MB (GITSERVER_MEMORY)"
+    assert out["excluded"][0]["reason"] == "repo size 2048 MB > cap 1024 MB"
     assert out["params"]["max_repo_size_mb"] == 1024 and out["params"]["size_bins_kb"] == [[300, 1024 * 1024]]
 
 

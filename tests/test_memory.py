@@ -9,12 +9,12 @@ from common.worker import run_job_with_timeout
 MIB = 1024 * 1024
 
 
-def _cgroup(d, *, current, inactive=0, limit="max", oom=0):
+def _cgroup(d, *, current, inactive=0, limit="max", oom=0, hits=0):
     d.mkdir(exist_ok=True)
     (d / "memory.current").write_text(f"{current}\n")
     (d / "memory.stat").write_text(f"anon 1\nactive_file 2\ninactive_file {inactive}\n")
     (d / "memory.max").write_text(f"{limit}\n")
-    (d / "memory.events").write_text(f"low 0\nhigh 0\nmax 3\noom 1\noom_kill {oom}\n")
+    (d / "memory.events").write_text(f"low 0\nhigh 0\nmax {hits}\noom 1\noom_kill {oom}\n")
     return d
 
 
@@ -25,19 +25,20 @@ def test_working_set_is_current_minus_inactive_file_like_docker_stats(tmp_path):
     assert memory.limit_bytes(_cgroup(tmp_path / "unlimited", current=1)) is None
 
 
-def test_job_sampler_keeps_the_peak_and_counts_oom_kills_during_the_job(tmp_path):
-    cg = _cgroup(tmp_path / "cg", current=200 * MIB, limit=1024 * MIB, oom=1)
+def test_job_sampler_keeps_the_peak_and_counts_limit_hits_and_oom_kills_during_the_job(tmp_path):
+    cg = _cgroup(tmp_path / "cg", current=200 * MIB, limit=1024 * MIB, oom=1, hits=5)
     sampler = memory.JobSampler(cg)
-    _cgroup(cg, current=700 * MIB, limit=1024 * MIB, oom=1)
+    _cgroup(cg, current=700 * MIB, limit=1024 * MIB, oom=1, hits=5)
     sampler.sample()
-    _cgroup(cg, current=300 * MIB, limit=1024 * MIB, oom=2)
-    assert sampler.result() == {"peak_memory_mb": 700.0, "memory_limit_mb": 1024.0, "oom_kills": 1}
+    _cgroup(cg, current=300 * MIB, limit=1024 * MIB, oom=2, hits=9)
+    assert sampler.result() == {"peak_memory_mb": 700.0, "memory_limit_mb": 1024.0, "limit_hits": 4, "oom_kills": 1}
 
 
 def test_without_cgroup_files_everything_is_none(tmp_path):
     assert memory.JobSampler(tmp_path / "missing").result() == {
         "peak_memory_mb": None,
         "memory_limit_mb": None,
+        "limit_hits": None,
         "oom_kills": None,
     }
     assert memory.host_memory(tmp_path / "meminfo") == {}
@@ -65,7 +66,7 @@ def test_every_job_result_carries_the_containers_resources(tmp_path, monkeypatch
         job_id="j1", tool="t", repo_info=RepoInfo(full_name="o/r", git_url="u", branch="main", size_kb=1)
     )
     res = run_job_with_timeout(_ok, instr, 5, worker_name="t")
-    assert (res.peak_memory_mb, res.memory_limit_mb, res.oom_kills) == (64.0, 512.0, 0)
+    assert (res.peak_memory_mb, res.memory_limit_mb, res.limit_hits, res.oom_kills) == (64.0, 512.0, 0, 0)
     assert json.loads(res.to_json())["peak_memory_mb"] == 64.0
 
 

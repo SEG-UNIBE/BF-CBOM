@@ -14,9 +14,11 @@ DEV_WORKERS := skeleton,testing,mssbomtool
 # Override per call: make experiment EXP=... EXPERIMENT_MEMORY_BUDGET_GB=0
 EXPERIMENT_MEMORY_BUDGET_GB ?= 14
 # Memory cap of the git server (compose limit). A full clone runs git pack-objects inside this cgroup; 256m killed it
-# on keycloak and ansible (CBOMkit's JGit clone, 2026-10-19). The cap also bounds the corpus: repos whose packed size
-# on GitHub exceeds CORPUS_MAX_REPO_SIZE_MB (default GITSERVER_MEMORY/4, i.e. 1536 MB) are not sampled.
-GITSERVER_MEMORY ?= 6g
+# on keycloak and ansible (CBOMkit's JGit clone, 2026-10-19). 16g (6g until 2026-10-30) leaves room for the concurrent
+# full clones of CBOMkit replicas; a limit is a cap, not a reservation.
+GITSERVER_MEMORY ?= 16g
+# Largest packed repo size `make corpus` samples; empty: 1536 MB (common/corpus.py DEFAULT_MAX_REPO_SIZE_MB, a quarter
+# of the git server's memory when the paper's corpus was built).
 CORPUS_MAX_REPO_SIZE_MB ?=
 # Memory cap of the runner (compose limit). `analysis report` holds every normalised CBOM of an experiment and runs
 # up to 8 worker processes (--jobs, misc/cli/parallel.py), each with one parsed CBOM or one repository's records
@@ -88,10 +90,16 @@ up-dev: build-all
 up_detached = docker compose up -d --wait --wait-timeout 300 $(1) \
 	|| echo "some services are not up yet; the board shows which"
 EXTRA_PROFILES ?=
+# REPLICAS="cbomkit=3,cipherradar=3,scanoss=2": that many containers of those workers (`--scale worker-<tool>=N`), all
+# taking jobs from the tool's one queue; every experiment counts them from their heartbeats, so `make experiment` needs
+# nothing more. A later `make up-prod` without REPLICAS scales back to one each: on the VM, export it in the shell
+# profile to keep it (experiments/README.md "Parallelism and memory").
+REPLICAS ?=
+SCALE = $(foreach r,$(subst $(comma), ,$(REPLICAS)),--scale worker-$(r))
 up-prod: export COMPOSE_PROFILES := prod$(if $(EXTRA_PROFILES),$(comma)$(EXTRA_PROFILES),)
 up-prod: export AVAILABLE_WORKERS := $(PROD_WORKERS)
 up-prod: build-all
-	$(call up_detached)
+	$(call up_detached,$(SCALE))
 	@$(MAKE) --no-print-directory board
 
 # Prod from prebuilt GHCR images (no local build; see .github/workflows/images.yml)
@@ -99,7 +107,7 @@ up-prod-pull: export COMPOSE_PROFILES := prod$(if $(EXTRA_PROFILES),$(comma)$(EX
 up-prod-pull: export AVAILABLE_WORKERS := $(PROD_WORKERS)
 up-prod-pull: ensure-env
 	docker compose pull
-	$(call up_detached,--no-build)
+	$(call up_detached,--no-build $(SCALE))
 	@$(MAKE) --no-print-directory board
 
 # All: exactly what's in AVAILABLE_WORKERS
@@ -123,12 +131,10 @@ board: ensure-env
 # ---- Batch experiments (results stay in the results-data volume; see experiments/README.md) ----
 # make experiment EXP=experiments/mutation-smoke.yaml
 # EXPERIMENT_IMAGE_IDS: the worker images on this host by content (recorded per session in <exp>/_run-log.json).
-# EXPERIMENT_REPLICAS="cryptoscan=3,xgrep=2": replicas started with `docker compose up -d --scale worker-<tool>=N`;
-# the memory budget then counts each replica (experiments/README.md "Parallelism and memory").
-EXPERIMENT_REPLICAS ?=
+# Replicas come from `make up-prod REPLICAS=...`; the run counts them and the memory budget counts each one.
 experiment: ensure-env
 	EXPERIMENT_IMAGE_IDS="$$(docker images --no-trunc --format '{{.Repository}}:{{.Tag}}={{.ID}}' --filter 'reference=bf-cbom/*:$(VERSION)' | paste -sd ',' -)" \
-	docker compose run --rm -e EXPERIMENT_IMAGE_IDS -e EXPERIMENT_REPLICAS runner experiment run /app/$(EXP) $(ARGS)
+	docker compose run --rm -e EXPERIMENT_IMAGE_IDS runner experiment run /app/$(EXP) $(ARGS)
 
 # make experiment-attach  -> join the terminal of the `experiment run` of this stack from another shell: its progress
 # board and the result lines from now on. Detach with Ctrl-P Ctrl-Q; Ctrl-C interrupts the run as in its own terminal.

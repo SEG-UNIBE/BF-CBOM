@@ -120,7 +120,9 @@ example, voter groups, how family and group are argued),
   out exactly by `clone_repo`. `JobResult` carries `tool_version`, `image_ref` (env `BF_CBOM_IMAGE`), `bfcbom_commit`
   (env `BF_CBOM_COMMIT`, stamped into every image as its last layer by make and bake; `-dirty` = uncommitted changes),
   `run_index`, `started_at` / `finished_at`, `notes`, the container's `peak_memory_mb` / `memory_limit_mb` /
-  `oom_kills` during the job (`common/memory.py`, cgroup v2, sampled every second) and, for LLM workers, `usage`
+  `limit_hits` / `oom_kills` during the job (`common/memory.py`, cgroup v2, sampled every second; `limit_hits` from
+  `memory.events` `max`, added 2026-10-30: 0 = the limit never constrained the job; the VM has no swap, so memory
+  beyond the limit ends in an OOM kill) and, for LLM workers, `usage`
   (requests, input / cached / cache-write / output / reasoning tokens, the model ids answered with; kept on failed
   runs).
 - **Tool registry:** `common/tools.yaml` (loader `common/tools_registry.py`): engine family, `voter_group` (tools sharing
@@ -138,30 +140,23 @@ example, voter groups, how family and group are argued),
 - **Memory budget (waves):** `EXPERIMENT_MEMORY_BUDGET_GB` (laptop default 14, 0 = unlimited) caps the summed
   `memory_gb` of the tools fed at once; the rest run in later waves. Runner and UI plan waves with
   `common/tools_registry.py:plan_waves` (UI: held jobs, `release_due_waves`, `coordinator/scheduler.py`).
-  `EXPERIMENT_REPLICAS="tool=N,..."` counts replicas started with `docker compose up -d --scale` (`experiments/README.md`
-  "Parallelism and memory").
+  Replicas (built 2026-10-30): `make up-prod REPLICAS="cbomkit=3,..."` starts them (`--scale worker-<tool>=N`);
+  every container also writes its own heartbeat `worker:<tool>:replica:<host>` (`common/worker.py:replica_key`), and
+  the runner counts them (`live_replicas`) at session start (budget, `_run-log.json` `replicas`, the summary's
+  overview) and on every refresh (`progress.forecast` shares a tool's remaining work among its live containers); the
+  stack board shows one row per tool (`busy 2/3`, summed RAM). Run times measured with replicas include their CPU
+  contention; to test that, corpus-pilot-medium is run once without and once with replicas (cbomkit 3, cipherradar 3,
+  scanoss 2) and the per-tool times compared, the unreplicated tools as the noise control; if they deviate,
+  corpus-main (RQ1's run times) runs without replicas and mutation-main with them (decided 2026-10-30).
 - **Later: memory-gated scheduling** (noted 2026-10-19, not built; the user may move the stack to Kubernetes
   instead). Waves cap the *sum of limits*, so the former 64 GB VM ran at ~21 GiB: each worker runs one job and most jobs use
   a fraction of their cap. The design to turn RAM into throughput: replace waves by an admission loop that dispatches
   a job when host used + the expected memory of the running jobs + the new job's cap fits the budget (expected =
   p95 of the stored `peak_memory_mb` per tool x1.25, else the cap); concurrency from replicas (`experiment plan`
-  suggesting `EXPERIMENT_REPLICAS` from stored peaks and serial times); `oom_score_adj` so a host OOM kill hits a
+  suggesting `REPLICAS` from stored peaks and serial times); `oom_score_adj` so a host OOM kill hits a
   worker job (recorded as `oom`, redone by `--retry-failed`), never redis or the git server. The corpus sampler
   would then also stratify by number of developers (GitHub contributors) next to language, stars, last push and
-  size (size cap: `GITSERVER_MEMORY`, below).
-- **Later: replicas from the spec** (noted 2026-10-23, not built). On mutation-pilot cdxgen had done 34 of 279
-  jobs after 1:18 h (forecast 9:21 h) and CBOMkit was the other long lane, while the other 13 tools were done within
-  1:15 h and their RAM sat idle. Replicas need no worker code: every replica pops from the tool's one queue
-  `jobs:<tool>`, no worker has a writable shared volume, and each CBOMkit replica embeds its own server. The design:
-  a spec field `replicas: {cdxgen: 3}` (keys among `tools`, ints >= 1, recorded in `_experiment.yaml`) replaces the
-  env `EXPERIMENT_REPLICAS` for the budget; `make experiment` asks the runner (`experiment replicas <spec>`, one
-  stdout line) and starts them with `docker compose up -d --no-deps --no-recreate --scale worker-<tool>=N` before
-  the run, since the runner keeps no Docker access; they start with the run, not when other tools finish (limits
-  are caps, not reservations), and stay up until `make up-prod`. With it: `progress.forecast` divides a tool's
-  remaining work by its running jobs (today it assumes one, so the forecast is N times too long), per-replica
-  heartbeats `worker:<tool>:replica:<host>` next to `worker:<tool>:alive` so the board shows `busy 3/3` and the
-  summed RAM (today replicas overwrite one key), `concurrency` (the most jobs of a tool seen running at once) in
-  `_run-log.json`, and a note that run times measured with replicas include CPU contention (`runtime.csv`).
+  size (size cap, below).
 - **Corpus and fixtures** (`experiments/corpus/`, mounted read-only into the runner): `micro/<language>/` the micro projects of
   Java, Python and Go with `micro/ground_truth.yaml`, both generated from the snippet catalog (`mutation/micro.py`,
   checked in, a test keeps them equal; 14 expected calls, each in a function of its own, and 8 decoys per project (4 kinds
@@ -182,8 +177,10 @@ example, voter groups, how family and group are argued),
   covariates `crypto_apis` and `topics` recorded per repo, never selected on; the populations and crypto checks in
   `<corpus>-frame.yaml`, reused with `--frame` (no search; 2026-10-30); protocol in `experiments/README.md`
   "Corpus sampling".
-  Repos above `CORPUS_MAX_REPO_SIZE_MB` (default `GITSERVER_MEMORY`/4: the git server must serve CBOMkit's full clone
-  from a container with that limit; Makefile) are never sampled and listed as excluded with the reason.
+  Repos above `CORPUS_MAX_REPO_SIZE_MB` (default 1536, `common/corpus.py:DEFAULT_MAX_REPO_SIZE_MB`: a quarter of the
+  git server's 6 GB when the paper's corpus was built, so that CBOMkit's full clone always fit; the git server has
+  16 GB since 2026-10-30, for the concurrent clones of CBOMkit replicas, and the cap stays) are never sampled and
+  listed as excluded with the reason.
 - **Analysis** (`analysis/`, offline, reads the results volume only; `make analysis ARGS="<command> <exp>"` writes
   `<exp>/_ANALYSIS/`; `experiment export` runs `report` first):
   - **Units** (`analysis/README.md` "Units"): an *asset* is a CBOM component as the tool wrote it, a *record* one
@@ -312,7 +309,8 @@ use a CBOM reports, counted as records and items, never as assets, which depend 
   traceability), names nobody can read (`resolution`); descriptive, more is not better (`runs.csv`, `units-`,
   `coverage-`, `traceability-run<i>.csv`), and what a scan costs: per tool and language the median time over
   repositories with a bootstrap CI, p90, max, the spread across repositories and between reruns, timeouts and the
-  scaling with source files (`runtime.csv`, the summary's "Run time").
+  scaling with source files, and the peak memory per tool with the same statistics (`runtime.csv`, the summary's
+  "Run time and memory", time and memory in one table).
 - **RQ2, conformity:** which CBOM standard and version do the generators follow, and how far do their documents
   comply with it in letter and in substance? The declared `bomFormat` / `specVersion` (CryptobomForge: IBM's draft),
   whole-document validity and the error kinds, per-field spec issues, the standard's own fields filled per asset type
@@ -606,7 +604,8 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
 - **Done:** the mutation smoke (2026-10-22) and the mutation pilot (2026-10-23) ran end to end on the VM
   (`docs/findings.md` "Mutation smoke", "Export review 2026-10-24"); both are rerun with the eight decoy kinds.
 - **End to end:** bar-micro and a 5-repo corpus spec from the spec to the tables with `bf-cbom experiment reproduce`.
-- **On the VM:** replica scaling (`--scale` with `EXPERIMENT_REPLICAS`) and traceability against the mirror.
+- **On the VM:** the replica test on corpus-pilot-medium (How it works, "Memory budget") and traceability against the
+  mirror.
 
 ## Method refinements (pitch review 2026-10-15; numbers are cited from code)
 1. **Unit of analysis.** Every RQ is reported at **repo level** (the items per repo; all tools take part) and at
@@ -629,10 +628,9 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
    insertion kind is recorded as a covariate.
 7. **Removal mutants are not built** (Phase 4): the planted decoys give RQ5 its negatives; if removal is ever built,
    its candidates are easier by construction, so insertion and removal results are reported apart.
-8. **Worker replicas.** Workers are stateless BLPOP consumers. Compose's `--scale worker-<tool>=N` can start replicas
-   when invoked with the Makefile's exported image settings; there is no dedicated scaling target yet.
-   The stability run's timings decide N per tool; the memory budget counts replicas (`EXPERIMENT_REPLICAS`), which
-   does not start them.
+8. **Worker replicas.** Workers are stateless BLPOP consumers, so several containers can share a tool's queue:
+   `make up-prod REPLICAS=...` starts them and every experiment counts them from their heartbeats (How it works,
+   "Memory budget"). The long lanes decide N per tool; run times measured with replicas carry their contention.
 9. **Statistics for few tools** (RQ5's bridge). Kendall τ over a handful of ranks is coarse: add Spearman between the
    confirmation rate (RQ4) and F1 on the planted items (RQ5) over all tool × dimension × language cells, with
    bootstrap over repos; Java, Python and Go are three replications of the method.

@@ -9,9 +9,10 @@ what the running stack does, read from Redis only, so it runs in the runner like
   `exp:<name>:tools`; the slowest tool ends the batch; none for inspections). The columns keep their width while a
   run moves: it depends on the totals and the number of waves, never on the current values.
 - Workers: one row per worker service (`BOARD_SERVICES`, every container of the stack as make lists it, so a crashed
-  worker shows as down), from its heartbeat (`common/worker.py:publish_heartbeat`): busy / idle / down, the job and
-  its origin (`jobs:routing`), for how long, the container's RAM against its limit, the jobs queued and the last
-  result.
+  worker shows as down), from its heartbeats (`common/worker.py:publish_heartbeat`, one per container): busy / idle /
+  down (with replicas, `busy 2/3`: containers busy of those alive), the longest-running job and its origin
+  (`jobs:routing`), for how long, the containers' RAM against their limits (summed over replicas), the jobs queued
+  and the last result.
 
 Ctrl-C closes the board; the stack keeps running. Off a terminal, or with `--once`, it prints one snapshot.
 """
@@ -22,6 +23,7 @@ import datetime as dt
 import json
 import os
 import time
+from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -37,6 +39,7 @@ from rich.text import Text
 from common.experiment import GITSERVER_URL
 from common.jobs import EXPERIMENT_ROUTE_PREFIX, JOB_ROUTING_KEY
 from common.memory import host_memory
+from common.worker import replica_key
 from coordinator.redis_io import count_done_jobs, list_inspections
 from misc.cli.progress import clock, count, forecast, remaining
 
@@ -118,15 +121,33 @@ def snapshot(r: redis.Redis, services: list[str], *, probe=None, now: float | No
         pipe.get(f"worker:{n}:alive")
         pipe.llen(f"jobs:{n}")
     raw = pipe.execute()
-    beats = {n: _json(raw[2 * i]) for i, n in enumerate(names)}
+    shared = {n: _json(raw[2 * i]) for i, n in enumerate(names)}
     queued = {n: raw[2 * i + 1] for i, n in enumerate(names)}
-    jobs = [b["job_id"] for b in beats.values() if b and b.get("state") == "busy" and b.get("job_id")]
+    keys = sorted(r.scan_iter(match=replica_key("*", "*"), count=500))
+    per_container: dict[str, list[dict]] = defaultdict(list)
+    for key, value in zip(keys, r.mget(keys) if keys else [], strict=True):
+        if (beat := _json(value)) is not None:
+            per_container[key.split(":")[1]].append(beat)
+    # an image from before the replica keys writes the shared key only
+    beats = {n: per_container.get(n) or ([shared[n]] if shared[n] else []) for n in names}
+    jobs = [b["job_id"] for bs in beats.values() for b in bs if b.get("state") == "busy" and b.get("job_id")]
     targets = dict(zip(jobs, r.hmget(JOB_ROUTING_KEY, jobs), strict=True)) if jobs else {}
     for n in names:
-        beat = beats[n]
-        target = targets.get(beat.get("job_id")) if beat else None
+        replicas = [
+            {"beat": b, "origin": _origin(r, t) if (t := targets.get(b.get("job_id"))) else None} for b in beats[n]
+        ]
+        busy = [x for x in replicas if x["beat"].get("state") == "busy"]
+        # the row's job: the longest-running one, the one that might be stuck
+        lead = min(busy, key=lambda x: (x["beat"].get("job") or {}).get("started") or 0) if busy else None
+        lead = lead or (replicas[0] if replicas else None)
         snap.workers.append(
-            {"name": n, "beat": beat, "queued": queued[n], "origin": _origin(r, target) if target else None}
+            {
+                "name": n,
+                "beat": lead["beat"] if lead else None,
+                "origin": lead["origin"] if lead else None,
+                "queued": queued[n],
+                "replicas": replicas,
+            }
         )
 
     for key in sorted(r.scan_iter(match="exp:*", count=500)):
@@ -168,19 +189,22 @@ def snapshot(r: redis.Redis, services: list[str], *, probe=None, now: float | No
 
 def _forecast(meta: dict, tools: dict, snap: Snapshot, name: str) -> tuple:
     """The experiment's remaining time from this session's jobs per tool (`tool_jobs`), the results and seconds the
-    runner stored per tool (`<tool>:n`, `<tool>:sec`) and how long each of its tools' running job has taken (the
-    heartbeats)."""
+    runner stored per tool (`<tool>:n`, `<tool>:sec`), how long each of its tools' running jobs have taken and how
+    many containers each tool has (the heartbeats)."""
     jobs = _json(meta.get("tool_jobs")) or {}
     n = {t: _int(tools.get(f"{t}:n")) for t in jobs}
     left = {t: c - n[t] for t, c in jobs.items()}
     mean = {t: float(tools.get(f"{t}:sec") or 0) / n[t] for t in jobs if n[t]}
-    running = {}
+    running: dict[str, list[float]] = defaultdict(list)
+    slots = {}
     for w in snap.workers:
-        info = (w["beat"] or {}).get("job") or {}
-        if w["origin"] == name and info.get("started"):
-            running[w["name"]] = max(snap.now - info["started"], 0.0)
+        slots[w["name"]] = len(w["replicas"])
+        for x in w["replicas"]:
+            info = x["beat"].get("job") or {}
+            if x["origin"] == name and info.get("started"):
+                running[w["name"]].append(max(snap.now - info["started"], 0.0))
     waves = _json(meta.get("waves")) or [sorted(jobs)]
-    return forecast(left, mean, running, waves if isinstance(waves, list) else [sorted(jobs)])
+    return forecast(left, mean, running, waves if isinstance(waves, list) else [sorted(jobs)], slots=slots)
 
 
 def _origin(r: redis.Redis, target: str) -> str:
@@ -307,6 +331,10 @@ def workers_table(snap: Snapshot) -> Table:
     for w in snap.workers:
         beat = w["beat"] or {}
         order, state = _state(w["beat"])
+        beats = [x["beat"] for x in w.get("replicas") or []]
+        n_busy = sum(1 for b in beats if b.get("state") == "busy")
+        if len(beats) > 1:  # replicas: how many of the containers alive are busy
+            state.append(f" {n_busy}/{len(beats)}")
         job, since = Text(""), ""
         info = beat.get("job") if order == 0 else None
         if info:
@@ -315,17 +343,25 @@ def workers_table(snap: Snapshot) -> Table:
                 job.append(f" run{info['run']}", style="dim")
             if w["origin"]:
                 job.append(f" · {w['origin']}", style="cyan")
+            if n_busy > 1:
+                job.append(f" +{n_busy - 1} running", style="dim")
             if info.get("started"):
                 since = clock(max(snap.now - info["started"], 0))
-        mem, limit = beat.get("mem_mb"), beat.get("mem_limit_mb")
+        mems = [b["mem_mb"] for b in beats if b.get("mem_mb") is not None]
+        limits = [b["mem_limit_mb"] for b in beats if b.get("mem_limit_mb")]
+        mem, limit = (sum(mems) if mems else None), (sum(limits) if limits else None)
         ram = Text("" if mem is None else f"{_gib(mem)}/{_gib(limit)}" if limit else _gib(mem))
-        if mem is not None and limit and mem / limit >= 0.9:
+        # the colour warns of the container closest to its own limit
+        fill = max((b["mem_mb"] / b["mem_limit_mb"] for b in beats if b.get("mem_mb") and b.get("mem_limit_mb")),
+                   default=0.0)  # fmt: skip
+        if fill >= 0.9:
             ram.stylize("bold red")
-        elif mem is not None and limit and mem / limit >= 0.75:
+        elif fill >= 0.75:
             ram.stylize("yellow")
         last = Text("")
-        if beat.get("last"):
-            lr = beat["last"]
+        latest = max((b["last"] for b in beats if b.get("last")), key=lambda x: x.get("finished_at") or 0, default=None)
+        if latest:
+            lr = latest
             last.append(lr.get("status") or "?", style="green" if lr.get("status") == "ok" else "red")
             if lr.get("duration_sec") is not None:
                 last.append(f" {clock(lr['duration_sec'])}")

@@ -39,8 +39,8 @@ ASSET_COMPONENT_TYPES = ("cryptographic-asset", "crypto-asset")  # the latter: I
 RUNS_COLUMNS = [
     "repo", "snapshot", "commit", "variant", "variant_commit", "language", "expect_crypto", "repo_files",
     "repo_source_files", "repo_bytes", "repo_source_bytes", "tool", "run", "tailored",
-    "status", "duration_sec", "size_bytes", "error", "workaround", "peak_memory_mb", "memory_limit_mb", "oom_kills",
-    "enqueued_at", "started_at", "finished_at", "queue_sec", "received_at",
+    "status", "duration_sec", "size_bytes", "error", "workaround", "peak_memory_mb", "memory_limit_mb", "limit_hits",
+    "oom_kills", "enqueued_at", "started_at", "finished_at", "queue_sec", "received_at",
     "tool_version", "image_ref", "bfcbom_commit", "bom_format", "spec_version",
     "components", "crypto_assets", "algorithm_assets", "certificate_assets", "protocol_assets", "material_assets",
     "other_assets", "located_file_assets", "located_line_assets",
@@ -294,6 +294,7 @@ def run_rows(
             "workaround": workaround_line(meta.get("notes")),
             "peak_memory_mb": meta.get("peak_memory_mb"),
             "memory_limit_mb": meta.get("memory_limit_mb"),
+            "limit_hits": meta.get("limit_hits"),
             "oom_kills": meta.get("oom_kills"),
             "enqueued_at": meta.get("enqueued_at"),
             "started_at": meta.get("started_at"),
@@ -332,6 +333,8 @@ def tool_rows(tools: Iterable[str], registry: dict[str, dict] | None = None) -> 
 RUNTIME_COLUMNS = [
     "tool", "language", "repos", "runs", "timeouts", "timeout_share", "median_sec", "median_ci_low", "median_ci_high",
     "p90_sec", "max_sec", "spread_cv", "rerun_cv", "rerun_pairs", "hours", "sec_per_1k_source_files", "size_rho",
+    "peak_median_mb", "peak_ci_low", "peak_ci_high", "peak_p90_mb", "peak_max_mb", "peak_spread_cv", "limit_mb",
+    "at_limit", "oom",
 ]  # fmt: skip
 RUNTIME_MIN_REPOS = 3  # a CI and a size correlation only over at least this many repositories (score.py's MIN_REPOS)
 RUNTIME_BOOTSTRAP = 1000
@@ -362,7 +365,12 @@ def runtime_rows(runs: list[dict], *, seed: int = 20261023) -> list[dict]:
     wall time of every run that ran (ok, error, timeout, oom); `timeout_share` of those; `sec_per_1k_source_files`
     the median over repositories of time per thousand source files of the repository's language; `size_rho`
     Spearman between a repository's time and its source files; both only where `size_rho` exists (RUNTIME_MIN_REPOS
-    repositories whose sizes differ). Unsupported runs never ran and are left out."""
+    repositories whose sizes differ). Memory, over every run that ran: a repository's peak is the largest
+    `peak_memory_mb` of its runs (the container's working set, common/memory.py), `peak_median_mb` with its bootstrap
+    CI (`peak_ci_low` / `peak_ci_high`, as for time), `peak_p90_mb` and `peak_spread_cv` over the repositories,
+    `peak_max_mb` the largest of a single run; `limit_mb` the container's limit; `at_limit` the
+    runs whose usage reached the limit (`limit_hits` > 0; empty where the workers did not record it yet), `oom` the
+    runs with an OOM kill. Unsupported runs never ran and are left out."""
     from .score import spearman
 
     ran = [r for r in runs if r.get("status") not in (None, "", "unsupported")]
@@ -418,6 +426,29 @@ def runtime_rows(runs: list[dict], *, seed: int = 20261023) -> list[dict]:
             # only where sizes vary: over projects of one size (the micro projects: one file) it is start-up cost
             rates = [1000 * repo_sec[s] / n for s, n in sized.items() if n]
             row["sec_per_1k_source_files"] = round(statistics.median(rates), 1) if rates else None
+        peaks: dict[str, float] = {}
+        for r in rs:
+            if r.get("peak_memory_mb") not in (None, ""):
+                peaks[r["snapshot"]] = max(float(r["peak_memory_mb"]), peaks.get(r["snapshot"], 0.0))
+        if peaks:
+            pv = sorted(peaks.values())
+            row |= {
+                "peak_median_mb": round(statistics.median(pv), 1),
+                "peak_p90_mb": round(_quantile(pv, 0.9), 1),
+                "peak_max_mb": round(pv[-1], 1),
+            }
+            if (cv := _cv(pv)) is not None:
+                row["peak_spread_cv"] = round(cv, 2)
+            if len(pv) >= RUNTIME_MIN_REPOS:
+                rng = random.Random(seed)
+                medians = sorted(statistics.median(rng.choice(pv) for _ in pv) for _ in range(RUNTIME_BOOTSTRAP))
+                row["peak_ci_low"] = round(_quantile(medians, 0.025), 1)
+                row["peak_ci_high"] = round(_quantile(medians, 0.975), 1)
+        if limits := [float(r["memory_limit_mb"]) for r in rs if r.get("memory_limit_mb") not in (None, "")]:
+            row["limit_mb"] = round(max(limits), 1)
+        if hits := [int(float(r["limit_hits"])) for r in rs if r.get("limit_hits") not in (None, "")]:
+            row["at_limit"] = sum(h > 0 for h in hits)
+        row["oom"] = sum(int(float(r.get("oom_kills") or 0)) > 0 for r in rs)
         out.append(row)
     return out
 

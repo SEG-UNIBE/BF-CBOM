@@ -21,10 +21,9 @@ a tool was tuned on (`tailored_on` in common/tools.yaml, refinement 13). The cry
 source only (no test, vendor, example or documentation paths). Every exclusion is recorded with its reason.
 `prune_corpus` drops repos where a tool timed out in an earlier experiment (the stability run), with the reason.
 
-Repo size cap: the git server serves full clones from a container limited to GITSERVER_MEMORY (Makefile), so the
-corpus never samples repos above CORPUS_MAX_REPO_SIZE_MB (default GITSERVER_MEMORY / SIZE_CAP_RATIO; GitHub's `size`
-is the packed repository size in KB). The cap is recorded in the corpus `params` and the search cells are clamped to
-it; a candidate above it is listed as excluded with the reason.
+Repo size cap: the corpus never samples repos above CORPUS_MAX_REPO_SIZE_MB (default DEFAULT_MAX_REPO_SIZE_MB, below;
+GitHub's `size` is the packed repository size in KB). The cap is recorded in the corpus `params` and the search cells
+are clamped to it; a candidate above it is listed as excluded with the reason.
 """
 
 from __future__ import annotations
@@ -105,28 +104,18 @@ SOURCE_EXTENSIONS = {"java": "java", "python": "py", "go": "go"}
 EXTRA_EXCLUDES = {"go": ["**/*_test.go", "**/testdata/**"]}
 # Repos that are themselves CBOM tooling or benchmarks would bias the comparison.
 DEFAULT_EXCLUDE_PATTERNS = [r"cbom", r"benchmark", r"sonar-cryptography", r"cryptobom", r"crypto-finder", r"cryptoscan"]
-# Rule of thumb: a repo whose packed size is below GITSERVER_MEMORY / SIZE_CAP_RATIO clones through the git server
-# (pack-objects holds the object list plus bounded delta windows, Dockerfile.gitserver).
-SIZE_CAP_RATIO = 4
-_SIZE_UNITS = {"": 1, "b": 1, "k": 1024, "m": 1024**2, "g": 1024**3}
-
-
-def parse_size_mb(text: str | None) -> int | None:
-    """A Docker memory string (`4g`, `512m`, `1024k`, bytes without a suffix) in MB; None when empty or malformed."""
-    m = re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*([kmgb]?)i?b?\s*", (text or "").lower())
-    if not m:
-        return None
-    return int(float(m.group(1)) * _SIZE_UNITS[m.group(2)] / 1024**2)
+# The largest packed repo size the corpus samples: a quarter of the git server's memory (6 GB) when the paper's corpus
+# was built on 2026-10-30, so that a full clone through it always fit (CBOMkit's JGit clone; pack-objects holds the
+# object list plus bounded delta windows, Dockerfile.gitserver). The git server has 16 GB since, for the concurrent
+# clones of CBOMkit replicas; the cap stays, so every corpus has the same definition.
+DEFAULT_MAX_REPO_SIZE_MB = 1536
 
 
 def repo_size_cap_mb(env: dict | None = None) -> int | None:
-    """The corpus size cap in MB: CORPUS_MAX_REPO_SIZE_MB when set, else GITSERVER_MEMORY / SIZE_CAP_RATIO."""
+    """The corpus size cap in MB: CORPUS_MAX_REPO_SIZE_MB when set (0: none), else DEFAULT_MAX_REPO_SIZE_MB."""
     env = os.environ if env is None else env
     explicit = (env.get("CORPUS_MAX_REPO_SIZE_MB") or "").strip()
-    if explicit:
-        return int(float(explicit))
-    gitserver = parse_size_mb(env.get("GITSERVER_MEMORY"))
-    return gitserver // SIZE_CAP_RATIO if gitserver else None
+    return (int(float(explicit)) or None) if explicit else DEFAULT_MAX_REPO_SIZE_MB
 
 
 Bin = tuple[int, int | None]  # [lo, hi): hi None = open (up to the size cap for sizes)
@@ -439,7 +428,7 @@ def build_corpus(
     cap_mb = params.max_repo_size_mb
     size_bins = clamp_size_bins(params.size_bins_kb, cap_mb)
     if cap_mb:
-        log(f"repo size cap {cap_mb} MB (git server memory / {SIZE_CAP_RATIO}); size cells (KB): {size_bins}")
+        log(f"repo size cap {cap_mb} MB; size cells (KB): {size_bins}")
     cells = [(s, z) for s in params.star_bins for z in size_bins]
     quota = params.per_cell
     if reuse:
@@ -494,7 +483,7 @@ def build_corpus(
                     excluded.append(
                         {
                             "full_name": cand["full_name"],
-                            "reason": f"repo size {cand['size_kb'] // 1024} MB > cap {cap_mb} MB (GITSERVER_MEMORY)",
+                            "reason": f"repo size {cand['size_kb'] // 1024} MB > cap {cap_mb} MB",
                         }
                     )
                     continue

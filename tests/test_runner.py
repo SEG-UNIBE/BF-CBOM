@@ -15,7 +15,7 @@ from typer.testing import CliRunner
 
 from common import experiment as ex
 from common.models import JobInstruction, JobResult
-from common.worker import publish_heartbeat
+from common.worker import heartbeat_key, live_replicas, publish_heartbeat, replica_key
 from misc.cli import experiment_cmd
 
 TOOLS = ["t1", "t2"]
@@ -250,9 +250,13 @@ def test_mutation_block_runs_originals_and_mutants_and_regenerates_them_identica
     assert len(world["workers"].seen) == 20
 
 
-def test_parse_replicas():
-    assert experiment_cmd.parse_replicas("cryptoscan=3, xgrep=2,bad,one=1") == {"cryptoscan": 3, "xgrep": 2}
-    assert experiment_cmd.parse_replicas(None) == {} and experiment_cmd.parse_replicas("") == {}
+def test_live_replicas_count_each_workers_containers_from_their_heartbeats():
+    r = fakeredis.FakeRedis(decode_responses=True)
+    for host in ("a1", "b2", "c3"):
+        r.set(replica_key("cbomkit", host), "{}")
+    r.set(heartbeat_key("cbomkit"), "{}")
+    r.set(heartbeat_key("xgrep"), "{}")  # an image from before the replica keys: one container
+    assert live_replicas(r, ["cbomkit", "xgrep", "qdarpan"]) == {"cbomkit": 3, "xgrep": 1, "qdarpan": 0}
 
 
 def test_list_shows_experiments_and_folders_in_an_older_layout(tmp_path, monkeypatch):

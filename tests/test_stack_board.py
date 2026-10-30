@@ -9,7 +9,7 @@ from rich.console import Console
 from typer.testing import CliRunner
 
 from common.jobs import JOB_ROUTING_KEY
-from common.worker import publish_heartbeat
+from common.worker import publish_heartbeat, replica_key
 from misc.cli import progress, stack_cmd
 from misc.cli.cli import app
 
@@ -78,13 +78,24 @@ def test_board_shows_workers_queues_and_experiments_with_their_remaining_time():
 
 def test_forecast_takes_the_slowest_tool_per_wave_and_adds_the_waves():
     mean = {"cbomkit": 600.0, "xgrep": 10.0}
-    assert progress.forecast({"cbomkit": 3, "xgrep": 50}, mean, {"cbomkit": 100.0}, [["cbomkit", "xgrep"]]) == (
+    assert progress.forecast({"cbomkit": 3, "xgrep": 50}, mean, {"cbomkit": [100.0]}, [["cbomkit", "xgrep"]]) == (
         1700.0, False)  # fmt: skip
     # a later wave starts when the first is done; its tool without a result yet makes the time a lower bound
     fc = progress.forecast({"cbomkit": 3, "xgrep": 50, "cdxgen": 4}, mean, {}, [["cbomkit", "xgrep"], ["cdxgen"]])
     assert fc == (1800.0, True) and progress.remaining(fc) == "≥ 0:30:00"
-    assert progress.forecast({"cbomkit": 1}, mean, {"cbomkit": 900.0}, [["cbomkit"]])[0] == 0.0  # overdue: now
+    assert progress.forecast({"cbomkit": 1}, mean, {"cbomkit": [900.0]}, [["cbomkit"]])[0] == 0.0  # overdue: now
     assert progress.remaining(progress.forecast({"cdxgen": 4}, mean, {}, [["cdxgen"]])) == "–"  # nothing known
+
+
+def test_forecast_shares_a_tools_work_among_its_replicas():
+    mean = {"cbomkit": 600.0}
+    # 7 jobs left, 3 of them running for 100, 200 and 900 s (the last counts one mean): (4200 - 900) / 3 containers
+    running = {"cbomkit": [100.0, 200.0, 900.0]}
+    fc = progress.forecast({"cbomkit": 7}, mean, running, [["cbomkit"]], slots={"cbomkit": 3})
+    assert fc == (1100.0, False)
+    # 2 jobs left on 3 containers: only 2 of them still work
+    assert progress.forecast({"cbomkit": 2}, mean, {}, [["cbomkit"]], slots={"cbomkit": 3})[0] == 600.0
+    assert progress.forecast({"cbomkit": 2}, mean, {}, [["cbomkit"]], slots={"cbomkit": 0})[0] == 1200.0  # down: as 1
 
 
 def test_experiment_columns_keep_their_width_while_a_run_moves():
@@ -139,3 +150,24 @@ def test_heartbeat_carries_job_memory_and_last_result():
     assert {"mem_mb", "mem_limit_mb", "ts"} <= set(beat)  # None off cgroup v2 (a laptop), numbers in a container
     publish_heartbeat(r, "t", "idle")  # the UI's workers and misc/pyqun call it like this
     assert json.loads(r.get("worker:t:alive"))["job"] is None
+    assert json.loads(r.get(replica_key("t")))["state"] == "idle"  # and this container's own key
+
+
+def test_board_shows_a_tools_replicas_in_one_row():
+    r = _world()
+    for host, state, mem, started in (("a1", "busy", 9000.0, NOW - 300), ("b2", "busy", 7000.0, NOW - 60),
+                                      ("c3", "idle", 1000.0, None)):  # fmt: skip
+        job = {"repo": f"o/{host}@abcdef0", "run": 1, "started": started} if started else None
+        r.set(replica_key("cbomkit", host), json.dumps({"state": state, "job_id": f"j-{host}" if job else None,
+              "job": job, "mem_mb": mem, "mem_limit_mb": 16384.0, "ts": NOW}))  # fmt: skip
+        if job:
+            r.hset(JOB_ROUTING_KEY, f"j-{host}", "exp:corpus-pilot-small")
+    snap = stack_cmd.snapshot(r, SERVICES, probe=lambda url: True, now=NOW)
+    (w,) = [w for w in snap.workers if w["name"] == "cbomkit"]
+    assert len(w["replicas"]) == 3 and w["beat"]["job"]["repo"] == "o/a1@abcdef0"  # the longest-running job
+    text = _text(snap)
+    (row,) = [line for line in text.splitlines() if line.startswith("cbomkit")]
+    assert "busy 2/3" in row and "+1 running" in row and "0:05:00" in row and "16.6/48.0" in row
+    # the experiment's forecast: cbomkit's 6 jobs left, less what its 2 running jobs did, on 3 containers
+    (exp,) = snap.experiments
+    assert exp["forecast"] == ((6 * 600 - 300 - 60) / 3, False)

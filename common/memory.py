@@ -2,9 +2,11 @@
 
 - A worker's container is its own cgroup, so `/sys/fs/cgroup` inside it describes that container: the working set
   (`memory.current` minus `inactive_file`, what `docker stats` shows), the limit (`memory.max`, the compose
-  `deploy.resources.limits.memory`) and the OOM kill counter (`memory.events`). `JobSampler` samples them while a job
-  runs, so every JobResult carries the peak of the whole container (the tool, its servers such as CBOMkit's Postgres,
-  and our worker), sampled once per second: spikes shorter than that can be missed.
+  `deploy.resources.limits.memory`), how often usage reached the limit and the OOM kills (both `memory.events`).
+  `JobSampler` samples them while a job runs, so every JobResult carries the peak of the whole container (the tool, its
+  servers such as CBOMkit's Postgres, and our worker), sampled once per second: spikes shorter than that can be
+  missed. A job with no limit hits ran without the limit ever constraining it; at the limit the kernel reclaims (file
+  cache first), and on a host without swap memory it cannot reclaim ends in an OOM kill.
 - `/proc/meminfo` is not namespaced, so inside any container it describes the Docker VM (or Linux host): total RAM
   and what is in use. The runner samples it for the peak of the whole experiment.
 """
@@ -53,17 +55,23 @@ def oom_kills(cgroup: Path = CGROUP_DIR) -> int | None:
     return events.get("oom_kill")
 
 
+def limit_hits(cgroup: Path = CGROUP_DIR) -> int | None:
+    """How often the container's usage reached its limit (`memory.events` `max`)."""
+    return _keyed(_read(cgroup / "memory.events")).get("max")
+
+
 def mib(n: int | None) -> float | None:
     return None if n is None else round(n / _MIB, 1)
 
 
 class JobSampler:
-    """Peak working set and OOM kills of this container between `__init__` and `result()`."""
+    """Peak working set, limit hits and OOM kills of this container between `__init__` and `result()`."""
 
     def __init__(self, cgroup: Path | None = None):
         self.cgroup = cgroup = cgroup or CGROUP_DIR
         self.peak: int | None = None
         self.oom_start = oom_kills(cgroup)
+        self.hits_start = limit_hits(cgroup)
         self.sample()
 
     def sample(self) -> None:
@@ -73,9 +81,15 @@ class JobSampler:
 
     def result(self) -> dict:
         self.sample()
-        oom_end = oom_kills(self.cgroup)
+        oom_end, hits_end = oom_kills(self.cgroup), limit_hits(self.cgroup)
         oom = None if self.oom_start is None or oom_end is None else oom_end - self.oom_start
-        return {"peak_memory_mb": mib(self.peak), "memory_limit_mb": mib(limit_bytes(self.cgroup)), "oom_kills": oom}
+        hits = None if self.hits_start is None or hits_end is None else hits_end - self.hits_start
+        return {
+            "peak_memory_mb": mib(self.peak),
+            "memory_limit_mb": mib(limit_bytes(self.cgroup)),
+            "limit_hits": hits,
+            "oom_kills": oom,
+        }
 
 
 def host_memory(meminfo: Path = MEMINFO) -> dict:

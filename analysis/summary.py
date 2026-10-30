@@ -332,6 +332,15 @@ def _experiment(
             table.append(["memory budget", f"{budget:g} GiB -> {len(waves)} wave(s) (last session)"])
         else:
             table.append(["memory budget", "none (all tools at once)"])
+    settings = [e.get("replicas") or {} for e in sessions]  # `make up-prod REPLICAS=...`, counted per session
+    if any(settings):
+
+        def shown(s: dict) -> str:
+            return ", ".join(f"{t} x{n}" for t, n in sorted(s.items())) or "none"
+
+        text = (shown(settings[-1]) if all(s == settings[-1] for s in settings)
+                else "; ".join(f"session {i}: {shown(s)}" for i, s in enumerate(settings, 1)))  # fmt: skip
+        table.append(["replicas", f"{text} (containers of one tool sharing its queue; run times include contention)"])
     peaks = [p for e in sessions if (p := _float(e.get("ram_peak_used_mb"))) is not None]
     if peaks:
         total = _float(host.get("ram_total_mb"))
@@ -1385,58 +1394,85 @@ def _rq1(
 
 
 def _runtime(rows: list[dict]) -> list[str]:
-    """How long each tool's scans take (runtime.csv): over all languages with its spread, then the median per
-    language. Slowest first: the order is the finding."""
+    """What a scan costs (runtime.csv): time and memory per tool in one table, slowest first (the order is the
+    finding), then the remaining time columns and the median per language."""
     every = sorted((r for r in rows if r["language"] == "all" and r.get("median_sec")),
                    key=lambda r: (-(_float(r["median_sec"]) or 0), r["tool"]))  # fmt: skip
     if not every:
         return []
 
-    def ci(r: dict) -> str:
-        lo, hi = _float(r.get("median_ci_low")), _float(r.get("median_ci_high"))
-        return "" if lo is None or hi is None else f"{_num(lo)} - {_num(hi)}"
+    def ci(r: dict, low: str, high: str, fmt) -> str:
+        lo, hi = _float(r.get(low)), _float(r.get(high))
+        return "" if lo is None or hi is None else f"{fmt(lo)} - {fmt(hi)}"
 
-    table = [
-        [r["tool"], r["repos"], _num(r["median_sec"]), ci(r), _num(r.get("p90_sec")), _num(r.get("max_sec")),
-         _pct(r.get("spread_cv")), _pct(r.get("rerun_cv")), _pct(r.get("timeout_share")), _num(r.get("hours")),
+    memory = any(r.get("peak_max_mb") not in (None, "") for r in every)
+    recorded = any(r.get("at_limit") not in (None, "") for r in every)
+    header = ["tool", "repos", "median s", "95 % CI s", "p90 s", "spread s", "timeouts"]
+    if memory:
+        header += ["median GiB", "95 % CI GiB", "p90 GiB", "max GiB", "spread GiB", "limit GiB", "at limit", "OOM"]
+    table = []
+    for r in every:
+        row = [r["tool"], r["repos"], _num(r["median_sec"]), ci(r, "median_ci_low", "median_ci_high", _num),
+               _num(r.get("p90_sec")), _pct(r.get("spread_cv")), _pct(r.get("timeout_share"))]  # fmt: skip
+        if memory:
+            row += [_gib(r.get("peak_median_mb")), ci(r, "peak_ci_low", "peak_ci_high", _gib),
+                    _gib(r.get("peak_p90_mb")), _gib(r.get("peak_max_mb")), _pct(r.get("peak_spread_cv")),
+                    _gib(r.get("limit_mb")), _n(r["at_limit"]) if r.get("at_limit") not in (None, "") else "",
+                    _n(r.get("oom")) if _float(r.get("oom")) else ""]  # fmt: skip
+        table.append(row)
+    lines = [
+        "### Run time and memory",
+        "",
+        "What a scan costs: one row per tool over every run it made, all variants and repetitions, slowest first "
+        "(`runtime.csv`). The unit is the repository, so a mutated or repeated repository counts once: its time is "
+        "the median of its ok runs (the worker's wall time for the job, the clone from the local git server "
+        "included), its peak memory the largest of its runs.",
+        "",
+        "- `repos`: repositories with an ok run; `median s` and `median GiB`: the median over them, each with a "
+        f"`95 % CI`, a bootstrap interval of that median over the repositories (resampled {RUNTIME_BOOTSTRAP} times; "
+        f"only with {RUNTIME_MIN_REPOS} or more); `p90`: the value 90 % of the repositories stay under.",
+        "- `spread`: the coefficient of variation of the repositories' values (sd / mean): around 0 the tool needs "
+        "about as much everywhere, above 1 the repository decides.",
+        "- `timeouts`: the share of its runs that hit the time limit (their time is the limit, so a high share makes "
+        "the median an underestimate).",
+    ]
+    if memory:
+        lines += [
+            "- Memory is the container's working set (memory in use less inactive file cache, as `docker stats` shows "
+            "it), sampled every second: the tool, any server it starts and the worker process; `max GiB`: a single "
+            "run. A tool on the Java VM grows its heap towards the ceiling it is given before it collects, so its "
+            "peak also reflects the heap configured for it.",
+            "- `limit GiB`: the container's memory limit; `at limit`: runs whose usage reached it (the kernel then "
+            "reclaims, file cache first); 0 means no run was constrained by its limit, so the peaks are the tools' "
+            "own"
+            + ("" if recorded else " (empty: the workers of this experiment did not record it yet)")
+            + "; `OOM`: runs killed for memory.",
+        ]
+    lines += [""] + md_table(header, table) + [""]
+
+    more = [
+        [r["tool"], _num(r.get("max_sec")), _pct(r.get("rerun_cv")), _num(r.get("hours")),
          _num(r.get("sec_per_1k_source_files")), _pct(r.get("size_rho"))]
         for r in every
     ]  # fmt: skip
     sized = any(r.get("size_rho") or r.get("sec_per_1k_source_files") for r in every)
-    lines = [
-        "### Run time",
-        "",
-        "What a scan costs: one row per tool over every run it made, all variants and repetitions, slowest first "
-        "(`runtime.csv`). The unit is the repository: its time is the median of its ok runs, so a mutated or "
-        "repeated repository counts once. Times are the worker's wall time for the job, the clone from the local "
-        "git server included.",
-        "",
-        "- `repos`: repositories with an ok run; `median s`: the median of their times; `95 % CI`: a bootstrap "
-        f"interval of that median over the repositories (resampled {RUNTIME_BOOTSTRAP} times; only with "
-        f"{RUNTIME_MIN_REPOS} or more).",
-        "- `p90 s`: the time 90 % of the repositories stay under; `max s`: the slowest single ok run.",
-        "- `spread`: the coefficient of variation of the repositories' times (sd / mean): around 0 the tool takes "
-        "about as long everywhere, above 1 the repository decides.",
-        "- `rerun`: the median coefficient of variation between repeated runs of one snapshot (run-to-run noise; "
-        "empty without repetitions).",
-        "- `timeouts`: the share of its runs that hit the time limit (their time is the limit, so a high share makes "
-        "the median an underestimate); `hours`: the summed wall time of every run, failed ones included.",
-    ]
-    if sized:
-        lines += [
-            "- `s / 1k files`: the median over repositories of seconds per thousand source files of the repository's "
+    lines += [
+        "More on time: `max s`, the slowest single ok run; `rerun`, the median coefficient of variation between "
+        "repeated runs of one snapshot (run-to-run noise; empty without repetitions); `hours`, the summed wall time "
+        "of every run, failed ones included."
+        + (
+            " `s / 1k files`: the median over repositories of seconds per thousand source files of the repository's "
             "language; `ρ size`: Spearman between a repository's time and its source files (near 1: the time grows "
             "with the code; near 0: something else, such as start-up or dependency resolution, dominates); both only "
-            f"with {RUNTIME_MIN_REPOS} or more repositories whose sizes differ.",
-        ]
-    else:
-        lines += [
-            f"- The size columns are empty: they need {RUNTIME_MIN_REPOS} or more repositories whose sizes are "
+            f"with {RUNTIME_MIN_REPOS} or more repositories whose sizes differ."
+            if sized
+            else f" The size columns are empty: they need {RUNTIME_MIN_REPOS} or more repositories whose sizes are "
             "known and differ (sizes come from the record, else from the snapshot files: `--fetch`)."
-        ]
-    header = ["tool", "repos", "median s", "95 % CI", "p90 s", "max s", "spread", "rerun", "timeouts", "hours",
-              "s / 1k files", "ρ size"]  # fmt: skip
-    lines += [""] + md_table(header, table) + [""]
+        ),
+        "",
+        *md_table(["tool", "max s", "rerun", "hours", "s / 1k files", "ρ size"], more),
+        "",
+    ]
     languages = sorted({r["language"] for r in rows if r["language"] != "all"})
     if len(languages) > 1:
         by = {(r["tool"], r["language"]): r for r in rows}

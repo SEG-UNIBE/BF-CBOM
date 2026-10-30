@@ -46,6 +46,7 @@ from common.experiment import (
 from common.memory import HostSampler
 from common.models import JobResult
 from common.tools_registry import load_tools, tool_memory_gb
+from common.worker import live_replicas
 from coordinator.redis_io import (
     EXPERIMENT_ROUTE_PREFIX,
     JOB_ROUTING_KEY,
@@ -125,17 +126,6 @@ def _descriptor(job: PlannedJob) -> str:
             "snapshot": job.snapshot.__dict__,
         }
     )
-
-
-def parse_replicas(raw: str | None) -> dict[str, int]:
-    """`"cryptoscan=3,xgrep=2"` -> {"cryptoscan": 3, "xgrep": 2}: how many containers of a worker run (started with
-    `docker compose up -d --scale worker-<tool>=N`); the memory budget counts every replica."""
-    out = {}
-    for item in (raw or "").split(","):
-        tool, _, n = item.strip().partition("=")
-        if tool and n.strip().isdigit() and int(n) > 1:
-            out[tool] = int(n)
-    return out
 
 
 def worker_image_ids(tools: list[str], env: str | None = None) -> dict[str, str]:
@@ -262,6 +252,7 @@ class _Board:
             return
         try:
             running = r.hgetall(_running_key(name))
+            slots = live_replicas(r, list(self.lines))  # the containers alive now share a tool's queue
         except redis.exceptions.RedisError:
             return
         busy: dict[str, list[tuple[float, PlannedJob]]] = defaultdict(list)
@@ -290,10 +281,12 @@ class _Board:
                 progress.update(self.lines[t], item=" · ".join(parts))
         left = {t: n - self.done[t] for t, n in self.per_tool.items()}
         mean = {t: self.seconds[t] / n for t, n in self.done.items() if n}
-        longest = {t: max(secs for secs, _ in jobs) for t, jobs in busy.items() if jobs}
+        elapsed = {t: [secs for secs, _ in jobs] for t, jobs in busy.items()}
         for t, task in self.lines.items():
-            progress.update(task, eta=progress.remaining(progress.forecast(left, mean, longest, [[t]])))
-        progress.update(self.all, eta=progress.remaining(progress.forecast(left, mean, longest, self.waves)))
+            fc = progress.forecast(left, mean, elapsed, [[t]], slots=slots)
+            progress.update(task, eta=progress.remaining(fc))
+        fc = progress.forecast(left, mean, elapsed, self.waves, slots=slots)
+        progress.update(self.all, eta=progress.remaining(fc))
 
     def _summary(self) -> None:
         statuses = sorted(self.statuses, key=lambda s: (s != "ok", s))
@@ -419,13 +412,12 @@ def run(
         err=True,
     )
     registry = load_tools()
-    replicas = parse_replicas(os.getenv("EXPERIMENT_REPLICAS"))
+    # replicas are chosen at `make up-prod REPLICAS=...`; their heartbeats say how many containers each tool has
+    replicas = {t: n for t, n in live_replicas(r, spec.tools).items() if n > 1}
     memory = {t: tool_memory_gb(t, registry) * replicas.get(t, 1) for t in spec.tools}
     if replicas:
         typer.secho(
-            "replicas (EXPERIMENT_REPLICAS): " + ", ".join(f"{t} x{n}" for t, n in sorted(replicas.items())),
-            fg=typer.colors.BLUE,
-            err=True,
+            "replicas: " + ", ".join(f"{t} x{n}" for t, n in sorted(replicas.items())), fg=typer.colors.BLUE, err=True
         )
     pending_tools = {j.tool for j in pending.values()}
     active_tools = [t for t in spec.tools if t in pending_tools or any(j.tool == t for j in jobs)]
@@ -901,7 +893,7 @@ def corpus_build(
         None,
         "--max-repo-size-mb",
         help="Largest packed repo size (GitHub `size`) sampled; default CORPUS_MAX_REPO_SIZE_MB, else "
-        f"GITSERVER_MEMORY / {corpus_mod.SIZE_CAP_RATIO} (the git server must serve a full clone); 0 = no cap",
+        f"{corpus_mod.DEFAULT_MAX_REPO_SIZE_MB} (common/corpus.py); 0 = no cap",
     ),
     frame_in: Path | None = FRAME_OPT,
 ):

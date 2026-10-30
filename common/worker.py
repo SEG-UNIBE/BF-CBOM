@@ -4,6 +4,7 @@ import logging
 import multiprocessing
 import os
 import signal
+import socket
 import time
 import traceback
 from collections.abc import Callable
@@ -39,6 +40,22 @@ def heartbeat_key(worker_name: str) -> str:
     return f"worker:{worker_name}:alive"
 
 
+def replica_key(worker_name: str, host: str | None = None) -> str:
+    """One container's own heartbeat: replicas of a worker (`make up-prod REPLICAS=...`) share `heartbeat_key`, which
+    the last writer wins, so each also writes this key under its hostname (unique per container)."""
+    return f"worker:{worker_name}:replica:{host or socket.gethostname()}"
+
+
+def live_replicas(r: redis.Redis, workers: list[str]) -> dict[str, int]:
+    """How many containers of each worker are alive: its replica heartbeats; 1 for a worker that only writes the shared
+    key (an image from before the replica keys); 0 for one that is down."""
+    out = {}
+    for w in workers:
+        n = sum(1 for _ in r.scan_iter(match=replica_key(w, "*"), count=500))
+        out[w] = n or int(bool(r.exists(heartbeat_key(w))))
+    return out
+
+
 def publish_heartbeat(
     r: redis.Redis,
     worker_name: str,
@@ -49,7 +66,8 @@ def publish_heartbeat(
     last: dict | None = None,
 ) -> None:
     """Best-effort liveness marker read by the coordinator and the stack board (missing key == worker down): the
-    state, the job it runs (`job`: repo, run, started), the container's memory and the previous job's result."""
+    state, the job it runs (`job`: repo, run, started), the container's memory and the previous job's result; once
+    under the worker's shared key and once under this container's replica key."""
     payload = json.dumps(
         {
             "state": state,
@@ -62,7 +80,10 @@ def publish_heartbeat(
         }
     )
     try:
-        r.set(heartbeat_key(worker_name), payload, ex=HEARTBEAT_TTL_SEC)
+        pipe = r.pipeline()
+        pipe.set(heartbeat_key(worker_name), payload, ex=HEARTBEAT_TTL_SEC)
+        pipe.set(replica_key(worker_name), payload, ex=HEARTBEAT_TTL_SEC)
+        pipe.execute()
     except redis.exceptions.RedisError:
         pass
 

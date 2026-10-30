@@ -115,8 +115,7 @@ cowrie, gopass) were not preflighted; a repository with too few hosts gets fewer
 Budget: 9 x 31 variants x 15 tools = 4185 planned results; current language support means 3348 actual scans and
 837 unsupported results. Multiplying the pilot-medium durations (1'602 s summed over the nine originals) by 31 gives
 about 14 summed tool-hours. The slowest worker lane (cdxgen, 519 s summed) extrapolates to about 4.5 hours with one
-replica, 2.2 with two (`EXPERIMENT_REPLICAS="cdxgen=2"` after `--scale worker-cdxgen=2`, the replica test the VM
-list still holds), before mutation preparation and resource contention; these are planning estimates, not measured
+replica, 2.2 with two (`make up-prod REPLICAS="cdxgen=2"`), before mutation preparation and resource contention; these are planning estimates, not measured
 mutant runtimes. Repetitions are 1, keeping the existing stability experiment responsible for repeatability checks.
 `mutation-smoke` runs first.
 
@@ -192,7 +191,7 @@ none, with a note.
 **Corpus sampling (`make corpus`, `common/corpus.py`; design of 2026-10-29).** The main corpus is a stratified sample
 of GitHub: for each paper language the cells are star bin x size bin (defaults `--star-bins 50-300,300-2000,2000-`
 and `--size-bins 300-3000,3000-30000,30000-` in KB of GitHub's packed `size`, bins `[lo, hi)`, the open last size bin
-ends at the repo size cap), and every cell gets the same quota, `--per-cell` (default 2, so 3 x 3 cells x 2 = 18
+ends at the repo size cap: 1536 MB, `CORPUS_MAX_REPO_SIZE_MB`, a quarter of the git server's 6 GB when the paper's corpus was built, so that a full clone through it always fit), and every cell gets the same quota, `--per-cell` (default 2, so 3 x 3 cells x 2 = 18
 repos per language, 54 in all; `--per-cell 3` gives 27 and 81). Equal allocation per cell is deliberate: the sample
 covers the design space evenly for a comparison of tools across strata, it is no estimate of the GitHub population.
 The builder first enumerates each cell's whole population (`pushed:` within 365 days, `archived:false fork:false`,
@@ -234,8 +233,9 @@ peak RAM in use on the VM, sampled every 2 s), `_ANALYSIS/` (the derived tables 
 `analysis report`), `mutants.json` (with a `mutation:` block) and one folder per snapshot, with one
 subfolder per variant (`original` and the mutants). The leading underscores keep the first three on top of a
 file listing. Every `run<i>.meta.json` also records the worker container's peak working set during the job (sampled
-every second, the figure `docker stats` shows), its memory limit and the OOM kills during the job (`peak_memory_mb`,
-`memory_limit_mb`, `oom_kills`), when the job was enqueued, started and finished (`enqueued_at`, `started_at`,
+every second, the figure `docker stats` shows), its memory limit, how often its usage reached that limit and the OOM
+kills during the job (`peak_memory_mb`, `memory_limit_mb`, `limit_hits`, `oom_kills`; 0 limit hits: the limit never
+constrained the job, and on a host without swap memory the kernel cannot reclaim ends in an OOM kill), when the job was enqueued, started and finished (`enqueued_at`, `started_at`,
 `finished_at`), the BF-CBOM commit the worker image was built from (`bfcbom_commit`, `-dirty` = uncommitted changes)
 and, for LLM workers, the structured `usage` (requests, input / cached / cache-write / output / reasoning tokens, the
 model ids the provider answered with; kept on failed runs). `_run-log.json` also records the runner's commit and the
@@ -284,7 +284,8 @@ experiment.
   (with `make up-prod` one per generator, each on a different repository); queued jobs cost only a Redis entry.
 - *Memory limits are caps, not reservations.* Every worker has a memory limit in `docker-compose.yml`, mirrored by
   `memory_gb` in `common/tools.yaml` (a test keeps them equal; adjust both). Idle workers use little, large jobs can
-  reach their caps, and the VM also needs memory for the coordinator, Redis and the git server.
+  reach their caps, and the VM also needs memory for the coordinator, Redis and the git server (`GITSERVER_MEMORY`,
+  16g, which leaves room for the concurrent full clones of CBOMkit replicas).
 - *Memory budget (waves).* `EXPERIMENT_MEMORY_BUDGET_GB` (Makefile, default 14 for a laptop whose Docker Desktop VM
   has ~20 GiB) caps the summed limits of the tools fed at once: the runner packs the tools into waves (largest
   first), feeds one wave, collects it, then feeds the next; workers of later waves sit idle meanwhile. A tool above
@@ -292,10 +293,14 @@ experiment.
   enqueued and stored in the experiment's Redis status (`waves`, `wave`). On the VM use 0 (one wave, everything in
   parallel), per call (`make experiment EXP=... EXPERIMENT_MEMORY_BUDGET_GB=0`) or once in the Makefile. The UI
   applies the same budget: jobs of later waves are created *held* (⏸️) and queued once the current wave is done.
-- *Replicas.* Workers are stateless, so several containers can share a tool's queue (`docker compose up -d --scale
-  worker-<tool>=N` with the Makefile's exported image settings; no make target yet). `EXPERIMENT_REPLICAS="<tool>=3"`
-  counts a tool three times in the budget and records the replicas in `_run-log.json`; it does not start them.
-  Untested beyond one replica per tool.
+- *Replicas.* Workers are stateless, so several containers can share a tool's queue: `make up-prod
+  REPLICAS="cbomkit=3,cipherradar=3,scanoss=2"` starts that many (`--scale worker-<tool>=N`). Every container writes
+  a heartbeat of its own (`worker:<tool>:replica:<host>`), and an experiment counts them when it starts and on every
+  refresh, so `make experiment` needs nothing more: the budget counts each replica, the forecast shares a tool's
+  remaining jobs among its containers, `_run-log.json` and the summary record the replicas, and the board shows a
+  tool's containers in one row (`busy 2/3`, their summed RAM). A later `make up-prod` without `REPLICAS` scales
+  back to one container each; on the VM, `export REPLICAS=...` in the shell profile keeps the choice. Run times
+  measured with replicas include their contention for the CPUs.
 - *The analysis report in parallel:* `--jobs` and `RUNNER_MEMORY`, see [Analysis](#analysis).
 
 ## Analysis
@@ -534,8 +539,8 @@ files and never change these:
 
 | File | Layer | One row per | Main columns |
 |---|---|---|---|
-| `runs.csv` | runs | stored run, every repetition, incl. failed, timed-out and `unsupported` | repo, snapshot, commit, variant, variant_commit, language, repo_files, repo_source_files, repo_bytes and repo_source_bytes (the snapshot's files and bytes, all and those of its language, at the pinned commit: from the record, else the two counts from the snapshot files; empty only for an older record on a copied export without `--fetch`), tool, run, tailored (the tool was tuned on this repo), status (`ok`, `error`, `timeout`, `unsupported`, `oom`: stored ok but the container was OOM-killed meanwhile, so the analysis reads no CBOM from it), duration_sec, size_bytes, error (the most telling line), peak_memory_mb, memory_limit_mb, oom_kills, enqueued_at, started_at, finished_at, queue_sec, received_at, tool_version, image_ref, bfcbom_commit, bom_format, spec_version (as the CBOM declares), components, crypto_assets and, by the declared `assetType`, algorithm_assets, certificate_assets, protocol_assets, material_assets, other_assets, plus located_file_assets and located_line_assets (crypto assets with a file, and with a file and a line, in the CBOM), expect_crypto (from the spec), workaround (recorded setup workarounds, such as CipherRadar `.cradarignore`); for LLM workers requests, requests_failed, chunks_total, chunks_sent, chunks_skipped (over `LLM_MAX_CHUNKS`, never sent), input_tokens, cached_input_tokens, cache_write_tokens, output_tokens, reasoning_tokens, models_answered, cost_usd, priced_model, price_period, price_table_version |
-| `runtime.csv` | runs | tool and language, plus `all` | repos, runs, timeouts, timeout_share, median_sec with median_ci_low / median_ci_high (bootstrap over repositories, 1'000 resamples, from 3 repositories), p90_sec, max_sec (slowest single ok run), spread_cv (CV of the repositories' times), rerun_cv and rerun_pairs (median CV between repeated runs of one snapshot), hours (every run that ran), sec_per_1k_source_files and size_rho (Spearman between time and source files), both only with 3 or more repositories whose sizes differ; a repository's time is the median of its ok runs, all variants and repetitions, so it counts once; unsupported runs are out |
+| `runs.csv` | runs | stored run, every repetition, incl. failed, timed-out and `unsupported` | repo, snapshot, commit, variant, variant_commit, language, repo_files, repo_source_files, repo_bytes and repo_source_bytes (the snapshot's files and bytes, all and those of its language, at the pinned commit: from the record, else the two counts from the snapshot files; empty only for an older record on a copied export without `--fetch`), tool, run, tailored (the tool was tuned on this repo), status (`ok`, `error`, `timeout`, `unsupported`, `oom`: stored ok but the container was OOM-killed meanwhile, so the analysis reads no CBOM from it), duration_sec, size_bytes, error (the most telling line), peak_memory_mb, memory_limit_mb, limit_hits, oom_kills, enqueued_at, started_at, finished_at, queue_sec, received_at, tool_version, image_ref, bfcbom_commit, bom_format, spec_version (as the CBOM declares), components, crypto_assets and, by the declared `assetType`, algorithm_assets, certificate_assets, protocol_assets, material_assets, other_assets, plus located_file_assets and located_line_assets (crypto assets with a file, and with a file and a line, in the CBOM), expect_crypto (from the spec), workaround (recorded setup workarounds, such as CipherRadar `.cradarignore`); for LLM workers requests, requests_failed, chunks_total, chunks_sent, chunks_skipped (over `LLM_MAX_CHUNKS`, never sent), input_tokens, cached_input_tokens, cache_write_tokens, output_tokens, reasoning_tokens, models_answered, cost_usd, priced_model, price_period, price_table_version |
+| `runtime.csv` | runs | tool and language, plus `all` | repos, runs, timeouts, timeout_share, median_sec with median_ci_low / median_ci_high (bootstrap over repositories, 1'000 resamples, from 3 repositories), p90_sec, max_sec (slowest single ok run), spread_cv (CV of the repositories' times), rerun_cv and rerun_pairs (median CV between repeated runs of one snapshot), hours (every run that ran), sec_per_1k_source_files and size_rho (Spearman between time and source files), both only with 3 or more repositories whose sizes differ; a repository's time is the median of its ok runs, all variants and repetitions, so it counts once; peak_median_mb with peak_ci_low / peak_ci_high (bootstrap, as for time), peak_p90_mb and peak_spread_cv over the repositories (a repository's peak is the largest working set of its runs), peak_max_mb, limit_mb, at_limit (runs with limit_hits > 0; empty where the workers did not record it), oom (runs with an OOM kill); unsupported runs are out |
 | `tools.csv` | `common/tools.yaml` | tool (those that ran) | vendor, url, shipped (CLI, server with an API, GitHub Action, HTTP API), approach (a third-party engine named first, else `own engine`, then how it detects); the summary's "Tools" |
 | `records-run<i>.csv` | records | normalised record: one (component, occurrence) of one tool | snapshot, variant, tool, run, location_kind (`line`, `window`, `import`, `file`, `none`, `unread`), record_id (`<tool>:<component>:<occurrence>`), site_id (`<tool>:<file>:<line>` when located), every record dimension, resolution (`mapped`, `ambiguous`, `api`, `non-crypto`, `undefined`; only `mapped` records become items), `raw_*`, `src_*`, unmapped, conflicts, spec_issues |
 | `groups-exact-run<i>.csv` | matches | group of the exact matcher: `repo` scope = one cluster per key at the level (its members plus attached records), `site` scope = its located records at one call site | matcher, repo, snapshot, commit, variant, run, group_id (`E00001`, clusters sorted by key; sites `E00001.001`), n_tools (tools; k counts voter groups: `voter_groups`), tools, language, level, scope, key (the level's key: a raw name at L0, an identity at L4), voters, voter_groups, member_voter_groups (voter groups with a record of their own in the group, attached records aside; 0 = the group is no item, the rule of `matchlevels-run<i>.csv` and the summary's "Per language"), n_records, n_sites, units (L4 identities of the members), n_units, n_attached, located_voters, colocated_voters (repo scope), file, line_min, line_max, parent (site scope) |
