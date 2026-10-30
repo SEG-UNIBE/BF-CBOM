@@ -171,6 +171,8 @@ experiment-export-all:
 
 # make corpus ARGS="--per-cell 2"  -> results volume: corpus/corpus.yaml (export with corpus-export); 3 star bins x
 # 3 size bins x 2 repos = 18 per language by default (--star-bins, --size-bins, --per-cell; common/corpus.py)
+# plus corpus/corpus-frame.yaml (every cell's population, the crypto checks); ARGS="--frame /data/results/corpus/
+# corpus-frame.yaml --per-cell 3" redraws from it without searching
 corpus: ensure-env
 	docker compose run --rm runner experiment corpus build $(ARGS)
 

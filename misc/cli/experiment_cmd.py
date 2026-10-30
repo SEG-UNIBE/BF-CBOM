@@ -872,6 +872,14 @@ def env():
     )
 
 
+FRAME_OPT = typer.Option(
+    None,
+    "--frame",
+    help="Reuse a frame file (`<corpus>-frame.yaml` of an earlier build): no search, its search date stands; same "
+    "languages, bins and cap; crypto checks of unchanged commits are reused",
+)
+
+
 @corpus_app.command("build")
 def corpus_build(
     out: Path = CORPUS_OUT_OPT,
@@ -895,6 +903,7 @@ def corpus_build(
         help="Largest packed repo size (GitHub `size`) sampled; default CORPUS_MAX_REPO_SIZE_MB, else "
         f"GITSERVER_MEMORY / {corpus_mod.SIZE_CAP_RATIO} (the git server must serve a full clone); 0 = no cap",
     ),
+    frame_in: Path | None = FRAME_OPT,
 ):
     """Sample a stratified corpus: per language every (star bin x size bin) cell is enumerated completely and
     `--per-cell` repos are drawn at random (seeded), pre-filtered for first-party crypto usage and pinned to commits;
@@ -921,6 +930,12 @@ def corpus_build(
             fg=typer.colors.YELLOW,
             err=True,
         )
+    frame_out = out.with_name(f"{out.stem}-frame.yaml")
+    frame: dict = {}
+    if frame_in is not None:
+        if not frame_in.exists():
+            _err(f"no frame file {frame_in}")
+        frame = yaml.safe_load(frame_in.read_text(encoding="utf-8")) or {}
     with progress.session():
         with progress.step("GitHub API check"):
             try:
@@ -938,11 +953,20 @@ def corpus_build(
             if now is None:
                 progress.end(lines[language])
 
-        corpus = corpus_mod.build_corpus(params, token, log=lambda m: typer.echo(m, err=True), status=status)
+        try:
+            corpus = corpus_mod.build_corpus(
+                params, token, log=lambda m: typer.echo(m, err=True), status=status, frame=frame
+            )
+        finally:  # an interrupted build keeps what it searched and checked
+            if frame.get("cells") or frame.get("crypto_checks"):
+                frame_out.parent.mkdir(parents=True, exist_ok=True)
+                frame_out.write_text(yaml.safe_dump(frame, sort_keys=False), encoding="utf-8")
+    corpus["frame_file"] = frame_out.name
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(yaml.safe_dump(corpus, sort_keys=False), encoding="utf-8")
     typer.echo(f"wrote {len(corpus['repos'])} repos to {out} (stats: {corpus['stats']})")
     typer.echo(f"excluded with reasons: {len(corpus['excluded'])} (listed under `excluded` in the file)")
+    typer.echo(f"frame (every cell's population, the crypto checks): {frame_out}")
 
 
 PRUNE_IN_OPT = typer.Option(..., "--in", help="Corpus YAML to prune")

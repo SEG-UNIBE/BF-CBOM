@@ -208,7 +208,12 @@ criterion. The corpus file records the frame (`params`: search date, bins, quota
 `population`, how many were enumerated, tried and sampled), every sampled repo with its `stratum` and two covariates
 that are recorded but never selected on, `crypto_apis` (the API families the pre-filter matched: JCA, BouncyCastle,
 JSSE; pyca, hashlib, ssl, pycryptodome, nacl, pyOpenSSL, other; Go stdlib, x/crypto) and `topics` (the repository's
-GitHub topics), and every candidate dropped under `excluded` with its reason. The record `_experiment.yaml` carries
+GitHub topics), and every candidate dropped under `excluded` with its reason. Next to it, `<corpus>-frame.yaml`
+holds the populations themselves (every enumerated repo of every cell, its query and the search date) and the crypto
+checks by commit, so the draw can be verified offline (frame + seed -> sample) and a rebuild with `--frame` draws
+another `--per-cell` or `--seed` from the same population without a search request (on one frame the smaller
+quota's sample is inside the larger one's; a check is reused while the repo's default branch is at the same
+commit; an interrupted build resumes from its frame on the same day). The record `_experiment.yaml` carries
 `stratum`, `crypto_apis` and `topics` per repo. After the stability run `make corpus-prune` drops the repos a tool
 timed out on (listed under `pruned`, never replaced).
 

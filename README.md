@@ -460,7 +460,10 @@ make experiment-export NAME=mutation-smoke            # -> experiments/results/m
 make experiment-export-all                               # every complete experiment (no run missing), one ZIP each, overwriting the old ZIPs
 make experiment-list                                     # experiments stored on the volume
 make experiment-delete NAME=mutation-smoke            # remove one from the volume (asks first; ARGS=--yes skips)
-make corpus ARGS="--per-cell 2"                          # stratified GitHub corpus with pinned commits (3 x 3 cells x 2 per language)
+make corpus ARGS="--per-cell 2"                          # stratified GitHub corpus with pinned commits (3 x 3 cells x 2 per language); checks the GitHub API first
+                                                         #   writes corpus.yaml and corpus-frame.yaml (every cell's population, the crypto checks by commit)
+make corpus ARGS="--frame /data/results/corpus/corpus-frame.yaml --per-cell 3"   # redraw from a stored frame: no search, same population and search date
+make corpus-export                                       # corpus YAMLs (sample and frame) -> experiments/results/
 make experiment EXP=experiments/bar-micro.yaml            # 15 tools on 3 generated micro projects: the voter bar
 make experiment EXP=experiments/stability-pilot.yaml        # every tool 3x on the micro projects and ten pilot repos
 make analysis ARGS="report stability-pilot"                 # everything below in one pass + _ANALYSIS/_SUMMARY.md (Markdown tables)

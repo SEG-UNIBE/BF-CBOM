@@ -235,3 +235,27 @@ def test_github_check_reports_the_quota_and_names_a_rejected_token(monkeypatch):
     monkeypatch.setattr(corpus.requests, "get", lambda *a, **k: Resp(401))
     with pytest.raises(RuntimeError, match="rejected the token"):
         corpus.github_check("t0ken")
+
+
+def test_a_frame_is_reused_without_searching_nests_the_draws_and_caches_crypto_checks(monkeypatch):
+    population = [{"full_name": f"o/r{i:02d}", "git_url": f"u{i}", "branch": "main", "size_kb": 500, "stars": 60}
+                  for i in range(20)]  # fmt: skip
+    clones: list[str] = []
+    monkeypatch.setattr(corpus, "has_crypto_usage", lambda url, branch, lang: clones.append(url) or ["JCA"])
+    frame: dict = {}
+    small = _build(monkeypatch, _params(per_cell=1, crypto_filter=True), population, frame=frame)
+    cell = frame["cells"][0]
+    assert cell["population"] == 20 and [r["full_name"] for r in cell["repos"]] == sorted(
+        r["full_name"] for r in population
+    )
+    assert "commit" not in cell["repos"][0] and len(frame["crypto_checks"]) == len(clones) == 1
+    monkeypatch.setattr(corpus, "search_cell", lambda *a, **k: pytest.fail("a reused frame must not search"))
+    big = corpus.build_corpus(_params(per_cell=3, crypto_filter=True), None, log=lambda m: None,
+                              exclusions={"repos": {}, "patterns": []}, tailored={}, frame=frame)  # fmt: skip
+    names = [r["full_name"] for r in big["repos"]]
+    assert len(names) == 3 and names[0] == small["repos"][0]["full_name"]  # the small draw sits inside the big one
+    assert len(clones) == 3 and big["params"]["search_date"] == frame["search_date"]  # the first check was reused
+    old = {**frame, "search_date": "2020-01-01", "cells": frame["cells"]}
+    with pytest.raises(RuntimeError, match="has no cell"):
+        corpus.build_corpus(_params(star_bins=[(1, 50), (50, None)]), None, log=lambda m: None,
+                            exclusions={"repos": {}, "patterns": []}, tailored={}, frame=old)  # fmt: skip

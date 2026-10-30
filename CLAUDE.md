@@ -173,7 +173,8 @@ normalisation, analysis outputs),
   cells of star bin x size bin, each cell's population enumerated completely (paginated, split by creation date above
   the API's 1000) and `--per-cell` repos drawn with the seed (default 3 x 3 cells x 2 = 18 per language, 54 in all;
   `--star-bins`, `--size-bins`; design of 2026-10-29), the frame recorded in the file (`cells` with populations), the
-  covariates `crypto_apis` and `topics` recorded per repo, never selected on; protocol in `experiments/README.md`
+  covariates `crypto_apis` and `topics` recorded per repo, never selected on; the populations and crypto checks in
+  `<corpus>-frame.yaml`, reused with `--frame` (no search; 2026-10-30); protocol in `experiments/README.md`
   "Corpus sampling".
   Repos above `CORPUS_MAX_REPO_SIZE_MB` (default `GITSERVER_MEMORY`/4: the git server must serve CBOMkit's full clone
   from a container with that limit; Makefile) are never sampled and listed as excluded with the reason.

@@ -10,8 +10,10 @@ the GitHub population). Every cell's population is enumerated completely before 
 to the API's limit of 1000 results, and a cell above it is split by creation date until every part fits, so the draw
 (`random.Random(seed)` over the full, name-sorted population) is uniform over the cell. The frame is recorded in the
 corpus `params` (search date, bins, every cell with its population and quota), each sampled repo keeps its `stratum`,
-and two covariates are recorded but never selected on: `crypto_apis` (the API families the pre-filter matched) and
-`topics` (the repository's GitHub topics). No topic targeting: the crypto-use pre-filter is the one content criterion.
+the populations themselves (every enumerated repository) and the crypto checks by commit go into the frame file
+(`<corpus>-frame.yaml`, reusable with `--frame`), and two covariates are recorded but never selected on:
+`crypto_apis` (the API families the pre-filter matched) and `topics` (the repository's GitHub topics). No topic
+targeting: the crypto-use pre-filter is the one content criterion.
 
 Exclusions (CLAUDE.md refinement 11): name patterns (CBOM tooling, benchmarks), the reviewed list
 `experiments/corpus/exclusions.yaml` (the generators' own repos and test suites, with a reason each), and the repos
@@ -386,6 +388,7 @@ def build_corpus(
     status=lambda language, picked, now: None,
     exclusions: dict | None = None,
     tailored: dict[str, frozenset[str]] | None = None,
+    frame: dict | None = None,
 ) -> dict:
     """Stratified sample per language over stars x size cells, `per_cell` repos each, filtered and pinned to
     commits. Every cell's population is enumerated and recorded, the draw is a seeded shuffle of the name-sorted
@@ -394,17 +397,35 @@ def build_corpus(
     experiments/corpus/exclusions.yaml and the registry's `tailored_on`; every excluded candidate is listed
     with its reason.
     `status(language, picked, now)` follows the search (the CLI's progress line): `now` is the cell searched or the
-    repo checked, None once the language is done."""
+    repo checked, None once the language is done.
+    `frame` (filled in place; the CLI keeps it as `<corpus>-frame.yaml`): every cell's enumerated population with
+    its query and the search date, plus the crypto checks by commit. A frame with cells is reused instead of
+    searching (same languages, bins and cap; its search date stands), so another `per_cell` or `seed` draws from the
+    same population and can be verified offline; a check whose repo still has the same default-branch commit is
+    reused instead of cloning."""
     exclusions = load_exclusions() if exclusions is None else exclusions
     tailored = tailored_map() if tailored is None else tailored
     rng = random.Random(params.seed)
-    pushed_since = time.strftime("%Y-%m-%d", time.gmtime(time.time() - params.pushed_within_days * 86400))
+    frame = {} if frame is None else frame
+    reuse = bool(frame.get("cells"))
+    today = time.strftime("%Y-%m-%d", time.gmtime())
+    if not reuse:
+        frame.update(
+            search_date=today,
+            pushed_since=time.strftime("%Y-%m-%d", time.gmtime(time.time() - params.pushed_within_days * 86400)),
+            cells=[],
+        )
+    checks: dict[str, dict] = frame.setdefault("crypto_checks", {})
+    pushed_since, search_date = frame["pushed_since"], frame["search_date"]
+    stored = {(c["language"], tuple(c["stars"]), tuple(c["size_kb"])): c for c in frame["cells"]}
     cap_mb = params.max_repo_size_mb
     size_bins = clamp_size_bins(params.size_bins_kb, cap_mb)
     if cap_mb:
         log(f"repo size cap {cap_mb} MB (git server memory / {SIZE_CAP_RATIO}); size cells (KB): {size_bins}")
     cells = [(s, z) for s in params.star_bins for z in size_bins]
     quota = params.per_cell
+    if reuse:
+        log(f"frame of {search_date} reused: {len(stored)} cells without search requests")
     log(
         f"{len(params.star_bins)} star bins x {len(size_bins)} size bins = {len(cells)} cells x {quota} repos = "
         f"{len(cells) * quota} per language, {len(cells) * quota * len(params.languages)} in all"
@@ -412,16 +433,28 @@ def build_corpus(
     pause = 2.1 if token else 6.5  # 30 (10) search requests per minute
     chosen: list[dict] = []
     excluded: list[dict] = []
-    frame: list[dict] = []
+    cell_rows: list[dict] = []
     stats = {"searched": 0, "requests": 0, "excluded": 0, "no_crypto": 0, "clone_failed": 0, "unresolved": 0}
     for language in params.languages:
         picked_for_lang: list[dict] = []
         for stars, size in cells:
             label = f"{bin_text(*stars)} stars, {bin_text(*size)} KB"
-            status(language, len(picked_for_lang), f"enumerating {label}")
-            candidates, population, n_requests = search_cell(
-                language, stars, size, pushed_since, token, pause=pause, log=log
-            )
+            key = (language, tuple(stars), tuple(size))
+            if key in stored:
+                cell = stored[key]
+                candidates, population, n_requests = [dict(r) for r in cell["repos"]], cell["population"], 0
+            elif search_date != today:  # one frame, one search date
+                raise RuntimeError(f"the frame of {search_date} has no cell {language}, {label} (other bins, "
+                                   "languages or cap)")  # fmt: skip
+            else:  # a new frame, or one an interrupted build of today left
+                status(language, len(picked_for_lang), f"enumerating {label}")
+                candidates, population, n_requests = search_cell(
+                    language, stars, size, pushed_since, token, pause=pause, log=log
+                )
+                listed = [dict(c) for c in sorted(candidates, key=lambda c: c["full_name"])]
+                frame["cells"].append({"language": language, "stars": list(stars), "size_kb": list(size),
+                                       "query": cell_query(language, stars, size, pushed_since),
+                                       "population": population, "repos": listed})  # fmt: skip
             stats["searched"] += len(candidates)
             stats["requests"] += n_requests
             candidates.sort(key=lambda c: c["full_name"])  # the API's order varies; the seed decides the draw
@@ -447,9 +480,19 @@ def build_corpus(
                         }
                     )
                     continue
+                commit = resolve_remote_commit(cand["git_url"], cand["branch"])
+                if not commit:
+                    stats["unresolved"] += 1
+                    continue
                 if params.crypto_filter:
-                    status(language, len(picked_for_lang), f"{cand['full_name']}: cloning for the crypto check")
-                    apis = has_crypto_usage(cand["git_url"], cand["branch"], language)
+                    cached = checks.get(cand["full_name"])
+                    if cached and cached.get("commit") == commit:
+                        apis = cached["apis"]
+                    else:
+                        status(language, len(picked_for_lang), f"{cand['full_name']}: cloning for the crypto check")
+                        apis = has_crypto_usage(cand["git_url"], cand["branch"], language)
+                        if apis is not None:  # a failed clone may be transient: never cached
+                            checks[cand["full_name"]] = {"commit": commit, "apis": apis}
                     if apis is None:
                         stats["clone_failed"] += 1
                         excluded.append({"full_name": cand["full_name"], "reason": "clone failed"})
@@ -459,16 +502,12 @@ def build_corpus(
                         excluded.append({"full_name": cand["full_name"], "reason": "no first-party crypto usage"})
                         continue
                     cand["crypto_apis"] = apis
-                commit = resolve_remote_commit(cand["git_url"], cand["branch"])
-                if not commit:
-                    stats["unresolved"] += 1
-                    continue
                 cand["commit"] = commit
                 cand["stratum"] = {"stars": list(stars), "size_kb": list(size)}
                 picked_for_lang.append(cand)
                 taken += 1
                 log(f"  + {cand['full_name']} ({language}, {cand['stars']}★, {cand['size_kb']} KB) {commit[:12]}")
-            frame.append(
+            cell_rows.append(
                 {
                     "language": language,
                     "stars": list(stars),
@@ -482,7 +521,8 @@ def build_corpus(
             )
             if taken < quota:
                 log(f"  ! {language} {label}: {taken} of {quota} (population {population}, {tried} tried)")
-            time.sleep(pause)
+            if n_requests:
+                time.sleep(pause)
         status(language, len(picked_for_lang), None)
         log(f"{language}: {len(picked_for_lang)} repos")
         chosen.extend(picked_for_lang)
@@ -496,12 +536,12 @@ def build_corpus(
             "size_bins_kb": [list(b) for b in size_bins],
             "max_repo_size_mb": cap_mb,
             "pushed_since": pushed_since,
-            "search_date": time.strftime("%Y-%m-%d", time.gmtime()),
+            "search_date": search_date,
             "crypto_filter": params.crypto_filter,
             "exclude_patterns": params.exclude_patterns,
             "seed": params.seed,
         },
-        "cells": frame,
+        "cells": cell_rows,
         "stats": stats,
         "excluded": excluded,
         "repos": chosen,
