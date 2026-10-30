@@ -1,4 +1,4 @@
-"""Read-only access to the files of a pinned snapshot, for `file_exists` and the traceability check (RQ2).
+"""Read-only access to the files of a pinned snapshot, for `file_exists` and the traceability check (RQ1).
 
 Two places can hold a snapshot's objects, both bare git repositories:
 - the git server's mirror on the VM (`GIT_MIRROR_DIR`, `common/experiment.py:mirror_path`), present wherever the

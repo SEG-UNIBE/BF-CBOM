@@ -1,4 +1,4 @@
-"""The per-tool rates without ground truth (RQ5, CLAUDE.md Phase 3 `score.py`; no ranking claim), on the exact
+"""The per-tool rates without ground truth (RQ4, CLAUDE.md Phase 3 `score.py`; no ranking claim), on the exact
 matcher's groups.
 
 Voters are voter groups (`common/tools.yaml`; tools sharing an engine count once, `--merge-llm` merges the LLM

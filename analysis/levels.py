@@ -533,13 +533,13 @@ def unit_family(unit: str, vocab: Vocabulary) -> str:
 
 def unit_in_registry(unit: str, vocab: Vocabulary) -> bool:
     """Whether the item's family is one of the CycloneDX registry's (`FamilyInfo.registry`), not an addition of
-    `algorithms.yaml` (RQ4: the share of items the registry alone would not name)."""
+    `algorithms.yaml` (RQ3: the share of items the registry alone would not name)."""
     info = vocab.family_info(unit_family(unit, vocab))
     return bool(info and info.registry)
 
 
 def layer_sizes(vocab: Vocabulary) -> dict[str, int]:
-    """The identifier layer the registry lacks and the vocabulary adds (RQ4), as the size of each table: family
+    """The identifier layer the registry lacks and the vocabulary adds (RQ3), as the size of each table: family
     aliases (spellings of families beyond the canonical names), algorithms (concrete algorithms under the families),
     algorithm aliases, whole names (JOSE, SSH, JCA identifiers), API identifiers, OIDs (beyond the registry's curve
     OIDs) and the cipher-suite grammar's cipher entries."""
@@ -556,7 +556,7 @@ def layer_sizes(vocab: Vocabulary) -> dict[str, int]:
 
 
 def registry_rows(items: list[dict], vocab: Vocabulary | None = None) -> list[dict]:
-    """registry-run<i>.csv, the delta between the CycloneDX registry and what real CBOMs need (RQ4): one row per
+    """registry-run<i>.csv, the delta between the CycloneDX registry and what real CBOMs need (RQ3): one row per
     addition of `algorithms.yaml` (`kind: addition`; every addition, also one no item rests on, so the table is the
     complete delta) with its gap kind, primitive, the items of `items` (item_rows) resting on it, the repositories and
     tools behind them and the addition's reason; one row per unit that rests on no known family at all (`kind:

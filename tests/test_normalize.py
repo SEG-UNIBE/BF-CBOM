@@ -743,7 +743,7 @@ def test_coverage_and_units_count_assets_records_and_items():
 
 
 def test_sources_rows_say_where_each_dimension_lives():
-    """RQ3's "where the information lives": per (tool, dimension, kind of source) the algorithm assets whose value came
+    """RQ2's "where the information lives": per (tool, dimension, kind of source) the algorithm assets whose value came
     from a standard field, the name, a property, ... and the share of the tool's algorithm assets
     (sources-run<i>.csv)."""
     from analysis import summary as sm

@@ -1,4 +1,4 @@
-"""Does a value conform to the CycloneDX version the CBOM declares? (RQ3 sub-questions; not a full validation.)
+"""Does a value conform to the CycloneDX version the CBOM declares? (RQ2 sub-questions; not a full validation.)
 
 The normaliser reads leniently (any version, the IBM draft, fields of later versions), so every value it takes is
 checked here against the official JSON schema of the declared `specVersion` (vendored in analysis/data/cyclonedx/).
@@ -9,7 +9,7 @@ Issue codes, `<kind>:<component-relative path>[=<value>]`:
 - `deprecated`  the declared version deprecates the field (1.6 `curve` in a 1.7 CBOM)
 Document level: `dialect:<bomFormat>/<specVersion>` (not CycloneDX, e.g. IBM's `1.4-cbom-1.0`) and
 `version:<specVersion>` (a CycloneDX version without crypto fields or without a vendored schema).
-Full validation of whole documents (RQ3, analysis/schema.py) is a separate step that uses the same schema files.
+Full validation of whole documents (RQ2, analysis/schema.py) is a separate step that uses the same schema files.
 """
 
 from __future__ import annotations

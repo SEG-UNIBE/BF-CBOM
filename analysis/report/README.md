@@ -10,7 +10,7 @@ import pandas as pd
 A = "experiments/results/corpus-icpc/_ANALYSIS"   # or any copied export
 ```
 
-**Tools per item, UpSet plot (RQ5).** Which voter groups report which items per repository.
+**Tools per item, UpSet plot (RQ4).** Which voter groups report which items per repository.
 ```python
 groups = pd.read_csv(f"{A}/groups-exact-run1.csv").query("scope == 'repo'")
 # one row per (repo group, voter group); `voters` is a ';'-joined list in groups-exact
@@ -20,13 +20,13 @@ keys = ["snapshot", "variant", "run", "group_id"]
 memberships = pd.crosstab([sets[c] for c in keys], sets["voter"]).astype(bool)  # UpSet input
 ```
 
-**Fill-rate heatmap (RQ2).** Share of algorithm assets per tool and dimension with a reported value.
+**Fill-rate heatmap (RQ1).** Share of algorithm assets per tool and dimension with a reported value.
 ```python
 cov = pd.read_csv(f"{A}/coverage-run1.csv")
 heat = cov.pivot(index="tool", columns="dimension", values="reported_share")
 ```
 
-**Meaningful: standard fields vs any source (RQ3).**
+**Meaningful: standard fields vs any source (RQ2).**
 ```python
 m = pd.read_csv(f"{A}/meaningful-run1.csv").query("asset_type == 'algorithm'")
 pd.melt(m, id_vars=["tool", "dimension"], value_vars=["standard_share", "any_share"])   # grouped bars per dimension
@@ -40,7 +40,7 @@ ladder = ladder[["L0", "L1", "L2", "L3", "L4"]]       # one line per tool, level
 params = lv.query("dimension != 'algorithm' and tool == 'all'").pivot(index="dimension", columns="level", values="share")
 ```
 
-**Matchability per level (RQ4).** Items by the number of voter groups in their largest group, and the agreement per
+**Matchability per level (RQ3).** Items by the number of voter groups in their largest group, and the agreement per
 dimension inside the groups, exact matcher vs RaQuN, level by level.
 ```python
 ml = pd.read_csv(f"{A}/matchlevels-run1.csv")
@@ -48,7 +48,7 @@ k = ml.set_index(["matcher", "level"])[["k1", "k2", "k3", "k4plus"]].div(ml["ite
 agree = ml.set_index(["matcher", "level"]).filter(like="_agree")                                   # heatmap
 ```
 
-**Per-tool rates with confidence intervals (RQ5; the ranking by F1 is RQ6's, `mutation-scores.csv`).**
+**Per-tool rates with confidence intervals (RQ4; the ranking by F1 is RQ5's, `mutation-scores.csv`).**
 ```python
 sc = pd.read_csv(f"{A}/score-run1.csv").query("dimension == 'algorithm'")
 ranked = sc.dropna(subset=["rank", "ci_low", "ci_high"]).sort_values("rate")
@@ -73,4 +73,4 @@ per_item = pd.concat([cost, items], axis=1).dropna().assign(
 
 **Run-to-run stability.** `stability.csv`: `jaccard_mean` per tool as a box plot over repositories.
 
-**Matchers compared (RQ5).** `matchers-run1.csv`: `pair_jaccard` per repository, exact vs RaQuN.
+**Matchers compared (RQ4).** `matchers-run1.csv`: `pair_jaccard` per repository, exact vs RaQuN.

@@ -185,7 +185,7 @@ def test_xdh_attaches_to_x25519_and_x448_without_merging_them():
 
 
 def test_items_record_whether_their_family_is_the_registrys_and_the_delta_table_is_complete():
-    """RQ4: `registry` on every item (its family is a CycloneDX registry entry, not an addition of algorithms.yaml),
+    """RQ3: `registry` on every item (its family is a CycloneDX registry entry, not an addition of algorithms.yaml),
     and registry-run<i>.csv lists every addition once with the items behind it, the units under no family and the
     identifier layer's sizes."""
     from analysis.normalize.vocab import load_vocabulary

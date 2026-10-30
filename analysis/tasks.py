@@ -68,7 +68,7 @@ def normalize_one(item: NormalizeItem) -> tuple[dict, Path, NormalizedCbom] | No
 
 
 def schema_one(item: SchemaItem) -> dict | None:
-    """RQ3: one CBOM validated as a whole document against the schema it declares (analysis/schema.py:schema_row);
+    """RQ2: one CBOM validated as a whole document against the schema it declares (analysis/schema.py:schema_row);
     None when the file is not JSON."""
     meta, cbom_path, language, cbom_by = item
     try:

@@ -19,6 +19,6 @@ project each. Each file names its source snapshots in
 | `cryptarium.json` | cryptarium 0.3.0 (on `corpus/micro/c`, 2026-10-19; complete) | a CBOM without locations, `UNKNOWN` names, AES with primitive `ae` |
 | `qscan.json` | qScan 0.12.0 (on `corpus/micro/python`, 2026-10-19; complete) | `location: <file>:<line>`, names `<algorithm> (<primitive>)`, the algorithm in parameterSetIdentifier |
 | `deepseek.json` | deepseek-chat (our LLM worker) | `assetType: key`, padding `PSS`, mode `KW`, `bf-cbom:digest` |
-| `cryptobomforge-empty.json` | cryptobom-forge 1.1.0 (on a CodeQL SARIF with zero results, 2026-10-20; complete) | the tool's own empty draft document (no `components` key): 0 records, no error, non-CycloneDX in RQ3 |
+| `cryptobomforge-empty.json` | cryptobom-forge 1.1.0 (on a CodeQL SARIF with zero results, 2026-10-20; complete) | the tool's own empty draft document (no `components` key): 0 records, no error, non-CycloneDX in RQ2 |
 
 The xgrep test uses hand-written CBOMs in the tool's format.

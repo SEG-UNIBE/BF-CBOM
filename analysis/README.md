@@ -18,15 +18,15 @@ guessed: a name nobody can read stays `undefined` and never becomes an item that
 
 ## Units: asset, record, item
 
-A tool's *findings* are the cryptographic uses its CBOM reports (the word of RQ2 and RQ5). Every table counts
+A tool's *findings* are the cryptographic uses its CBOM reports (the word of RQ1 and RQ4). Every table counts
 them in one of three units. They differ by orders of magnitude for the same output, so a number is only
 readable with its unit (the normalisation table counted records until 2026-10-20 and showed CryptoScan's 199 assets
 as 13,996).
 
 | Unit | What it is | Identified by | Counted in |
 |---|---|---|---|
-| **asset** | one crypto asset component of a CBOM, as the tool wrote it | `component_index` in the CBOM | RQ2 (what the tools report), RQ3 meaningful, the RQ2 section (`units-run<i>.csv`, `coverage-run<i>.csv`, `conformance-run<i>.csv`), `normalize.json` |
-| **record** | one occurrence of an asset: an asset found at five lines gives five records, an asset without occurrences one record without a location | `record_id` = `<tool>:<component>:<occurrence>`, its location `site_id` = `<tool>:<file>:<line>` | `records-run<i>.csv`, `units-run<i>.csv`, RQ2 traceability, the matchers' clusters and call-site groups (`members-*.csv`) |
+| **asset** | one crypto asset component of a CBOM, as the tool wrote it | `component_index` in the CBOM | RQ1 (what the tools report), RQ2 meaningful, the RQ1 section (`units-run<i>.csv`, `coverage-run<i>.csv`, `conformance-run<i>.csv`), `normalize.json` |
+| **record** | one occurrence of an asset: an asset found at five lines gives five records, an asset without occurrences one record without a location | `record_id` = `<tool>:<component>:<occurrence>`, its location `site_id` = `<tool>:<file>:<line>` | `records-run<i>.csv`, `units-run<i>.csv`, RQ1 traceability, the matchers' clusters and call-site groups (`members-*.csv`) |
 | **item** | one algorithm in one repository (snapshot and variant): one distinct L4 identity, however many assets and records of a tool carry it; a tool reports the item when one of its `mapped` records has that identity | algorithm: (snapshot, unit); parameter: (snapshot, unit, value); location: (snapshot, unit, file:line) | the ladder (`levels-`, `items-run<i>.csv`), the scores, stability, the tools-per-item distribution, E4 |
 
 - **Asset to record.** The normaliser writes one record per (component, occurrence) (`normalize/record.py`), and
@@ -45,7 +45,7 @@ as 13,996).
   pairs (a site = file and line; the call-site groups chain located records within the window); RaQuN's elements are
   a tool's distinct attribute sets per repository, over the exact matcher's records (`matchers/raqun.py`: records
   with the same canonical values are one element, so AES-128 and AES-256 are two). Packaging shows only where a table describes the tool's own document:
-  RQ2's asset counts as written, RQ3's meaningful shares, RQ2's names and values (shares of
+  RQ1's asset counts as written, RQ2's meaningful shares, RQ1's names and values (shares of
   components, as a reader of the CBOM finds them), and, by design, `units-run<i>.csv`, which measures it.
 - **Kinds of place.** Tools also differ in what a place is, and every record says which kind it names
   (`location_kind` in `records-run<i>.csv`, per tool in `units-run<i>.csv` and the summary's "Places per tool";
@@ -61,7 +61,7 @@ as 13,996).
   analyses count these places like any other, because the tools are benchmarked on the repositories as they are
   (decided 2026-10-23: no scope filter, no test-path heuristic); the share is for the discussion.
 - **Two more words.** A *unit* is an L4 identity: the identity of an item (the `unit` column of
-  `items-run<i>.csv`) and the expected value of an RQ6 mutant (`expected.unit`). A *site* is a record's file and line
+  `items-run<i>.csv`) and the expected value of an RQ5 mutant (`expected.unit`). A *site* is a record's file and line
   (the call-site level, reported next to the repository level and never pooled with it). The micro ground truth's entries are *expected items* at site level, a known
   crypto call in a function of its own (`micro-items-run<i>.csv`; `experiments/corpus/micro/ground_truth.yaml`, generated from
   the snippet catalog, keeps the pilot's key `assets`).
@@ -177,7 +177,7 @@ its information (structured field, custom property, only the name).
 read from a standard field is checked against the official JSON schema of the CycloneDX version the CBOM declares.
 Deviations become `spec_issues` on the record: `field` (the version does not define the field, e.g. 1.7
 `algorithmFamily` in a 1.6 CBOM), `enum` (`padding: PSS`, `assetType: key`), `type`, `deprecated` (1.6 `curve` in a
-1.7 CBOM); per document `dialect` (not CycloneDX) and `version`. This feeds the RQ3 questions "which tool reports in
+1.7 CBOM); per document `dialect` (not CycloneDX) and `version`. This feeds the RQ2 questions "which tool reports in
 what, and where does it violate its declared standard"; a full validation of whole documents is a separate step.
 
 **How much agreement does normalisation create?** A normaliser developed on the outputs it evaluates could manufacture
@@ -296,7 +296,7 @@ the shared engine; the check showed that it rested on the engine alone, so they 
 "Other voter groupings", Kendall's tau against the declared ranking): `per-tool` (every tool its own voter, so
 CBOMkit and cbomkit-jar confirm each other), `llm-merged` (the LLM workers as one voter) and `engine-merged` (the
 tools of one pattern engine family as one voter: `engine_family` in `tools.yaml`, the former `grep-rules`); next to
-it leave-one-voter-out. **Planned with the mutation run (RQ6):** whether two tools miss the same inserted items more often than chance
+it leave-one-voter-out. **Planned with the mutation run (RQ5):** whether two tools miss the same inserted items more often than chance
 (conditional dependence given the truth, the assumption behind independent voters and Dawid-Skene); tools with
 strongly correlated misses share a blind spot and would be one voter. Agreement on unlabelled data cannot decide
 this, since two tools also agree when both are right.
@@ -311,7 +311,7 @@ this, since two tools also agree when both are right.
 | `non-crypto` | a finding outside cryptography reported as an asset | securin-xbom's `...sqli.jpa-sqli` | no |
 | `undefined` | a name nobody can read | `0`, `UNKNOWN`, `Sig` | no |
 
-The shares of each tool's algorithm assets are RQ2 results (the summary's RQ2 section,
+The shares of each tool's algorithm assets are RQ1 results (the summary's RQ1 section,
 `coverage-run<i>.csv`; per record in `records-run<i>.csv`). Only `mapped` records enter the ladder and the scores.
 
 **What our reading of a name may add** (vocabulary 2026-10-23.1, prompted by the corpus-pilot-medium review): the
@@ -379,11 +379,11 @@ nothing else. The registry names schemes (RSAES-OAEP, ECDSA) but tools mostly re
 dropping those records we add a name and disclose it: the additions (RSA, EC, CSPRNG, PRNG, PBE, FN-DSA,
 NTRU-Prime, Hybrid-KEM, crypt and the generic `SHA` marker) are marked `registry: false` in the data, listed with
 their reasons in `data/algorithms.yaml`, and the share of items that rest on an addition rather than a registry name
-is reported (RQ4; it is dominated by RSA and EC): every item of `items-run<i>.csv` says in its `registry` column
+is reported (RQ3; it is dominated by RSA and EC): every item of `items-run<i>.csv` says in its `registry` column
 whether its family is the registry's, and `registry-run<i>.csv` is the delta itself, one row per addition with its
 kind of gap (`gap:` in `algorithms.yaml`: missing-family, scheme-less, generic-marker, non-crypto), the items, repos
 and tools behind it, and the size of the identifier layer the registry lacks (family and algorithm aliases, whole
-names, API identifiers, OIDs, cipher suites), rendered in the summary's RQ4 section "The registry and what it lacks".
+names, API identifiers, OIDs, cipher suites), rendered in the summary's RQ3 section "The registry and what it lacks".
 That the standard cannot name what tools most often report is itself a finding about the standard.
 
 **`group` is ours and carries no claim.** The coarse groups (RSA, EC, AES, SHA-2, HASH-other, HMAC, TLS, CERT, ...)
@@ -398,10 +398,10 @@ spans pke and signature), and serves fill-rate and distribution figures without 
 related-crypto-material) plus `library` for the dependency components some tools emit, which are not crypto assets
 and are counted apart; `material` and `primitive` are the standard's per-type enums without the no-information
 values `other` and `unknown`; protocols fold to the `protocolProperties.type` enum or are `other` there (SSL,
-OpenPGP, OTR). A test keeps `data/cbom-norm.schema.json` equal to the vendored 1.7 schema, and the RQ3 tables are
+OpenPGP, OTR). A test keeps `data/cbom-norm.schema.json` equal to the vendored 1.7 schema, and the RQ2 tables are
 per asset type with that type's own field set.
 
-## Mutants (RQ6)
+## Mutants (RQ5)
 
 A mutant's CBOMs are normalised like every other, with the same specs and vocabulary; nothing in the normaliser knows
 about mutants. `analysis/mutation.py` compares each tool's records on a mutant with its records on the original and

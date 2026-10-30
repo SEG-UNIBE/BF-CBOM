@@ -608,7 +608,7 @@ services:
     profiles: [prod, all]
 
   worker-cbomkit-jar:
-    # same engine as worker-cbomkit, packaged as the standalone action jar (one voter in RQ4, two tools otherwise)
+    # same engine as worker-cbomkit, packaged as the standalone action jar (one voter in RQ3, two tools otherwise)
     image: bf-cbom/worker-cbomkit-jar:${VERSION:-latest}
     build:
       context: .

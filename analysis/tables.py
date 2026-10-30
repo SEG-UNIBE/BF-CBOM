@@ -194,7 +194,7 @@ ASSET_TYPE_COLUMNS = {  # cryptoProperties.assetType as declared -> runs.csv col
 def _located(component: dict) -> tuple[bool, bool]:
     """(names a file, names a file and a line) as the tool wrote it: CycloneDX `evidence.occurrences[].location`
     (+ `line`), or `cryptoProperties.detectionContext[].filePath` (+ `lineNumbers`) in IBM's draft. A file alone is
-    a weaker claim than a file and a line, so the two are counted apart (RQ2: `located` and traceability)."""
+    a weaker claim than a file and a line, so the two are counted apart (RQ1: `located` and traceability)."""
     occurrences = [o for o in (component.get("evidence") or {}).get("occurrences") or [] if isinstance(o, dict)]
     contexts = [
         c for c in (component.get("cryptoProperties") or {}).get("detectionContext") or [] if isinstance(c, dict)
@@ -208,7 +208,7 @@ def _located(component: dict) -> tuple[bool, bool]:
 
 def _cbom_counts(cbom: dict) -> dict:
     """What the CBOM holds as written, before normalisation: components, crypto assets by declared asset type, and
-    the crypto assets with a location (the raw RQ2 columns of runs.csv)."""
+    the crypto assets with a location (the raw RQ1 columns of runs.csv)."""
     comps = [c for c in cbom.get("components") or [] if isinstance(c, dict)]
     crypto = [c for c in comps if c.get("type") in ASSET_COMPONENT_TYPES]
     out = {
@@ -316,7 +316,7 @@ def run_rows(
     return rows
 
 
-# ----- run time (RQ2: what a scan costs) -----
+# ----- run time (RQ1: what a scan costs) -----
 
 TOOLS_COLUMNS = ["tool", "vendor", "url", "shipped", "approach"]
 
@@ -541,7 +541,7 @@ def raqun_inspection_rows(
 def matchlevel_row(
     matcher: str, level: str, run: int, groups_by_snapshot: dict, voter_of: dict[str, str] | None = None
 ) -> dict:
-    """One row of matchlevels-run<i>.csv (RQ4, matcher x level): over the repo groups of every snapshot, how many
+    """One row of matchlevels-run<i>.csv (RQ3, matcher x level): over the repo groups of every snapshot, how many
     items (algorithms, by their L4 identity: `extra.units` of the matchers' groups, else the group key) have
     1 / 2 / 3 / 4+ voter groups in their largest group at that level,
     and per dimension the share of the groups with at least two

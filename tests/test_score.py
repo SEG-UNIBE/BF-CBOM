@@ -199,7 +199,7 @@ def test_grouping_rows_rank_again_with_every_tool_its_own_voter():
 
 
 def test_flux_counts_the_items_not_in_every_run_and_the_baseline_summarises_it_per_tool():
-    """RQ6's noise floor: `flux` per (tool, snapshot) is the share of items that come and go between repeated runs of
+    """RQ5's noise floor: `flux` per (tool, snapshot) is the share of items that come and go between repeated runs of
     unchanged code; `baseline_flux` gives each tool's mean flux and the share of its snapshots whose runs differ."""
     from analysis.stability import baseline_flux
 

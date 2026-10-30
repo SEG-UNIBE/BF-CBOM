@@ -5,7 +5,7 @@ For every (tool, snapshot, variant) with at least two stored ok runs: the Jaccar
 and the consensus set: the items (L4 identity, as in the ladder and the scores) present in more than half of the runs
 (an inserted snippet of Phase 4 counts as detected only when it is in most runs). Scoring uses the
 consensus sets instead of run i's sets when repetitions exceed one (`--consensus`, the default then).
-`flux` is the noise floor of RQ6's "changes off the edit": the share of the items (the consensus unit, L4) a tool
+`flux` is the noise floor of RQ5's "changes off the edit": the share of the items (the consensus unit, L4) a tool
 reported on the unchanged snapshot in some run but not in every run; `baseline_flux` summarises it per tool for
 `mutation-scores.csv` (`report --baseline`).
 """
@@ -80,7 +80,7 @@ def stability_rows(
 def baseline_flux(rows: list[dict]) -> dict[str, dict[str, float]]:
     """Per tool over a stability table's rows (stability.csv, read back or fresh): `flux`, the mean share of items
     that come and go between repeated runs of unchanged code, and `changed`, the share of (snapshot, variant) pairs
-    whose repeated runs differ at all; the noise floor RQ6's off-edit changes are read against."""
+    whose repeated runs differ at all; the noise floor RQ5's off-edit changes are read against."""
     by_tool: dict[str, list[float]] = defaultdict(list)
     for r in rows:
         f = r.get("flux")

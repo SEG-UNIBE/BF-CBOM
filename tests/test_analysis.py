@@ -273,10 +273,10 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert ("The L0-L4 deltas (the agreement ladder)", "the-l0-l4-deltas-the-agreement-ladder") in links
     assert info["voters"]["cipherradar"] == {"voter_group": "cipherradar", "engine": "opengrep-rules"}
     sections = ("## Preamble", "### How to read this summary", "### Research questions", "### Runs",
-                "### Repositories", "## RQ1 Tool selection", "## RQ2 Volume", "### What the tools report, as written",
-                "### Units per tool", "### Traceable", "## RQ3 Conformity", "### Spec issues", "### Meaningful",
-                "### Where the information lives", "## RQ4 Normalisation", "### The registry and what it lacks",
-                "### The L0-L4 deltas", "#### Spellings per identity", "## RQ5 Agreement", "### Voter groups",
+                "### Repositories", "## Entry exam", "## RQ1 Volume", "### What the tools report, as written",
+                "### Units per tool", "### Traceable", "## RQ2 Conformity", "### Spec issues", "### Meaningful",
+                "### Where the information lives", "## RQ3 Normalisation", "### The registry and what it lacks",
+                "### The L0-L4 deltas", "#### Spellings per identity", "## RQ4 Agreement", "### Voter groups",
                 "### Agreement at L4", "### Per-tool rates")  # fmt: skip
     for section in (*sections, "## Files"):
         assert section in summary, section
@@ -294,7 +294,7 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert "Per repository (`units-repo-run<i>.csv`)" in summary
     meaningful = summary.index("### Meaningful")
     assert meaningful < summary.index("#### Asset type `algorithm`", meaningful) < summary.index("### Where the info")
-    assert "**RQ5 Agreement**" in summary[summary.index("## Files") :]  # files by question
+    assert "**RQ4 Agreement**" in summary[summary.index("## Files") :]  # files by question
     sources = _read_csv(out / "sources-run1.csv")
     assert sources and {r["kind"] for r in sources} <= set(SOURCE_KINDS) and all(r["dimension"] for r in sources)
     registry = _read_csv(out / "registry-run1.csv")
@@ -708,13 +708,13 @@ def test_runtime_rows_count_each_repository_once_with_spread_ci_and_size():
 
 
 def test_runtime_section_lists_the_slowest_tool_first_with_its_languages():
-    from analysis.summary import _rq2
+    from analysis.summary import _rq1
     from analysis.tables import RUNTIME_COLUMNS, runtime_rows
 
     runs = [_run("fast", s, 10.0, source=50) for s in "abc"] + [_run("slow", s, 600.0, source=50) for s in "abc"]
     runs += [_run("slow", "p", 60.0, language="Python", source=50)]
     rows = [{c: ("" if r.get(c) is None else str(r[c])) for c in RUNTIME_COLUMNS} for r in runtime_rows(runs)]
-    text = "\n".join(_rq2([], [], [], [], [], rows))
+    text = "\n".join(_rq1([], [], [], [], [], rows))
     assert "### Run time" in text
     assert text.index("| slow |") < text.index("| fast |")
     assert "| tool | Java | Python |" in text and "| slow | 600 (3) | 60 (1) |" in text

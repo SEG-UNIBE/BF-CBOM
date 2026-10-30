@@ -1,4 +1,4 @@
-"""RQ6 detection (analysis/mutation.py) on synthetic records, the rates, and the report on a micro-java mutant."""
+"""RQ5 detection (analysis/mutation.py) on synthetic records, the rates, and the report on a micro-java mutant."""
 
 import copy
 import csv
@@ -274,8 +274,8 @@ def test_report_judges_mutants_and_keeps_them_out_of_the_agreement_tables(tmp_pa
     assert len({r["variant"] for r in rows("runs.csv")}) == 3  # runs.csv lists every stored run
     assert (exp / snapshot / mid / "cbomkit" / "run1.norm.json").exists()  # mutants are normalised too
     summary = (out / "_SUMMARY.md").read_text()
-    assert "## RQ6 Detection" in summary and "```diff" in summary and f"`{mid}`" in summary
-    assert "### Recall, precision and F1 on the planted items" in summary and "the bridge to RQ5" in summary
+    assert "## RQ5 Detection" in summary and "```diff" in summary and f"`{mid}`" in summary
+    assert "### Recall, precision and F1 on the planted items" in summary and "the bridge to RQ4" in summary
     assert "### Changes off the edit" in summary
 
 
@@ -291,7 +291,7 @@ def test_not_judged_counts_the_planted_calls_by_status():
 
 
 def test_changes_off_the_edit_are_counted_apart_from_detection_and_read_against_the_baseline():
-    """RQ6's side finding: mutants with any new unit or located site outside the inserted lines, their share and the
+    """RQ5's side finding: mutants with any new unit or located site outside the inserted lines, their share and the
     medians, never folded into recall or F1; the noise floor joins from a stability table (`--baseline`)."""
 
     def row(repo, kind, tool, extra_units, extra_sites, **v):

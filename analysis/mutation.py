@@ -1,4 +1,4 @@
-"""RQ6, planted calls and decoys: did a tool pick up the crypto call a mutant inserted, and did it stay quiet on a
+"""RQ5, planted calls and decoys: did a tool pick up the crypto call a mutant inserted, and did it stay quiet on a
 planted decoy (mutation/, mutants.json)?
 
 Each (mutant, tool) is compared with the same tool on the original snapshot. A mutant record counts only if it is new:
@@ -18,7 +18,7 @@ the change (an LLM's memorised repository) is not credited.
   sides; read next to the tool's run-to-run instability on the original (stability.csv).
 Rates (`mutation-rates.csv`): per tool, language, style and dimension the mean of the per-repository detection rates
 (refinement 1), the pooled rate, and a bootstrap CI over repositories when the support suffices (score.py's
-thresholds). The bridge to RQ5's rates is `bridge_rows`.
+thresholds). The bridge to RQ4's rates is `bridge_rows`.
 """
 
 from __future__ import annotations
@@ -425,7 +425,7 @@ def score_rows(
     site: strict; by group: lenient), the precision over the planted items (calls found / (calls found + decoys
     hit); the decoys, style-less, count for every style) and F1, with bootstrap CIs over repositories. Precision and
     F1 are empty without decoys. `supported` as in score.py (repositories and calls).
-    Changes off the edit (RQ6's side finding, never folded into recall, precision or F1): over the judged mutants of
+    Changes off the edit (RQ5's side finding, never folded into recall, precision or F1): over the judged mutants of
     the (tool, language), calls and decoys together and style-less like the decoys, `offedit_mutants` with any new
     unit or new located site outside the inserted lines, `offedit_share` of the judged mutants, and the medians of
     `extra_units` and `extra_sites` over those mutants (how much changes when something does); `baseline_flux` and
@@ -496,8 +496,8 @@ def score_rows(
 
 
 def bridge_rows(confirmation: dict[tuple[str, str], float], scores: list[dict]) -> list[dict]:
-    """bridge-run<i>.csv (RQ6's bridge to RQ5, refinement 9): per language and over all cells, a tool's confirmation
-    rate (RQ5, the exact matcher at L4 on the experiment's original repositories of that language) against its F1 on
+    """bridge-run<i>.csv (RQ5's bridge to RQ4, refinement 9): per language and over all cells, a tool's confirmation
+    rate (RQ4, the exact matcher at L4 on the experiment's original repositories of that language) against its F1 on
     the planted items (style `all`): the cells, then per language and `all` the Spearman correlation over the cells
     and Kendall's tau between the two rankings (`tool` = `all`; empty with fewer than three cells)."""
     from .score import kendall_tau, spearman

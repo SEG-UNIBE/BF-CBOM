@@ -84,7 +84,7 @@ def _sized(x: tuple) -> str:
 
 
 analysis_app = typer.Typer(
-    help="Offline analysis of stored experiments (normalisation, RQ3 schema, matching, micro ground truth, CSV tables)",
+    help="Offline analysis of stored experiments (normalisation, RQ2 schema, matching, micro ground truth, CSV tables)",
     add_completion=False,
     no_args_is_help=True,
     context_settings={"help_option_names": ["-h", "--help"]},
@@ -139,7 +139,7 @@ BASELINE_OPT = typer.Option(
     None,
     "--baseline",
     help="A stability experiment (repeated runs, reported already) whose stability.csv gives the noise floor of "
-    "RQ6's changes off the edit (`baseline_flux`, `baseline_changed` in mutation-scores.csv): how much a tool's "
+    "RQ5's changes off the edit (`baseline_flux`, `baseline_changed` in mutation-scores.csv): how much a tool's "
     "report of unchanged code varies between its own runs",
 )
 WINDOW_OPT = typer.Option(2, help="Line window of the exact matcher's call-site groups (same file, lines within it)")
@@ -418,7 +418,7 @@ def _normalize_step(
 def _schema_step(
     exp_dir: Path, run: int, normalized: list[Normalized], write: Writer, *, store: SnapshotStore, jobs: int = 0
 ):
-    """RQ3 (analysis/schema.py): schema-run<i>.csv (whole-document validation, one CBOM per task in the process pool),
+    """RQ2 (analysis/schema.py): schema-run<i>.csv (whole-document validation, one CBOM per task in the process pool),
     meaningful-run<i>.csv and traceability-run<i>.csv (needs the snapshot files: the mirror on the VM or `--fetch`)."""
     languages = _languages(exp_dir)
     cbom_by = {t: info.get("cbom_by") for t, info in load_tools().items()}
@@ -427,11 +427,11 @@ def _schema_step(
          cbom_by.get(meta.get("worker") or cbom_path.parent.name))
         for meta, cbom_path, _ in normalized
     ]  # fmt: skip
-    rows = pmap(tasks.schema_one, items, jobs=jobs, name="RQ3: schema validation", item=_sized)
+    rows = pmap(tasks.schema_one, items, jobs=jobs, name="RQ2: schema validation", item=_sized)
     write(f"schema-run{run}.csv", [r for r in rows if r is not None], sch.SCHEMA_COLUMNS)
-    meaningful = sch.meaningful_rows(progress.track(normalized, "RQ3: meaningful", item=_label), cbom_by)
+    meaningful = sch.meaningful_rows(progress.track(normalized, "RQ2: meaningful", item=_label), cbom_by)
     write(f"meaningful-run{run}.csv", meaningful, sch.MEANINGFUL_COLUMNS)
-    trace = sch.traceability_rows(progress.track(normalized, "RQ2: traceable", item=_label), store, languages=languages)
+    trace = sch.traceability_rows(progress.track(normalized, "RQ1: traceable", item=_label), store, languages=languages)
     write(f"traceability-run{run}.csv", trace, sch.TRACE_COLUMNS)
     if trace and not any(r.get("source") for r in trace):
         typer.secho(
@@ -443,7 +443,7 @@ def _schema_step(
 
 @analysis_app.command("schema")
 def schema_cmd(name: str = EXP_ARG, run: int = RUN_OPT, fetch: bool = FETCH_OPT, jobs: int = JOBS_OPT):
-    """RQ3: validate every CBOM of repetition `run` against the CycloneDX schema it declares, measure how many assets
+    """RQ2: validate every CBOM of repetition `run` against the CycloneDX schema it declares, measure how many assets
     are meaningful (parameters in standard fields vs anywhere) and traceable (file exists at the commit, line in
     range, vocabulary token nearby). See analysis/schema.py."""
     exp_dir = _experiment(name)
@@ -479,7 +479,7 @@ def _levels_step(
     closure: bool = False,
 ) -> list[lv.LevelRow]:
     """The L0-L4 ladder (levels-run<i>.csv), which items each tool reports (items-run<i>.csv, with whether the
-    item's family is the registry's) and the delta to the CycloneDX registry (registry-run<i>.csv, RQ4).
+    item's family is the registry's) and the delta to the CycloneDX registry (registry-run<i>.csv, RQ3).
     (tool, repo) pairs the tool was tuned on (refinement 13) are marked in items-run<i>.csv and left out of
     the ladder unless `include_tailored`; `closure` adds the implied items (refinement 2)."""
     ladder_in: dict[tuple[str, str], list] = {}
@@ -557,7 +557,7 @@ def _tables_step(
             location_kinds=kinds,
         )
     write(f"records-run{run}.csv", norm_rows, tbl.RECORDS_COLUMNS)
-    # one run of the original variants, like every table of the summary's RQ2 section
+    # one run of the original variants, like every table of the summary's RQ1 section
     with progress.step("units, coverage and conformance"):
         cboms = [n for _, _, n in normalized]
         write(f"units-run{run}.csv", tbl.unit_rows(cboms, location_kinds), tbl.UNIT_COLUMNS)
@@ -570,7 +570,7 @@ def _tables_step(
         write(f"coverage-run{run}.csv", per_run.coverage_rows(), COVERAGE_COLUMNS)
         write(f"conformance-run{run}.csv", per_run.conformance_rows(), CONFORMANCE_COLUMNS)
         write(f"sources-run{run}.csv", per_run.sources_rows(), SOURCES_COLUMNS)
-    # both matchers at every level, one repository per task, feed matchlevels-run<i>.csv (RQ4 and RQ5, matcher x
+    # both matchers at every level, one repository per task, feed matchlevels-run<i>.csv (RQ3 and RQ4, matcher x
     # level); the full group, member and agreement tables are written at the scoring level only
     with progress.step("matcher input"):  # the records per repository; PyQuN's import
         per_snapshot = _match_input(normalized, include_tailored)
@@ -691,10 +691,10 @@ def _mutation_step(
     samples: int, obs: sc.Observations | None = None,
     baseline: dict[str, dict[str, float]] | None = None,
 ) -> None:  # fmt: skip
-    """RQ6 (analysis/mutation.py), for an experiment with mutants (mutants.json): mutants.csv, mutation.csv (one row
+    """RQ5 (analysis/mutation.py), for an experiment with mutants (mutants.json): mutants.csv, mutation.csv (one row
     per mutant and tool, majority over the repetitions), mutation-rates.csv, mutation-scores.csv (recall, precision,
     F1 on the planted calls and decoys; the changes off the edit with the noise floor of `baseline`) and, with the
-    scores' observations, bridge-run<i>.csv (RQ5's confirmation rate per language against F1)."""
+    scores' observations, bridge-run<i>.csv (RQ4's confirmation rate per language against F1)."""
     manifest = load_mutants(exp_dir)
     if not manifest.get("repos"):
         return
@@ -707,7 +707,7 @@ def _mutation_step(
         key = (cbom_path.parents[2].name, cbom_path.parents[1].name, meta.get("worker") or cbom_path.parent.name)
         statuses[key][int(meta.get("run_index") or 1)] = str(stored_status(meta) or "?")
     languages = _languages(exp_dir)
-    with progress.step("RQ6: planted calls and decoys"):
+    with progress.step("RQ5: planted calls and decoys"):
         rows = mu.detection_rows(
             manifest,
             records,
@@ -788,12 +788,12 @@ def _score_step(
             obs.restrict(f"{snapshot}/{variant}", tool, set(keys))  # keep the items in the tool's consensus set
         return obs
 
-    with progress.step(f"RQ5: per-tool rates, {samples} bootstraps"):
+    with progress.step(f"RQ4: per-tool rates, {samples} bootstraps"):
         obs = observe(voter_of)
         rows, loo = sc.score_rows(obs, samples=samples)
     write(f"score-run{run}.csv", rows, sc.SCORE_COLUMNS)
     write(f"loo-run{run}.csv", loo, sc.LOO_COLUMNS)
-    with progress.step("RQ5: other voter groupings"):
+    with progress.step("RQ4: other voter groupings"):
         groupings = {"declared": obs, "per-tool": observe({t: t for t in voter_of})}
         if not merge_llm:
             groupings["llm-merged"] = observe(_voter_of(True))
@@ -816,7 +816,7 @@ def score_cmd(
     consensus: bool = CONSENSUS_OPT,
     jobs: int = JOBS_OPT,
 ):
-    """RQ5: the per-tool rates without ground truth (confirmation rate, exclusivity, Dawid-Skene support,
+    """RQ4: the per-tool rates without ground truth (confirmation rate, exclusivity, Dawid-Skene support,
     leave-one-voter-out, bootstrap CIs) on the exact matcher's groups; stability.csv over repeated runs."""
     exp_dir = _experiment(name)
     counts: dict[str, int] = {}
@@ -976,7 +976,7 @@ def run_report(
     baseline: str | None = None,
 ) -> Path:
     """`normalize`, `schema`, `levels`, `tables` and `score` in one pass (every CBOM normalised once), then
-    _SUMMARY.md. `baseline`: the stability experiment whose stability.csv gives RQ6's noise floor.
+    _SUMMARY.md. `baseline`: the stability experiment whose stability.csv gives RQ5's noise floor.
     `_ANALYSIS/` holds regenerated output only, so it is emptied first: no stale file from an earlier version."""
     floor = _baseline(baseline)  # first: a missing baseline fails before anything runs
     out_dir = analysis_dir(exp_dir)
@@ -1063,9 +1063,9 @@ def report(
     jobs: int = JOBS_OPT,
     baseline: str | None = BASELINE_OPT,
 ):
-    """Everything in one pass: normalised CBOMs, every CSV table (runs, records, RQ3 schema/meaningful/sources and
-    RQ2 traceability, the exact matcher's groups/members/agreement, scores and leave-one-out, stability, micro at two
-    levels, items per tool and level, ladder, the registry delta, coverage, conformance; with mutants the RQ6 tables
+    """Everything in one pass: normalised CBOMs, every CSV table (runs, records, RQ2 schema/meaningful/sources and
+    RQ1 traceability, the exact matcher's groups/members/agreement, scores and leave-one-out, stability, micro at two
+    levels, items per tool and level, ladder, the registry delta, coverage, conformance; with mutants the RQ5 tables
     mutants.csv, mutation.csv, mutation-rates.csv, mutation-scores.csv and bridge-run<i>.csv, the agreement tables on
     the originals only) and _ANALYSIS/_SUMMARY.md with Markdown tables."""
     exp_dir = _experiment(name)

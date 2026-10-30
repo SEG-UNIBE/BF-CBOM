@@ -6,13 +6,13 @@ unmapped values. `coverage_rows` and `conformance_rows` (one run, `coverage-run<
 how complete the algorithm assets are per dimension (reported by the tool vs derived by us), what their names
 resolve to, and the spec issues.
 
-Fill rates, resolutions, sources and spec issues count **assets** (CBOM components), the unit of the RQ2 and RQ3
-tables (`sources_rows`, `sources-run<i>.csv`: where the information lives, RQ3): a record is one occurrence of an
+Fill rates, resolutions, sources and spec issues count **assets** (CBOM components), the unit of the RQ1 and RQ2
+tables (`sources_rows`, `sources-run<i>.csv`: where the information lives, RQ2): a record is one occurrence of an
 asset, and counted per record a tool's few assets with hundreds of occurrences would dominate its shares (CryptoScan:
 199 algorithm assets, 13996 records on the pilot corpus).
 
 `vocab.csv`: one row per (tool, source, raw value) with what it mapped to. This is the reviewable mapping table of
-the paper (RQ4): rows with status `unmapped` or `partial` are curation gaps of analysis/data/algorithms.yaml or of the
+the paper (RQ3): rows with status `unmapped` or `partial` are curation gaps of analysis/data/algorithms.yaml or of the
 tool's spec (analysis/adapters/<tool>.yaml); `ambiguous` rows name several algorithms at once.
 """
 
@@ -208,7 +208,7 @@ class Report:
         return rows
 
     def sources_rows(self) -> list[dict]:
-        """Where the information lives (RQ3), long format: one row per (tool, dimension, kind of source) with the
+        """Where the information lives (RQ2), long format: one row per (tool, dimension, kind of source) with the
         algorithm assets whose value of that dimension came from that kind (`field`: a standard CycloneDX field;
         `property`: a tool's own property; `name`: parsed from the component's name; `occurrence`: evidence of an
         occurrence; `context`: an API identifier; `ref`, `dependency`: another component; `derived`: implied by

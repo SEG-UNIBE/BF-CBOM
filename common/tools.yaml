@@ -1,7 +1,7 @@
 # Engine / rule-set families of the CBOM generators (BF-CBOM 2.0, Phase 2 "engine independence").
 #
 # Tools sharing their detection logic (an engine, or a rule set) have one `voter_group` and count as one voter in
-# the agreement-based rates (RQ5; default: the tool itself; evidence per group in analysis/README.md "Voter
+# the agreement-based rates (RQ4; default: the tool itself; evidence per group in analysis/README.md "Voter
 # groups"). `merge_group` names a coarser voter the sensitivity analysis can merge them into (`--merge-llm`: the LLM
 # workers, which share prompts and file selection, decided 2026-10-18); `engine_family` marks tools that share only a
 # pattern engine but run independently written rules (decided 2026-10-20 after the rule-overlap check): separate
@@ -13,7 +13,7 @@
 #   A spec narrows a tool further by hand (`tool_languages:` in experiments/<spec>.yaml, e.g. after reading the
 #   bar-micro report); nothing here is derived from the bar exam.
 # `status`: integrated (worker exists) | candidate (passed the pilot's inclusion bar, worker pending)
-#          | blocked (needs access, see CLAUDE.md) | excluded (failed the bar; kept for RQ2/RQ3 only)
+#          | blocked (needs access, see CLAUDE.md) | excluded (failed the bar; kept for RQ1/RQ2 only)
 #          | prepared (worker ready, but kept out of AVAILABLE_WORKERS and the specs until its source is public).
 # Every tool votes. The bar exam's verdicts are recorded in the bar-micro export only; nothing here records them.
 # `packaging`: how the tool packages its findings, read from its CBOMs by hand (decided 2026-10-30), one of

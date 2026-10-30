@@ -155,7 +155,7 @@ repos:                     # and/or explicit repos
   - full_name: bfcbom/micro-java
     path: corpus/micro/java   # a plain directory (relative to this file) published to gitserver as a
     language: Java               # deterministic fixture commit; no git_url/commit (see experiments/corpus/README.md)
-mutation:                  # optional: every repo also gets mutants as variants (RQ6, below)
+mutation:                  # optional: every repo also gets mutants as variants (RQ5, below)
   per_repo: 10             # mutants per repo (fewer when not enough (snippet, style) pairs fit a host)
   styles: [direct, wrapper, indirect]
   snippets: all            # or a list of catalog ids (mutation/catalog/<language>.yaml)
@@ -305,18 +305,18 @@ tables in [`analysis/report/README.md`](../analysis/report/README.md).
 
 The analysis (`analysis/`) works offline: it reads the stored CBOMs from the results volume and needs neither Redis
 nor running workers. It uses only runs with status `ok` (failed, timed-out and `unsupported` runs are skipped) and,
-by default, only algorithm assets and repetition 1. Every agreement analysis (RQ2-RQ5: conformity, ladder, matchers,
-scores; stability, micro) reads the `original` variants only; mutants are normalised too and feed the RQ6 tables
+by default, only algorithm assets and repetition 1. Every agreement analysis (RQ1-RQ4: conformity, ladder, matchers,
+scores; stability, micro) reads the `original` variants only; mutants are normalised too and feed the RQ5 tables
 alone, so a mutated repository is never counted once per mutant.
 
 ```
 make analysis ARGS="report stability-pilot"     # all of the below in one pass, plus _ANALYSIS/_SUMMARY.md (Markdown tables)
 make analysis ARGS="normalize stability-pilot"  # every CBOM -> normalised records (run<i>.norm.json next to it)
-make analysis ARGS="schema stability-pilot"     # RQ3 (validity, meaningful shares) and RQ2 traceability (--fetch on a laptop)
+make analysis ARGS="schema stability-pilot"     # RQ2 (validity, meaningful shares) and RQ1 traceability (--fetch on a laptop)
 make analysis ARGS="levels stability-pilot"     # how much agreement normalisation creates: L0 (raw) to L4 (tool specs)
 make analysis ARGS="micro bar-micro"          # score each tool against the micro projects' ground truth, two levels
 make analysis ARGS="tables stability-pilot"     # flat CSV tables (runs, records, exact-matcher groups, micro) for pandas/R
-make analysis ARGS="score stability-pilot"      # RQ5: per-tool rates (confirmation, exclusivity, Dawid-Skene, leave-one-out, CIs); stability
+make analysis ARGS="score stability-pilot"      # RQ4: per-tool rates (confirmation, exclusivity, Dawid-Skene, leave-one-out, CIs); stability
 ```
 
 **`report <exp>`** normalises every CBOM once and writes the CSV tables for the analyses below, then
@@ -331,7 +331,7 @@ Its numbers carry `'` between thousands (13'043); the CSVs keep plain numbers. E
 as CSV tables instead.
 `report --baseline <experiment>` reads another, already reported experiment's `stability.csv` (repeated runs on
 unchanged code) and joins each tool's noise floor into `mutation-scores.csv` (`baseline_flux`, `baseline_changed`),
-so RQ6's "Changes off the edit" table can be read against it; a baseline without that file is a clear error before
+so RQ5's "Changes off the edit" table can be read against it; a baseline without that file is a clear error before
 anything runs. `experiment export` runs `report` first (skip with `--no-report`), so every zip carries current tables. On a
 terminal both show a live line per step (done/total, remaining time, elapsed time and the run being worked on), so a
 long step reads as working, like a run's board ("Watching a run"); off a terminal each step prints one line when it
@@ -350,11 +350,11 @@ conformance tables. The diagnostic tables aggregate original variants only, so m
 | `_ANALYSIS/coverage-run<i>.csv` | one row per (tool, dimension), run i, original variants (the same CBOMs as `units-run<i>.csv`): algorithm assets (CBOM components) with a value the tool reported vs only one we derived, as counts and shares of the assets (fill-rate heatmaps); every row also carries the tool's `assets` and the assets per resolution (`mapped`, `ambiguous`, `api`, `non-crypto`, `undefined`) |
 | `_ANALYSIS/units-run<i>.csv` | one row per tool, run i, original variants: how it packages its findings: `packaging` (the hand label of `common/tools.yaml`: per hit, per rule, per algorithm, per family, no places, unknown; `analysis/README.md` "Packaging per tool"), `assets` (algorithm components; the summary's column reads `algorithm assets`, since certificates, protocols and key material never become items), `records` (their occurrences), `items` (distinct L4 identities of its mapped records per repository, summed), records_per_asset_median / _max, multi_occurrence_share (assets at more than one place), assets_per_item (above 1: one component per finding), unlocated_share (assets without a file), loc_line / loc_window / loc_import / loc_file / loc_none / loc_unread (algorithm records by the kind of place they name, `analysis/README.md` "Units"), outside_code (algorithm records whose file is not a source file of the repository's language: fixtures, test vectors, configuration, documentation, other languages; the summary's "Places per tool" shows it as a share of the located records) |
 | `_ANALYSIS/units-repo-run<i>.csv` | one row per (tool, repository), run i, original variants: `assets`, `records` and `items` of that CBOM as in `units-run<i>.csv` (whose counts are these rows summed), with `language`; the summary shows them as a repository x tool matrix |
-| `_ANALYSIS/sources-run<i>.csv` | one row per (tool, dimension, kind of source), run i, original variants: the algorithm assets whose value of that dimension came from a standard `field`, a tool `property`, the parsed `name`, an `occurrence`, an API identifier (`context`), a `ref`, a `dependency` or was `derived`, with the share of the tool's algorithm assets (RQ3, the summary's "Where the information lives") |
-| `_ANALYSIS/registry-run<i>.csv` | the delta to the CycloneDX registry (RQ4): one row per addition of `algorithms.yaml` (`kind: addition`; name, `gap`: missing-family, scheme-less, generic-marker, non-crypto; primitive, `count` = items resting on it, repos, tools, the reason), one per unit under no family (`kind: unknown`), one per table of the identifier layer with its size (`kind: layer`) |
+| `_ANALYSIS/sources-run<i>.csv` | one row per (tool, dimension, kind of source), run i, original variants: the algorithm assets whose value of that dimension came from a standard `field`, a tool `property`, the parsed `name`, an `occurrence`, an API identifier (`context`), a `ref`, a `dependency` or was `derived`, with the share of the tool's algorithm assets (RQ2, the summary's "Where the information lives") |
+| `_ANALYSIS/registry-run<i>.csv` | the delta to the CycloneDX registry (RQ3): one row per addition of `algorithms.yaml` (`kind: addition`; name, `gap`: missing-family, scheme-less, generic-marker, non-crypto; primitive, `count` = items resting on it, repos, tools, the reason), one per unit under no family (`kind: unknown`), one per table of the identifier layer with its size (`kind: layer`) |
 | `_ANALYSIS/conformance-run<i>.csv` | one row per (tool, scope, issue kind), run i, original variants: `asset` scope counts assets with a value read from standard fields that break the declared version's schema (field, enum, type, deprecated), `document` scope counts CBOMs (dialect, version); tools without issues have no row |
 
-**`schema <exp>`** answers RQ3 (`analysis/schema.py`): every CBOM that declares a CycloneDX version with a vendored
+**`schema <exp>`** answers RQ2 (`analysis/schema.py`): every CBOM that declares a CycloneDX version with a vendored
 schema (1.6, 1.7) is validated as a whole document with `jsonschema` (offline, `referencing` registry), reported per
 CBOM in `schema-run<i>.csv` (valid, error count, error kinds `<keyword>:<path>`); tools whose CBOM our worker assembles
 (`cbom_by: bf-cbom` in `common/tools.yaml`, the LLM workers) are reported apart. `meaningful-run<i>.csv` gives, per tool,
@@ -412,7 +412,7 @@ and the number of underlying records, e.g. `["AES-256-GCM"] <algorithm=AES; fami
 filter `n_tools >= 2` for cross-tool matches. Repository, snapshot, variant, run, level, group ID and similarity
 identify the match; group IDs are local to that snapshot, variant, run and level, not stable across levels.
 
-**`score <exp>`** computes the per-tool rates without ground truth (RQ5, `analysis/score.py`; no ranking claim) on the exact
+**`score <exp>`** computes the per-tool rates without ground truth (RQ4, `analysis/score.py`; no ranking claim) on the exact
 matcher's groups. Voter groups follow shared detection logic (the two CBOMkit packagings count once;
 using the same pattern engine alone does not merge tools). `--merge-llm` merges the LLM workers.
 Per tool, dimension (algorithm, key size, mode, padding, curve, digest, location) and level: the **confirmation rate**
@@ -440,7 +440,7 @@ every tool; `dimension` is `algorithm` or a parameter: key_size, mode, padding,
 curve, digest, which exist from L2 on) and `_ANALYSIS/items-run<i>.csv`: one row per (snapshot, variant, tool, item;
 `unit` = its L4 identity) with the tool's voter group, whether the tool was tuned on the repo (`tailored`),
 whether the row is only implied (`implied`, with `--closure`), whether its family is a CycloneDX registry entry
-rather than an addition of `algorithms.yaml` (`registry`, RQ4), the repo's language, the number of records and
+rather than an addition of `algorithms.yaml` (`registry`, RQ3), the repo's language, the number of records and
 distinct spellings behind it, and per level the voter groups in the item's largest cluster (`k_L0` .. `k_L4`). That table is location-free, so every tool
 takes part; it is the basis for UpSet plots and the tools-per-item distribution. Options: `--run <i>` for another repetition, `--merge-llm` (every LLM worker one
 voter), `--include-tailored`, `--closure` (adds the algorithms a record implies).
@@ -484,16 +484,16 @@ The commands write to the experiment's folder on the volume:
 ├── _SUMMARY.md                            # report: Markdown tables of everything below, for reading
 ├── micro-run1.json                       # micro: per (project, tool), status, verdict, recalls, precision, F1, hits, misses, false sites and decoys
 ├── runs.csv                              # tables: one row per stored run (all repetitions)
-├── runtime.csv                           # tables: per tool and language, how long its scans take (RQ2)
+├── runtime.csv                           # tables: per tool and language, how long its scans take (RQ1)
 ├── tools.csv                             # tables: per tool that ran, vendor, project page, how it is shipped, engine and approach
 ├── groups-exact-run1.csv                 # tables: exact matcher, one row per group (repo scope per algorithm, site scope per call site)
 ├── members-exact-run1.csv                # tables: one row per (group, record)
 ├── agreement-exact-run1.csv              # tables: one row per (group, dimension): voters reporting / agreeing, majority value
 ├── groups-raqun-run1.csv                 # tables: RaQuN's groups (with members-/agreement-raqun-run1.csv), unless --no-raqun
 ├── matchers-run1.csv                     # tables: exact vs RaQuN per repository (co-membership pair Jaccard)
-├── matchlevels-run1.csv                  # tables: RQ4, per matcher and level: items by voter groups, agreement per dimension
-├── score-run1.csv                        # score (RQ5): per tool, dimension, level: items, confirmation [CI], exclusivity, rank, Dawid-Skene
-├── loo-run1.csv                          # score (RQ5): ranking without each voter group, Kendall tau vs the full ranking
+├── matchlevels-run1.csv                  # tables: RQ3, per matcher and level: items by voter groups, agreement per dimension
+├── score-run1.csv                        # score (RQ4): per tool, dimension, level: items, confirmation [CI], exclusivity, rank, Dawid-Skene
+├── loo-run1.csv                          # score (RQ4): ranking without each voter group, Kendall tau vs the full ranking
 ├── grouping-run1.csv                     # score: the ranking under other voter groupings, Kendall tau
 ├── stability.csv                         # score: per (tool, snapshot) with repeated runs: Jaccard across runs, records CV, consensus
 ├── micro-run1.csv                        # tables: one row per (micro project, tool); only with micro projects
@@ -503,9 +503,9 @@ The commands write to the experiment's folder on the volume:
 ├── units-repo-run1.csv                   # tables: per (tool, repo) assets, records, items
 ├── tables-run1.json                      # tables: settings used, row counts, versions, the voter map (group, engine per tool)
 ├── normalize.json                        # normalize: diagnostics per tool over every run (sources, spec issues, conflicts)
-├── schema-run1.csv                       # schema (RQ3): one row per CBOM: declared version, valid, errors, error kinds
-├── meaningful-run1.csv                   # schema (RQ3): per tool and dimension, assets with a value from standard fields / any
-├── traceability-run1.csv                 # schema (RQ2): per (snapshot, tool): located, existing, in range, strong
+├── schema-run1.csv                       # schema (RQ2): one row per CBOM: declared version, valid, errors, error kinds
+├── meaningful-run1.csv                   # schema (RQ2): per tool and dimension, assets with a value from standard fields / any
+├── traceability-run1.csv                 # schema (RQ1): per (snapshot, tool): located, existing, in range, strong
 ├── levels-run1.csv                       # levels: confirmed share per tool at normalisation levels L0-L4
 ├── items-run1.csv                        # levels: which items each tool reports per repository, with the voter groups matching at each level
 ├── coverage-run1.csv                     # tables: fill rates per tool and dimension, and what the assets' names are
@@ -542,12 +542,12 @@ files and never change these:
 | `score-run<i>.csv` | scores | (dimension, tool) at the matcher's level | dimension, level, tool, voter_group, repos (with items), items, confirmed, rate (mean of the per-repository confirmation rates), rate_pooled, ci_low, ci_high (bootstrap of the mean over repositories; only with enough support), exclusive, exclusivity, majority_items, majority_covered, coverage (of the repository's majority items, those at least half of the voter groups that ran there report, the share the tool reports, mean over repositories: a recall proxy), rank (only with items in ≥ 3 repos and ≥ 10 items), ds_support, ds_sensitivity, ds_specificity (algorithm dimension only) |
 | `loo-run<i>.csv` | scores | (dimension, left-out voter group) | dimension, level, left_out, kendall_tau, ranking |
 | `grouping-run<i>.csv` | scores | (dimension, voter grouping) | dimension, level, grouping (`declared`, `per-tool`, `llm-merged`, `engine-merged`), voter_groups, ranked, kendall_tau (against `declared`), ranking: the sensitivity checks of the voter groups (`analysis/README.md` "Voter groups") |
-| `stability.csv` | scores | (tool, snapshot, variant) with >= 2 runs | repo, snapshot, variant, tool, level, runs, records_mean, records_cv, items_mean, jaccard_mean, jaccard_min, flux (the share of the tool's items on that snapshot not in every run: the noise floor of RQ6's changes off the edit), consensus, unstable |
-| `mutants.csv` | RQ6 | mutant (mutants.json) | repo, snapshot, commit, language, variant (the mutant id), variant_commit, snippet, style, catalog_version, unit (expected L4 identity, `protocol:TLS` for the TLS context), family, expected, also, file, call_line, related_lines, spans (`kind:start-end`), host, host_line, host_callers, host_entry, imports_added, qualified (Java types written fully qualified), patch |
-| `mutation.csv` | RQ6 | (mutant, tool) | repo, snapshot, language, variant, snippet, style, tool, voter_group, status (`ok`, or why it is not judged: the mutant's or the original's run missing or not ok), runs_mutant, runs_original, unit, masked (the original already has the unit: no repository-level value), found_repo, found_file, found_span (inserted lines ±2), found_site (call line ±2), found_group (lenient: same group at the site), key_size, mode, padding, curve, digest, iterations, protocol_version (the expected value on a new record of the unit on the inserted lines; empty = not judged), extra_units, lost_units, extra_sites, lost_sites (other changes; majority sets), new_records (per run: records absent from the original at the same place, the original's lines shifted into the mutant; a record is matched by its unit, or by its raw name when it has none, so a tool's identity-less import markers are not new on every mutant). Only new records count: an original finding moved by the insertion is not new; with repetitions a value holds in most of the mutant's runs |
-| `mutation-rates.csv` | RQ6 | (tool, language, style or `all`, dimension) | tool, voter_group, language, style, dimension, repos, mutants (judged), detected, rate (mean of per-repository rates), pooled, ci_low, ci_high (bootstrap over repositories, only when supported: score.py's MIN_REPOS and MIN_ITEMS), supported |
-| `mutation-scores.csv` | RQ6 | (tool, language, style or `all`) | tool, voter_group, language, style, repos, calls, found_site, found_group, decoys, decoys_hit, recall_site, recall_low, recall_high, recall_group, precision, f1, f1_low, f1_high, supported, offedit_mutants and offedit_share (judged mutants, calls and decoys together, with a new unit or a new located site outside the inserted lines; never folded into recall, precision or F1), extra_units_median and extra_sites_median (over those mutants), baseline_flux and baseline_changed (the tool's noise floor from `report --baseline <stability experiment>`: its mean `flux` there and the share of its snapshots whose repeated runs differ; empty without one) |
-| `bridge-run<i>.csv` | RQ6 -> RQ5 | (language, tool) cells and per language `all` | language, tool, confirmation, f1, n, spearman, kendall_tau |
+| `stability.csv` | scores | (tool, snapshot, variant) with >= 2 runs | repo, snapshot, variant, tool, level, runs, records_mean, records_cv, items_mean, jaccard_mean, jaccard_min, flux (the share of the tool's items on that snapshot not in every run: the noise floor of RQ5's changes off the edit), consensus, unstable |
+| `mutants.csv` | RQ5 | mutant (mutants.json) | repo, snapshot, commit, language, variant (the mutant id), variant_commit, snippet, style, catalog_version, unit (expected L4 identity, `protocol:TLS` for the TLS context), family, expected, also, file, call_line, related_lines, spans (`kind:start-end`), host, host_line, host_callers, host_entry, imports_added, qualified (Java types written fully qualified), patch |
+| `mutation.csv` | RQ5 | (mutant, tool) | repo, snapshot, language, variant, snippet, style, tool, voter_group, status (`ok`, or why it is not judged: the mutant's or the original's run missing or not ok), runs_mutant, runs_original, unit, masked (the original already has the unit: no repository-level value), found_repo, found_file, found_span (inserted lines ±2), found_site (call line ±2), found_group (lenient: same group at the site), key_size, mode, padding, curve, digest, iterations, protocol_version (the expected value on a new record of the unit on the inserted lines; empty = not judged), extra_units, lost_units, extra_sites, lost_sites (other changes; majority sets), new_records (per run: records absent from the original at the same place, the original's lines shifted into the mutant; a record is matched by its unit, or by its raw name when it has none, so a tool's identity-less import markers are not new on every mutant). Only new records count: an original finding moved by the insertion is not new; with repetitions a value holds in most of the mutant's runs |
+| `mutation-rates.csv` | RQ5 | (tool, language, style or `all`, dimension) | tool, voter_group, language, style, dimension, repos, mutants (judged), detected, rate (mean of per-repository rates), pooled, ci_low, ci_high (bootstrap over repositories, only when supported: score.py's MIN_REPOS and MIN_ITEMS), supported |
+| `mutation-scores.csv` | RQ5 | (tool, language, style or `all`) | tool, voter_group, language, style, repos, calls, found_site, found_group, decoys, decoys_hit, recall_site, recall_low, recall_high, recall_group, precision, f1, f1_low, f1_high, supported, offedit_mutants and offedit_share (judged mutants, calls and decoys together, with a new unit or a new located site outside the inserted lines; never folded into recall, precision or F1), extra_units_median and extra_sites_median (over those mutants), baseline_flux and baseline_changed (the tool's noise floor from `report --baseline <stability experiment>`: its mean `flux` there and the share of its snapshots whose repeated runs differ; empty without one) |
+| `bridge-run<i>.csv` | RQ5 -> RQ4 | (language, tool) cells and per language `all` | language, tool, confirmation, f1, n, spearman, kendall_tau |
 | `agreement-exact-run<i>.csv` | matches | (group, dimension) | matcher, repo, snapshot, variant, run, group_id, scope, key, dimension (key_size, mode, padding, curve, digest; location for repo groups), reporting (voters with a value), agreeing (voters carrying the majority value), majority, values |
 | `matchlevels-run<i>.csv` | matches | (matcher, level) | matcher, level, run, repos, items (algorithms by L4 identity), records, k1, k2, k3, k4plus (items by the voter groups of their largest group at the level), share_k2plus, `<dim>_groups` and `<dim>_agree` for key_size, mode, padding, curve, digest (groups with 2+ voters reporting a value admitted at the level; share where all agree), location_groups, location_agree (groups with 2+ located voters; share with 2+ at one call site) |
 | `micro-run<i>.csv` | ground truth | micro project and tool of the spec, also unsupported and failed runs | project, language, tool, run, tailored, status (of the run, `missing` without one), verdict (`pass`, `fail`, `unsupported`, `error`, `missing`), n_items, strict, lenient, repo, recall_strict, recall_lenient, recall_repo, sites_in_file, sites_correct, precision, f1, bar_items, passes_bar, entry_bar (`passed`, `disqualified`, `not judged`, over all scored projects of the tool), missed, repo_missed, repo_extra (families reported that the project does not contain), decoys (count), decoys_hit (ids) |

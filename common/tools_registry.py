@@ -57,7 +57,7 @@ def voter_groups(
     engine_family: bool = False,
 ) -> dict[str, str]:
     """tool -> voter group (`voter_group`, else the tool itself). Tools of one group share an engine or rule set and
-    count as one voter (RQ5). With `merge_llm`, tools that declare a `merge_group` (the LLM workers: shared prompts
+    count as one voter (RQ4). With `merge_llm`, tools that declare a `merge_group` (the LLM workers: shared prompts
     and file selection) are merged into it, the sensitivity analysis of CLAUDE.md Phase 2; with `engine_family`, tools
     sharing a pattern engine family are merged (the `engine-merged` ranking). Every tool votes."""
     tools = tools if tools is not None else load_tools()

@@ -1,6 +1,8 @@
 # Findings so far
 
-Results gathered while building BF-CBOM 2.0. They come from the development
+Results gathered while building BF-CBOM 2.0. Research-question numbers in a dated section follow the numbering of that date: since
+2026-10-30 there are five (volume, conformity, normalisation, agreement, detection as RQ1-RQ5), and the entry exam is
+a preparatory step; before, the entry exam was RQ1 and the others RQ2-RQ6. They come from the development
 set (the pilot corpus `experiments/corpus/pilot-2026-10-08.yaml`, the micro projects `experiments/corpus/micro`) and from runs that will be
 rerun before the paper's experiments; the date says which code produced a number. The micro projects are tiny and
 AI-written: their numbers are an inclusion check, not a ranking.

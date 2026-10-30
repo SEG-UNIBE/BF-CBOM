@@ -1,4 +1,4 @@
-"""Comparing two matchers on the same records (RQ5): do they put the same records together?
+"""Comparing two matchers on the same records (RQ4): do they put the same records together?
 
 Both matchers partition the algorithm records of a repository into groups (repo scope). Over the records both
 matchers grouped, the co-membership pairs (two records in one group) are compared: the Jaccard of the two pair sets,
