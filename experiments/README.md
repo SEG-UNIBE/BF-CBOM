@@ -26,7 +26,7 @@ make experiment-delete NAME=bar-micro                 # remove one from the volu
 make experiment-export NAME=bar-micro                 # -> experiments/results/bar-micro.zip (runs the analysis report first)
 make experiment-export-all                              # every complete experiment (no run missing), one ZIP each, overwriting
 make corpus ARGS="--per-cell 3"                         # stratified GitHub corpus -> results volume corpus/corpus.yaml + corpus-frame.yaml
-make corpus ARGS="--frame /data/results/corpus/corpus-frame.yaml --per-cell 2"   # redraw from a stored frame, no search
+make corpus ARGS="--frame /data/results/corpus/corpus-frame.yaml --per-cell 2 --out /data/results/corpus/corpus-pc2.yaml"   # redraw from a stored frame, no search (without --out it replaces corpus.yaml)
 make corpus-prune ARGS="--in /data/results/corpus/corpus.yaml --from stability-pilot"   # drop repos a tool timed out on
 make corpus-export                                      # corpus YAMLs (sample and frame) -> experiments/results/
 make analysis ARGS="report bar-micro"                 # the analysis alone (below), into <exp>/_ANALYSIS/
@@ -209,7 +209,7 @@ holds the populations themselves (every enumerated repo of every cell, its query
 checks by commit, so the draw can be verified offline (frame + seed -> sample) and a rebuild with `--frame` draws
 another `--per-cell` or `--seed` from the same population without a search request (on one frame the smaller
 quota's sample is inside the larger one's; a check is reused while the repo's default branch is at the same
-commit; an interrupted build resumes from its frame on the same day). The record `_experiment.yaml` carries
+commit; an interrupted build resumes from its frame on the same day). A redraw needs the frame's languages, bins and cap (anything else is a new search), pins every drawn repo at its current default-branch commit (a repo that moved since is checked again, and one that no longer passes gives way to the next candidate of its cell), and writes `--out` (default `corpus.yaml`, which it replaces) with a copy of the frame next to it, `<out>-frame.yaml`. The record `_experiment.yaml` carries
 `stratum`, `crypto_apis` and `topics` per repo. After the stability run `make corpus-prune` drops the repos a tool
 timed out on (listed under `pruned`, never replaced).
 
