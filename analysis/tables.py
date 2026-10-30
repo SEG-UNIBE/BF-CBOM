@@ -24,7 +24,7 @@ from datetime import datetime
 from pathlib import Path
 
 from common.experiment import iter_results, repo_full_name, stored_status
-from common.tools_registry import tool_packaging, votes
+from common.tools_registry import tool_packaging
 
 from .costs import cost_usd, load_prices
 from .groundtruth import TruthProject, TruthScore, entry_verdict
@@ -93,11 +93,11 @@ AGREEMENT_COLUMNS = [
 ]  # fmt: skip
 LOCATION_KINDS = ("line", "window", "import", "file", "none", "unread")  # analysis/schema.py:location_kind
 UNIT_COLUMNS = [
-    "tool", "packaging", "role", "cboms", "assets", "records", "items", "records_per_asset_median",
+    "tool", "packaging", "cboms", "assets", "records", "items", "records_per_asset_median",
     "records_per_asset_max", "multi_occurrence_share", "assets_per_item", "unlocated_share",
     *[f"loc_{k}" for k in LOCATION_KINDS], "outside_code",
 ]  # fmt: skip
-UNIT_REPO_COLUMNS = ["tool", "role", "repo", "language", "assets", "records", "items"]
+UNIT_REPO_COLUMNS = ["tool", "repo", "language", "assets", "records", "items"]
 MICRO_COLUMNS = [
     "project", "language", "tool", "run", "tailored", "status", "verdict", "n_items",
     "strict", "lenient", "repo", "recall_strict", "recall_lenient", "recall_repo",
@@ -458,9 +458,8 @@ def group_rows(
     for g in groups:
         voters = g.voters(voter_of)
         # the voter groups whose own records are in the group (not attached by vocabulary knowledge): a group with
-        # none is no item of the voters (matchlevel_row skips it), however many generic records hang on it
-        members = {(voter_of or {}).get(r.tool, r.tool) for r in g.members
-                   if r.record_id not in g.attached and votes(voter_of, r.tool)}  # fmt: skip
+        # none is no item (matchlevel_row skips it), however many generic records hang on it
+        members = {(voter_of or {}).get(r.tool, r.tool) for r in g.members if r.record_id not in g.attached}
         g_rows.append(
             {
                 **base,
@@ -545,12 +544,11 @@ def matchlevel_row(
         for g in groups:
             if g.scope != "repo":
                 continue
-            voting = [r for r in g.members if votes(voter_of, r.tool)]  # observers are in no k and no count
-            if not any(r.record_id not in g.attached for r in voting):
-                continue  # only an observer reports it: the voters' generic records attached to it make no item
-            for unit in g.extra.get("units") or [g.key]:  # the matchers' units are the voters' already
+            if not any(r.record_id not in g.attached for r in g.members):
+                continue  # generic records attached to it alone make no item
+            for unit in g.extra.get("units") or [g.key]:
                 best[(snapshot, unit)] = max(best.get((snapshot, unit), 0), len(g.voters(voter_of)))
-            records += len(voting)
+            records += len(g.members)
             for row in agreement(g, voter_of=voter_of, level=level):
                 if row["reporting"] >= 2:
                     reporting[row["dimension"]] += 1
@@ -592,7 +590,6 @@ class MicroEntry:
 
 def unit_rows(
     cboms: list[NormalizedCbom],
-    voter_of: dict[str, str] | None = None,
     location_kinds: list[dict[str, str]] | None = None,
 ) -> list[dict]:
     """How each tool packages its findings (analysis/README.md "Units"), over the algorithm assets of `cboms` (one
@@ -623,7 +620,6 @@ def unit_rows(
             {
                 "tool": tool,
                 "packaging": tool_packaging(tool),
-                "role": "voter" if votes(voter_of, tool) else "observer",
                 "cboms": t["cboms"],
                 "assets": n_assets,
                 "records": sum(per),
@@ -644,7 +640,6 @@ def unit_repo_rows(
     cboms: list[NormalizedCbom],
     repos: list[str],
     languages: dict[str, str] | None = None,
-    voter_of: dict[str, str] | None = None,
 ) -> list[dict]:
     """unit_rows' assets, records and items per repository, one row per CBOM (`repos[i]` is the repository of
     `cboms[i]`): the items are what the matchers work on, one repository at a time."""
@@ -654,7 +649,6 @@ def unit_repo_rows(
         rows.append(
             {
                 "tool": n.tool,
-                "role": "voter" if votes(voter_of, n.tool) else "observer",
                 "repo": repo,
                 "language": (languages or {}).get(repo),
                 "assets": len(assets),

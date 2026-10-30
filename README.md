@@ -82,7 +82,7 @@ semgrep-rule scanner for Java and Python (Apache-2.0), CycloneDX 1.6. Runs offli
 opengrep rules plus tree-sitter (`cradar` CLI, built from source), CycloneDX 1.7, many languages. Known crash on some Java EC parameter code is worked around automatically with `.cradarignore` and recorded in the result notes.
 
 - **[`xgrep`](https://mondoo.com/docs/xgrep/code-scanning/cbom)** (Mondoo):
-tree-sitter and data-flow scanner for Java, Python, Go and JS/TS, CycloneDX 1.6. Free of charge but proprietary: the worker fetches the pinned npm package (0.86.0, verified by its sha512) at build time.
+tree-sitter and data-flow scanner for Java, Python, Go and JS/TS, CycloneDX 1.6. Free of charge but proprietary: the worker fetches the pinned npm package (0.101.0, verified by its sha512) at build time.
 
 - **[`CipherSift`](https://github.com/SEG-UNIBE/ciphersift)** (Apache-2.0):
 tree-sitter and YAML-rule scanner for Java, Python and Go source and their dependency manifests, CycloneDX 1.7; a clean-room reimplementation of the approach of Crypsy ([Näther & Hirsch, 2026](https://arxiv.org/abs/2608.04857)). The worker builds the pinned release (v1.2.0, source archive verified by its sha256) with Maven, which runs the tool's test and conformance suite.
@@ -443,7 +443,7 @@ Workers mark a job running the moment they take it (`common/jobs.py`), using the
 
 Every inspection resolves each repository's branch to a commit SHA when it starts (`git ls-remote`, no token needed) and stores it with the repo snapshot.
 Workers that clone check out exactly that commit (`common/utils.py:clone_repo`), so re-executing or retrying an inspection scans the same bytes.
-Each `JobResult` records `tool_version` (reported by the worker, e.g. `cdxgen 12.8.5`), `image_ref` (the image it ran in), `bfcbom_commit` (the checkout used to build it) and `run_index`, plus timing, peak memory, OOM kills and run notes.
+Each `JobResult` records `tool_version` (reported by the worker, e.g. `cdxgen 13.5.0`), `image_ref` (the image it ran in), `bfcbom_commit` (the checkout used to build it) and `run_index`, plus timing, peak memory, OOM kills and run notes.
 
 ### Batch experiments (journal extension)
 

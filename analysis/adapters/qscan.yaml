@@ -4,7 +4,7 @@ version: 1
 declared: [{bomFormat: CycloneDX, specVersion: "1.6"}]
 checked_on: "corpus/micro 2026-10-19 (qScan 0.12.0, 5 CBOMs; fixture tests/fixtures/normalize/qscan.json)"
 notes: >
-  Observer (tools.yaml role). One component per (assetType, algorithm, discriminator) with every occurrence as
+  Disqualified by the bar exam (2026-10-23). One component per (assetType, algorithm, discriminator) with every occurrence as
   `location: <file>:<line>` (no `line` field) and additionalContext a CWE id. Names are `<algorithm> (<primitive>)`
   (RSA (kem), ECDH (key-agree), unknown (signature)); parameterSetIdentifier repeats the algorithm name (RSA, ECDSA),
   kept as the param value it is (a tool's oddity, not repaired). It reports quantum-vulnerable crypto (properties

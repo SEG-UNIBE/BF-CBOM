@@ -85,9 +85,9 @@ handle_instruction = build_handle_instruction(NAME, _produce)
 def main():
     version = pqcheck_version()
     logger.info("pqcheck version: %s", version)
-    run_worker(
-        NAME, handle_instruction, default_timeout=TIMEOUT_SEC, tool_version=f"pqcheck {version}" if version else None
-    )
+    # the image's TOOL_VERSION names the pinned source commit (a release and later commits share one version string)
+    tool_version = os.getenv("TOOL_VERSION") or (f"pqcheck {version}" if version else None)
+    run_worker(NAME, handle_instruction, default_timeout=TIMEOUT_SEC, tool_version=tool_version)
 
 
 if __name__ == "__main__":

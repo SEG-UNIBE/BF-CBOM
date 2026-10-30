@@ -8,12 +8,12 @@ ARG BASE_TAG=latest
 FROM ${BASE_IMAGE}:${BASE_TAG}
 
 ARG XBOM_REPO=https://github.com/securin-public/securin-xbom
-ARG XBOM_COMMIT=a270c5f
-ARG SEMGREP_VERSION=1.181.0
+ARG XBOM_COMMIT=a270c5ffd393d904efc1d5ad51f406dabe197117
+ARG SEMGREP_VERSION=1.183.0
 # The semgrep.dev registry rule sets xbom fetches online, frozen from this semgrep-rules commit
 # (the whole rule sets, registry ids; see workers/securin-xbom/freeze_rules.py).
 ARG SEMGREP_RULES_REPO=https://github.com/semgrep/semgrep-rules
-ARG SEMGREP_RULES_COMMIT=17e31e11ebac99fb7dfe1cd288f7a32151b6f3f9
+ARG SEMGREP_RULES_COMMIT=16b9e6d45f10649f6a531ec4838ed9924372c3bc
 
 USER root
 RUN set -eu; \

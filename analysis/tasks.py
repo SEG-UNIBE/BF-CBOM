@@ -18,14 +18,13 @@ from analysis.matchers.compare import compare
 from analysis.matchers.exact import ExactMatcher
 from analysis.normalize import normalize_cbom
 from analysis.normalize.record import NormalizedCbom, NormRecord
-from common.tools_registry import VoterMap
 
 # (meta, cbom path, tool, language, the snapshot's files or None, write run<i>.norm.json)
 NormalizeItem = tuple[dict, Path, str, str | None, frozenset[str] | None, bool]
 # (meta, cbom path, language, cbom_by)
 SchemaItem = tuple[dict, Path, str | None, str | None]
 # ((snapshot, variant), its records, the levels, window, closure, voter map, RaQuN too)
-MatchItem = tuple[tuple[str, str], list[NormRecord], tuple[str, ...], int, bool, VoterMap, bool]
+MatchItem = tuple[tuple[str, str], list[NormRecord], tuple[str, ...], int, bool, dict[str, str], bool]
 # ({level: exact groups}, {level: RaQuN groups} or None, {level: compare row}, {matcher: {level: seconds}})
 MatchResult = tuple[
     dict[str, list[MatchGroup]], dict[str, list[MatchGroup]] | None, dict[str, dict], dict[str, dict[str, float]]

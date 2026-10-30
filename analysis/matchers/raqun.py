@@ -29,8 +29,6 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from functools import lru_cache
 
-from common.tools_registry import votes
-
 from ..levels import UNIT_LEVEL, identity
 from ..normalize.record import NormRecord
 from ..normalize.vocab import Vocabulary, load_vocabulary
@@ -168,8 +166,7 @@ class RaqunMatcher:
             sets = [{str(a.value) for a in e.attributes} for e in elements]
             similarity = len(set.intersection(*sets)) / len(set.union(*sets)) if sets else 0.0
             # the items it holds, as the exact matcher counts them (matchlevels: items are L4 identities at every level)
-            voting = [r for r in members if votes(self.voter_of, r.tool)] or members
-            units = sorted({u for r in voting if (u := identity(r, UNIT_LEVEL, self.vocab))})
+            units = sorted({u for r in members if (u := identity(r, UNIT_LEVEL, self.vocab))})
             extra = {
                 "level": self.level,
                 "n_records": len(members),

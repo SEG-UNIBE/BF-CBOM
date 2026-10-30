@@ -638,7 +638,7 @@ services:
     security_opt: [no-new-privileges:true]
     profiles: [prod, all]
 
-  worker-qelens:   # observer (common/tools.yaml role): harvested, not a voter
+  worker-qelens:   # disqualified by the bar exam; run on bar-micro only
     image: bf-cbom/worker-qelens:${VERSION:-latest}
     build:
       context: .
@@ -667,7 +667,7 @@ services:
     security_opt: [no-new-privileges:true]
     profiles: [prod, all]
 
-  worker-cryptarium:   # observer (common/tools.yaml role): harvested, not a voter
+  worker-cryptarium:   # disqualified by the bar exam; run on bar-micro only
     image: bf-cbom/worker-cryptarium:${VERSION:-latest}
     build:
       context: .
@@ -696,7 +696,7 @@ services:
     security_opt: [no-new-privileges:true]
     profiles: [prod, all]
 
-  worker-qscan:   # observer (common/tools.yaml role): harvested, not a voter
+  worker-qscan:   # disqualified by the bar exam; run on bar-micro only
     image: bf-cbom/worker-qscan:${VERSION:-latest}
     build:
       context: .

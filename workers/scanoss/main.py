@@ -50,7 +50,7 @@ def build_command(repo_path: Path, out_file: Path, *, timeout_sec: float) -> lis
 
 
 def format_version(output: str | None, opengrep: str | None = None, rules_commit: str | None = None) -> str | None:
-    """`crypto-finder 0.37.1 (opengrep 1.22.0, open-crypto-rules@c5f32b7bbd07)` from `crypto-finder version`."""
+    """`crypto-finder 0.43.0 (opengrep 1.22.0, open-crypto-rules@55d46c2365c1)` from `crypto-finder version`."""
     m = re.search(r"\b(\d+\.\d+\.\d+)\b", output or "")
     if not m:
         return None

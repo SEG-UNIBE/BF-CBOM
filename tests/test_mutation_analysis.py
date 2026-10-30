@@ -109,7 +109,7 @@ def test_a_decoy_is_a_false_positive_only_when_a_new_crypto_record_lands_on_it()
 
 def test_scores_pool_calls_and_decoys_and_the_bridge_correlates_them_with_confirmation():
     def row(repo, kind, style, tool, **v):
-        return {"repo": repo, "language": "java", "tool": tool, "voter_group": tool, "role": "voter",
+        return {"repo": repo, "language": "java", "tool": tool, "voter_group": tool,
                 "status": "ok", "kind": kind, "style": style, **v}  # fmt: skip
 
     rows = []
@@ -140,7 +140,7 @@ def test_scores_pool_calls_and_decoys_and_the_bridge_correlates_them_with_confir
     assert spearman({"a": 1, "b": 2, "c": 3}, {"a": 3, "b": 2, "c": 1}) == -1.0
     marked = mu.score_rows(rows, samples=0, tailored=frozenset({"good"}))
     assert {s["tool"] for s in marked if s["tailored"]} == {"good"}
-    table = "\n".join(sm._mutation_scores(marked, {}))
+    table = "\n".join(sm._mutation_scores(marked))
     assert "| java | good\\* |" in table and "| java | noisy |" in table and sm.TAILORED_CATALOG_NOTE in table
     assert spearman({"a": 1, "b": 1, "c": 3}, {"a": 1, "b": 2, "c": 3}) == pytest.approx(0.866, abs=1e-3)  # a tie
     assert spearman({"a": 1, "b": 2}, {"a": 1, "b": 2}) is None
@@ -171,13 +171,13 @@ def test_majority_over_runs_and_other_changes():
 
 def test_rates_are_means_of_per_repository_rates():
     rows = [
-        {"repo": "a/x", "tool": "t", "voter_group": "t", "role": "voter", "language": "Java", "style": "direct",
+        {"repo": "a/x", "tool": "t", "voter_group": "t", "language": "Java", "style": "direct",
          "status": "ok", "found_site": True},
-        {"repo": "a/x", "tool": "t", "voter_group": "t", "role": "voter", "language": "Java", "style": "wrapper",
+        {"repo": "a/x", "tool": "t", "voter_group": "t", "language": "Java", "style": "wrapper",
          "status": "ok", "found_site": False},
-        {"repo": "b/y", "tool": "t", "voter_group": "t", "role": "voter", "language": "Java", "style": "direct",
+        {"repo": "b/y", "tool": "t", "voter_group": "t", "language": "Java", "style": "direct",
          "status": "ok", "found_site": True},
-        {"repo": "b/y", "tool": "t", "voter_group": "t", "role": "voter", "language": "Java", "style": "direct",
+        {"repo": "b/y", "tool": "t", "voter_group": "t", "language": "Java", "style": "direct",
          "status": "error"},
     ]  # fmt: skip
     rates = {(r["style"], r["dimension"]): r for r in mu.rate_rows(rows)}
@@ -285,7 +285,7 @@ def test_not_judged_counts_the_planted_calls_by_status():
     mutant = {"repo": "o/a", "language": "java", "kind": "call", "style": "direct", "variant": "m-1", "file": "A.java",
               "call_line": 3, "host": "run", "patch": ""}  # fmt: skip
     statuses = (("a", "ok"), ("b", "unsupported"), ("c", "unsupported"), ("d", "original error"))
-    rows = [{"tool": t, "language": "java", "kind": "call", "style": "direct", "role": "voter", "status": st}
+    rows = [{"tool": t, "language": "java", "kind": "call", "style": "direct", "status": st}
             for t, st in statuses]  # fmt: skip
     text = "\n".join(sm._mutation([mutant], rows, []))
     assert "Not judged (3 planted call × tool" in text
@@ -297,7 +297,7 @@ def test_changes_off_the_edit_are_counted_apart_from_detection_and_read_against_
     medians, never folded into recall or F1; the noise floor joins from a stability table (`--baseline`)."""
 
     def row(repo, kind, tool, extra_units, extra_sites, **v):
-        return {"repo": repo, "language": "java", "tool": tool, "voter_group": tool, "role": "voter",
+        return {"repo": repo, "language": "java", "tool": tool, "voter_group": tool,
                 "status": "ok", "kind": kind, "style": "direct", "extra_units": extra_units,
                 "extra_sites": extra_sites, **v}  # fmt: skip
 
@@ -318,7 +318,7 @@ def test_changes_off_the_edit_are_counted_apart_from_detection_and_read_against_
     assert (t["recall_site"], t["precision"], t["f1"]) == (1.0, 1.0, 1.0)  # the off-edit changes do not touch them
     assert (quiet["offedit_mutants"], quiet["offedit_share"], quiet["baseline_flux"]) == (0, 0.0, None)
     assert scores[("t", "direct")]["offedit_mutants"] == 2  # style-less, like the decoys
-    text = "\n".join(sm._offedit(list(scores.values()), {}))
+    text = "\n".join(sm._offedit(list(scores.values())))
     assert "### Changes off the edit" in text and "| java | t | 4 | 2 | 0.50 | 0.5 | 1.5 | 0.25 (0.10) |" in text
     assert "| java | quiet | 1 | 0 | 0.00 |  |  |  |" in text
     # read back from mutation.csv, the lists are text

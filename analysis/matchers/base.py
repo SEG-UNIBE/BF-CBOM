@@ -6,8 +6,6 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import Protocol
 
-from common.tools_registry import votes
-
 from ..levels import PARAMETER_DIMS, parameter_at
 from ..normalize.record import NormRecord
 
@@ -37,9 +35,9 @@ class MatchGroup:
         return len(self.tools)
 
     def voters(self, voter_of: dict[str, str] | None = None) -> list[str]:
-        """The voter groups among the members (observers are none: `common.tools_registry.votes`)."""
+        """The voter groups among the members."""
         voter_of = voter_of if voter_of is not None else {}
-        return sorted({voter_of.get(t, t) for t in self.tools if votes(voter_of, t)})
+        return sorted({voter_of.get(t, t) for t in self.tools})
 
 
 class Matcher(Protocol):
@@ -76,7 +74,7 @@ def agreement(
         by_voter: dict[str, set[str]] = {}
         for r in group.members:
             v = parameter_at(r, level, dim)
-            if v is not None and votes(voter_of, r.tool):  # observers report, but take no part in agreement
+            if v is not None:
                 by_voter.setdefault(voter_of.get(r.tool, r.tool), set()).add(str(v))
         if not by_voter:
             rows.append({"dimension": dim, "reporting": 0, "agreeing": 0, "majority": None, "values": []})

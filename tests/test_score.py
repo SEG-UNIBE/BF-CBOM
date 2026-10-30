@@ -181,41 +181,6 @@ def test_stability_jaccard_and_consensus():
     assert consensus == {("s", "original", "t"): {"AES", "RSA"}}  # a single run has no consensus row; L4 identities
 
 
-def test_observers_are_confirmed_but_confirm_nobody_and_change_no_voter_number():
-    """An observer (tools.yaml `role: observer`) is scored against the voters, but the voters' scores, ranks, LOO and
-    Dawid-Skene are the same with and without it; with `--observers-vote` it is a voter like any other."""
-    from common.tools_registry import VoterMap
-
-    voters = VoterMap(VOTERS)
-    snaps = {
-        "s1": [_rec(0, "a", "AES"), _rec(1, "b", "AES"), _rec(2, "a", "RSA"), _rec(3, "c", "MD5")],
-        "s2": [_rec(0, "a", "AES"), _rec(1, "c", "SHA-256")],
-    }
-    seen = {"s1": [_rec(9, "o", "AES"), _rec(8, "o", "RSA"), _rec(7, "o", "SHA-256")], "s2": [_rec(9, "o", "SHA-256")]}
-
-    def scored(voter_of, with_observer):
-        matcher = ExactMatcher(level="L3", voter_of=voter_of)
-        recs = {s: snaps[s] + (seen[s] if with_observer else []) for s in snaps}
-        ran = {s: {"a", "b", "c"} | ({"o"} if with_observer else set()) for s in snaps}
-        obs = sc.observe({s: matcher.match(r) for s, r in recs.items()}, level="L3", voter_of=voter_of, tools_ran=ran)
-        rows, loo = sc.score_rows(obs, samples=20, **LOW)
-        return {(r["dimension"], r["tool"]): r for r in rows}, loo
-
-    base, base_loo = scored(voters, False)
-    observed = VoterMap(VOTERS, observers={"o"})
-    rows, loo = scored(observed, True)
-    for key, row in base.items():  # every voter number is unchanged by the observer's records
-        assert rows[key] == row, key
-    assert loo == base_loo
-    o = rows[("algorithm", "o")]
-    assert (o["items"], o["confirmed"], o["role"], o["rank"], o["ds_support"]) == (4, 3, "observer", None, None)
-    # a's RSA and c's SHA-256 (s2) are reported by o alone; as an observer it confirms nobody
-    assert (rows[("algorithm", "a")]["confirmed"], rows[("algorithm", "c")]["confirmed"]) == (1, 0)
-    voting, _ = scored(VoterMap(VOTERS), True)  # --observers-vote: o is a voter like any other
-    assert (voting[("algorithm", "a")]["confirmed"], voting[("algorithm", "c")]["confirmed"]) == (2, 1)
-    assert voting[("algorithm", "o")]["role"] == "voter" and voting[("algorithm", "o")]["rank"] is not None
-
-
 def test_grouping_rows_rank_again_with_every_tool_its_own_voter():
     # a and a2 share a voter group: a2's RSA is confirmed only once they count apart
     recs = [_rec(0, "a", "RSA"), _rec(1, "a2", "RSA"), _rec(2, "b", "AES"), _rec(3, "c", "AES")]

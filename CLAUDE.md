@@ -11,7 +11,7 @@ normalisation, analysis outputs),
 - **Current scope and wording (2026-10-22, bar 2026-10-23):** describe BF-CBOM publicly as integrating **15 CBOM
   generator tools**, of which **11 are eligible** after the bar exam (the specs name them by hand). LLM providers are
   excluded for now and may be considered later; their existing implementation is retained. Do not define the tools
-  by contrast with LLMs. Research roles (the transitional observer role, being removed) stay in the research docs.
+  by contrast with LLMs. Research roles stay in the research docs.
 - **Start with make, never plain compose.** `make up-prod` starts the stack detached and opens the live board
   (`misc/cli/stack_cmd.py`; Ctrl-C closes it, the stack keeps running; `make board` reopens it, `make logs` shows the
   raw logs, `make down` stops the stack); clean rebuild `make clean-docker && make up-prod
@@ -33,6 +33,13 @@ normalisation, analysis outputs),
 - **Results are disposable until the paper's runs.** One code path per feature, no compatibility with older result
   layouts; old experiments are rerun, not migrated.
 - **Benchmark every tool as shipped, in its best fair run** (refinement 15). Fix our setup, never the tool.
+- **Tool versions (decided 2026-10-30, the paper's rule):** for each tool we used the latest stable release published
+  by 30 October 2026, excluding pre-releases and nightly builds; for tools without any stable release, the default
+  branch at its last commit on that date; engines bundled by a tool's own build stay at the version the tool pins
+  (crypto-finder's OpenGrep 1.22.0), engines a tool pins none of follow the rule too. The table is
+  `docs/tool-versions.md` (the paper's version table); a newer version means moving the cutoff for every tool and
+  rerunning bar-micro. Every pin is exact: a release version plus the sums of its checksums file (an npm package: its
+  `dist.integrity` as hex), an image digest, a full commit SHA.
 - **Pinned builds:** base images, uv, git sources and CodeQL packs are pinned. Never pin an old dependency to dodge a
   bug; fix our code. Bumping: an image digest from `docker buildx imagetools inspect <image:tag> --format
   '{{json .Manifest.Digest}}'`, a git ref (`*_REF` ARG) from `git ls-remote <url> HEAD`, `CODEQL_VERSION` together
@@ -119,9 +126,8 @@ normalisation, analysis outputs),
   `memory_gb` (= the worker's compose memory limit; a test keeps them equal) and `packaging` (how the tool packages
   its findings into components, a hand label read from its CBOMs, decided 2026-10-30: `per hit`, `per rule`,
   `per algorithm`, `per family`, `no places`, default `unknown`; printed in the summary's "Units per tool" next
-  to the measured signature, never derived from it; `analysis/README.md` "Packaging per tool"). The verdict lines `micro_2026-10-17`
-  and `pilot` are stale history and go with the observer cleanup: the bar's record is the bar-micro export, and
-  nothing in code reads a verdict.
+  to the measured signature, never derived from it; `analysis/README.md` "Packaging per tool"). No verdict is
+  recorded there: the bar's record is the bar-micro export, and nothing in code reads a verdict.
 - **Memory budget (waves):** `EXPERIMENT_MEMORY_BUDGET_GB` (laptop default 14, 0 = unlimited) caps the summed
   `memory_gb` of the tools fed at once; the rest run in later waves. Runner and UI plan waves with
   `common/tools_registry.py:plan_waves` (UI: held jobs, `release_due_waves`, `coordinator/scheduler.py`).
@@ -242,10 +248,8 @@ each tool's invocation and caveats are in the table below, the details in its `w
 eligible in the languages where it passed the bar, and a tool below the bar in every language is `disqualified`; the
 user reads the bar-micro report and writes that into the specs (`tool_languages:`, the `tools` list). No code
 couples the verdicts to the specs and nothing records them but the export. Bar of 2026-10-23: 11 eligible in every
-language they were scored in; cdxgen, cryptarium, qelens and qscan disqualified. **Observers** (`role: observer`,
-2026-10-19) was the transitional state of the three tools below the colleague's pilot bar: confirmed by the voters,
-confirming nobody, counting in no k (`--observers-vote` made them voters). The bar replaces it; its removal is
-decided (2026-10-29) and pending.
+language they were scored in; cdxgen, cryptarium, qelens and qscan disqualified. The transitional observer role
+(2026-10-19) was removed on 2026-10-30: every tool votes.
 
 | Worker | Voter group | Languages | Invocation and caveats |
 |---|---|---|---|
@@ -254,7 +258,7 @@ decided (2026-10-29) and pending.
 | `cdxgen` | cdxgen | Java, Python, JS, Go | disqualified by the bar (2026-10-23: 0 / 0 / 6 of 14); `--include-crypto --evidence`, `-t python` / `-t go` for those repos (the `cbom` command finds nothing in Go, `--profile research` adds nothing; checked 2026-10-22); algorithms carry locations only for JS/TS (occurrences) and Go (property `cdx:golem:crypto:sourceLocation`, one per asset); Go analysis type-checks, so a module's imports resolve only with its `go.sum`, network and a writable module cache (a GOPATH per job: under `cap_drop` root cannot create the image's; until 2026-10-22 every Go repo with a dependency gave nothing); Java code yields none (atom has no crypto sinks); 24 GiB (OOM-killed at 8 on Chat2DB, bisq, bisq2, kafka; at 16 on 8 of 60 pilot-medium repos, 2026-10-23) |
 | `cryptobomforge` | cryptobomforge | Python, C | CodeQL's crypto inventory queries, C with `--build-mode none`; writes IBM's draft `1.4-cbom-1.0`, not CycloneDX, also when CodeQL finds nothing (every stored CBOM is the tool's; the worker's placeholder for that case went 2026-10-20) |
 | `deepseek`, `chatgpt`, `claude` | one each, `merge_group: llm` | all five | `common/llm_cbom.py` (below), CycloneDX 1.7 assembled by us; `chatgpt` / `claude` need `make up-prod EXTRA_PROFILES=llm` and a key in `docker/env/worker-<provider>.env`; a request that fails after the provider's retries fails the job (no partial CBOMs), `LLM_MAX_CHUNKS` 1000, `LLM_CONCURRENCY` 4 |
-| `cryptoscan` | cryptoscan | eleven | always `--include-quantum-safe`; skips folders named demo, example, sample; 1.4.0 panics on specific files and the run fails (its `--exclude` cannot name one exact file, so no workaround; `docs/findings.md` "Interventions") |
+| `cryptoscan` | cryptoscan | eleven | always `--include-quantum-safe`; skips folders named demo, example, sample; 1.4.0 panicked on specific files and the run failed (its `--exclude` could not name one exact file, so no workaround; `docs/findings.md` "Interventions"); 1.5.0 (pinned 2026-10-30) says such lines no longer end the scan and skips vendor, venv and target folders by default |
 | `pqcheck` | pqcheck | Python, Go | |
 | `qdarpan` | qdarpan | Java, Go, C | the worker adapter moves `qdarpan:location.N` into `evidence.occurrences` |
 | `securin-xbom` | securin-xbom | Java, Python | the registry rule sets it fetches online, frozen unfiltered at a semgrep-rules commit |
@@ -262,9 +266,9 @@ decided (2026-10-29) and pending.
 | `scanoss` | scanoss | Go, C, JS, Rust | crypto-finder with the public open rules; Java/Python rules need an API key (research key requested) |
 | `ciphersift` | ciphersift | Java, Python, Go | benchmark-informed: `tailored_on` the micro projects and the pilot corpus (refinement 13) |
 | `xgrep` | xgrep | Java, Python, Go, JS | |
-| `qelens` | observer | Python, JS | disqualified by the bar (5 of 14 in Python); crate `cbom` 0.1.2, CycloneDX on stdout; many findings on import lines; category names such as `HASHING (see usage)` stay `undefined` |
-| `cryptarium` | observer | Java, Python, Go, JS, C | disqualified by the bar (0 everywhere: no locations); v0.3.0, `-deterministic`; its CBOM has no locations (only its JSON format has them; benchmarked as shipped) |
-| `qscan` | observer | Java, Python, Go, JS, C, Rust, C#, Ruby, PHP | disqualified by the bar (5 of 14 in every language); quantakrypto npm 0.12.0, offline (no `--triage`/`--audit`); quantum-vulnerable crypto only; exit 1 = findings |
+| `qelens` | qelens | Python, JS | disqualified by the bar (5 of 14 in Python); crate `cbom` 0.1.2, CycloneDX on stdout; many findings on import lines; category names such as `HASHING (see usage)` stay `undefined` |
+| `cryptarium` | cryptarium | Java, Python, Go, JS, C | disqualified by the bar (0 everywhere: no locations); v0.3.0, `-deterministic`; its CBOM has no locations (only its JSON format has them; benchmarked as shipped) |
+| `qscan` | qscan | Java, Python, Go, JS, C, Rust, C#, Ruby, PHP | disqualified by the bar (5 of 14 in every language); quantakrypto npm 0.12.0, offline (no `--triage`/`--audit`); quantum-vulnerable crypto only; exit 1 = findings |
 | `cryptoscope` | – | Java | blocked: the implementation is not public; artifact requested from Moffie et al. |
 
 ---
@@ -348,10 +352,11 @@ where they declare support, but no analysis, figure or tuning effort goes into t
   8 GiB), sizes recorded at pin time. Headline agreement at L4 0.78-0.81 (exact matcher) against RaQuN's 0.58-0.59;
   RQ6 F1 per tool and language filled with CIs; cdxgen OOM-killed 8 times at 24 GiB (read as `oom`), disqualified
   anyway. stability-pilot and mutation-smoke were not in this round (the user runs them).
-- **Decided 2026-10-29, to build:** the observer role goes (`role: observer` in `tools.yaml`, `--observers-vote`,
+- **Done 2026-10-30:** the observer role is gone (`role: observer` in `tools.yaml`, `--observers-vote`,
   `common/tools_registry.py:votes`, the `role` columns of `levels-`, `items-`, `score-run<i>.csv` and the `°` mark:
-  the bar exam is the one filter, the three observers are disqualified by it). The stale `micro_2026-10-17` lines
-  in `tools.yaml` go with it: the bar's verdicts are recorded in the bar-micro export, nothing in code reads them.
+  the bar exam is the one filter, the three former observers are disqualified by it; every tool votes, the voter
+  groups stay). The stale `micro_2026-10-17` and `pilot` lines in `tools.yaml` went with it: the bar's verdicts are
+  recorded in the bar-micro export, nothing in code reads them.
 - **Done 2026-10-29:** the catalogs have eight decoy kinds (four added: a variable named after an algorithm, a hex
   constant shaped like a key, a URL ending in `.sha256`, a certificate file path; the planted calls stay as they
   are, for simplicity); the micro projects and their ground truth are regenerated (catalog and truth version
@@ -380,7 +385,7 @@ where they declare support, but no analysis, figure or tuning effort goes into t
 - **Small open analysis items:** CryptobomForge's IBM-draft windows are CodeQL's `contextRegion` (finding ±2 lines),
   so the exact line could be read as the window centre (one over-credit on micro-python); Jaro-Winkler candidates
   for curating the mapping table; per-field columns in `micro-run<i>.csv`; inferring `functions` from API names.
-- **Next:** the 11 tools into the specs (the user) -> the observer cleanup -> on the VM: stability-pilot,
+- **Next:** on the VM: stability-pilot,
   mutation-smoke, `make experiment-delete NAME=<x>` for the former smoke experiments e0-smoke, e0-cbomkit-smoke,
   e0-llm-smoke, e0-phase2-smoke and the runs under the old spec names e0-micro, e0-stability, e1-pilot-corpus,
   e1-icpc-corpus, e1-pilot-60, e4-mutation-smoke; corpus-main built with `GITHUB_TOKEN` (`make corpus
@@ -446,7 +451,7 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
   - `record_id` = `<tool>:<component>:<occurrence>`, `site_id` = `<tool>:<file>:<line>`.
 - **RQ3, and RQ2's traceability** (`schema.py`): whole-document validation against the vendored schemas (`jsonschema`
   with an offline `referencing` registry), split by `cbom_by` (refinement 3); the tools' CycloneDX versions stay as
-  shipped (1.6: CBOMkit, cbomkit-jar, CryptoScan, pqcheck, securin-xbom, xgrep and the observers; 1.7: cdxgen,
+  shipped (1.6: CBOMkit, cbomkit-jar, CryptoScan, pqcheck, securin-xbom, xgrep, qelens, Cryptarium and qScan; 1.7: cdxgen,
   CipherRadar, CipherSift, Q-DARPAN, SCANOSS; CryptobomForge IBM's draft, its own empty draft document when CodeQL
   finds nothing; what BF-CBOM writes itself, the LLM assembly, is 1.7); "meaningful" shares per CycloneDX asset type
   with the standard's own fields for that type (standard fields vs any source; no tautological assetType column);
@@ -493,9 +498,6 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
   items in ≥ 3 repos and ≥ 10 items** (`MIN_REPOS`, `MIN_ITEMS`); exclusivity; majority coverage (the share of the
   repo's majority items the tool reports, a recall proxy next to confirmation's precision proxy); Dawid-Skene (binary
   EM without labels, seeded from the majority vote) and leave-one-voter-out with Kendall τ as sensitivity checks. Tailored (tool, repo) pairs are excluded (`--include-tailored`).
-  Observers (`role: observer`) get rates and CIs, confirmed by the voters, but confirm nobody and get no rank; the
-  rule is `common/tools_registry.py:votes` on the voter map, used by the ladder, the matchers' agreement and k, and
-  the scores; the `role` column marks them in `levels-`, `items-` and `score-run<i>.csv`.
   `stability.py`: Jaccard across repeated runs and majority consensus sets (`--consensus`).
 - **Tables** (`tables.py`), flat long-format CSVs in three layers, so new matchers only add files: **runs**
   (`runs.csv`, one row per stored run with status, timing, memory, provenance, LLM usage and `cost_usd`), **records**

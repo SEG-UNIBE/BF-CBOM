@@ -26,9 +26,7 @@ groups (`analysis/levels.py` clusters, one per key at the level): a tool's item 
 of its records for that item also holds a record of another voter group, so attached generic reports (SHA-2 next to
 SHA-256) confirm and are confirmed, and a group is never counted twice however many units it spans. (tool,
 repository) pairs the tool was tuned on (`tailored_on`, refinement 13) are left out: they neither count for the tool
-nor confirm the others. Observers (`role: observer` in common/tools.yaml) get their rates and CIs, confirmed by the
-voters, but confirm nobody, make nothing non-exclusive, are no Dawid-Skene annotators and are never ranked, so the
-voters' numbers are the same with and without them.
+nor confirm the others.
 """
 
 from __future__ import annotations
@@ -38,8 +36,6 @@ import statistics
 from collections import defaultdict
 from dataclasses import dataclass, field
 
-from common.tools_registry import role, votes
-
 from .levels import UNIT_LEVEL, identity, parameter_at
 from .matchers import PARAMETER_DIMS, MatchGroup
 from .normalize.vocab import Vocabulary, load_vocabulary
@@ -48,7 +44,7 @@ DIMS = ("algorithm", *PARAMETER_DIMS, "location")
 MIN_REPOS = 3  # a tool is ranked only with items in at least this many repositories ...
 MIN_ITEMS = 10  # ... and at least this many items in total
 SCORE_COLUMNS = [
-    "dimension", "level", "tool", "voter_group", "role", "repos", "items", "confirmed", "rate", "rate_pooled", "ci_low",
+    "dimension", "level", "tool", "voter_group", "repos", "items", "confirmed", "rate", "rate_pooled", "ci_low",
     "ci_high", "exclusive", "exclusivity", "majority_items", "majority_covered", "coverage", "rank", "ds_support",
     "ds_sensitivity", "ds_specificity",
 ]  # fmt: skip
@@ -83,9 +79,6 @@ class Observations:
     def voter(self, tool: str) -> str:
         return self.voter_of.get(tool, tool)
 
-    def votes(self, tool: str) -> bool:
-        return votes(self.voter_of, tool)
-
     def tallies(self, snapshot: str, dim: str) -> dict[str, Tally]:
         """Per tool in `snapshot`: its items of `dim`, those confirmed (another voter group inside a shared group
         reports the item: any item for algorithm and location, the same value for a parameter) and those exclusive
@@ -97,20 +90,18 @@ class Observations:
         contested: dict[str, set] = defaultdict(set)  # another voter group reports something inside a shared group
         unit_voters: dict[str, set[str]] = defaultdict(set)  # algorithm -> voter groups reporting it (any group)
         for aset in self.sets.get(key, []):
-            voters = {self.voter(t) for t, its in aset.items() if its and self.votes(t)}  # observers confirm nobody
+            voters = {self.voter(t) for t, its in aset.items() if its}
             for tool, its in aset.items():
                 mine = self.voter(tool)
                 others = voters - {mine}
                 for item in its:
                     out[tool].items.add(item)
-                    if self.votes(tool):
-                        unit_voters[item if dim == "algorithm" else item[0]].add(mine)
+                    unit_voters[item if dim == "algorithm" else item[0]].add(mine)
                     if not others:
                         continue
                     contested[tool].add(item)
                     if dim in ("algorithm", "location") or any(
-                        self.voter(t2) != mine and self.votes(t2) and any(v2 == item[1] for _, v2 in its2)
-                        for t2, its2 in aset.items()
+                        self.voter(t2) != mine and any(v2 == item[1] for _, v2 in its2) for t2, its2 in aset.items()
                     ):
                         out[tool].confirmed.add(item)
         for tool, t in out.items():
@@ -237,16 +228,16 @@ def majority_coverage(
     obs: Observations, dim: str, snapshots: list[str] | None = None
 ) -> dict[str, list[tuple[int, int]]]:
     """{tool: per snapshot it ran on, (its items among the snapshot's majority items, the majority items)}: the
-    majority items are those reported by at least half of the voter groups that ran there (observers report but
-    do not count towards the majority). A recall proxy next to confirmation's precision proxy. Empty for
-    `location` (call sites are compared by window, not by equality) and for snapshots without a majority item."""
+    majority items are those reported by at least half of the voter groups that ran there. A recall proxy next to
+    confirmation's precision proxy. Empty for `location` (call sites are compared by window, not by equality) and
+    for snapshots without a majority item."""
     out: dict[str, list[tuple[int, int]]] = {t: [] for t in obs.tools}
     if dim == "location":
         return out
     snapshots = sorted(obs.snapshots) if snapshots is None else snapshots
     for snapshot in snapshots:
         ran = obs.ran.get(snapshot, set())
-        voters = {obs.voter(t) for t in ran if obs.votes(t)}
+        voters = {obs.voter(t) for t in ran}
         if not voters:
             continue
         by_item: dict = defaultdict(set)
@@ -254,9 +245,8 @@ def majority_coverage(
         for aset in obs.sets.get((snapshot, dim), []):
             for tool, its in aset.items():
                 reported[tool] |= its
-                if obs.votes(tool):
-                    for it in its:
-                        by_item[it].add(obs.voter(tool))
+                for it in its:
+                    by_item[it].add(obs.voter(tool))
         majority = {it for it, vs in by_item.items() if 2 * len(vs) >= len(voters)}
         if not majority:
             continue
@@ -336,19 +326,14 @@ def spearman(a: dict[str, float], b: dict[str, float]) -> float | None:
     return round(cov / (va * vb) ** 0.5, 3)
 
 
-def _voting(obs: Observations, per_tool: dict) -> dict:
-    """The entries of the tools that vote (observers are never ranked)."""
-    return {t: v for t, v in per_tool.items() if obs.votes(t)}
-
-
 def leave_one_out(obs: Observations, dim: str, *, min_repos: int = MIN_REPOS, min_items: int = MIN_ITEMS) -> list[dict]:
-    """Rankings without each voter group and their Kendall tau against the full ranking (voters only)."""
-    full = ranking(_voting(obs, repo_rates(obs, dim)), confirmation(obs, dim), min_repos=min_repos, min_items=min_items)
+    """Rankings without each voter group and their Kendall tau against the full ranking."""
+    full = ranking(repo_rates(obs, dim), confirmation(obs, dim), min_repos=min_repos, min_items=min_items)
     rows = []
-    for voter in sorted({obs.voter(t) for t in obs.tools if obs.votes(t)}):
+    for voter in sorted({obs.voter(t) for t in obs.tools}):
         reduced = obs.without(voter)
         order = ranking(
-            _voting(reduced, repo_rates(reduced, dim)),
+            repo_rates(reduced, dim),
             confirmation(reduced, dim),
             min_repos=min_repos,
             min_items=min_items,
@@ -378,9 +363,7 @@ def grouping_rows(
         for name, obs in by_grouping.items():
             pooled = confirmation(obs, dim)
             if any(n for n, _, _ in pooled.values()):
-                orders[name] = ranking(
-                    _voting(obs, repo_rates(obs, dim)), pooled, min_repos=min_repos, min_items=min_items
-                )
+                orders[name] = ranking(repo_rates(obs, dim), pooled, min_repos=min_repos, min_items=min_items)
         if names[0] not in orders:
             continue
         for name in names:
@@ -392,7 +375,7 @@ def grouping_rows(
                     "dimension": dim,
                     "level": obs.level,
                     "grouping": name,
-                    "voter_groups": len({obs.voter(t) for t in obs.tools if obs.votes(t)}),
+                    "voter_groups": len({obs.voter(t) for t in obs.tools}),
                     "ranked": len(orders[name]),
                     "kendall_tau": kendall_tau(orders[names[0]], orders[name]),
                     "ranking": orders[name],
@@ -426,14 +409,14 @@ def dawid_skene(obs: Observations, *, iterations: int = 50, tol: float = 1e-6) -
     "iterations": n}. Seeded from the majority vote (share of present voters that report the item)."""
     # every voter group that ran somewhere is an annotator, also one that never reported an algorithm (cdxgen on
     # Java): its silence counts against the items of the snapshots it was present in
-    voting = {t for t in obs.tools | {t for ts in obs.ran.values() for t in ts} if obs.votes(t)}  # no observers
+    voting = obs.tools | {t for ts in obs.ran.values() for t in ts}
     voters = sorted({obs.voter(t) for t in voting})
     reports: dict[tuple[str, str], set[str]] = {}  # item -> voters reporting it (sorted keys: reproducible sums)
     present: dict[str, list[str]] = {}  # snapshot -> voters present
     for snapshot in sorted(obs.snapshots):
-        present[snapshot] = sorted({obs.voter(t) for t in obs.ran[snapshot] if obs.votes(t)})
+        present[snapshot] = sorted({obs.voter(t) for t in obs.ran[snapshot]})
         tallies = obs.tallies(snapshot, "algorithm")
-        for tool in sorted(t for t in obs.tools if obs.votes(t)):
+        for tool in sorted(obs.tools):
             for key in sorted(tallies.get(tool, Tally()).items):
                 reports.setdefault((snapshot, key), set()).add(obs.voter(tool))
     reports = dict(sorted(reports.items()))
@@ -498,7 +481,7 @@ def score_rows(
             continue
         rates = repo_rates(obs, dim)
         coverage = majority_coverage(obs, dim)
-        order = ranking(_voting(obs, rates), pooled, min_repos=min_repos, min_items=min_items)
+        order = ranking(rates, pooled, min_repos=min_repos, min_items=min_items)
         cis = bootstrap_ci(obs, dim, samples=samples, seed=seed) if samples else {}
         for tool in sorted(pooled):
             n, c, e = pooled[tool]
@@ -513,7 +496,6 @@ def score_rows(
                 "level": obs.level,
                 "tool": tool,
                 "voter_group": voter,
-                "role": role(obs.voter_of, tool),
                 "repos": len(rates[tool]),
                 "items": n,
                 "confirmed": c,
@@ -531,7 +513,7 @@ def score_rows(
                 "ds_sensitivity": None,
                 "ds_specificity": None,
             }
-            if dim == "algorithm" and ds["posterior"] and obs.votes(tool):
+            if dim == "algorithm" and ds["posterior"]:
                 mine = [
                     ds["posterior"][(s, k)]
                     for s in sorted(obs.snapshots)

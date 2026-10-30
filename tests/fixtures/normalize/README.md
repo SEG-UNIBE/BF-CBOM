@@ -1,7 +1,7 @@
 # Normaliser fixtures
 
 Small excerpts (a few components each, occurrences trimmed to two or three) of real CBOMs from experiment
-`e1-pilot-corpus` (16 pinned projects, run on 2026-10-16), and complete CBOMs of the observer tools on one micro
+`e1-pilot-corpus` (16 pinned projects, run on 2026-10-16), and complete CBOMs of the disqualified tools on one micro
 project each. Each file names its source snapshots in
 `metadata.properties` (`bf-cbom:fixture-origin`). They pin the per-tool quirks the adapter specs in
 `analysis/adapters/` handle; `tests/test_normalize.py` uses them.

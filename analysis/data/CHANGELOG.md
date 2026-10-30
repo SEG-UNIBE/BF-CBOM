@@ -5,6 +5,10 @@ refinement 14): they were developed on the pilot corpus (the development set); t
 change bumps `version` in `algorithms.yaml`, adds an entry here with the fingerprint `python -m analysis.freeze`
 prints and the reason, and the tests fail otherwise (`tests/test_vocab_frozen.py`). Newest entry first.
 
+## 2026-10-30.1 (2026-10-30) fingerprint `63acd59c4e6694933afe34c36265e601383b77ad303145c861d9f7abce6f5178`
+Comments only, no reading changes: the observer role went (2026-10-30); the notes of the qelens, qScan and Cryptarium
+specs no longer call them observers.
+
 ## 2026-10-29.1 (2026-10-29) fingerprint `187d6e58629d5e8c50edeb0fb16e97082bdcc7f934451d43873c4a65be544645`
 Metadata only, no reading changes: every entry of `additions:` (the families the CycloneDX registry lacks) carries a
 `gap:` kind for RQ4's delta table (`registry-run<i>.csv`): `missing-family` (CSPRNG, FN-DSA, NTRU-Prime, Hybrid-KEM,

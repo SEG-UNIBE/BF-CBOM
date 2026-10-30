@@ -10,7 +10,7 @@ ARG BASE_TAG=latest
 # ---- build stage (image index digest of golang:1.26-bookworm, 2026-10-15)
 FROM golang:1.26-bookworm@sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c AS gobuild
 ARG PQCHECK_REPO=https://github.com/Rafael-Ryu/pqcheck
-ARG PQCHECK_COMMIT=3e99c74
+ARG PQCHECK_COMMIT=c0ccf5be96e71add49c9d9865b020a279d1f1a4a
 ARG TARGETARCH
 RUN git clone --quiet "${PQCHECK_REPO}" /src && git -C /src checkout --quiet "${PQCHECK_COMMIT}"
 WORKDIR /src/tools/crypto-analyzer
@@ -23,7 +23,7 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
 
 # ---- runtime
 FROM ${BASE_IMAGE}:${BASE_TAG}
-ARG PQCHECK_COMMIT=3e99c74
+ARG PQCHECK_COMMIT=c0ccf5be96e71add49c9d9865b020a279d1f1a4a
 ARG PQCHECK_VERSION=0.1.0
 
 USER root

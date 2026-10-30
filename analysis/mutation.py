@@ -28,7 +28,7 @@ from collections import defaultdict
 from statistics import mean, median
 
 from common.experiment import ORIGINAL_VARIANT, repo_dir_name
-from common.tools_registry import role, voter_groups
+from common.tools_registry import voter_groups
 
 from .levels import identity
 from .normalize.vocab import Vocabulary, load_vocabulary
@@ -46,19 +46,19 @@ MUTANTS_COLUMNS = [
     "host_callers", "host_entry", "imports_added", "qualified", "patch",
 ]  # fmt: skip
 MUTATION_COLUMNS = [
-    "repo", "snapshot", "language", "variant", "snippet", "style", "kind", "tool", "voter_group", "role", "status",
+    "repo", "snapshot", "language", "variant", "snippet", "style", "kind", "tool", "voter_group", "status",
     "runs_mutant", "runs_original", "unit", "masked", *DETECTIONS, "false_positive", *PARAMETERS, "extra_units",
     "lost_units", "extra_sites", "lost_sites", "new_records",
 ]  # fmt: skip
 SCORE_COLUMNS = [
-    "tool", "voter_group", "role", "language", "style", "repos", "calls", "found_site", "found_group", "decoys",
+    "tool", "voter_group", "language", "style", "repos", "calls", "found_site", "found_group", "decoys",
     "decoys_hit", "recall_site", "recall_low", "recall_high", "recall_group", "precision", "f1", "f1_low", "f1_high",
     "supported", "tailored", "offedit_mutants", "offedit_share", "extra_units_median", "extra_sites_median",
     "baseline_flux", "baseline_changed",
 ]  # fmt: skip
 BRIDGE_COLUMNS = ["language", "tool", "confirmation", "f1", "n", "spearman", "kendall_tau"]
 RATE_COLUMNS = [
-    "tool", "voter_group", "role", "language", "style", "dimension", "repos", "mutants", "detected", "rate",
+    "tool", "voter_group", "language", "style", "dimension", "repos", "mutants", "detected", "rate",
     "pooled", "ci_low", "ci_high", "supported",
 ]  # fmt: skip
 
@@ -287,7 +287,6 @@ def detection_rows(
                     "kind": "decoy" if m.get("decoy") else "call",
                     "tool": tool,
                     "voter_group": voter_of.get(tool, tool),
-                    "role": role(voter_of, tool),
                 }
                 mutant_runs = records.get((snapshot, m["id"], tool), {})
                 original_runs = records.get((snapshot, ORIGINAL_VARIANT, tool), {})
@@ -333,7 +332,7 @@ def rate_rows(rows: list[dict], *, samples: int = 200, seed: int = BOOTSTRAP_SEE
     for r in rows:
         if r.get("status") != "ok":
             continue
-        meta[r["tool"]] = {"voter_group": r["voter_group"], "role": r["role"]}
+        meta[r["tool"]] = {"voter_group": r["voter_group"]}
         for dim in DIMENSIONS:
             v = r.get(dim)
             if v is None:
@@ -443,7 +442,7 @@ def score_rows(
     for r in rows:
         if r.get("status") != "ok":
             continue
-        meta[r["tool"]] = {"voter_group": r["voter_group"], "role": r["role"]}
+        meta[r["tool"]] = {"voter_group": r["voter_group"]}
         key = (r["tool"], r["language"])
         offedit[key].append((_count(r.get("extra_units")), _count(r.get("extra_sites"))))
         if r.get("kind") == "decoy":

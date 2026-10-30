@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1.7
 # docker/Dockerfile.worker-cryptarium
 # cryptarium (Apache-2.0): Go/tree-sitter scanner with embedded YAML rule packs, CycloneDX CBOM output.
-# Built with `go install` at the pinned release tag (go.sum pins the dependencies). Observer (common/tools.yaml role).
+# Built with `go install` at the pinned release tag (go.sum pins the dependencies).
+# Disqualified by the bar exam (2026-10-23); run on bar-micro only.
 ARG BASE_IMAGE=base
 ARG BASE_TAG=latest
 

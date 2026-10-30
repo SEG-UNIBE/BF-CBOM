@@ -184,41 +184,6 @@ def test_xdh_attaches_to_x25519_and_x448_without_merging_them():
     assert not items["X25519"].confirmed_strictly_at("L4", "a", voters)
 
 
-def test_observers_get_ladder_rows_but_confirm_nobody():
-    from common.tools_registry import VoterMap, voter_groups
-
-    records = {("s", "a"): _records("a", "AES", "SHA-256"), ("s", "b"): _records("b", "aes")}
-    observer = {("s", "o"): _records("o", "AES", "SHA-256", "MD5")}
-    plain = {(r.dimension, r.level, r.tool): r.to_dict() for r in ladder(records, VoterMap({}))}
-    voter_of = VoterMap({}, observers={"o"})
-    rows = {(r.dimension, r.level, r.tool): r.to_dict() for r in ladder({**records, **observer}, voter_of)}
-    assert {k: v for k, v in rows.items() if k[2] != "o"} == plain  # voters and the pooled `all` rows: unchanged
-    o = rows[("algorithm", "L4", "o")]
-    assert (o["items"], o["confirmed"], o["role"]) == (3, 2, "observer")  # AES and SHA-256 confirmed by a, b
-    assert rows[("algorithm", "L4", "a")]["confirmed"] == 1  # a's SHA-256: only the observer reports it, no vote
-    algos = item_rows({("s", "original", t): recs for (_, t), recs in {**records, **observer}.items()}, voter_of, run=1)
-    md5 = next(r for r in algos if r["unit"] == "MD5")
-    assert (md5["role"], md5["k_L4"]) == ("observer", 0)  # only an observer reports it: no voter group
-    assert voter_groups({"x": {"role": "observer"}, "y": {}}).observers == {"x"}
-    assert voter_groups({"x": {"role": "observer"}}, observers_vote=True).observers == frozenset()
-
-
-def test_an_item_only_an_observer_reports_is_no_matchlevels_item():
-    # micro-java (e0-stability, 2026-10-22): qScan alone reported ECDH, the voters' generic EC records were attached
-    # to its cluster, and matchlevels counted ECDH as an item with k = 4
-    from analysis.matchers import ExactMatcher
-    from analysis.tables import matchlevel_row
-    from common.tools_registry import VoterMap
-
-    voter_of = VoterMap({}, observers={"o"})  # empty, yet it must keep its observers
-    voters = _records("a", "EC") + _records("b", "EC", "AES")
-    rows = []
-    for records in (voters, voters + _records("o", "ECDH", "AES")):
-        groups = ExactMatcher(level="L3", voter_of=voter_of).match(records)
-        rows.append(matchlevel_row("exact", "L3", 1, {("s", "original"): groups}, voter_of))
-    assert rows[0]["items"] == 2 and rows[1] == rows[0]
-
-
 def test_items_record_whether_their_family_is_the_registrys_and_the_delta_table_is_complete():
     """RQ4: `registry` on every item (its family is a CycloneDX registry entry, not an addition of algorithms.yaml),
     and registry-run<i>.csv lists every addition once with the items behind it, the units under no family and the

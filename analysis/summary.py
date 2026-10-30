@@ -61,7 +61,7 @@ FILES = {
     "existing at the commit, in range, strong",
     "vocab.csv": "what every raw value mapped to, per tool and source (the reviewable mapping table)",
     "groups-exact-run{i}.csv": "exact matcher: one row per group (repo scope per item, site scope per call site; "
-    "`member_voter_groups` = 0: no voter's own record, no item)",
+    "`member_voter_groups` = 0: only attached records, no item)",
     "members-exact-run{i}.csv": "exact matcher: one row per (group, record); `matched` = joined through a lower "
     "level, `implied` with --closure",
     "matchlevels-run{i}.csv": "per matcher and level, items by number of voter groups, the agreement per "
@@ -191,15 +191,6 @@ def _false(v) -> bool:
 
 VERDICT_MARK = {"pass": "✅", "fail": "⛔"}  # a micro project's verdict in the entry-exam table (RQ1)
 ENTRY_MARK = {"passed": "✅", "disqualified": "⛔"}  # the tool's entry-bar verdict
-OBSERVER_NOTE = (
-    "`°` = observer (tools.yaml `role`): confirmed by the voters like every tool, but it confirms nobody, is in no "
-    "pooled row and no k, and gets no rank (`--observers-vote` makes it a voter)."
-)
-
-
-def _tool(r: dict) -> str:
-    """The tool's name, marked when it is an observer in this report."""
-    return f"{r['tool']} °" if r.get("role") == "observer" else r["tool"]
 
 
 def _lang_key(lang: str) -> tuple[int, str]:
@@ -246,10 +237,6 @@ def _reading() -> list[str]:
         'never confirms itself (section "Voter groups"). A tool\'s item is **confirmed** when a tool of another voter '
         "group reports it too. **k** = the number of voter groups that report an item (k=1: one group only, "
         "unconfirmed).",
-        "- **Observer** (`°` after its name): a tool the registry marks `role: observer` (`common/tools.yaml`; a "
-        "transitional role of the tools below the colleague's pilot bar). Its items are checked against the voters "
-        "like everyone's, but it confirms nobody and counts in no k, so the voters' numbers are the same with and "
-        "without it. The entry exam's verdicts of this run (RQ1) do not set the role.",
         "- **Cells**: `–` = the repository's language is outside the tool's languages (not run), `×` = the run "
         "failed or timed out, empty = nothing to show; `1'234` = 1234; every share is a fraction with two decimals "
         "(`0.43` = 43 %, `1.00` = all). Cells that combine numbers (`a / b`, `x (y)`, `rate [low, high]`) are "
@@ -508,6 +495,48 @@ def _size_strata(repos: list[dict]) -> list[str]:
         *md_table(["language", *labels, "all"], table, "l" + "r" * (len(labels) + 1)),
         "",
     ]
+
+
+VERSION_RULE = (
+    "Images built since 2026-10-30 follow one rule (`docs/tool-versions.md` lists the pins): the latest stable "
+    "release published by 30 October 2026, pre-releases and nightly builds excluded; a tool without any stable release "
+    "at its default branch's last commit on that date; an engine a tool's own build bundles at the version the tool "
+    "pins. Runs of older images show older versions here."
+)
+
+
+def _versions(rows: list[dict]) -> list[str]:
+    """What ran, per tool, as every stored run recorded it (`tool_version`, `image_ref`, `bfcbom_commit` in runs.csv):
+    one row per tool, several values joined when the runs disagree, which the text then flags."""
+    ran = [r for r in rows if r.get("tool_version") or r.get("image_ref")]
+    if not ran:
+        return []
+    by_tool: dict[str, list[dict]] = defaultdict(list)
+    for r in ran:
+        by_tool[r["tool"]].append(r)
+    table, mixed = [], []
+    for tool in sorted(by_tool):
+        rs = by_tool[tool]
+        cells = [sorted({r.get(k) or "" for r in rs} - {""}) for k in ("tool_version", "image_ref", "bfcbom_commit")]
+        if any(len(c) > 1 for c in cells):
+            mixed.append(tool)
+        table.append([tool, *["; ".join(f"`{v}`" for v in c) for c in cells], len(rs)])
+    lines = [
+        "### Tool versions",
+        "",
+        "What ran, as every stored run recorded it: the tool's version string (for a tool built from source, its "
+        "pinned commit), the worker image and the BF-CBOM commit the image was built from (`-dirty`: built with "
+        "uncommitted changes). " + VERSION_RULE,
+        "",
+    ]
+    lines += md_table(["tool", "tool version", "image", "BF-CBOM commit", "runs"], table, "llllr")
+    if mixed:
+        lines += [
+            "",
+            f"⛔ Runs of {', '.join(f'`{t}`' for t in mixed)} disagree on what ran (a worker rebuilt between "
+            "sessions): their numbers mix versions; rerun the experiment whole (`--overwrite-old`).",
+        ]
+    return lines + [""]
 
 
 def _runs(rows: list[dict]) -> list[str]:
@@ -1029,7 +1058,7 @@ def _places(units: list[dict]) -> list[str]:
         shares = [_pct(_int(u.get(f"loc_{k}")) / total if total else None) for k in LOCATION_KINDS]
         located = total - _int(u.get("loc_none"))
         outside = _pct(_int(u.get("outside_code")) / located) if located and "outside_code" in u else ""
-        table.append([_tool(u), total, *shares, outside])
+        table.append([u["tool"], total, *shares, outside])
     unread = sum(_int(u.get("loc_unread")) for u in units)
     lines = [
         "**Places per tool**: where a tool's algorithm records point, as shares of its `records`:",
@@ -1061,8 +1090,7 @@ def _units_per_repo(unit_repos: list[dict]) -> list[str]:
     """Each tool's assets / records / items per repository (units-repo-run<i>.csv), with the sums of the units table."""
     if not unit_repos:
         return []
-    roles = {r["tool"]: r.get("role") for r in unit_repos}
-    tools = sorted(roles)
+    tools = sorted({r["tool"] for r in unit_repos})
     repos = sorted({(r["repo"], (r.get("language") or "").lower()) for r in unit_repos},
                    key=lambda x: (_lang_key(x[1] or "?"), x[0]))  # fmt: skip
     counts = ("assets", "records", "items")
@@ -1080,7 +1108,7 @@ def _units_per_repo(unit_repos: list[dict]) -> list[str]:
         "each column. The matchers, the ladder and the scores compare the items one repository at a time.",
         "",
     ]
-    header = ["repo", "language", *[_tool({"tool": t, "role": roles[t]}) for t in tools]]
+    header = ["repo", "language", *tools]
     lines += md_table(header, matrix, "ll" + "r" * len(tools))
     eg = next(((repo, t, by_pair[(repo, t)]) for repo, _ in repos for t in tools
                if (repo, t) in by_pair and _int(by_pair[(repo, t)]["records"]) > _int(by_pair[(repo, t)]["items"])),
@@ -1255,7 +1283,7 @@ def _rq2(
     if units:
         table = [
             [
-                _tool(u),
+                u["tool"],
                 u.get("packaging") or "unknown",
                 u["cboms"],
                 u["assets"],
@@ -1306,14 +1334,13 @@ def _rq2(
         by_tool: dict[str, dict[str, dict]] = defaultdict(dict)
         for r in cov:
             by_tool[r["tool"]][r["dimension"]] = r
-        roles = {u["tool"]: u.get("role") for u in units}
         table = []
         for tool in sorted(by_tool):
             dims = by_tool[tool]
             first = next(iter(dims.values()))
             assets = _int(first["assets"])
             table.append(
-                [_tool({"tool": tool, "role": roles.get(tool)}), assets]
+                [tool, assets]
                 + [_pct(_int(first[k]) / assets if assets else None) for k in RESOLUTION_SHOWN]
                 + [_pct(dims.get(d, {}).get("reported_share")) for d in COVERAGE_SHOWN]
             )
@@ -1333,8 +1360,6 @@ def _rq2(
         ]
         header = ["tool", "algorithm assets", *RESOLUTION_SHOWN, *[d.replace("_", " ") for d in COVERAGE_SHOWN]]
         lines += md_table(header, table, "lr" + "r" * (len(RESOLUTION_SHOWN) + len(COVERAGE_SHOWN))) + [""]
-    if any(u.get("role") == "observer" for u in units):
-        lines += [OBSERVER_NOTE, ""]
     return lines + _traceability(trace) + _runtime(runtime or [])
 
 
@@ -1894,7 +1919,7 @@ def _scores(rows: list[dict], loo: list[dict], grouping: list[dict] | None = Non
             ci = f" [{_pct(r['ci_low'])}, {_pct(r['ci_high'])}]" if r.get("ci_low") not in (None, "") else ""
             row = [
                 r.get("rank") or "–",
-                _tool(r),
+                r["tool"],
                 r["voter_group"],
                 r.get("repos", ""),
                 r["items"],
@@ -1924,8 +1949,6 @@ def _scores(rows: list[dict], loo: list[dict], grouping: list[dict] | None = Non
             lines += _eg(example)
             shown = True
         lines += [""]
-    if any(r.get("role") == "observer" for r in rows):
-        lines += [OBSERVER_NOTE, ""]
     if loo:
         by_dim: dict[str, list[dict]] = defaultdict(list)
         for r in loo:
@@ -2078,7 +2101,6 @@ def _mutation(
         "",
     ]
     cell = {(r["tool"], r["language"], r["style"], r["dimension"]): r for r in rates}
-    role = {r["tool"]: r.get("role") for r in rows}
     pairs = sorted({(r["tool"], r["language"]) for r in rows}, key=lambda tl: (_lang_key(tl[1] or ""), tl[0]))
     table = []
     for tool, lang in pairs:
@@ -2090,7 +2112,7 @@ def _mutation(
         ok = [r for r in rows if (r["tool"], r["language"]) == (tool, lang) and r.get("status") == "ok"]
         masked = sum(_true(r.get("masked")) for r in ok)
         table.append(
-            [lang, _tool({"tool": tool, "role": role.get(tool)})]
+            [lang, tool]
             + [show(st, "found_site") for st in styles]
             + [show("all", "found_span"), show("all", "found_repo"), masked, len(ok)]
         )
@@ -2105,8 +2127,6 @@ def _mutation(
             f"`{c}` under site, {st} for {row[1]} in {row[0]}: {row[1]} reported the inserted algorithm at the "
             f"inserted call in {detected} of the {judged} judged {st} mutant(s)."
         )
-    if any(r.get("role") == "observer" for r in rows):
-        lines += ["", OBSERVER_NOTE]
     failed = Counter(r.get("status") or "missing" for r in rows if r.get("status") != "ok")
     if failed:
         why = "; ".join(
@@ -2115,8 +2135,8 @@ def _mutation(
         )
         lines += ["", f"Not judged ({_n(sum(failed.values()))} planted call × tool, by the status of the run on the "
                   f"mutant, `original <status>` for the original's; `status` in `mutation.csv`): {why}."]  # fmt: skip
-    lines += _mutation_scores(scores or [], role)
-    lines += _offedit(scores or [], role)
+    lines += _mutation_scores(scores or [])
+    lines += _offedit(scores or [])
     lines += _bridge(bridge or [])
     lines += ["", f"### Mutant patches (first {min(MUTANT_PATCHES, len(mutants))} of {_n(len(mutants))})", ""]
     for m in mutants[:MUTANT_PATCHES]:
@@ -2131,7 +2151,7 @@ TAILORED_CATALOG_NOTE = (
 )
 
 
-def _mutation_scores(scores: list[dict], role: dict) -> list[str]:
+def _mutation_scores(scores: list[dict]) -> list[str]:
     """Recall, precision and F1 on the planted items (mutation-scores.csv), style `all`."""
     rows = [s for s in scores if s.get("style") == "all"]
     if not rows:
@@ -2173,7 +2193,7 @@ def _mutation_scores(scores: list[dict], role: dict) -> list[str]:
         table.append(
             [
                 s["language"],
-                _tool({"tool": s["tool"], "role": role.get(s["tool"])}) + (r"\*" if _true(s.get("tailored")) else ""),
+                s["tool"] + (r"\*" if _true(s.get("tailored")) else ""),
                 s["calls"],
                 ci(_float(s["recall_site"]), _float(s.get("recall_low")), _float(s.get("recall_high"))),
                 _pct(s["recall_group"]),
@@ -2200,7 +2220,7 @@ def _mutation_scores(scores: list[dict], role: dict) -> list[str]:
     return lines
 
 
-def _offedit(scores: list[dict], role: dict) -> list[str]:
+def _offedit(scores: list[dict]) -> list[str]:
     """RQ6's side finding: the changes a tool reports outside the inserted lines (mutation-scores.csv, style `all`),
     read against its run-to-run noise floor from a stability experiment (`--baseline`)."""
     rows = [s for s in scores if s.get("style") == "all" and s.get("offedit_share") not in (None, "")]
@@ -2236,7 +2256,7 @@ def _offedit(scores: list[dict], role: dict) -> list[str]:
         table.append(
             [
                 s["language"],
-                _tool({"tool": s["tool"], "role": role.get(s["tool"])}),
+                s["tool"],
                 judged,
                 s["offedit_mutants"],
                 _pct(s["offedit_share"]),
@@ -2467,11 +2487,9 @@ def _voters(info: dict) -> list[str]:
         return []
     groups: dict[str, list[str]] = defaultdict(list)
     for tool, v in voters.items():
-        if v.get("role") != "observer":
-            groups[v.get("voter_group") or tool].append(tool)
+        groups[v.get("voter_group") or tool].append(tool)
     shared = {g: ts for g, ts in sorted(groups.items()) if len(ts) > 1}
     single = sorted(ts[0] for ts in groups.values() if len(ts) == 1)
-    observers = sorted(t for t, v in voters.items() if v.get("role") == "observer")
     lines = ["### Voter groups", ""]
     lines += [
         "Who confirms whom in every table below. A tool's finding counts as confirmed only when a tool of *another* "
@@ -2492,12 +2510,6 @@ def _voters(info: dict) -> list[str]:
         lines += md_table(["voter group", "tools", "engine"], table, "lll") + [""]
     if single:
         lines += [f"One voter group each: {', '.join(single)}.", ""]
-    if observers:
-        lines += [
-            f"Observers (°), with a group of their own in the tables below that confirms nobody (`--observers-vote` "
-            f"makes them voters): {', '.join(observers)}.",
-            "",
-        ]
     if (info.get("settings") or {}).get("merge_llm"):
         lines += ["`--merge-llm`: the LLM workers count as one voter (`merge_group: llm`), the sensitivity check.", ""]
     return lines
@@ -2514,7 +2526,7 @@ def _ladder(all_rows: list[dict]) -> list[str]:
     for t in tools:
         first = by.get((t, levels[0]), {})
         table.append(
-            [_tool({"tool": t, "role": first.get("role")}), first.get("voter_group", "")]
+            [t, first.get("voter_group", "")]
             + [_pct(by.get((t, lv), {}).get("share")) for lv in levels]
             + [first.get("items", "")]
         )
@@ -2537,8 +2549,6 @@ def _ladder(all_rows: list[dict]) -> list[str]:
             f"identical name ({levels[0]}) and {eg[1 + len(levels)]} once every normalisation step counts "
             f"({levels[-1]})."
         )
-    if any(r.get("role") == "observer" for r in rows):
-        lines += ["", OBSERVER_NOTE]
     alls = {r["level"]: r for r in rows if r["tool"] == "all"}
     if alls and any(r.get("multi_unit_clusters") not in (None, "") for r in alls.values()):
         strict = ", ".join(
@@ -2588,8 +2598,8 @@ def _overlap(groups: list[dict]) -> list[str]:
 
     def line(label: str, rows: list[dict]) -> list:
         best: dict[tuple, int] = {}  # (snapshot, variant, unit) -> voter groups of its largest group
-        # a group whose only non-attached records are observers' is no item of the voters, however many of their
-        # generic records hang on it (the rule of tables.matchlevel_row, so `all` equals the matcher x level table)
+        # a group without a member record of its own is no item, however many generic records hang on it (the rule
+        # of tables.matchlevel_row, so `all` equals the matcher x level table)
         rows = [g for g in rows if _int(g.get("member_voter_groups", g.get("voter_groups")))]
         for g in rows:
             for unit in (g.get("units") or g["key"]).split(";"):  # the L4 identities inside the group
@@ -2763,6 +2773,7 @@ def render(analysis_dir: Path, *, run: int = 1) -> str:
     lines = ["## Preamble", "", "The terms the tables use, the questions they answer, and every stored run.", ""]
     lines += _reading() + _questions()
     lines += _runs(rows("runs.csv"))
+    lines += _versions(rows("runs.csv"))
     lines += _repositories(spec or {})
     lines += _negatives(rows("runs.csv"), run)
     lines += _micro(rows("micro-run{i}.csv"), rows("micro-items-run{i}.csv"))

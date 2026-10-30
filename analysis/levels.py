@@ -61,7 +61,6 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 
 from common.experiment import repo_full_name as full_name
-from common.tools_registry import role, votes
 
 from .normalize.record import NormRecord
 from .normalize.vocab import Vocabulary, fold, load_vocabulary
@@ -83,11 +82,11 @@ PARAMETER_LEVELS = ("L2", "L3", "L4")  # parameters do not exist in a raw name
 DIM_FIRST_LEVEL = {"digest": "L3"}
 CLOSURE_LEVELS = ("L3", "L4")  # an implied algorithm is a parsed fact: it exists from L3 on
 LEVEL_COLUMNS = [
-    "dimension", "level", "tool", "voter_group", "role", "items", "confirmed", "share", "confirmed_strict",
+    "dimension", "level", "tool", "voter_group", "items", "confirmed", "share", "confirmed_strict",
     "multi_unit_clusters",
 ]  # fmt: skip
 ITEM_COLUMNS = [
-    "repo", "snapshot", "variant", "run", "language", "tool", "voter_group", "role", "tailored", "unit", "registry",
+    "repo", "snapshot", "variant", "run", "language", "tool", "voter_group", "tailored", "unit", "registry",
     "implied", "records", "spellings", *[f"k_{lv}" for lv in LEVELS],
 ]  # fmt: skip
 REGISTRY_COLUMNS = ["kind", "name", "gap", "primitive", "count", "repos", "tools", "note"]
@@ -191,8 +190,8 @@ class Cluster:
         return {u for r in self.members if (u := identity(r, UNIT_LEVEL, vocab))}
 
     def voters(self, voter_of: dict[str, str]) -> set[str]:
-        """The voter groups holding a record of the cluster; observers (`common.tools_registry.votes`) are none."""
-        return {voter_of.get(r.tool, r.tool) for r in self.records if votes(voter_of, r.tool)}
+        """The voter groups holding a record of the cluster."""
+        return {voter_of.get(r.tool, r.tool) for r in self.records}
 
 
 @dataclass
@@ -219,18 +218,13 @@ class Item:
 
     def k_at(self, level: str, voter_of: dict[str, str]) -> int:
         """Voter groups in the item's largest cluster at `level` (1 when it has no cluster yet, e.g. an implied item
-        below L3: its tool reports it, nobody can match it). Observers are no voters: an item only observers report
-        has k 0."""
+        below L3: its tool reports it, nobody can match it)."""
         return max((len(c.voters(voter_of)) for c in self.clusters_at(level)), default=1)
 
     def confirmed_at(self, level: str, tool: str, voter_of: dict[str, str]) -> bool:
-        """A cluster holding one of the tool's records of the item also holds a record of another voter group (an
-        observer's record confirms nobody; an observer's item is confirmed by the voters)."""
+        """A cluster holding one of the tool's records of the item also holds a record of another voter group."""
         mine = voter_of.get(tool, tool)
-        return any(
-            any(voter_of.get(r.tool, r.tool) != mine and votes(voter_of, r.tool) for r in c.records)
-            for c in self.clusters_of(level, tool)
-        )
+        return any(any(voter_of.get(r.tool, r.tool) != mine for r in c.records) for c in self.clusters_of(level, tool))
 
     def confirmed_strictly_at(self, level: str, tool: str, voter_of: dict[str, str]) -> bool:
         """Confirmed through members alone: the tool's record is a member of a cluster whose members include another
@@ -238,8 +232,7 @@ class Item:
         mine = voter_of.get(tool, tool)
         own = {r.record_id for r in self.own.get(tool, [])}
         return any(
-            any(c.is_member(rid) for rid in own)
-            and any(voter_of.get(r.tool, r.tool) != mine and votes(voter_of, r.tool) for r in c.members)
+            any(c.is_member(rid) for rid in own) and any(voter_of.get(r.tool, r.tool) != mine for r in c.members)
             for c in self.clusters_of(level, tool)
         )
 
@@ -364,7 +357,6 @@ class LevelRow:
     dimension: str = "algorithm"  # `algorithm`, or one of PARAMETER_DIMS
     confirmed_strict: int = 0  # ... confirmed through cluster members alone (no generic or implied attachment)
     multi_unit_clusters: int = 0  # clusters at this level whose members span several L4 identities (all repos)
-    role: str = "voter"  # `observer`: confirmed by the voters, confirms nobody, not pooled into `all`
 
     @property
     def share(self) -> float:
@@ -376,7 +368,6 @@ class LevelRow:
             "level": self.level,
             "tool": self.tool,
             "voter_group": self.voter_group,
-            "role": self.role,
             "items": self.items,
             "confirmed": self.confirmed,
             "share": round(self.share, 3),
@@ -423,7 +414,7 @@ def _pair_confirmed(item: Item, tool: str, dim: str, value, level: str, voter_of
     if not any(parameter_at(r, level, dim) == value for r in item.own[tool]):
         return False  # the tool's own value is not admitted at this level
     return any(
-        voter_of.get(r.tool, r.tool) != mine and votes(voter_of, r.tool) and parameter_at(r, level, dim) == value
+        voter_of.get(r.tool, r.tool) != mine and parameter_at(r, level, dim) == value
         for c in item.clusters_of(level, tool)
         for r in c.records
     )
@@ -441,7 +432,7 @@ def ladder(
     """`records`: {(snapshot key, tool): records of that tool's CBOM}. Only algorithm records count.
     `exclude`: (snapshot key, tool) pairs left out entirely, e.g. repos the tool was tuned on (refinement 13): they
     neither count for the tool nor confirm the others. Returns one row per (dimension, level, tool) plus `all`
-    (the voters pooled; an observer has its own rows and is in no pool); parameter dimensions exist from L2 on."""
+    (every tool pooled); parameter dimensions exist from L2 on."""
     vocab = vocab or load_vocabulary()
     records = {k: v for k, v in records.items() if k not in (exclude or set())}
     by_snap: dict[str, list[NormRecord]] = defaultdict(list)
@@ -456,10 +447,8 @@ def ladder(
             if dim == "algorithm":
                 for items in items_by_snap.values():
                     multi += sum(
-                        len({u for r in c.members if votes(voter_of, r.tool) and (u := identity(r, UNIT_LEVEL, vocab))})
-                        > 1
-                        for c in clusters_at(items, level)
-                    )  # what the level declares "the same" among the voters
+                        len(c.units(vocab)) > 1 for c in clusters_at(items, level)
+                    )  # what the level declares "the same"
             total_n = total_conf = total_strict = 0
             for tool in tools:
                 group = voter_of.get(tool, tool)
@@ -476,9 +465,7 @@ def ladder(
                             pairs = _parameter_pairs(item, tool, dim)
                             n += len(pairs)
                             conf += sum(_pair_confirmed(item, tool, dim, v, level, voter_of) for _, v in pairs)
-                rows.append(LevelRow(level, tool, group, n, conf, dim, strict, multi, role(voter_of, tool)))
-                if not votes(voter_of, tool):
-                    continue
+                rows.append(LevelRow(level, tool, group, n, conf, dim, strict, multi))
                 total_n += n
                 total_conf += conf
                 total_strict += strict
@@ -499,7 +486,7 @@ def item_rows(
     """Which items each tool reports per repository: one row per (snapshot, variant, tool, item; `unit` = its L4
     identity) with the
     number of records and distinct spellings behind it and, per level, the voter groups in the item's largest
-    cluster (`k_<level>`, the tool's own group included; observers are no voter groups, see `role`). `records`:
+    cluster (`k_<level>`, the tool's own group included). `records`:
     {(snapshot, variant, tool): records}; `tailored`: {tool: repos it was tuned on} (the `tailored` column,
     refinement 13); with `closure` the items the records imply get rows too (`implied` true, refinement 2).
     Location-free, so every tool takes part; the basis for UpSet plots and the tools-per-item distribution."""
@@ -527,7 +514,6 @@ def item_rows(
                         "language": languages.get(repo),
                         "tool": tool,
                         "voter_group": voter_of.get(tool, tool),
-                        "role": role(voter_of, tool),
                         "tailored": repo in tailored.get(tool, ()),
                         "unit": key,
                         "registry": unit_in_registry(key, vocab),

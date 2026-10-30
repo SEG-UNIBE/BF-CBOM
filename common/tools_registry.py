@@ -50,37 +50,16 @@ def tool_packaging(tool: str, tools: dict[str, dict] | None = None) -> str:
     return value if value in PACKAGINGS else DEFAULT_PACKAGING
 
 
-class VoterMap(dict):
-    """tool -> voter group, plus the set of observers (`role: observer`): tools whose records are matched and confirmed
-    like everyone's but never confirm another tool, count in no k and are never ranked (decided 2026-10-19). A plain
-    dict works wherever a VoterMap is expected: everyone votes."""
-
-    def __init__(self, groups: dict[str, str] | None = None, observers: frozenset[str] | set[str] = frozenset()):
-        super().__init__(groups or {})
-        self.observers = frozenset(observers)
-
-
-def votes(voter_of: dict[str, str] | None, tool: str) -> bool:
-    """Does `tool` vote, i.e. can its records confirm another tool's? False only for an observer of a VoterMap."""
-    return tool not in getattr(voter_of, "observers", ())
-
-
-def role(voter_of: dict[str, str] | None, tool: str) -> str:
-    return "voter" if votes(voter_of, tool) else "observer"
-
-
 def voter_groups(
     tools: dict[str, dict] | None = None,
     *,
     merge_llm: bool = False,
-    observers_vote: bool = False,
     engine_family: bool = False,
-) -> VoterMap:
+) -> dict[str, str]:
     """tool -> voter group (`voter_group`, else the tool itself). Tools of one group share an engine or rule set and
     count as one voter (RQ5). With `merge_llm`, tools that declare a `merge_group` (the LLM workers: shared prompts
     and file selection) are merged into it, the sensitivity analysis of CLAUDE.md Phase 2; with `engine_family`, tools
-    sharing a pattern engine family are merged (the `engine-merged` ranking). The observers ride along
-    (`VoterMap.observers`); `observers_vote` makes them voters (the sensitivity check of the observer role)."""
+    sharing a pattern engine family are merged (the `engine-merged` ranking). Every tool votes."""
     tools = tools if tools is not None else load_tools()
     out = {}
     for tool, info in tools.items():
@@ -90,14 +69,7 @@ def voter_groups(
         if engine_family and info.get("engine_family"):
             group = str(info["engine_family"])
         out[tool] = group
-    return VoterMap(out, frozenset() if observers_vote else observers(tools))
-
-
-def observers(tools: dict[str, dict] | None = None) -> frozenset[str]:
-    """Tools with `role: observer` (decided 2026-10-19): analysed like every tool and confirmed by the voters, but
-    they confirm nobody, count in no k and are never ranked. The default role is `voter`."""
-    tools = tools if tools is not None else load_tools()
-    return frozenset(t for t, info in tools.items() if str(info.get("role") or "voter") == "observer")
+    return out
 
 
 def tailored_repos(tool: str, tools: dict[str, dict] | None = None, root: Path = REPO_ROOT) -> frozenset[str]:

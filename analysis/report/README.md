@@ -10,15 +10,6 @@ import pandas as pd
 A = "experiments/results/corpus-icpc/_ANALYSIS"   # or any copied export
 ```
 
-Observers (`role: observer` in `common/tools.yaml`: qelens, cryptarium, qScan) are in every table; their records never
-confirm anyone and they are in no `voters` list, so voter-based figures exclude them already. To leave them out of a
-per-tool figure, drop them by role where the table has the column (`levels-`, `items-`, `score-run<i>.csv`) and
-by name elsewhere:
-```python
-OBSERVERS = {"qelens", "cryptarium", "qscan"}   # or: tools.yaml entries with role == "observer"
-scores = pd.read_csv(f"{A}/score-run1.csv").query("role == 'voter'")
-```
-
 **Tools per item, UpSet plot (RQ5).** Which voter groups report which items per repository.
 ```python
 groups = pd.read_csv(f"{A}/groups-exact-run1.csv").query("scope == 'repo'")
@@ -59,7 +50,7 @@ agree = ml.set_index(["matcher", "level"]).filter(like="_agree")                
 
 **Per-tool rates with confidence intervals (RQ5; the ranking by F1 is RQ6's, `mutation-scores.csv`).**
 ```python
-sc = pd.read_csv(f"{A}/score-run1.csv").query("dimension == 'algorithm' and role == 'voter'")
+sc = pd.read_csv(f"{A}/score-run1.csv").query("dimension == 'algorithm'")
 ranked = sc.dropna(subset=["rank", "ci_low", "ci_high"]).sort_values("rate")
 # dot = rate (mean per-repository confirmation), whiskers = ci_low .. ci_high
 err = [ranked["rate"] - ranked["ci_low"], ranked["ci_high"] - ranked["rate"]]

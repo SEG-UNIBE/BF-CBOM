@@ -1,10 +1,10 @@
 """qScan worker: quantakrypto/pqc-tools (Apache-2.0, npm @quantakrypto/qscan), TypeScript pattern detectors with a
 CycloneDX 1.6 CBOM (`qscan <dir> --format cbom -o <file>`).
 
-Observer (common/tools.yaml `role`, decided 2026-10-19): it failed the pilot's inclusion bar, its data is harvested,
-it does not vote. Offline: its optional LLM triage (`--triage`) and supply-chain audit (`--audit`) are never enabled,
-and LLM keys are removed from its environment. Exit code 1 means "findings at or above the severity threshold", not an
-error. A `quantakrypto.config.json` committed in a scanned repo is honoured as the tool ships (recorded in the notes).
+Disqualified by the bar exam (2026-10-23): integrated, run on bar-micro only. Offline: its optional LLM triage
+(`--triage`) and supply-chain audit (`--audit`) are never enabled, and LLM keys are removed from its environment.
+Exit code 1 means "findings at or above the severity threshold", not an error.
+A `quantakrypto.config.json` committed in a scanned repo is honoured as the tool ships (recorded in the notes).
 """
 
 import json

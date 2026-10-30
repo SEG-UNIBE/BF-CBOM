@@ -272,8 +272,8 @@ def test_ciphersift_rule_family_fills_the_gap_and_api_names_stay_quiet():
     assert all(r.resolution == "mapped" for r in recs if r.values.get("asset_type") == "algorithm")
 
 
-def test_observer_specs_read_their_tools_as_shipped():
-    """qelens, cryptarium and qScan (observers, 2026-10-19) need no dictionary: the generic CycloneDX reading takes
+def test_disqualified_specs_read_their_tools_as_shipped():
+    """qelens, cryptarium and qScan (disqualified by the bar) need no dictionary: the generic CycloneDX reading takes
     their names and fields; their oddities stay visible instead of being repaired."""
     qe = normalize_cbom(_load("fixtures/normalize/qelens.json"), "qelens").records
     assert all(

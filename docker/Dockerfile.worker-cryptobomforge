@@ -52,11 +52,14 @@ RUN --mount=type=cache,target=/root/.cache/uv \
         "https://github.com/Santandersecurityresearch/cryptobom-forge/releases/download/${CRYPTOBOM_FORGE_VERSION}/cryptobom_forge-${CRYPTOBOM_FORGE_VERSION}-py3-none-any.whl"
 
 # Install CodeQL CLI in a separate, cached layer.
-ARG CODEQL_VERSION=2.23.0
+ARG CODEQL_VERSION=2.27.3
+# sha256 of codeql-linux64.zip of that release
+ARG CODEQL_SHA256=845075a2fa2fdf72629adc6cbde6264691b698d1f294bd27f10c6b579cd750a4
 RUN mkdir -p /opt/codeql \
     && curl -#Lf --retry 5 --retry-all-errors --retry-delay 5 --continue-at - \
          -o /tmp/codeql.zip \
          "https://github.com/github/codeql-cli-binaries/releases/download/v${CODEQL_VERSION}/codeql-linux64.zip" \
+    && echo "${CODEQL_SHA256}  /tmp/codeql.zip" | sha256sum -c - \
     && unzip /tmp/codeql.zip -d /opt/codeql \
     && rm /tmp/codeql.zip \
     && ln -s /opt/codeql/codeql/codeql /usr/local/bin/codeql \
@@ -67,9 +70,9 @@ RUN mkdir -p /opt/codeql \
 # Download CodeQL query packs and resolve languages.
 # Pack versions must match the CLI: these are the ones shipped with CODEQL_VERSION
 # (see github/codeql tag codeql-cli/v<CODEQL_VERSION>, <lang>/ql/src/qlpack.yml).
-ARG CODEQL_PYTHON_QUERIES=1.6.4
-ARG CODEQL_JAVA_QUERIES=1.7.0
-ARG CODEQL_CPP_QUERIES=1.4.7
+ARG CODEQL_PYTHON_QUERIES=1.8.13
+ARG CODEQL_JAVA_QUERIES=1.11.13
+ARG CODEQL_CPP_QUERIES=1.9.2
 # The worker runs experimental/cryptography/inventory/new_models (Python, C/C++); fail the build if absent.
 RUN /usr/local/bin/codeql pack download \
         codeql/python-queries@${CODEQL_PYTHON_QUERIES} \

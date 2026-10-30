@@ -139,9 +139,9 @@ handle_instruction = build_handle_instruction(NAME, _produce)
 def main():
     version = qdarpan_version()
     logger.info("qdarpan version: %s", version)
-    run_worker(
-        NAME, handle_instruction, default_timeout=TIMEOUT_SEC, tool_version=f"qdarpan {version}" if version else None
-    )
+    # the image's TOOL_VERSION names the pinned source commit (a release and later commits share one version string)
+    tool_version = os.getenv("TOOL_VERSION") or (f"qdarpan {version}" if version else None)
+    run_worker(NAME, handle_instruction, default_timeout=TIMEOUT_SEC, tool_version=tool_version)
 
 
 if __name__ == "__main__":

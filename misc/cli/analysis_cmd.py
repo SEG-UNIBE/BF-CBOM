@@ -58,7 +58,7 @@ from common.experiment import (
     stored_status,
 )
 from common.languages import source_files
-from common.tools_registry import VoterMap, load_tools, role, tailored_map, voter_groups
+from common.tools_registry import load_tools, tailored_map, voter_groups
 from misc.cli import progress
 from misc.cli.parallel import pmap
 
@@ -130,12 +130,6 @@ JOBS_OPT = typer.Option(
     help="Worker processes for normalising, validating and matching (misc/cli/parallel.py): 0 = auto, min(CPUs, 8) "
     "when a step has 16 or more items, else sequential; 1 = sequential; N = that many. The results do not depend on it",
 )
-OBSERVERS_VOTE_OPT = typer.Option(
-    False,
-    "--observers-vote",
-    help="Let the observer tools (tools.yaml role: observer) vote: they confirm others, count in k and are ranked "
-    "(the sensitivity check of the observer role; by default they are confirmed by the voters but confirm nobody)",
-)
 INCLUDE_TAILORED_OPT = typer.Option(
     False,
     "--include-tailored",
@@ -169,8 +163,8 @@ def _expects(exp_dir: Path) -> dict[str, str | None]:
     return {r["full_name"]: r.get("expect_crypto") for r in _spec(exp_dir).get("repos") or []}
 
 
-def _voter_of(merge_llm: bool = False, observers_vote: bool = False) -> VoterMap:
-    return voter_groups(merge_llm=merge_llm, observers_vote=observers_vote)
+def _voter_of(merge_llm: bool = False) -> dict[str, str]:
+    return voter_groups(merge_llm=merge_llm)
 
 
 def _is_tailored(tailored: dict[str, frozenset[str]], tool: str, repo: str) -> bool:
@@ -481,7 +475,6 @@ def _levels_step(
     write: Writer,
     *,
     merge_llm: bool = False,
-    observers_vote: bool = False,
     include_tailored: bool = False,
     closure: bool = False,
 ) -> list[lv.LevelRow]:
@@ -501,7 +494,7 @@ def _levels_step(
             excluded.add((f"{snapshot}/{variant}", n.tool))
     if not ladder_in:
         _err(f"no ok results for run{run} in {exp_dir}")
-    voter_of = _voter_of(merge_llm, observers_vote)
+    voter_of = _voter_of(merge_llm)
     with progress.step("ladder L0-L4"):
         rows = lv.ladder(ladder_in, voter_of, exclude=set() if include_tailored else excluded, closure=closure)
     write(f"levels-run{run}.csv", [r.to_dict() for r in rows], lv.LEVEL_COLUMNS)
@@ -526,7 +519,6 @@ def _tables_step(
     level: str = "L4",
     closure: bool = False,
     merge_llm: bool = False,
-    observers_vote: bool = False,
     raqun: bool | None = None,
     all_assets: bool,
     include_tailored: bool = False,
@@ -544,7 +536,7 @@ def _tables_step(
         runs = tbl.run_rows(exp_dir, languages, tailored=tailored_map(), expects=_expects(exp_dir), sizes=sizes)
     write("runs.csv", runs, tbl.RUNS_COLUMNS)
     write("runtime.csv", tbl.runtime_rows(runs), tbl.RUNTIME_COLUMNS)
-    voter_of = _voter_of(merge_llm, observers_vote)
+    voter_of = _voter_of(merge_llm)
     norm_rows: list[dict] = []
     commits: dict[str, str | None] = {}
     location_kinds: list[dict[str, str]] = []
@@ -567,9 +559,9 @@ def _tables_step(
     # one run of the original variants, like every table of the summary's RQ2 section
     with progress.step("units, coverage and conformance"):
         cboms = [n for _, _, n in normalized]
-        write(f"units-run{run}.csv", tbl.unit_rows(cboms, voter_of, location_kinds), tbl.UNIT_COLUMNS)
+        write(f"units-run{run}.csv", tbl.unit_rows(cboms, location_kinds), tbl.UNIT_COLUMNS)
         repos = [tbl.full_name(p.parents[2].name) for _, p, _ in normalized]
-        units_repo = tbl.unit_repo_rows(cboms, repos, languages, voter_of)
+        units_repo = tbl.unit_repo_rows(cboms, repos, languages)
         write(f"units-repo-run{run}.csv", units_repo, tbl.UNIT_REPO_COLUMNS)
         per_run = Report()
         for n in cboms:
@@ -602,7 +594,7 @@ def _tables_step(
 
 def _match_step(
     run: int, per_snapshot: dict[tuple[str, str], list], write: Writer, *, window: int, closure: bool,
-    voter_of: VoterMap, level: str, raqun: bool, commits: dict, languages: dict, jobs: int,
+    voter_of: dict[str, str], level: str, raqun: bool, commits: dict, languages: dict, jobs: int,
 ) -> tuple[dict[tuple[str, str], list], list[dict]]:  # fmt: skip
     """Both matchers at every level, one repository per task (analysis/tasks.py:match_snapshot, in the process pool):
     groups/members/agreement-exact-run<i>.csv at the scoring level and, with RaQuN, the same -raqun tables and
@@ -695,7 +687,7 @@ def _baseline(name: str | None) -> dict[str, dict[str, float]] | None:
 
 def _mutation_step(
     exp_dir: Path, all_runs: list[Normalized], write: Writer, *, run: int, window: int, merge_llm: bool,
-    observers_vote: bool, samples: int, obs: sc.Observations | None = None,
+    samples: int, obs: sc.Observations | None = None,
     baseline: dict[str, dict[str, float]] | None = None,
 ) -> None:  # fmt: skip
     """RQ6 (analysis/mutation.py), for an experiment with mutants (mutants.json): mutants.csv, mutation.csv (one row
@@ -722,7 +714,7 @@ def _mutation_step(
             list(_spec(exp_dir).get("tools") or []),
             window=window,
             languages=languages,
-            voter_of=_voter_of(merge_llm, observers_vote),
+            voter_of=_voter_of(merge_llm),
         )
         rates = mu.rate_rows(rows, samples=samples)
         # tuned on a micro project (<owner>/micro-<language>): the mutants' snippets are the same catalog
@@ -767,7 +759,6 @@ def _score_step(
     *,
     level: str,
     merge_llm: bool,
-    observers_vote: bool,
     include_tailored: bool,
     samples: int,
     consensus: dict[tuple[str, str, str], set[str]] | None = None,
@@ -775,9 +766,8 @@ def _score_step(
     """score-run<i>.csv, loo-run<i>.csv and grouping-run<i>.csv (analysis/score.py) from the exact matcher's groups;
     returns the observations under the declared voter groups (the bridge of the mutation step reads them).
     grouping-run<i>.csv ranks the tools again with every tool its own voter group, with the LLM workers merged and
-    with the tools of one pattern engine family merged (the sensitivity checks of the declared voter groups;
-    observers stay observers)."""
-    voter_of = _voter_of(merge_llm, observers_vote)
+    with the tools of one pattern engine family merged (the sensitivity checks of the declared voter groups)."""
+    voter_of = _voter_of(merge_llm)
     tools_ran: dict[str, set[str]] = defaultdict(set)
     repo_of: dict[str, str] = {}
     for _, cbom_path, n in normalized:
@@ -786,7 +776,7 @@ def _score_step(
         repo_of[f"{snapshot}/{variant}"] = tbl.full_name(snapshot)
     groups = {f"{s}/{v}": g for (s, v), g in groups_by_snapshot.items()}
 
-    def observe(voters: VoterMap) -> sc.Observations:
+    def observe(voters: dict[str, str]) -> sc.Observations:
         obs = sc.observe(
             groups,
             level=level,
@@ -805,12 +795,10 @@ def _score_step(
     write(f"score-run{run}.csv", rows, sc.SCORE_COLUMNS)
     write(f"loo-run{run}.csv", loo, sc.LOO_COLUMNS)
     with progress.step("RQ5: other voter groupings"):
-        groupings = {"declared": obs, "per-tool": observe(VoterMap({t: t for t in voter_of}, voter_of.observers))}
+        groupings = {"declared": obs, "per-tool": observe({t: t for t in voter_of})}
         if not merge_llm:
-            groupings["llm-merged"] = observe(_voter_of(True, observers_vote))
-        groupings["engine-merged"] = observe(
-            voter_groups(merge_llm=merge_llm, observers_vote=observers_vote, engine_family=True)
-        )
+            groupings["llm-merged"] = observe(_voter_of(True))
+        groupings["engine-merged"] = observe(voter_groups(merge_llm=merge_llm, engine_family=True))
         grouping = sc.grouping_rows(groupings)
     write(f"grouping-run{run}.csv", grouping, sc.GROUPING_COLUMNS)
     return obs
@@ -824,7 +812,6 @@ def score_cmd(
     window: int = WINDOW_OPT,
     closure: bool = CLOSURE_OPT,
     merge_llm: bool = MERGE_LLM_OPT,
-    observers_vote: bool = OBSERVERS_VOTE_OPT,
     include_tailored: bool = INCLUDE_TAILORED_OPT,
     samples: int = SAMPLES_OPT,
     consensus: bool = CONSENSUS_OPT,
@@ -839,7 +826,7 @@ def score_cmd(
     normalized = [x for x in all_runs if x[1].name == f"run{run}.json"]
     if not normalized:
         _err(f"no ok results for run{run} in {exp_dir}")
-    matcher = ExactMatcher(level=level, window=window, closure=closure, voter_of=_voter_of(merge_llm, observers_vote))
+    matcher = ExactMatcher(level=level, window=window, closure=closure, voter_of=_voter_of(merge_llm))
     groups = {key: matcher.match(records) for key, records in _match_input(normalized, include_tailored).items()}
     sets = _stability_step(all_runs, write, level=level)
     _score_step(
@@ -850,7 +837,6 @@ def score_cmd(
         write,
         level=level,
         merge_llm=merge_llm,
-        observers_vote=observers_vote,
         include_tailored=include_tailored,
         samples=samples,
         consensus=sets if consensus else None,
@@ -858,15 +844,20 @@ def score_cmd(
 
 
 def _write_info(
-    out_dir: Path, run: int, settings: dict, counts: dict[str, int], normalized: list[Normalized], voter_of: VoterMap
+    out_dir: Path,
+    run: int,
+    settings: dict,
+    counts: dict[str, int],
+    normalized: list[Normalized],
+    voter_of: dict[str, str],
 ):
     """tables-run<i>.json: settings, row counts, the vocabulary and adapter spec versions used, and the voter map the
-    numbers rest on (each spec tool's voter group, role and engine, after --merge-llm / --observers-vote)."""
+    numbers rest on (each spec tool's voter group and engine, after --merge-llm)."""
     vocabulary = next((n.vocabulary for _, _, n in normalized), {})
     adapters = {n.tool: n.adapter.get("spec") for _, _, n in normalized}
     registry = load_tools()
     voters = {
-        t: {"voter_group": voter_of.get(t, t), "role": role(voter_of, t), "engine": registry.get(t, {}).get("engine")}
+        t: {"voter_group": voter_of.get(t, t), "engine": registry.get(t, {}).get("engine")}
         for t in _spec(out_dir.parent).get("tools") or []
     }
     info = {
@@ -902,7 +893,6 @@ def levels(
     name: str = EXP_ARG,
     run: int = RUN_OPT,
     merge_llm: bool = MERGE_LLM_OPT,
-    observers_vote: bool = OBSERVERS_VOTE_OPT,
     include_tailored: bool = INCLUDE_TAILORED_OPT,
     closure: bool = CLOSURE_OPT,
     jobs: int = JOBS_OPT,
@@ -918,7 +908,6 @@ def levels(
         _normalize_runs(exp_dir, run=run, jobs=jobs),
         _writer(analysis_dir(exp_dir), counts),
         merge_llm=merge_llm,
-        observers_vote=observers_vote,
         include_tailored=include_tailored,
         closure=closure,
     )
@@ -937,7 +926,6 @@ def tables(
     level: str = LEVEL_OPT,
     closure: bool = CLOSURE_OPT,
     merge_llm: bool = MERGE_LLM_OPT,
-    observers_vote: bool = OBSERVERS_VOTE_OPT,
     raqun: bool | None = RAQUN_OPT,
     all_assets: bool = ALL_ASSETS_OPT,
     include_tailored: bool = INCLUDE_TAILORED_OPT,
@@ -961,13 +949,12 @@ def tables(
         level=level,
         closure=closure,
         merge_llm=merge_llm,
-        observers_vote=observers_vote,
         raqun=raqun,
         all_assets=all_assets,
         include_tailored=include_tailored,
         jobs=jobs,
     )
-    _write_info(out_dir, run, settings, counts, normalized, _voter_of(merge_llm, observers_vote))
+    _write_info(out_dir, run, settings, counts, normalized, _voter_of(merge_llm))
     typer.echo(f"written to {out_dir}")
 
 
@@ -980,7 +967,6 @@ def run_report(
     level: str = "L4",
     all_assets: bool = False,
     merge_llm: bool = False,
-    observers_vote: bool = False,
     include_tailored: bool = False,
     closure: bool = False,
     fetch: bool = False,
@@ -1009,7 +995,6 @@ def run_report(
         normalized,
         write,
         merge_llm=merge_llm,
-        observers_vote=observers_vote,
         include_tailored=include_tailored,
         closure=closure,
     )
@@ -1022,7 +1007,6 @@ def run_report(
         level=level,
         closure=closure,
         merge_llm=merge_llm,
-        observers_vote=observers_vote,
         raqun=raqun,
         all_assets=all_assets,
         include_tailored=include_tailored,
@@ -1038,13 +1022,12 @@ def run_report(
         write,
         level=level,
         merge_llm=merge_llm,
-        observers_vote=observers_vote,
         include_tailored=include_tailored,
         samples=samples,
         consensus=sets if consensus else None,
     )
     _mutation_step(exp_dir, done, write, run=run, window=window, merge_llm=merge_llm,
-                   observers_vote=observers_vote, samples=samples, obs=obs, baseline=floor)  # fmt: skip
+                   samples=samples, obs=obs, baseline=floor)  # fmt: skip
     settings = {
         "run": run,
         "window": window,
@@ -1054,13 +1037,12 @@ def run_report(
         "raqun": rq.available() if raqun is None else raqun,
         "all_assets": all_assets,
         "merge_llm": merge_llm,
-        "observers_vote": observers_vote,
         "include_tailored": include_tailored,
         "closure": closure,
         "fetch": fetch,
         "baseline": baseline,
     }
-    _write_info(out_dir, run, settings, counts, normalized, _voter_of(merge_llm, observers_vote))
+    _write_info(out_dir, run, settings, counts, normalized, _voter_of(merge_llm))
     with progress.step(sm.SUMMARY_FILE):
         return sm.write(out_dir, run=run)
 
@@ -1073,7 +1055,6 @@ def report(
     level: str = LEVEL_OPT,
     all_assets: bool = ALL_ASSETS_OPT,
     merge_llm: bool = MERGE_LLM_OPT,
-    observers_vote: bool = OBSERVERS_VOTE_OPT,
     include_tailored: bool = INCLUDE_TAILORED_OPT,
     closure: bool = CLOSURE_OPT,
     fetch: bool = FETCH_OPT,
@@ -1096,7 +1077,6 @@ def report(
         level=level,
         all_assets=all_assets,
         merge_llm=merge_llm,
-        observers_vote=observers_vote,
         include_tailored=include_tailored,
         closure=closure,
         fetch=fetch,

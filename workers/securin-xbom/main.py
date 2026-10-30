@@ -125,7 +125,8 @@ handle_instruction = build_handle_instruction(NAME, _produce)
 def main():
     version = xbom_version()
     logger.info("tool version: %s", version)
-    run_worker(NAME, handle_instruction, default_timeout=TIMEOUT_SEC, tool_version=version)
+    # the image's TOOL_VERSION names the pinned source commit (a release and later commits share one version string)
+    run_worker(NAME, handle_instruction, default_timeout=TIMEOUT_SEC, tool_version=os.getenv("TOOL_VERSION") or version)
 
 
 if __name__ == "__main__":

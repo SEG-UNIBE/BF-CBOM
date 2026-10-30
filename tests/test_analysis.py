@@ -271,7 +271,7 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert [title for title, _ in links] == headings
     assert links[0] == ("Preamble", "preamble") and ("How to read this summary", "how-to-read-this-summary") in links
     assert ("The L0-L4 deltas (the agreement ladder)", "the-l0-l4-deltas-the-agreement-ladder") in links
-    assert info["voters"]["cipherradar"] == {"voter_group": "cipherradar", "role": "voter", "engine": "opengrep-rules"}
+    assert info["voters"]["cipherradar"] == {"voter_group": "cipherradar", "engine": "opengrep-rules"}
     sections = ("## Preamble", "### How to read this summary", "### Research questions", "### Runs",
                 "### Repositories", "## RQ1 Tool selection", "## RQ2 Volume", "### What the tools report, as written",
                 "### Units per tool", "### Traceable", "## RQ3 Conformity", "### Spec issues", "### Meaningful",
@@ -286,7 +286,7 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert "| tool | records | line | window | import | file | none | unread | outside code |" in summary
     assert "| tool | packaging | CBOMs | algorithm assets | records | items |" in summary  # algorithm components
     assert "| packaging | one component is | signature in this table |" in summary
-    # "Per language" counts the items of the matcher x level table (groups only observers are in are no items)
+    # "Per language" counts the items of the matcher x level table
     per_language = summary[summary.index("**Per language**") : summary.index("**exact vs raqun")]
     assert re.search(r"^\| all \| ([\d']+) \|", per_language, flags=re.M).group(1) == exact[-1]["items"]
     # the record carries the repository's size, so the Repositories table is flat (no commit in it: no /tree link)
@@ -303,33 +303,6 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert {r["name"] for r in registry if r["kind"] == "layer"} == set(lv.LAYERS)
     assert all(r["registry"] in ("true", "false") for r in algos)
     assert "| cbomkit | 11 / 11 · 11 |" in summary
-
-
-def test_per_language_table_skips_groups_only_observers_are_in():
-    # micro-java, 2026-10-22: qScan alone reported ECDH, the voters' generic EC records were attached to its cluster;
-    # matchlevels skipped it, the summary's "Per language" counted it with k = 2 (corpus-pilot-medium: 1'455 vs 1'425)
-    from analysis import summary as sm, tables as tbl
-    from analysis.matchers import ExactMatcher
-    from analysis.normalize import normalize_cbom
-    from common.tools_registry import VoterMap
-
-    def records(tool, *names):
-        comps = [{"type": "cryptographic-asset", "name": n, "cryptoProperties": {"assetType": "algorithm"}}
-                 for n in names]  # fmt: skip
-        return normalize_cbom({"bomFormat": "CycloneDX", "specVersion": "1.6", "components": comps}, tool).records
-
-    voter_of = VoterMap({}, observers={"o"})
-    recs = records("a", "EC") + records("b", "EC", "AES") + records("o", "ECDH", "AES")
-    groups = ExactMatcher(level="L3", voter_of=voter_of).match(recs)
-    row = tbl.matchlevel_row("exact", "L3", 1, {("s", "original"): groups}, voter_of)
-    g_rows, _, _ = tbl.group_rows("exact", groups, snapshot="s", variant="original", run=1, commit="c",
-                                  language="Java", voter_of=voter_of)  # fmt: skip
-    ecdh = next(g for g in g_rows if g["key"] == "ECDH")
-    assert (ecdh["voter_groups"], ecdh["member_voter_groups"]) == (2, 0)  # two voters attached, none of its own
-    as_csv = [{k: str(tbl._cell(v)) for k, v in g.items()} for g in g_rows]
-    lines = sm._overlap(as_csv)
-    (all_row,) = [ln for ln in lines if ln.startswith("| all |")]
-    assert all_row.split("|")[2].strip() == str(row["items"]) == "2"
 
 
 def test_an_oom_killed_run_is_listed_but_its_cbom_is_not_read(tmp_path, monkeypatch, old_truth):
@@ -783,3 +756,25 @@ def test_repositories_section_counts_by_language_and_size_stratum():
         "| repository | language | files | source files | MiB | source MiB |"
     )
     assert _size_strata([{"full_name": "a/b", "language": "Go", "commit": "ee"}]) == []
+
+
+def test_tool_versions_section_lists_what_ran_and_flags_mixed_versions():
+    from analysis.summary import _versions
+
+    rows = [
+        {"tool": "xgrep", "tool_version": "xgrep 0.101.0", "image_ref": "bf-cbom/worker-xgrep:1.0.4",
+         "bfcbom_commit": "abc123"},
+        {"tool": "xgrep", "tool_version": "xgrep 0.101.0", "image_ref": "bf-cbom/worker-xgrep:1.0.4",
+         "bfcbom_commit": "abc123"},
+        {"tool": "pqcheck", "tool_version": "pqcheck 0.1.0 (c0ccf5be)", "image_ref": "bf-cbom/worker-pqcheck:1.0.4",
+         "bfcbom_commit": "abc123"},
+        {"tool": "pqcheck", "tool_version": "pqcheck 0.1.0 (3e99c742)", "image_ref": "bf-cbom/worker-pqcheck:1.0.3",
+         "bfcbom_commit": "abc123"},
+        {"tool": "cdxgen", "tool_version": "", "image_ref": "", "bfcbom_commit": ""},  # unsupported: nothing ran
+    ]  # fmt: skip
+    lines = _versions(rows)
+    assert lines[0] == "### Tool versions" and "30 October 2026" in lines[2]
+    assert "| xgrep | `xgrep 0.101.0` | `bf-cbom/worker-xgrep:1.0.4` | `abc123` | 2 |" in lines
+    assert not any(line.startswith("| cdxgen") for line in lines)
+    assert any("⛔" in line and "`pqcheck`" in line and "xgrep" not in line for line in lines)
+    assert _versions([]) == []

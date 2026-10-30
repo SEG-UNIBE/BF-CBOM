@@ -69,10 +69,10 @@ def base_command(repo_path: Path, out_file: Path) -> list[str]:
 
 
 def run_cryptoscan(repo_path: Path, out_file: Path, trace: Trace, *, timeout: float) -> None:
-    """Run CryptoScan once, as released. 1.4.0 panics in `patterns.MatchWithContext` on some files, which ends the
-    whole scan; such a run fails with the panic head in the error. No crash workaround: the tool's own `--exclude`
-    matches a file by its basename only, so it cannot leave out exactly the file it crashes on (docs/findings.md
-    "Interventions")."""
+    """Run CryptoScan once, as released. 1.4.0 panicked in `patterns.MatchWithContext` on some files, which ended the
+    whole scan (1.5.0's notes say such lines no longer end it); a run that still panics fails with the panic head in
+    the error. No crash workaround: 1.4.0's `--exclude` matched a file by its basename only, so it could not leave out
+    exactly the file it crashed on (docs/findings.md "Interventions")."""
     cmd = base_command(repo_path, out_file)
     trace.add(f"cryptoscan cmd: {' '.join(cmd)}")
     proc = _scan(cmd, repo_path, timeout)

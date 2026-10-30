@@ -2,15 +2,15 @@
 # docker/Dockerfile.worker-xgrep
 # Mondoo xgrep (free of charge, LicenseRef-Mondoo-Proprietary). The binary is taken from the public
 # npm package at build time and verified against the registry's sha512.
-# Pinned to 0.80.0, the version the pilot of 2026-10-08 graded.
+# Pinned to the latest stable release as of 2026-10-30 (CLAUDE.md "Pinned builds"; docs/tool-versions.md).
 ARG BASE_IMAGE=base
 ARG BASE_TAG=latest
 FROM ${BASE_IMAGE}:${BASE_TAG}
 
-ARG XGREP_VERSION=0.86.0
+ARG XGREP_VERSION=0.101.0
 # sha512 (hex) of @mondoohq/xgrep_linux_<arch>-<version>.tgz, from the npm registry's dist.integrity
-ARG XGREP_SHA512_AMD64=fd10fc06c7b32d686a1f95e5f45a5f7d8066ef75f29d0ec30e186ac0ac1f9fa8436cb1dab184c6546a99638a51f0cd2106caba9f881422b9cbc965a6fe0c6776
-ARG XGREP_SHA512_ARM64=f552a948d10158659944631c199a07c0afe11836c1f15a7b250df3085880a4c0a8a5f2118df0d18f220c04ac73ef9ef4ea6f0f2a2b7c136d2326ec3e323b66cf
+ARG XGREP_SHA512_AMD64=51143ad50bf3063d7441eafccd4950858adcd0aadf98b876a2731a3b4817b25615df695a163cf4a58f63bf56ca6a1ecb783789de84187a89e5ef0d62ee4f90ea
+ARG XGREP_SHA512_ARM64=dcc5c167a98a77ff28156729f6758d9cf098a4c34d428594846efdd3b8c828f517f20edcc6342b6f333eec3b9d2104a97a971f4ad9a83ac33aba0fc83254ff6f
 ARG TARGETARCH
 
 USER root

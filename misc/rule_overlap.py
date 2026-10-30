@@ -25,9 +25,9 @@ import yaml
 
 # name -> (repository, commit), as pinned in docker/Dockerfile.worker-{securin-xbom,cipherradar,scanoss}
 SOURCES = {
-    "semgrep-rules": ("https://github.com/semgrep/semgrep-rules", "17e31e11ebac99fb7dfe1cd288f7a32151b6f3f9"),
+    "semgrep-rules": ("https://github.com/semgrep/semgrep-rules", "16b9e6d45f10649f6a531ec4838ed9924372c3bc"),
     "cipherradar": ("https://github.com/nk-sentinel/cipherradar", "efa5d9de322c9120b15acc2e958dc6c1c4e609e1"),
-    "open-crypto-rules": ("https://github.com/scanoss/open-crypto-rules", "c5f32b7bbd07f53acd0820cda1d0f3425d0da7ee"),
+    "open-crypto-rules": ("https://github.com/scanoss/open-crypto-rules", "55d46c2365c1fea84aa41baab70af62e9538a81d"),
 }
 SECURIN_SETS = {"java": "java/lang/security", "python": "python/cryptography"}  # freeze_rules.py SETS
 LANGUAGES = ("java", "python", "go", "javascript")

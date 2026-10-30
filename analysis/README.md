@@ -94,15 +94,15 @@ summary's "Units per tool" prints both side by side.
 | xgrep | per algorithm | an algorithm (registry-style name) | occurrences |
 | SCANOSS | per algorithm | an (algorithm, parameters) pair | every match an occurrence |
 | Q-DARPAN | per algorithm | an algorithm | up to 30+ places, written by the tool into properties `qdarpan:location.N` and copied into occurrences by our worker |
-| qScan ° | per algorithm | an (asset type, algorithm, discriminator) triple | occurrences as `location: <file>:<line>` |
+| qScan | per algorithm | an (asset type, algorithm, discriminator) triple | occurrences as `location: <file>:<line>` |
 | CryptobomForge | per algorithm | one entry of CodeQL's crypto inventory (IBM's draft format) | `detectionContext` windows of 5-9 lines |
 | CipherSift | per rule | a (rule, name, parameter, OID) combination | occurrences, the `symbol` is the API |
 | CipherRadar | per hit | a finding | one occurrence (absolute path of its temporary clone) |
 | pqcheck | per hit | a finding (with detector id and confidence); declared dependencies are separate library components, skipped | one occurrence |
-| qelens ° | per hit | a finding, many of them on import lines | one occurrence |
+| qelens | per hit | a finding, many of them on import lines | one occurrence |
 | securin-xbom | per hit | a semgrep finding, named after the rule id | one occurrence |
 | cdxgen | per algorithm | an algorithm name (lower case, with OID); also crypto files (certificates, keys) | only for JS/TS (occurrences) and Go (property `cdx:golem:crypto:sourceLocation`); Java and Python algorithms have none |
-| Cryptarium ° | no places | a distinct finding id | none: the CBOM has no locations (only the tool's JSON format has them) |
+| Cryptarium | no places | a distinct finding id | none: the CBOM has no locations (only the tool's JSON format has them) |
 | DeepSeek, ChatGPT, Claude | per hit | a site the model reported (CycloneDX assembled by our worker, `common/llm_cbom.py`) | one occurrence, file and line checked against the clone |
 
 Three patterns follow. Tools that list an algorithm once with its places (CBOMkit, CryptoScan, xgrep, SCANOSS,
@@ -142,15 +142,6 @@ held-out corpora, versioned, and every change is recorded with its reason and pr
 (`python -m analysis.freeze`); the pilot corpus is the development set. A two-rater review of `vocab.csv` (Cohen's
 κ) is an option for the paper, not decided.
 
-### Observers
-
-Three tools (qelens, cryptarium, qScan) failed the pilot's inclusion bar and run as **observers** (`role: observer` in
-`common/tools.yaml`). Their CBOMs are normalised with specs of the same kind as everyone's, they have their own
-ladder and score rows, and the voters confirm their findings; but an observer's record never confirms another tool,
-never counts in k, exclusivity or Dawid-Skene, and an observer is never ranked. Every voter number is therefore the
-same with and without them (a test checks it), and `--observers-vote` turns them into voters for the sensitivity
-check. One predicate decides it everywhere (`common/tools_registry.py:votes`).
-
 ### Voter groups
 
 A tool's finding counts as confirmed only when a tool of another voter group reports it too (the ladder, the
@@ -165,8 +156,6 @@ independently is not: the rules decide what is found, the engine only runs them.
 | one each | securin-xbom, CipherRadar, SCANOSS | only a pattern engine (semgrep; opengrep, its fork); the rules are their own | the rule-overlap check below |
 | one each | DeepSeek, ChatGPT, Claude | our prompts and file selection, not the model | `--merge-llm` merges them (sensitivity) |
 | one each | every other tool | none | its own engine |
-
-Observers have groups of their own but confirm nobody (above).
 
 **Rule-overlap check** (2026-10-20, `misc/rule_overlap.py`, the rules at the commits the workers pin), per language
 both tools of a pair scan:

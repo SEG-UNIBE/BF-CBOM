@@ -1,5 +1,5 @@
-"""The three observer workers (qelens, cryptarium, qScan; common/tools.yaml `role: observer`): command line, output
-handling and failure reporting. The tools are not installed in the test environment; a fake executable stands in."""
+"""Three workers of tools disqualified by the bar exam (qelens, cryptarium, qScan): command line, output handling
+and failure reporting. The tools are not installed in the test environment; a fake executable stands in."""
 
 import importlib.util
 import json
