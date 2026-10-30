@@ -209,8 +209,10 @@ services:
       - REDIS_PORT=6379
       - WORKER_TIMEOUT_SEC=2700  # keycloak 469-551 s, kafka 363 s (2.3.0); pilot used 45 min
       - CBOMKIT_HEALTH_WAIT_SEC=20
-      # Leave 4 GiB of the container limit for native JVM memory and the worker/backend processes.
-      - JAVA_OPTS=-Xms1g -Xmx12g -XX:+ExitOnOutOfMemoryError
+      # Leave 4 GiB of the container limit for native JVM memory and the worker/backend processes. The heap is the
+      # binding limit (a full heap ends the job as a failure, not an OOM kill), so -Xmx rises with the limit: 12g in
+      # 16g until 2026-10-30, when the trials' highest peak (12.8 GiB, scapy) sat at that heap.
+      - JAVA_OPTS=-Xms1g -Xmx16g -XX:+ExitOnOutOfMemoryError
     env_file: docker/env/worker-cbomkit.env
     volumes:
       - git-certs:/certs:ro  # trust the local git server's certificate (CBOMkit forces https)
@@ -218,7 +220,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 16g
+          memory: 20g
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     profiles: [prod, all]
@@ -513,8 +515,9 @@ services:
     deploy:
       resources:
         limits:
-          # 4g killed it (rc=-9, no CBOM) on pycryptodome, bunkerweb and pyca/cryptography (corpus-pilot-medium, 2026-10-23)
-          memory: 8g
+          # 4g killed it (rc=-9, no CBOM) on pycryptodome, bunkerweb and pyca/cryptography (corpus-pilot-medium, 2026-10-23);
+          # 8g until 2026-10-30 (highest trial peak 7.3 GiB, bunkerweb; the peak grows with source size)
+          memory: 12g
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     profiles: [prod, all]
@@ -543,7 +546,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 4g
+          # 4g until 2026-10-30 (highest trial peak 3.0 GiB, parse-server)
+          memory: 8g
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     profiles: [prod, all]

@@ -31,7 +31,7 @@ tools:
   cbomkit:
     engine: sonar-cryptography      # IBM/PQCA sonar-cryptography plugin; the action jar and the server image share it
     packaging: per algorithm    # one component per algorithm (name and parameter set), every occurrence listed
-    memory_gb: 16
+    memory_gb: 20                   # with -Xmx16g (compose JAVA_OPTS); 16 with -Xmx12g until 2026-10-30 (peak 12.8 on scapy)
     approach: "sonar-cryptography (SonarQube plugin): syntax tree + resolution of provider strings (JCA, BouncyCastle, pyca/cryptography, Go std)"
     vendor: PQCA (Linux Foundation)
     url: "https://github.com/cbomkit/cbomkit"
@@ -177,7 +177,7 @@ tools:
   cipherradar:
     engine: opengrep-rules          # github.com/nk-sentinel/cipherradar efa5d9de322c, opengrep 1.33.1 rules + tree-sitter + YARA
     packaging: per hit          # one component per finding, one occurrence
-    memory_gb: 8                    # 4 killed it (rc=-9) on pycryptodome, bunkerweb, pyca/cryptography (2026-10-23)
+    memory_gb: 12                   # 4 killed it (rc=-9) on pycryptodome, bunkerweb, pyca/cryptography (2026-10-23); 8 until 2026-10-30 (peak 7.3 on bunkerweb)
     approach: "OpenGrep: pattern rules, plus tree-sitter and YARA-X passes"
     vendor: nk-sentinel (individual)
     url: "https://github.com/nk-sentinel/cipherradar"
@@ -230,7 +230,7 @@ tools:
   xgrep:
     engine: mondoo-xgrep            # proprietary binary (free of charge) from the public npm package, pinned 0.101.0
     packaging: per algorithm    # one component per algorithm (AES-128 and AES-256 apart), its places as occurrences
-    memory_gb: 4
+    memory_gb: 8                    # 4 until 2026-10-30 (peak 3.0 on parse-server)
     approach: "own engine (proprietary): syntax tree (tree-sitter) + data flow"
     vendor: Mondoo
     url: "https://xgrep.ai"

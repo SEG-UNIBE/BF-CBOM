@@ -285,7 +285,12 @@ experiment.
 - *Memory limits are caps, not reservations.* Every worker has a memory limit in `docker-compose.yml`, mirrored by
   `memory_gb` in `common/tools.yaml` (a test keeps them equal; adjust both). Idle workers use little, large jobs can
   reach their caps, and the VM also needs memory for the coordinator, Redis and the git server (`GITSERVER_MEMORY`,
-  16g, which leaves room for the concurrent full clones of CBOMkit replicas).
+  16g, which leaves room for the concurrent full clones of CBOMkit replicas). On the VM the caps of every container
+  an experiment feeds, replicas included, plus those of the services stay within its RAM (corpus-main with
+  `REPLICAS="cbomkit=2"`: 115 of 121.5 GiB): every job can then reach its cap at the same time, a tool's reported
+  peak is its own and not our limit's, and the kernel never has to pick Redis or the git server for an OOM kill.
+  CBOMkit's limit is set by its Java heap (`JAVA_OPTS` `-Xmx`, 4 GiB below the container's limit): a full heap
+  ends the job as a failure, not an OOM kill, so the two rise together.
 - *Memory budget (waves).* `EXPERIMENT_MEMORY_BUDGET_GB` (Makefile, default 14 for a laptop whose Docker Desktop VM
   has ~20 GiB) caps the summed limits of the tools fed at once: the runner packs the tools into waves (largest
   first), feeds one wave, collects it, then feeds the next; workers of later waves sit idle meanwhile. A tool above
