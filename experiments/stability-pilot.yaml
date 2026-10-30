@@ -5,7 +5,7 @@
 #   make experiment EXP=experiments/stability-pilot.yaml EXPERIMENT_MEMORY_BUDGET_GB=0
 name: stability-pilot
 description: "run-to-run stability: the 11 eligible tools, three repetitions, micro projects plus ten small pilot repositories"
-tools: [cbomkit, cbomkit-jar, cipherradar, ciphersift, cryptobomforge, cryptoscan, pqcheck, qdarpan, scanoss, securin-xbom, xgrep]  # the 11 that passed the bar exam of 2026-10-29 (bar-micro export); cdxgen, cryptarium, qelens, qscan disqualified
+tools: [cbomkit, cipherradar, ciphersift, cryptobomforge, cryptoscan, pqcheck, qdarpan, scanoss, securin-xbom, xgrep]  # the bar exam of 2026-10-29 (bar-micro export) passed 11, of which cbomkit-jar is left out (CBOMkit runs as its server distribution, decided 2026-10-30); cdxgen, cryptarium, qelens, qscan disqualified
 repetitions: 3
 repos:
   - full_name: bfcbom/micro-java

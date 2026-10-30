@@ -8,8 +8,12 @@ normalisation, analysis outputs),
 `docs/pilot-2026-10-08/` (the colleague's pilot).
 
 ## Rules
-- **Current scope and wording (2026-10-22, bar 2026-10-23):** describe BF-CBOM publicly as integrating **15 CBOM
-  generator tools**, of which **11 are eligible** after the bar exam (the specs name them by hand). LLM providers are
+- **Current scope and wording (2026-10-22, bar 2026-10-23, CBOMkit 2026-10-30):** describe BF-CBOM publicly as
+  integrating **14 CBOM generator tools**, CBOMkit in both of its official distributions (server and GitHub Action,
+  15 workers), of which **10 are eligible** after the bar exam (the specs name them by hand). Both CBOMkit
+  distributions passed with identical scores; the later specs run the server only (`cbomkit`: one failed run fewer
+  on corpus-pilot-medium, 58 vs 57 of 60, otherwise identical results, although at about twice the RAM, peak 13 vs
+  6.8 GB; decided 2026-10-30). LLM providers are
   excluded for now and may be considered later; their existing implementation is retained. Do not define the tools
   by contrast with LLMs. Research roles stay in the research docs.
 - **Start with make, never plain compose.** `make up-prod` starts the stack detached and opens the live board
@@ -254,7 +258,7 @@ language they were scored in; cdxgen, cryptarium, qelens and qscan disqualified.
 | Worker | Voter group | Languages | Invocation and caveats |
 |---|---|---|---|
 | `cbomkit` | cbomkit | Java, Python, Go | CBOMkit server image, cloned through the git server over TLS; Python covers pyca only; modules need a build file and `src/`; large repos need ~45 min and a 16 GB heap |
-| `cbomkit-jar` | cbomkit | Java, Python, Go | cbomkit-action, source only, the same engine (packaging differences are measured); the indexing risk (build file without `src/`) is noted, `CBOMKIT_ENSURE_SRC=1` stays off |
+| `cbomkit-jar` | cbomkit | Java, Python, Go | cbomkit-action, source only, the same engine; runs on bar-micro only since 2026-10-30 (the server's results were the same, with one failed run fewer); the indexing risk (build file without `src/`) is noted, `CBOMKIT_ENSURE_SRC=1` stays off |
 | `cdxgen` | cdxgen | Java, Python, JS, Go | disqualified by the bar (2026-10-23: 0 / 0 / 6 of 14); `--include-crypto --evidence`, `-t python` / `-t go` for those repos (the `cbom` command finds nothing in Go, `--profile research` adds nothing; checked 2026-10-22); algorithms carry locations only for JS/TS (occurrences) and Go (property `cdx:golem:crypto:sourceLocation`, one per asset); Go analysis type-checks, so a module's imports resolve only with its `go.sum`, network and a writable module cache (a GOPATH per job: under `cap_drop` root cannot create the image's; until 2026-10-22 every Go repo with a dependency gave nothing); Java code yields none (atom has no crypto sinks); 24 GiB (OOM-killed at 8 on Chat2DB, bisq, bisq2, kafka; at 16 on 8 of 60 pilot-medium repos, 2026-10-23) |
 | `cryptobomforge` | cryptobomforge | Python, C | CodeQL's crypto inventory queries, C with `--build-mode none`; writes IBM's draft `1.4-cbom-1.0`, not CycloneDX, also when CodeQL finds nothing (every stored CBOM is the tool's; the worker's placeholder for that case went 2026-10-20) |
 | `deepseek`, `chatgpt`, `claude` | one each, `merge_group: llm` | all five | `common/llm_cbom.py` (below), CycloneDX 1.7 assembled by us; `chatgpt` / `claude` need `make up-prod EXTRA_PROFILES=llm` and a key in `docker/env/worker-<provider>.env`; a request that fails after the provider's retries fails the job (no partial CBOMs), `LLM_MAX_CHUNKS` 1000, `LLM_CONCURRENCY` 4 |
@@ -345,7 +349,7 @@ where they declare support, but no analysis, figure or tuning effort goes into t
 - **Current experiment scope:** 15 CBOM generator tools integrated; the bar exam of 2026-10-23 passes 11 of them
   (`docs/findings.md` "Export review 2026-10-24"), confirmed by the rerun with eight decoys (bar-micro export of
   2026-10-29: the same 11 pass, the same 4 fail, the gap between the lowest pass and the highest fail is 8 vs 6 of
-  14). Every spec but bar-micro lists the 11 (no `tool_languages` needed: every passed tool passes in every language
+  14). Every spec but bar-micro lists 10 of the 11, `cbomkit-jar` left out since 2026-10-30 (no `tool_languages` needed: every passed tool passes in every language
   it was scored in). LLM providers are excluded for now; the provider workers and their analysis support remain implemented.
 - **Exports of 2026-10-24 reviewed:** bar-micro, corpus-pilot-small, corpus-icpc, corpus-pilot-medium and
   mutation-pilot, rerun whole with vocabulary 2026-10-23.2 and the caps of 2026-10-23 (cdxgen 24 GiB, CipherRadar
