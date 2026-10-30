@@ -170,6 +170,10 @@ example, voter groups, how family and group are argued),
   by CipherSift's `tailored_on`); `pilot-2026-10-22.yaml` (second pilot: 60 manually selected repos, 20 per paper
   language, default-branch HEADs pinned on 2026-10-22; `experiments/corpus-pilot-medium.yaml`);
   `icpc-2026.yaml` (the 23 ICPC paper repos at HEAD of 2026-10-18, held out);
+  `corpus-pc1.yaml` ... `corpus-pc6.yaml` (the stratified corpus built on 2026-10-30, nested draws of 1 to 6 repos
+  per cell, 27 to 162 repos; `corpus-main.yaml` runs pc6, decided 2026-10-30) with its frame zipped
+  (`corpus-pc6-frame.yaml.zip`); the pilot sets are smoke tests the paper does not mention, so corpus-main's
+  overlaps with them stay (skill-scanner is in pilot-2026-10-22, Sa-Token in the ICPC set; decided 2026-10-30);
   `exclusions.yaml` (repos the corpus builder never samples, with reasons). `make corpus` builds a stratified GitHub
   corpus of Java, Python and Go repos (`common/corpus.py`; needs `GITHUB_TOKEN` in `docker/env/coordinator.env`):
   cells of star bin x size bin, each cell's population enumerated completely (paginated, split by creation date above
@@ -400,10 +404,9 @@ where they declare support, but no analysis, figure or tuning effort goes into t
 - **Next:** on the VM: stability-pilot,
   mutation-smoke, `make experiment-delete NAME=<x>` for the former smoke experiments e0-smoke, e0-cbomkit-smoke,
   e0-llm-smoke, e0-phase2-smoke and the runs under the old spec names e0-micro, e0-stability, e1-pilot-corpus,
-  e1-icpc-corpus, e1-pilot-60, e4-mutation-smoke; corpus-main built with `GITHUB_TOKEN` (`make corpus
-  ARGS="--per-cell 2"`, or 3; scale check: 27 repos x 11 tools x 3 languages = 891 runs, about one corpus-pilot-medium
-  session) and pruned (enough Python repos that already depend on `cryptography`, for the pyca snippets), replicas
-  checked -> the corpus-main run -> stability-pilot's export as `report --baseline` for mutation-main -> the rater
+  e1-icpc-corpus, e1-pilot-60, e4-mutation-smoke; corpus-main sampled (2026-10-30: pc6, 162 repos,
+  1242 supported scans; 7 of its 54 Python repos use pyca, 22 of its 54 Go repos x/crypto); bar-micro and
+  stability-pilot rerun on the pins of 2026-10-30 (every export so far ran on the old versions) -> the corpus-main run -> stability-pilot's export as `report --baseline` for mutation-main -> the rater
   study and mutation-main -> Phase 6.
 
 ## Phases 1-3 (done 2026-10-15 to 2026-10-18)
