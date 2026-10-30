@@ -58,7 +58,7 @@ tools:
     voter_group: cbomkit            # one voter together with cbomkit; a separate tool in every other table
     status: integrated              # workers/cbomkit-jar; source-only scan (CBOMKIT_JAVA_REQUIRE_BUILD=false), CBOMKIT_LANGUAGES from the repo language
   cdxgen:
-    # disqualified by the bar exam (2026-10-23); integrated, run on bar-micro only
+    # failed the bar exam (2026-10-23); integrated, run on bar-micro only
     engine: cdxgen
     packaging: per algorithm    # one component per algorithm; one location at most (Go, a property), none in Java and Python
     memory_gb: 24                   # 4 OOM-killed Gradle on bisq/bisq2 (2026-10-18); 8 still on Chat2DB, bisq, bisq2, kafka (2026-10-19); 16 on 8 of 60 pilot-medium repos (2026-10-23)
@@ -250,7 +250,7 @@ tools:
     languages: [java]
     status: blocked
 
-  # ---- disqualified by the bar exam (2026-10-23); integrated, run on bar-micro only
+  # ---- failed the bar exam (2026-10-23); integrated, run on bar-micro only
   qelens:
     engine: qelens                  # qelens/cbom (ex keylens, MPL-2.0), crate `cbom` 0.1.2
     packaging: per hit          # one component per finding on an import line, one occurrence

@@ -431,6 +431,22 @@ def test_mark_unsupported_records_meta_and_plan_skips_it(tmp_path: Path):
     assert [(m["worker"], m["status"]) for m, _ in ex.iter_results(exp_dir)] == [("cbomkit", "unsupported")] * 2
 
 
+def test_plan_jobs_queues_the_largest_repositories_first(tmp_path: Path):
+    spec = ex.spec_from_dict({"name": "e", "tools": ["t"], "repos": [{"full_name": "o/a"}]})
+
+    def snap(name, size, variant="original"):
+        return ex.Snapshot(full_name=name, source_url="u", branch="main", commit="c", variant=variant,
+                           variant_commit="c", scan_url="s", scan_branch="b", source_bytes=size)  # fmt: skip
+
+    snaps = [snap("o/small", 10), snap("o/unknown", None), snap("o/big", 30), snap("o/big", 30, "ins-x")]
+    ids = iter(f"id{i}" for i in range(10))
+    jobs, _ = ex.plan_jobs(spec, snaps, tmp_path, new_id=lambda: next(ids))
+    # a repo's variants stay together in their order; a size not known goes last
+    assert [(j.snapshot.full_name, j.snapshot.variant) for j in jobs] == [
+        ("o/big", "original"), ("o/big", "ins-x"), ("o/small", "original"), ("o/unknown", "original")
+    ]  # fmt: skip
+
+
 def test_repo_spec_keeps_expect_crypto_as_metadata():
     spec = ex.spec_from_dict(
         {"name": "e", "tools": ["t"], "repos": [{"full_name": "o/r", "expect_crypto": "low"}, {"full_name": "o/s"}]}

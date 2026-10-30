@@ -105,7 +105,8 @@ def run_cradar(repo_path: Path, out_file: Path, home: Path, trace: Trace, *, dea
     if ignored:
         with (repo_path / ".cradarignore").open("a", encoding="utf-8") as fh:
             fh.write("".join(f + "\n" for f in ignored))
-        trace.add(f"cradar: {len(ignored)} Java files with the known crash trigger added to .cradarignore")
+        files = "file" if len(ignored) == 1 else "files"
+        trace.add(f"cradar: {len(ignored)} Java {files} with the known crash trigger added to .cradarignore")
     cmd = [BINARY, "--verbose", "scan", str(repo_path), "-o", str(out_file), "--validate", "--no-baseline"]
     cmd += ["--passes", "1,2", *EXTRA_ARGS]
     trace.add(f"cradar cmd: {' '.join(cmd)}")
@@ -161,10 +162,7 @@ def _produce(instr: JobInstruction, trace: Trace) -> tuple[str, float]:
         ignored = run_cradar(Path(cloned), out_file, home, trace, deadline=deadline)
         raw = out_file.read_text(encoding="utf-8")
     if ignored:
-        trace.add(
-            f"workaround: .cradarignore {','.join(ignored)} (known nil-pointer crash trigger / crashes; the tool is "
-            "unchanged)"
-        )
+        trace.add(f"workaround: .cradarignore {','.join(ignored)} (files CipherRadar crashes on)")
     cbom = json.loads(raw)  # fail early on malformed output
     logger.info("%s: %d components", instr.repo_info.full_name, len(cbom.get("components") or []))
     return raw, time.monotonic() - start

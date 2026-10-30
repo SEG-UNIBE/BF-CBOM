@@ -9,6 +9,6 @@
 #   make experiment-export NAME=corpus-main BF_CBOM_JOBS=32 RUNNER_MEMORY=96g
 name: corpus-main
 description: stratified GitHub sample of 2026-10-30, 54 repos each in Java, Python and Go
-tools: [cbomkit, cipherradar, ciphersift, cryptobomforge, cryptoscan, pqcheck, qdarpan, scanoss, securin-xbom, xgrep]  # the eligible tools of the bar exam (cbomkit-jar left out: CBOMkit runs as its server distribution); cdxgen, cryptarium, qelens, qscan disqualified
+tools: [cbomkit, cipherradar, ciphersift, cryptobomforge, cryptoscan, pqcheck, qdarpan, scanoss, securin-xbom, xgrep]  # the eligible tools of the bar exam (cbomkit-jar left out: CBOMkit runs as its server distribution); cdxgen, cryptarium, qelens, qscan failed the bar
 repetitions: 1
 corpus: corpus/corpus-pc6.yaml

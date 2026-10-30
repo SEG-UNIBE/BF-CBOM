@@ -668,11 +668,13 @@ def _produce(instr: JobInstruction, trace: Trace) -> str | tuple[str, float]:
         raise TimeoutError(err)
     if err and str(err).startswith("scan_error:"):
         # Deterministic backend failure (clone/checkout/scan error); no point in waiting for the timeout
+        message = str(err)[len("scan_error:") :].strip()
         trace.add(
-            f"cbomkit backend error for repo={instr.repo_info.full_name} branch={instr.repo_info.branch}: "
-            f"{str(err)[len('scan_error:') :]}"
+            f"cbomkit backend error for repo={instr.repo_info.full_name} branch={instr.repo_info.branch}: {message}"
         )
-        raise RuntimeError("cbomkit_scan_error")
+        # the backend's first line names the cause (`Parse error at line 1 column 8`); runs.csv shows this line
+        first = message.splitlines()[0].rstrip(":").strip() if message else ""
+        raise RuntimeError(f"cbomkit_scan_error: {first}" if first else "cbomkit_scan_error")
     if err == "backend_oom":
         trace.add("cbomkit backend encountered OutOfMemoryError")
         # Give the supervisor time to restart backend before we release the job,

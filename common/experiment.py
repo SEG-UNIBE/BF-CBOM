@@ -646,6 +646,7 @@ class Snapshot:
     language: str | None = None
     stars: int | None = None
     size_kb: int | None = None
+    source_bytes: int | None = None  # the record's size (snapshot_size): plan_jobs queues the largest first
 
     def repo_info(self) -> RepoInfo:
         return RepoInfo(
@@ -758,6 +759,7 @@ def resolve_snapshots(
                     language=repo.language,
                     stars=repo.stars,
                     size_kb=repo.size_kb,
+                    source_bytes=size.get("source_bytes"),
                 )
             )
     write_spec_copy(exp_dir, replace(spec, repos=resolved))
@@ -822,10 +824,12 @@ def plan_jobs(
     """Jobs still to run. Resumable: a run whose meta file exists is skipped, unless `retry_failed` and its stored
     status is not "ok" (an `ok` run with OOM kills counts as not ok), or its tool is in `rerun` (every stored run of
     that tool is redone, unsupported pairs excepted). Redone runs have their stored files removed first.
+    The largest repositories come first (`source_bytes`), so the longest jobs do not start last and set the batch's
+    end; the sort is stable, so a repo's variants stay together and equal sizes keep the spec's order.
     Returns (jobs, skipped)."""
     jobs: list[PlannedJob] = []
     skipped = 0
-    for snap in snapshots:
+    for snap in sorted(snapshots, key=lambda s: -(s.source_bytes or 0)):
         for tool in spec.tools:
             for i in range(1, spec.repetitions + 1):
                 cbom, meta = result_paths(exp_dir, snap.full_name, snap.commit, snap.variant, tool, i)

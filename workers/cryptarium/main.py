@@ -1,7 +1,7 @@
 """cryptarium worker: sgoveia/cryptarium (Apache-2.0), a Go/tree-sitter scanner with embedded YAML rule packs and
 CycloneDX CBOM output (`cryptarium scan -format cbom -deterministic -output <file> <dir>`).
 
-Disqualified by the bar exam (2026-10-23): integrated, run on bar-micro only. Its defaults are kept (test files and
+Failed the bar exam (2026-10-23): integrated, run on bar-micro only. Its defaults are kept (test files and
 fixtures are down-scored by the tool, not by us); `-deterministic` only suppresses timestamps and machine metadata.
 Its CBOM has no locations (only its JSON format has them): benchmarked as shipped.
 """

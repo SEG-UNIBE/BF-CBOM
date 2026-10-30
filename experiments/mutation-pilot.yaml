@@ -14,7 +14,7 @@
 #   make experiment-export NAME=mutation-pilot
 name: mutation-pilot
 description: mutation pilot on nine crypto-rich, broadly processable repositories selected from pilot-medium, three per language
-tools: [cbomkit, cipherradar, ciphersift, cryptobomforge, cryptoscan, pqcheck, qdarpan, scanoss, securin-xbom, xgrep]  # the bar exam of 2026-10-29 (bar-micro export) passed 11, of which cbomkit-jar is left out (CBOMkit runs as its server distribution, decided 2026-10-30); cdxgen, cryptarium, qelens, qscan disqualified
+tools: [cbomkit, cipherradar, ciphersift, cryptobomforge, cryptoscan, pqcheck, qdarpan, scanoss, securin-xbom, xgrep]  # the bar exam of 2026-10-29 (bar-micro export) passed 11, of which cbomkit-jar is left out (CBOMkit runs as its server distribution, decided 2026-10-30); cdxgen, cryptarium, qelens, qscan failed the bar
 repetitions: 1
 mutation:
   per_repo: 15

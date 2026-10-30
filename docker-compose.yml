@@ -74,7 +74,8 @@ services:
       # later waves. Set per machine in the Makefile / environment; 0 = no limit (one wave).
       - EXPERIMENT_MEMORY_BUDGET_GB=${EXPERIMENT_MEMORY_BUDGET_GB:-14}
       - BF_CBOM_JOBS=${BF_CBOM_JOBS:-0}  # worker processes of `analysis report` (--jobs; Makefile)
-      # The git server's memory cap (recorded per session) and the corpus size cap derived from it (common/corpus.py)
+      # The git server's memory cap (recorded per session); CORPUS_MAX_REPO_SIZE_MB overrides the corpus size cap
+      # (common/corpus.py, default 1536 MB)
       - GITSERVER_MEMORY=${GITSERVER_MEMORY:-16g}
       - CORPUS_MAX_REPO_SIZE_MB=${CORPUS_MAX_REPO_SIZE_MB:-}
     env_file: docker/env/coordinator.env  # GITHUB_TOKEN for the corpus builder
@@ -642,7 +643,7 @@ services:
     security_opt: [no-new-privileges:true]
     profiles: [prod, all]
 
-  worker-qelens:   # disqualified by the bar exam; run on bar-micro only
+  worker-qelens:   # failed the bar exam; run on bar-micro only
     image: bf-cbom/worker-qelens:${VERSION:-latest}
     build:
       context: .
@@ -671,7 +672,7 @@ services:
     security_opt: [no-new-privileges:true]
     profiles: [prod, all]
 
-  worker-cryptarium:   # disqualified by the bar exam; run on bar-micro only
+  worker-cryptarium:   # failed the bar exam; run on bar-micro only
     image: bf-cbom/worker-cryptarium:${VERSION:-latest}
     build:
       context: .
@@ -700,7 +701,7 @@ services:
     security_opt: [no-new-privileges:true]
     profiles: [prod, all]
 
-  worker-qscan:   # disqualified by the bar exam; run on bar-micro only
+  worker-qscan:   # failed the bar exam; run on bar-micro only
     image: bf-cbom/worker-qscan:${VERSION:-latest}
     build:
       context: .

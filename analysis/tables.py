@@ -28,7 +28,7 @@ from common.experiment import iter_results, repo_full_name, stored_status
 from common.tools_registry import load_tools, tool_packaging
 
 from .costs import cost_usd, load_prices
-from .groundtruth import TruthProject, TruthScore, entry_verdict
+from .groundtruth import TruthProject, TruthScore, bar_verdict
 from .levels import UNIT_LEVEL, identity
 from .matchers import MatchGroup, agreement
 from .normalize.record import RECORD_COLUMNS, NormalizedCbom, NormRecord
@@ -103,7 +103,7 @@ UNIT_REPO_COLUMNS = ["tool", "repo", "language", "assets", "records", "items"]
 MICRO_COLUMNS = [
     "project", "language", "tool", "run", "tailored", "status", "verdict", "n_items",
     "strict", "lenient", "repo", "recall_strict", "recall_lenient", "recall_repo",
-    "sites_in_file", "sites_correct", "precision", "f1", "bar_items", "passes_bar", "entry_bar", "missed",
+    "sites_in_file", "sites_correct", "precision", "f1", "bar_items", "passes_bar", "bar_verdict", "missed",
     "repo_missed", "repo_extra", "decoys", "decoys_hit",
 ]  # fmt: skip
 MICRO_ITEM_COLUMNS = [
@@ -761,7 +761,7 @@ def _packaging(n: NormalizedCbom) -> tuple[list[list[NormRecord]], set[str]]:
 
 
 def micro_verdict(status: str, score: TruthScore | None) -> str:
-    """pass/fail (the entry bar: lenient call-site recall) for a scored run; otherwise why there is no grade:
+    """pass/fail (the bar: lenient call-site recall) for a scored run; otherwise why there is no grade:
     unsupported (outside the tool's languages), missing (not run), error (failed, timed out, cancelled, unreadable)."""
     if score is not None:
         return "pass" if score.passes_bar else "fail"
@@ -769,8 +769,8 @@ def micro_verdict(status: str, score: TruthScore | None) -> str:
 
 
 def micro_rows(entries: list[MicroEntry], *, run: int) -> list[dict]:
-    """One row per (micro project, tool); `entry_bar` is the tool's verdict over all its projects (passed,
-    disqualified, not judged: groundtruth.entry_verdict)."""
+    """One row per (micro project, tool); `bar_verdict` is the tool's verdict over all its projects (bar passed,
+    bar failed, not judged: groundtruth.bar_verdict)."""
     by_tool: dict[str, list] = defaultdict(list)
     for e in entries:
         by_tool[e.tool].append(e.score)
@@ -787,7 +787,7 @@ def micro_rows(entries: list[MicroEntry], *, run: int) -> list[dict]:
             "verdict": micro_verdict(e.status, s),
             "n_items": len(e.project.assets),
             "decoys": len(e.project.decoys),
-            "entry_bar": entry_verdict(by_tool[e.tool]),
+            "bar_verdict": bar_verdict(by_tool[e.tool]),
         }
         if s is not None:
             recall_repo = s.recall_repo

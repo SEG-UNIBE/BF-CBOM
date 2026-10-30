@@ -273,7 +273,7 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert ("The L0-L4 deltas (the agreement ladder)", "the-l0-l4-deltas-the-agreement-ladder") in links
     assert info["voters"]["cipherradar"] == {"voter_group": "cipherradar", "engine": "opengrep-rules"}
     sections = ("## Preamble", "### How to read this summary", "### Research questions", "### Runs",
-                "### Repositories", "## Entry exam", "## RQ1 Volume", "### What the tools report, as written",
+                "### Repositories", "## Bar exam", "## RQ1 Volume", "### What the tools report, as written",
                 "### Units per tool", "### Traceable", "## RQ2 Conformity", "### Spec issues", "### Meaningful",
                 "### Where the information lives", "## RQ3 Normalisation", "### The registry and what it lacks",
                 "### The L0-L4 deltas", "#### Spellings per identity", "## RQ4 Agreement", "### Voter groups",
@@ -474,8 +474,8 @@ def test_summary_markdown_from_csv_rows():
     types = ["unknown", "related-crypto-material", "algorithm", "certificate"]
     assert sm._asset_types(types) == ["algorithm", "certificate", "related-crypto-material", "unknown"]
     base = {"n_items": "11"}
-    weak = {**base, "tool": "weak", "entry_bar": "disqualified"}
-    good = {**base, "tool": "good", "entry_bar": "passed"}
+    weak = {**base, "tool": "weak", "bar_verdict": "bar failed"}
+    good = {**base, "tool": "good", "bar_verdict": "bar passed"}
     rows = [
         {**weak, "language": "java", "verdict": "fail", "strict": "0", "lenient": "2", "repo": "7",
          "recall_lenient": "0.182", "precision": "0.5", "f1": "0.267"},
@@ -485,10 +485,10 @@ def test_summary_markdown_from_csv_rows():
         {**good, "language": "go", "verdict": "unsupported"},
     ]  # fmt: skip
     lines = sm._micro(rows, [])
-    assert "| tool | java | go | entry bar |" in lines  # paper languages first, then the tool's verdict
-    assert lines.index("| good | ✅ 11 | – | ✅ passed |") < lines.index("| weak | ⛔ 2 | error | ⛔ disqualified |")
+    assert "| tool | java | go | bar exam |" in lines  # paper languages first, then the tool's verdict
+    assert lines.index("| good | ✅ 11 | – | ✅ bar passed |") < lines.index("| weak | ⛔ 2 | error | ⛔ bar failed |")
     verdicts = next(x for x in lines if x.startswith("**Verdicts**"))  # the hand-over into the later specs
-    assert verdicts.startswith("**Verdicts**: 1 of 2 tools pass the bar, 1 is disqualified (weak). Every passed tool ")
+    assert verdicts.startswith("**Verdicts**: 1 of 2 tools pass the bar, 1 failed it (weak). Every passed tool ")
     assert "no `tool_languages:` entry follows" in verdicts and "tools: [good]" in lines
     assert "tool_languages:" not in lines
     assert "| weak | 0 / 2 · 7 |  |" in lines
@@ -588,12 +588,12 @@ def test_summary_starts_with_when_how_long_and_how_much_ram(tmp_path, monkeypatc
     summary = (exp / "_ANALYSIS" / "_SUMMARY.md").read_text(encoding="utf-8")
     assert summary.index("| repositories |") < summary.index("## Contents") < summary.index("### Runs")
     assert "| ran | 2026-10-18 08:00 UTC to 2026-10-18 10:30 UTC |" in summary
-    assert "| duration | 2 h 30 min in 1 runner session(s) |" in summary
+    assert "| duration | 2 h 30 min in 1 runner session |" in summary
     assert "| host | 20.0 GiB RAM, 10 CPUs (Docker VM) |" in summary
     assert "| memory budget | 14 GiB -> 2 wave(s) (last session) |" in summary
     assert "| peak RAM in use | 15.0 GiB of 20.0 GiB (0.75) on the VM" in summary
     assert "| peak RAM of a job | 2.9 GiB: `cbomkit` on `bfcbom/micro-java`" in summary
-    assert "| queue wait | median 90 s, max 90 s before a job started |" in summary
+    assert "| queue wait |" not in summary  # a batch enqueues everything at once: the wait is only the position
     assert (
         "| BF-CBOM commit | `abc123def456`, `abc123def456-dirty` (`-dirty`: built from uncommitted changes) |"
         in summary
@@ -653,11 +653,11 @@ def test_workaround_line_collects_the_recorded_setup_workarounds():
     from analysis.tables import workaround_line
 
     notes = (
-        "cradar: 1 Java files with the known crash trigger added to .cradarignore\n"
+        "cradar: 1 Java file with the known crash trigger added to .cradarignore\n"
         "cradar cmd: cradar --verbose scan /tmp/r\n"
-        "workaround: .cradarignore a/B.java (known nil-pointer crash trigger / crashes; the tool is unchanged)\n"
+        "workaround: .cradarignore a/B.java (files CipherRadar crashes on)\n"
     )
-    expected = ".cradarignore a/B.java (known nil-pointer crash trigger / crashes; the tool is unchanged)"
+    expected = ".cradarignore a/B.java (files CipherRadar crashes on)"
     assert workaround_line(notes) == expected
     assert workaround_line("cradar cmd: cradar scan\n") is None and workaround_line(None) is None
 
@@ -746,13 +746,35 @@ def test_runtime_rows_report_peak_memory_and_cpu_per_repository_and_the_limits_a
     assert "| median CPU s | 95 % CI CPU s | median cores | max cores |" in text
     assert "limit GiB" not in text
     line = next(x for x in text.splitlines() if x.startswith("| t |"))
-    assert "| 2.4 | " in line and line.endswith("| 20 |  | 2.0 | 4.0 |")  # median GiB; CPU s, cores
+    assert "| 10.0 | 0 | 2.4 | " in line  # p90 s, timeouts as a count (as in "Runs"), median GiB
+    assert line.endswith("| 20.0 |  | 2.0 | 4.0 |")  # CPU s, cores: one decimal each
     assert f"| {row['peak_ci_low'] / 1024:.1f} - {row['peak_ci_high'] / 1024:.1f} |" in line
     csv_runs = [{"repo": r["snapshot"], **{k: ("" if v is None else str(v)) for k, v in r.items()}} for r in runs]
     limits = "\n".join(_memory_limits(csv_runs, [csv_row]))
     assert "| t | 4.0 | 4.0 | 1.00 | 3.7 | 1 | 1 | 1 |" in limits  # at limit, OOM kills, failed for memory
     assert "⛔ Runs that may have failed for memory (1;" in limits and "`t` on `c`" in limits and "`d`" not in limits
-    assert "✅ No run failed for memory." in "\n".join(_memory_limits(csv_runs[:3], [csv_row]))
+    assert "reached their limit and still finished" not in limits  # c is listed as a failure, not twice
+    # an ok run at the limit is listed apart: its peak is the limit's, not the tool's
+    capped = {**csv_runs[2], "repo": "e", "limit_hits": "3", "peak_memory_mb": "4096.0"}
+    ok = "\n".join(_memory_limits([*csv_runs[:3], capped], [csv_row]))
+    assert "Runs that reached their limit and still finished (1; their peak is capped by the limit):" in ok
+    assert "- `t` on `e` (original, run 1): ok, peak 4.0 of 4.0 GiB, 3 limit hits" in ok
+    assert ok.index("still finished") < ok.index("✅ No run failed for memory.")
+
+
+def test_runs_without_a_result_are_listed_by_tool_then_repository():
+    from analysis.summary import _runs
+
+    def row(tool, repo, status="error"):
+        return {"tool": tool, "repo": repo, "variant": "original", "run": "1", "status": status, "duration_sec": "1",
+                "tool_version": "", "error": "boom"}  # fmt: skip
+
+    lines = _runs([row("zeta", "o/a"), row("alpha", "o/b"), row("alpha", "o/a", "timeout"), row("alpha", "o/c", "ok")])
+    assert [x for x in lines if " on `o/" in x] == [
+        "- `alpha` on `o/a` (original, run 1): timeout: boom",
+        "- `alpha` on `o/b` (original, run 1): error: boom",
+        "- `zeta` on `o/a` (original, run 1): error: boom",
+    ]
 
 
 def test_memory_failure_names_why_a_failed_run_may_have_failed_for_memory():
@@ -776,7 +798,7 @@ def test_runtime_section_lists_the_slowest_tool_first_with_its_languages():
     text = "\n".join(_rq1([], [], [], [], [], rows))
     assert "### Run time" in text
     assert text.index("| slow |") < text.index("| fast |")
-    assert "| tool | Java | Python |" in text and "| slow | 600 (3) | 60 (1) |" in text
+    assert "| tool | Java | Python |" in text and "| slow | 600.0 (3) | 60.0 (1) |" in text
 
 
 def test_repositories_section_counts_by_language_and_size_stratum():

@@ -22,7 +22,7 @@ Since 2026-10-22, `mutation/micro.py` generates both the micro source files and 
 `uv run python -m mutation.micro`; do not edit or reformat the generated files, because the ground truth records
 their exact lines. Tests check that the checked-in files match the generator.
 
-The entry bar is at least 7 of 14 calls found in their functions, leniently, in one paper language. The analysis
+The bar is at least 7 of 14 calls found in their functions, leniently, in one paper language. The analysis
 also reports strict and repository-level recall, precision, F1 and decoy hits. The hit and accepted-location rules
 are stated in the ground truth's header. The catalogs and decoys are AI-made (the last four decoy kinds added 2026-10-29) and **not yet human-reviewed**;
 review them before paper use.

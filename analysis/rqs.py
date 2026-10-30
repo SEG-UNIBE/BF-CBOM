@@ -1,6 +1,6 @@
 """The research questions, defined once (CLAUDE.md "Research questions"; five since 2026-10-30, the paper's order):
 their ids, titles, wording and the tables that answer each. The summary's headings and its "Research questions"
-section come from here; tests/test_rqs.py keeps CLAUDE.md's section equal to it. The entry exam (subject selection,
+section come from here; tests/test_rqs.py keeps CLAUDE.md's section equal to it. The bar exam (subject selection,
 a preparatory step before the questions since 2026-10-30) and the stability run are method sections next to the
 questions, named here too so every document calls them the same."""
 
@@ -61,15 +61,15 @@ RQ5 = RQ(
 )
 RQS = (RQ1, RQ2, RQ3, RQ4, RQ5)
 
-ENTRY_EXAM = "Entry exam"
-ENTRY_EXAM_TABLES = ("micro-run{i}.csv", "micro-items-run{i}.csv")
-ENTRY_EXAM_NOTE = (
+BAR_EXAM = "Bar exam"
+BAR_EXAM_TABLES = ("micro-run{i}.csv", "micro-items-run{i}.csv")
+BAR_EXAM_NOTE = (
     "Before the questions, a preparatory step selects the subject tools: the tool search (where and when the "
-    "candidates were looked for and which requirements each had to meet; `docs/tool-selection.md`) and the entry "
-    "exam, which this summary reports: every tool on the generated micro projects (14 planted calls and 8 decoys per "
-    "language, so with ground truth) gives recall, precision and F1, the verdict (`passed` at 7 of 14 calls, "
-    "leniently, in one language, else `disqualified`) and the languages a tool is eligible in, which the user writes "
-    "into the later specs by hand; the one filter on the tools."
+    "candidates were looked for and which requirements each had to meet; `docs/tool-selection.md`) and the bar "
+    "exam, in a section of its own when the experiment includes the micro projects: every tool on the generated "
+    "micro projects (14 planted calls and 8 decoys per language, so with ground truth) gives recall, precision and "
+    "F1, the verdict (`bar passed` at 7 of 14 calls, leniently, in one language, else `bar failed`) and the "
+    "languages a tool is eligible in, which the later experiments name by hand; the one filter on the tools."
 )
 STABILITY = "Run-to-run stability"
 STABILITY_NOTE = (

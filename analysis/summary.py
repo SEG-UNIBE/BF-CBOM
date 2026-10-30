@@ -23,7 +23,8 @@ import yaml
 from common.corpus import CorpusParams, bin_text
 from common.experiment import load_run_log, spec_path
 
-from .rqs import ENTRY_EXAM, ENTRY_EXAM_NOTE, ENTRY_EXAM_TABLES, RQ1, RQ2, RQ3, RQ4, RQ5, RQS, STABILITY, STABILITY_NOTE
+from .groundtruth import BAR_FAILED, BAR_PASSED
+from .rqs import BAR_EXAM, BAR_EXAM_NOTE, BAR_EXAM_TABLES, RQ1, RQ2, RQ3, RQ4, RQ5, RQS, STABILITY, STABILITY_NOTE
 from .tables import RUNTIME_BOOTSTRAP, RUNTIME_MIN_REPOS
 
 SUMMARY_FILE = "_SUMMARY.md"
@@ -144,9 +145,9 @@ def _pct(v) -> str:
 
 
 def _num(v) -> str:
-    """A count or ratio without trailing zeros (2.0 -> 2, 1.25 -> 1.2)."""
+    """A measured number with one decimal (2 -> 2.0, 1.25 -> 1.2), so a column lines up."""
     f = _float(v)
-    return "" if f is None else _n(f"{f:.1f}".removesuffix(".0"))
+    return "" if f is None else _n(f"{f:.1f}")
 
 
 NUMBER = re.compile(r"-?\d+(\.\d+)?")
@@ -188,6 +189,11 @@ def _cores(v) -> str:
     return "" if f is None else f"{f:.1f}"
 
 
+def _by_tool(r: dict) -> tuple:
+    """A run's place in a list of runs: by tool, repository, variant and run."""
+    return (r.get("tool") or "", r.get("repo") or "", r.get("variant") or "", _int(r.get("run")))
+
+
 def _true(v) -> bool:
     """CSV booleans: write_csv lowercases them."""
     return str(v).strip().lower() == "true"
@@ -197,8 +203,8 @@ def _false(v) -> bool:
     return str(v).strip().lower() == "false"
 
 
-VERDICT_MARK = {"pass": "✅", "fail": "⛔"}  # a micro project's verdict in the entry-exam table
-ENTRY_MARK = {"passed": "✅", "disqualified": "⛔"}  # the tool's entry-bar verdict
+VERDICT_MARK = {"pass": "✅", "fail": "⛔"}  # a micro project's verdict in the bar exam's table
+BAR_MARK = {BAR_PASSED: "✅", BAR_FAILED: "⛔"}  # the tool's verdict over its micro projects
 
 
 def _lang_key(lang: str) -> tuple[int, str]:
@@ -280,7 +286,7 @@ def _questions() -> list[str]:
     for rq in RQS:
         tables = ", ".join(f"`{t.replace('{i}', '<i>')}`" for t in rq.tables)
         lines.append(f"- **{rq.id}, {rq.title.lower()}:** {rq.question} ({tables})")
-    return lines + ["", ENTRY_EXAM_NOTE + " " + STABILITY_NOTE, ""]
+    return lines + ["", BAR_EXAM_NOTE + " " + STABILITY_NOTE, ""]
 
 
 def _eg(text: str) -> list[str]:
@@ -314,20 +320,13 @@ def _experiment(
         )
         if s_start and s_end:
             table.append(["ran", f"{_when(min(s_start))} to {_when(max(s_end))}"])
-            table.append(["duration", f"{_span(active)} in {len(sessions)} runner session(s)"])
+            n = len(sessions)
+            table.append(["duration", f"{_span(active)} in {n} runner session{'' if n == 1 else 's'}"])
         outcomes = Counter(str(e.get("status") or "?") for e in sessions)
         table.append(["sessions", ", ".join(f"{n} {k}" for k, n in sorted(outcomes.items()))])
     tool_time = sum(_float(r.get("duration_sec")) or 0 for r in ran)
     if ran:
         table.append(["tool time", f"{_span(tool_time)} summed over {_n(len(ran))} runs (excluding unsupported)"])
-    queue = [q for r in ran if (q := _float(r.get("queue_sec"))) is not None]
-    if queue:
-        table.append(
-            [
-                "queue wait",
-                f"median {_n(round(statistics.median(queue)))} s, max {_n(round(max(queue)))} s before a job started",
-            ]
-        )
     host = next((e.get("host") for e in reversed(sessions) if e.get("host")), None) or {}
     if host.get("ram_total_mb"):
         table.append(["host", f"{_gib(host['ram_total_mb'])} GiB RAM, {host.get('cpus') or '?'} CPUs (Docker VM)"])
@@ -361,7 +360,7 @@ def _experiment(
         table.append(["OOM kills", str(ooms)])
     images = sorted({r["image_ref"].rsplit(":", 1)[-1] for r in ran if r.get("image_ref") and ":" in r["image_ref"]})
     if images:
-        table.append(["BF-CBOM images", ", ".join(images)])
+        table.append(["BF-CBOM version", f"{', '.join(images)} (image tag; the commit below identifies the build)"])
     commits = sorted({r["bfcbom_commit"] for r in ran if r.get("bfcbom_commit")})
     commits += sorted({e["runner_commit"] for e in sessions if e.get("runner_commit")} - set(commits))
     if commits:
@@ -614,7 +613,7 @@ def _runs(rows: list[dict]) -> list[str]:
         "",
     ]
     lines += md_table([*header, "tool version"], table, "l" + "r" * (len(header) - 1) + "l")
-    failed = [r for r in rows if r["status"] not in ("ok", "oom", "unsupported")]
+    failed = sorted((r for r in rows if r["status"] not in ("ok", "oom", "unsupported")), key=_by_tool)
     if failed:
         lines += ["", f"Runs without a result ({_n(len(failed))}):", ""]
         for r in failed[:25]:
@@ -622,7 +621,7 @@ def _runs(rows: list[dict]) -> list[str]:
             lines.append(f"- `{r['tool']}` on `{r['repo']}` ({r['variant']}, run {r['run']}): {r['status']}{err}")
         if len(failed) > 25:
             lines.append(f"- ... and {_n(len(failed) - 25)} more (runs.csv)")
-    workarounds = [r for r in rows if r.get("workaround")]
+    workarounds = sorted((r for r in rows if r.get("workaround")), key=_by_tool)
     if workarounds:
         lines += [
             "",
@@ -665,8 +664,9 @@ def _memory_limits(runs: list[dict], runtime: list[dict]) -> list[str]:
         "",
         "- `limit GiB`: the container's memory limit; `max peak GiB`: the largest working set of a single run, "
         "`of limit` that as a share of the limit; `p90 peak GiB`: 90 % of the repositories' peaks stay under it.",
-        "- `at limit`: runs whose usage reached the limit at least once; the kernel then reclaims, file cache "
-        "first, so this alone does no harm"
+        "- `at limit`: runs whose usage reached the limit at least once; the kernel then reclaims memory, file "
+        "cache first, which can slow the job, and the run's peak is the limit, not what the tool would have taken; "
+        "each is listed below the table"
         + ("" if recorded else " (empty: the workers of this experiment did not record it yet)")
         + "; `OOM kills`: runs during which the kernel killed a process of the container for memory.",
         "- `failed for memory`: runs that failed (error, timeout, oom) with an OOM kill, an error saying the tool ran "
@@ -688,7 +688,20 @@ def _memory_limits(runs: list[dict], runtime: list[dict]) -> list[str]:
         ),  # fmt: skip
         "",
     ]
-    failed = [r for r in runs if r.get("memory_failure")]
+    capped = sorted((r for r in runs if _int(r.get("limit_hits")) > 0 and not r.get("memory_failure")), key=_by_tool)
+    if capped:
+        lines += [f"Runs that reached their limit and still finished ({_n(len(capped))}; their peak is capped by the "
+                  "limit):", ""]  # fmt: skip
+        for r in capped[:25]:
+            lines.append(
+                f"- `{r['tool']}` on `{r['repo']}` ({r['variant']}, run {r['run']}): {r['status']}, peak "
+                f"{_gib(r.get('peak_memory_mb'))} of {_gib(r.get('memory_limit_mb'))} GiB, "
+                f"{_n(_int(r.get('limit_hits')))} limit hits"
+            )
+        if len(capped) > 25:
+            lines.append(f"- ... and {_n(len(capped) - 25)} more (runs.csv)")
+        lines.append("")
+    failed = sorted((r for r in runs if r.get("memory_failure")), key=_by_tool)
     if not failed:
         return lines + ["✅ No run failed for memory.", ""]
     lines += [
@@ -857,7 +870,7 @@ def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
     n_items = max((_int(r.get("n_items")) for r in rows), default=11)
     bar = (n_items + 1) // 2
 
-    entry = {r["tool"]: r.get("entry_bar") or "" for r in rows}
+    tool_verdict = {r["tool"]: r.get("bar_verdict") or "" for r in rows}
 
     def rank(tool: str) -> tuple:
         rs = [cells[(tool, lg)] for lg in langs if (tool, lg) in cells]
@@ -882,11 +895,11 @@ def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
 
     scored = [(t, lg, cells[(t, lg)]) for t in tools for lg in langs if (t, lg) in cells
               and cells[(t, lg)]["verdict"] in ("pass", "fail")]  # fmt: skip
-    lines = [f"## {ENTRY_EXAM}", "", "A preparatory step before the research questions: which of the integrated "
+    lines = [f"## {BAR_EXAM}", "", "A preparatory step before the research questions: which of the integrated "
              "generators meet the minimum requirements of this study?", ""]  # fmt: skip
     lines += [
         "The tool search (the candidates, where and when they were looked for, the requirements and every exclusion "
-        "with its reason) is documented in `docs/tool-selection.md`; this section is the entry exam on the generated "
+        "with its reason) is documented in `docs/tool-selection.md`; this section is the bar exam on the generated "
         "micro projects. "
         f"Each micro project (`experiments/corpus/micro`, one per language) is a small program generated from the "
         f"snippet catalog (`mutation/micro.py`): {n_items} known crypto calls, each in a function of its own, "
@@ -895,16 +908,16 @@ def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
         "person reads them and writes the tools and their languages into the later specs by hand (`tools`, "
         "`tool_languages:`); no code reads them.",
         "",
-        f"**Entry bar: {bar} of {n_items} calls** (half, lenient call-site recall, below) in at least one language. "
+        f"**The bar: {bar} of {n_items} calls** (half, lenient call-site recall, below) in at least one language. "
         f"One row per tool, one column per language: `{VERDICT_MARK['pass']} n` (pass) or `{VERDICT_MARK['fail']} n` "
         "(fail) with n the calls the tool found in their functions (`–` = outside the tool's languages, `error` = "
-        "the run failed or timed out). Then the tool's verdict, `entry bar`: `passed` when it clears the bar in at "
-        "least one language, `disqualified` when it was scored and clears it nowhere (a candidate to leave out of "
+        "the run failed or timed out). Then the tool's verdict, `bar exam`: `bar passed` when it clears the bar in "
+        "at least one language, `bar failed` when it was scored and clears it nowhere (a candidate to leave out of "
         "the later specs), `not judged` without any scored run.",
         "",
     ]
-    lines += md_table(["tool", *langs, "entry bar"],
-                      [[t] + [verdict_cell(cells.get((t, lg))) for lg in langs] + [_entry_cell(entry[t])]
+    lines += md_table(["tool", *langs, "bar exam"],
+                      [[t] + [verdict_cell(cells.get((t, lg))) for lg in langs] + [_bar_cell(tool_verdict[t])]
                        for t in tools],
                       "l" + "r" * len(langs) + "l")  # fmt: skip
     if tailored:
@@ -933,7 +946,7 @@ def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
         "reported span counts at every line it covers; for a key generation a key record of the family counts too).",
         "- `lenient`: `strict`, or a record on those lines whose name fits no family (a code identifier such as "
         "`Cipher.getInstance`, a label nobody can read): the tool points at the right place, but not clearly at the "
-        "right algorithm. The entry bar uses this number.",
+        "right algorithm. The bar uses this number.",
         "- `repo`: the family is reported somewhere in the project, location ignored; calls sharing a family (two "
         "RSA, three AES) are found or missed together. It can be lower than `lenient`: a record without a family "
         "counts nowhere here.",
@@ -988,9 +1001,9 @@ def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
     return lines + [""]
 
 
-def _entry_cell(verdict: str) -> str:
-    """The entry-bar verdict with its mark (`passed`, `disqualified`; `not judged` has none)."""
-    mark = ENTRY_MARK.get(verdict)
+def _bar_cell(verdict: str) -> str:
+    """The tool's bar verdict with its mark (`bar passed`, `bar failed`; `not judged` has none)."""
+    mark = BAR_MARK.get(verdict)
     return f"{mark} {verdict}" if mark else verdict
 
 
@@ -999,10 +1012,10 @@ def _handover(rows: list[dict], tools: list[str], langs: list[str]) -> list[str]
     failed the bar in a language it was scored on, the languages it passed in (`tool_languages:`). No code reads
     this; it is the hand-over."""
     cells = {(r["tool"], r["language"]): r for r in rows}
-    entry = {r["tool"]: r.get("entry_bar") or "" for r in rows}
-    passed = sorted(t for t in tools if entry[t] == "passed")
-    out = sorted(t for t in tools if entry[t] == "disqualified")
-    unjudged = sorted(t for t in tools if entry[t] not in ("passed", "disqualified"))
+    tool_verdict = {r["tool"]: r.get("bar_verdict") or "" for r in rows}
+    passed = sorted(t for t in tools if tool_verdict[t] == BAR_PASSED)
+    out = sorted(t for t in tools if tool_verdict[t] == BAR_FAILED)
+    unjudged = sorted(t for t in tools if tool_verdict[t] not in (BAR_PASSED, BAR_FAILED))
     if not passed and not out:
         return []
     narrowed: dict[str, list[str]] = {}
@@ -1016,7 +1029,7 @@ def _handover(rows: list[dict], tools: list[str], langs: list[str]) -> list[str]
             failed_runs.append(f"{t} in {', '.join(broken)}")
     parts = [f"**Verdicts**: {len(passed)} of {len(tools)} tools pass the bar"]
     if out:
-        parts.append(f"{len(out)} {'is' if len(out) == 1 else 'are'} disqualified ({', '.join(out)})")
+        parts.append(f"{len(out)} failed it ({', '.join(out)})")
     if unjudged:
         parts.append(f"{len(unjudged)} not judged ({', '.join(unjudged)})")
     text = ", ".join(parts) + ". "
@@ -1465,7 +1478,7 @@ def _runtime(rows: list[dict]) -> list[str]:
     table = []
     for r in every:
         row = [r["tool"], r["repos"], _num(r["median_sec"]), ci(r, "median_ci_low", "median_ci_high", _num),
-               _num(r.get("p90_sec")), _pct(r.get("timeout_share"))]  # fmt: skip
+               _num(r.get("p90_sec")), r.get("timeouts") or "0"]  # fmt: skip
         if memory:
             row += [_gib(r.get("peak_median_mb")), ci(r, "peak_ci_low", "peak_ci_high", _gib),
                     _gib(r.get("peak_p90_mb")), _gib(r.get("peak_max_mb"))]  # fmt: skip
@@ -1487,8 +1500,9 @@ def _runtime(rows: list[dict]) -> list[str]:
         "- `runtime.csv` has more columns than are printed: the spread across repositories (`spread_cv`, "
         "`peak_spread_cv`: sd / mean, around 0 the tool needs about as much everywhere, above 1 the repository "
         "decides), the p90 and max of CPU s, the CI and p90 of cores.",
-        "- `timeouts`: the share of its runs that hit the time limit (their time is the limit, so a high share makes "
-        "the median an underestimate).",
+        '- `timeouts`: its runs that hit the time limit, as in "Runs". They have no time of their own, so the '
+        "median, its CI and p90 leave them out and understate the tool on the repositories it timed out on; `hours` "
+        "counts them at about the limit.",
     ]
     if memory or cpu:
         lines += ["", "<details>", "<summary>How to read memory and CPU</summary>", ""]
@@ -2843,7 +2857,7 @@ def _files(info: dict, run: int) -> list[str]:
     counts = info.get("rows") or {}
     lines = ["## Files", "", "The files in this folder behind the tables above, with their row counts, by the "
              "question they answer:", ""]  # fmt: skip
-    groups = [(ENTRY_EXAM, ENTRY_EXAM_TABLES), *((f"{rq.id} {rq.title}", rq.tables) for rq in RQS),
+    groups = [(BAR_EXAM, BAR_EXAM_TABLES), *((f"{rq.id} {rq.title}", rq.tables) for rq in RQS),
               (STABILITY, ("stability.csv",))]  # fmt: skip
     listed: set[str] = set()
     for title, patterns in groups:

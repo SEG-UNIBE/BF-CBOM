@@ -5,6 +5,6 @@
 #   make experiment-export NAME=corpus-icpc        # runs the analysis report first
 name: corpus-icpc
 description: ICPC 2026 paper repositories rerun through BF-CBOM at today's commits (held out from all tuning)
-tools: [cbomkit, cipherradar, ciphersift, cryptobomforge, cryptoscan, pqcheck, qdarpan, scanoss, securin-xbom, xgrep]  # the bar exam of 2026-10-29 (bar-micro export) passed 11, of which cbomkit-jar is left out (CBOMkit runs as its server distribution, decided 2026-10-30); cdxgen, cryptarium, qelens, qscan disqualified
+tools: [cbomkit, cipherradar, ciphersift, cryptobomforge, cryptoscan, pqcheck, qdarpan, scanoss, securin-xbom, xgrep]  # the bar exam of 2026-10-29 (bar-micro export) passed 11, of which cbomkit-jar is left out (CBOMkit runs as its server distribution, decided 2026-10-30); cdxgen, cryptarium, qelens, qscan failed the bar
 repetitions: 1
 corpus: corpus/icpc-2026.yaml

@@ -94,8 +94,9 @@ example, voter groups, how family and group are argued),
   clone's default branch; a mutant is a branch `bfcbom/<id>`; the base mirror in `git-data` is cloned on first use
   and fetched when the pinned commit is missing, each announced by a line, and nothing else goes over the network,
   so a rerun pins 60 repos in seconds; a git call that stalls for 15 min fails the step with that reason,
-  `_git`), enqueues through the normal Redis protocol and
-  stores the results on `results-data`. A spec's `mutation:` block makes every repo's variants the original plus
+  `_git`; nginx with 16 fcgiwrap processes, so clones run side by side), enqueues through the normal Redis protocol,
+  every tool's queue largest repositories first (`source_bytes`, `plan_jobs`), and stores the results on
+  `results-data`. A spec's `mutation:` block makes every repo's variants the original plus
   generated mutants, planted calls and planted decoys (`mutation/mutants.py`, Phase 4), pinned in `mutants.json` like
   the commits in `_experiment.yaml`; `tool_languages:` narrows a tool to some languages in this experiment, a hand edit (after reading the
   bar-micro report, say; no code reads the verdicts). Resumable: a run with a stored meta file is skipped, `--retry-failed` redoes the runs that are not ok,
@@ -150,9 +151,11 @@ example, voter groups, how family and group are argued),
   the runner counts them (`live_replicas`) at session start (budget, `_run-log.json` `replicas`, the summary's
   overview) and on every refresh (`progress.forecast` shares a tool's remaining work among its live containers); the
   stack board shows one row per tool (`busy 2/3`, summed RAM). Run times measured with replicas include their CPU
-  contention; to test that, corpus-pilot-medium is run once without and once with replicas (cbomkit 3, cipherradar 3,
-  scanoss 2) and the per-tool times compared, the unreplicated tools as the noise control; if they deviate,
-  corpus-main (RQ1's run times) runs without replicas and mutation-main with them (decided 2026-10-30).
+  contention; the replica test (corpus-pilot-medium without and with cbomkit 3, cipherradar 3, scanoss 2, 2026-10-30;
+  `docs/findings.md` "Replica test") found CBOMkit's times within the unreplicated tools' noise (median ratio 1.03),
+  so corpus-main runs with `cbomkit=2`. It also found the git server serving one clone at a time, so a CBOMkit full
+  clone held up every other worker's clone, inside their run times (fixed: 16 fcgiwrap processes), and the corpus
+  order starting the longest jobs late (fixed: largest first).
 - **Later: memory-gated scheduling** (noted 2026-10-19, not built; the user may move the stack to Kubernetes
   instead). Waves cap the *sum of limits*, so the former 64 GB VM ran at ~21 GiB: each worker runs one job and most jobs use
   a fraction of their cap. The design to turn RAM into throughput: replace waves by an admission loop that dispatches
@@ -220,14 +223,14 @@ example, voter groups, how family and group are argued),
   - `mutation.py`: RQ5, each tool's recall on the planted calls, precision on the planted decoys and F1, and the
     bridge to RQ4 (Phase 4); every agreement analysis (RQ1-RQ4, stability) reads the original variants only, so a
     mutated repo is never counted twice.
-  - `rqs.py`: the five research questions (RQ1 volume to RQ5 detection), the entry exam
+  - `rqs.py`: the five research questions (RQ1 volume to RQ5 detection), the bar exam
     as a preparatory step, defined once (id, title, question,
     the tables that answer each); the
     summary's headings and its "Research questions" section come from it, and a test keeps this file's RQ section
     equal to it.
   - `groundtruth.py`: micro recall at call sites and at repo level, precision (over the places a tool reports, decoys
-    included) and F1, the entry bar (`ENTRY_BAR`: half the calls, lenient, in one language) and each tool's verdict
-    (`passed`, `disqualified`, `not judged`: `entry_verdict`), field-by-field comparison with `expected`.
+    included) and F1, the bar (`BAR`: half the calls, lenient, in one language) and each tool's verdict
+    (`bar passed`, `bar failed`, `not judged`: `bar_verdict`), field-by-field comparison with `expected`.
   - `tables.py` (flat CSV tables), `summary.py` (`_SUMMARY.md`, rendered from the CSVs only). RQ1's "Places per
     tool" ends with `outside code`: the share of a tool's located algorithm records whose file is not a source file
     of the repo's language (`in_scope`; fixtures, test vectors, configuration); the analyses count those places like
@@ -260,30 +263,30 @@ Scanner, decided 2026-10-17; pqc-mat, whose code scanner is CodeQL's crypto quer
 CryptobomForge engine repackaged, decided 2026-10-19). Versions are pinned in the Dockerfiles and recorded per run;
 each tool's invocation and caveats are in the table below, the details in its `workers/<tool>/main.py` and
 `docker/Dockerfile.worker-<tool>`. **The bar exam decides who plays, by hand** (decided 2026-10-22): a tool is
-eligible in the languages where it passed the bar, and a tool below the bar in every language is `disqualified`; the
+eligible in the languages where it passed the bar, and a tool below the bar in every language is `bar failed`; the
 user reads the bar-micro report and writes that into the specs (`tool_languages:`, the `tools` list). No code
 couples the verdicts to the specs and nothing records them but the export. Bar of 2026-10-23: 11 eligible in every
-language they were scored in; cdxgen, cryptarium, qelens and qscan disqualified. The transitional observer role
+language they were scored in; cdxgen, cryptarium, qelens and qscan failed it. The transitional observer role
 (2026-10-19) was removed on 2026-10-30: every tool votes.
 
 | Worker | Voter group | Languages | Invocation and caveats |
 |---|---|---|---|
 | `cbomkit` | cbomkit | Java, Python, Go | CBOMkit server image, cloned through the git server over TLS; Python covers pyca only; modules need a build file and `src/`; large repos need ~45 min and a 16 GB heap |
 | `cbomkit-jar` | cbomkit | Java, Python, Go | cbomkit-action, source only, the same engine; runs on bar-micro only since 2026-10-30 (the server's results were the same, with one failed run fewer); the indexing risk (build file without `src/`) is noted, `CBOMKIT_ENSURE_SRC=1` stays off |
-| `cdxgen` | cdxgen | Java, Python, JS, Go | disqualified by the bar (2026-10-23: 0 / 0 / 6 of 14); `--include-crypto --evidence`, `-t python` / `-t go` for those repos (the `cbom` command finds nothing in Go, `--profile research` adds nothing; checked 2026-10-22); algorithms carry locations only for JS/TS (occurrences) and Go (property `cdx:golem:crypto:sourceLocation`, one per asset); Go analysis type-checks, so a module's imports resolve only with its `go.sum`, network and a writable module cache (a GOPATH per job: under `cap_drop` root cannot create the image's; until 2026-10-22 every Go repo with a dependency gave nothing); Java code yields none (atom has no crypto sinks); 24 GiB (OOM-killed at 8 on Chat2DB, bisq, bisq2, kafka; at 16 on 8 of 60 pilot-medium repos, 2026-10-23) |
+| `cdxgen` | cdxgen | Java, Python, JS, Go | failed the bar (2026-10-23: 0 / 0 / 6 of 14); `--include-crypto --evidence`, `-t python` / `-t go` for those repos (the `cbom` command finds nothing in Go, `--profile research` adds nothing; checked 2026-10-22); algorithms carry locations only for JS/TS (occurrences) and Go (property `cdx:golem:crypto:sourceLocation`, one per asset); Go analysis type-checks, so a module's imports resolve only with its `go.sum`, network and a writable module cache (a GOPATH per job: under `cap_drop` root cannot create the image's; until 2026-10-22 every Go repo with a dependency gave nothing); Java code yields none (atom has no crypto sinks); 24 GiB (OOM-killed at 8 on Chat2DB, bisq, bisq2, kafka; at 16 on 8 of 60 pilot-medium repos, 2026-10-23) |
 | `cryptobomforge` | cryptobomforge | Python, C | CodeQL's crypto inventory queries, C with `--build-mode none`; writes IBM's draft `1.4-cbom-1.0`, not CycloneDX, also when CodeQL finds nothing (every stored CBOM is the tool's; the worker's placeholder for that case went 2026-10-20) |
 | `deepseek`, `chatgpt`, `claude` | one each, `merge_group: llm` | all five | `common/llm_cbom.py` (below), CycloneDX 1.7 assembled by us; `chatgpt` / `claude` need `make up-prod EXTRA_PROFILES=llm` and a key in `docker/env/worker-<provider>.env`; a request that fails after the provider's retries fails the job (no partial CBOMs), `LLM_MAX_CHUNKS` 1000, `LLM_CONCURRENCY` 4 |
-| `cryptoscan` | cryptoscan | eleven | always `--include-quantum-safe`; skips folders named demo, example, sample; 1.4.0 panicked on specific files and the run failed (its `--exclude` could not name one exact file, so no workaround; `docs/findings.md` "Interventions"); 1.5.0 (pinned 2026-10-30) says such lines no longer end the scan and skips vendor, venv and target folders by default |
+| `cryptoscan` | cryptoscan | eleven | always `--include-quantum-safe`; skips folders named demo, example, sample; 1.4.0 panicked on specific files and the run failed (its `--exclude` could not name one exact file, so no workaround; `docs/findings.md` "Interventions"); 1.5.0 (pinned 2026-10-30) says such lines no longer end the scan and skips vendor, venv and target folders by default; on corpus-pilot-medium 1.5.0 failed on no repo (1.4.0: 9) |
 | `pqcheck` | pqcheck | Python, Go | |
 | `qdarpan` | qdarpan | Java, Go, C | the worker adapter moves `qdarpan:location.N` into `evidence.occurrences` |
 | `securin-xbom` | securin-xbom | Java, Python | the registry rule sets it fetches online, frozen unfiltered at a semgrep-rules commit |
 | `cipherradar` | cipherradar | Java, Python, Go, JS | runs outside the clone; Java files with its crash trigger pre-excluded via `.cradarignore` (recorded); 12 GiB since 2026-10-30 (killed at 4 on pycryptodome, bunkerweb, pyca/cryptography, 2026-10-23; highest trial peak 7.3 at 8) |
 | `scanoss` | scanoss | Go, C, JS, Rust | crypto-finder with the public open rules; Java/Python rules need an API key (research key requested) |
 | `ciphersift` | ciphersift | Java, Python, Go | benchmark-informed: `tailored_on` the micro projects and the pilot corpus (refinement 13) |
-| `xgrep` | xgrep | Java, Python, Go, JS | |
-| `qelens` | qelens | Python, JS | disqualified by the bar (5 of 14 in Python); crate `cbom` 0.1.2, CycloneDX on stdout; many findings on import lines; category names such as `HASHING (see usage)` stay `undefined` |
-| `cryptarium` | cryptarium | Java, Python, Go, JS, C | disqualified by the bar (0 everywhere: no locations); v0.3.0, `-deterministic`; its CBOM has no locations (only its JSON format has them; benchmarked as shipped) |
-| `qscan` | qscan | Java, Python, Go, JS, C, Rust, C#, Ruby, PHP | disqualified by the bar (5 of 14 in every language); quantakrypto npm 0.12.0, offline (no `--triage`/`--audit`); quantum-vulnerable crypto only; exit 1 = findings |
+| `xgrep` | xgrep | Java, Python, Go, JS | 0.101.0 (pinned 2026-10-30) also reports key and certificate files (`.pem`, `.crt`, `.p12`, ...): on corpus-pilot-medium its records went from 5.7k to 38k, half of them outside code (0.86.0: 0.03), at 3.3 times the time |
+| `qelens` | qelens | Python, JS | failed the bar (5 of 14 in Python); crate `cbom` 0.1.2, CycloneDX on stdout; many findings on import lines; category names such as `HASHING (see usage)` stay `undefined` |
+| `cryptarium` | cryptarium | Java, Python, Go, JS, C | failed the bar (0 everywhere: no locations); v0.3.0, `-deterministic`; its CBOM has no locations (only its JSON format has them; benchmarked as shipped) |
+| `qscan` | qscan | Java, Python, Go, JS, C, Rust, C#, Ruby, PHP | failed the bar (5 of 14 in every language); quantakrypto npm 0.12.0, offline (no `--triage`/`--audit`); quantum-vulnerable crypto only; exit 1 = findings |
 | `cryptoscope` | – | Java | blocked: the implementation is not public; artifact requested from Moffie et al. |
 
 ---
@@ -302,7 +305,7 @@ use a CBOM reports, counted as records and items, never as assets, which depend 
   2026, and which of them meet the minimum requirements of this study? In the paper a "Subject selection" part of the
   study design, with the census (the candidates found) claimed as a contribution in the introduction. Two parts: the **tool search** (where and when the candidates were looked
   for, the inclusion requirements, every exclusion with its reason; `docs/tool-selection.md`, to write) and the
-  **entry exam** on the generated micro projects (14 planted calls and 8 decoys per language; the bar is 7 of 14 in
+  **bar exam** on the generated micro projects (14 planted calls and 8 decoys per language; the bar is 7 of 14 in
   a language, leniently, which needs a located finding; the one filter on the tools, and it names the languages a
   tool is eligible in, which the user writes into the later specs by hand). The result is the verdict table and the
   decoy hits; the micro F1 appears only next to RQ5's. The **eligible** tools (not "winners") generate the CBOMs of
@@ -371,11 +374,11 @@ where they declare support, but no analysis, figure or tuning effort goes into t
 - **Exports of 2026-10-24 reviewed:** bar-micro, corpus-pilot-small, corpus-icpc, corpus-pilot-medium and
   mutation-pilot, rerun whole with vocabulary 2026-10-23.2 and the caps of 2026-10-23 (cdxgen 24 GiB, CipherRadar
   8 GiB), sizes recorded at pin time. Headline agreement at L4 0.78-0.81 (exact matcher) against RaQuN's 0.58-0.59;
-  RQ5 F1 per tool and language filled with CIs; cdxgen OOM-killed 8 times at 24 GiB (read as `oom`), disqualified
+  RQ5 F1 per tool and language filled with CIs; cdxgen OOM-killed 8 times at 24 GiB (read as `oom`), failed the bar
   anyway. stability-pilot and mutation-smoke were not in this round (the user runs them).
 - **Done 2026-10-30:** the observer role is gone (`role: observer` in `tools.yaml`, `--observers-vote`,
   `common/tools_registry.py:votes`, the `role` columns of `levels-`, `items-`, `score-run<i>.csv` and the `°` mark:
-  the bar exam is the one filter, the three former observers are disqualified by it; every tool votes, the voter
+  the bar exam is the one filter, the three former observers failed it; every tool votes, the voter
   groups stay). The stale `micro_2026-10-17` and `pilot` lines in `tools.yaml` went with it: the bar's verdicts are
   recorded in the bar-micro export, nothing in code reads them.
 - **Done 2026-10-29:** the catalogs have eight decoy kinds (four added: a variable named after an algorithm, a hex
@@ -385,7 +388,7 @@ where they declare support, but no analysis, figure or tuning effort goes into t
   not be re-rendered (its line numbers moved). The decoys added after CipherSift's pinned release are held out for
   it. `vocab.csv` carries the record's `asset_type` and the "Spellings per identity" table counts algorithm assets
   only (cdxgen's certificate file names no longer count as spellings of ECDSA). The six questions of the paper are
-  in `analysis/rqs.py` and the summary follows them (the entry exam, RQ1 volume, RQ2 conformity with "Where the
+  in `analysis/rqs.py` and the summary follows them (the bar exam, RQ1 volume, RQ2 conformity with "Where the
   information lives" from `sources-run<i>.csv`, RQ3 normalisation with "The registry and what it lacks" from the
   `registry` column of `items-run<i>.csv` and `registry-run<i>.csv` (vocabulary 2026-10-29.1: `gap:` per
   addition), RQ4 agreement, RQ5 detection with "Changes off the edit" from `mutation-scores.csv` and the noise floor
@@ -398,7 +401,7 @@ where they declare support, but no analysis, figure or tuning effort goes into t
   paper owns that the bar requires a located finding (it decides cryptarium by construction) and that CipherSift
   passes trivially (only its decoy precision on the four new kinds is held out). To write: `docs/tool-selection.md`,
   the candidate table with every tool's fate; "eligible" wording in the summary's bar section. Open: whether the
-  four disqualified tools appear after step 0 (the proposal: one table and done).
+  four tools that failed the bar appear after step 0 (the proposal: one table and done).
 - **Waiting for the user:** human review of the snippet catalogs (the micro projects, their ground truth and the
   mutants are generated from them) and the decoys, the hand-check verdicts and the `languages` lists (all AI-made).
 - **External:** the SCANOSS research key, the Cryptoscope artifact; the rater study after the corpus-main run (a
@@ -580,7 +583,7 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
   `corpus-` (real repositories as they are), `mutation-` (real repositories with their mutants). Names, not studies:
   nothing in the analysis depends on them (`experiments/README.md`).
 - **The analysis is one code path on any spec:** `report` writes the same RQ1-RQ4 sections and per-tool rates for the
-  12 repos of corpus-pilot-small and for the 54 or 81 of corpus-main; the entry-exam section when the micro
+  12 repos of corpus-pilot-small and for the 54 or 81 of corpus-main; the bar-exam section when the micro
   projects are in the spec, the RQ5 section when it has mutants, stability when repetitions > 1. The pilot and ICPC
   specs are development runs; the paper's numbers come from corpus-main and mutation-main.
 - **Ground truth exists in two places:** the micro projects (full: recall, precision, F1, the bar) and the mutants
@@ -588,7 +591,7 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
   without ground truth. The rater study is not a spec: a hand-labelled sample drawn from the corpus run's
   `items-run<i>.csv`, stratified by k, two raters, Cohen's κ, precision per k; the k = 1 stratum is the "right alone"
   check.
-- **The runs:** `bar-micro` (every tool once on the three micro projects: the verdicts; the entry-exam table
+- **The runs:** `bar-micro` (every tool once on the three micro projects: the verdicts; the bar-exam table
   shows all 15 tools), `stability-pilot` (every tool 3× on the micro projects and ten small pilot repos:
   determinism and run-to-run variance, needed before any agreement claim; its timings decide replicas and pruning),
   `corpus-main` (the stratified sample, 18 or 27 repos per language by `--per-cell` 2 or 3, the tools and their languages as the user set them after the bar exam: RQ1-RQ4), `mutation-main` (~30 repos per language from corpus-main,
@@ -611,14 +614,14 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
 - **Done:** the mutation smoke (2026-10-22) and the mutation pilot (2026-10-23) ran end to end on the VM
   (`docs/findings.md` "Mutation smoke", "Export review 2026-10-24"); both are rerun with the eight decoy kinds.
 - **End to end:** bar-micro and a 5-repo corpus spec from the spec to the tables with `bf-cbom experiment reproduce`.
-- **On the VM:** the replica test on corpus-pilot-medium (How it works, "Memory budget") and traceability against the
-  mirror.
+- **On the VM:** traceability against the mirror. The replica test is done (2026-10-30, How it works, "Memory
+  budget").
 
 ## Method refinements (pitch review 2026-10-15; numbers are cited from code)
 1. **Unit of analysis.** Every RQ is reported at **repo level** (the items per repo; all tools take part) and at
    **call-site level** ((item, file, line ±w); only tools with locations). The micro check follows the same split
    (`analysis/groundtruth.py:score_records`): call-site recall (the expected call found in its own function; the
-   entry bar) and repo-level recall (the call's group anywhere in the project), side by side, never pooled. The micro projects are not changed to suit a tool: plain constant algorithm
+   bar) and repo-level recall (the call's group anywhere in the project), side by side, never pooled. The micro projects are not changed to suit a tool: plain constant algorithm
    strings are the common real-world pattern, and a tool's blindness to them is a finding.
 2. **Implied assets are not disagreement.** HMAC-SHA256 implies SHA-256, PBKDF2 implies HMAC; CBOMkit expands such
    hierarchies, others don't. `implies` in `algorithms.yaml` (generic rules from a record's digest plus an explicit
@@ -653,7 +656,7 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
     `tools.yaml`) has inflated scores there by construction, also in agreement-based scoring. Its tailored (tool, repo)
     pairs are marked `tailored` and left out of the ladder, the matchers and the scores by default; the corpus builder excludes
     those repos; pilot numbers are reported apart; its RQ5 scores carry no mark (decided 2026-10-30: CipherSift was developed
-    independently by a colleague of the research group; only the entry exam keeps the `*`); the four decoy kinds added 2026-10-29 post-date its pinned release, so its decoy precision is the one
+    independently by a colleague of the research group; only the bar exam keeps the `*`); the four decoy kinds added 2026-10-29 post-date its pinned release, so its decoy precision is the one
     part of the bar held out for it; the threats state that its rules and the micro ground truth were both written
     by Claude.
 14. **Normalisation can create agreement; report how much.** The vocabulary and the specs were developed on the

@@ -1,7 +1,7 @@
 """qelens worker: qelens/cbom (ex keylens, MPL-2.0), a Rust/tree-sitter scanner for Python and JavaScript with
 CycloneDX output (`cbom scan --path <dir> --format cyclonedx`, written to stdout; progress goes to stderr).
 
-Disqualified by the bar exam (2026-10-23): integrated, run on bar-micro only. Pilot verdict
+Failed the bar exam (2026-10-23): integrated, run on bar-micro only. Pilot verdict
 (2026-10-08): borderline on Java (import lines), fail elsewhere.
 """
 

@@ -21,11 +21,11 @@ import yaml
 
 from analysis import levels as lv, mutation as mu, schema as sch, score as sc, summary as sm, tables as tbl, tasks
 from analysis.groundtruth import (
-    DISQUALIFIED,
+    BAR_FAILED,
+    BAR_PASSED,
     NOT_JUDGED,
-    PASSED,
     SCORED_ASSET_TYPES,
-    entry_verdict,
+    bar_verdict,
     load_ground_truth,
     project_for_repo,
     score_records,
@@ -252,10 +252,10 @@ def micro(name: str = EXP_ARG, run: int = RUN_OPT, all_assets: bool = ALL_ASSETS
         )
     verdicts: dict[str, list[str]] = defaultdict(list)
     for tool in dict.fromkeys(e.tool for e in entries):
-        verdicts[entry_verdict([e.score for e in entries if e.tool == tool])].append(tool)
+        verdicts[bar_verdict([e.score for e in entries if e.tool == tool])].append(tool)
     bar = next((f"{e.score.bar_items} of {e.score.n_assets}" for e in entries if e.score), "half of the")
-    typer.echo(f"\nentry bar ({bar} calls, lenient, in at least one language):")
-    for verdict in (PASSED, DISQUALIFIED, NOT_JUDGED):
+    typer.echo(f"\nbar exam ({bar} calls, lenient, in at least one language):")
+    for verdict in (BAR_PASSED, BAR_FAILED, NOT_JUDGED):
         if verdicts.get(verdict):
             typer.echo(f"  {verdict}: {', '.join(sorted(verdicts[verdict]))}")
     out_dir = analysis_dir(exp_dir)

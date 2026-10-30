@@ -52,8 +52,9 @@ def forecast(
     """The remaining time of a batch whose tools work their own queues in parallel: per tool, its jobs left times its
     mean duration so far, less what its running jobs have taken (each at most one mean), shared by its containers
     (`slots`, the replicas; default 1) that still have a job (at most its jobs left); the slowest tool ends a wave and
-    the waves follow each other. Returns (seconds, whether it is a lower bound: a tool with jobs left and no result yet
-    counts as 0), or (None, True) when no tool with jobs left has a result yet."""
+    the waves follow each other. The queues hold the largest repositories first (`plan_jobs`), so early on the mean
+    comes from them and the forecast is too high. Returns (seconds, whether it is a lower bound: a tool with jobs left
+    and no result yet counts as 0), or (None, True) when no tool with jobs left has a result yet."""
     total, lower, known = 0.0, False, False
     for wave in waves:
         worst = 0.0

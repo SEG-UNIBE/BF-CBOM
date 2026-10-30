@@ -1,8 +1,8 @@
 # Findings so far
 
 Results gathered while building BF-CBOM 2.0. Research-question numbers in a dated section follow the numbering of that date: since
-2026-10-30 there are five (volume, conformity, normalisation, agreement, detection as RQ1-RQ5), and the entry exam is
-a preparatory step; before, the entry exam was RQ1 and the others RQ2-RQ6. They come from the development
+2026-10-30 there are five (volume, conformity, normalisation, agreement, detection as RQ1-RQ5), and the bar exam is
+a preparatory step; before, it was RQ1 and the others RQ2-RQ6. They come from the development
 set (the pilot corpus `experiments/corpus/pilot-2026-10-08.yaml`, the micro projects `experiments/corpus/micro`) and from runs that will be
 rerun before the paper's experiments; the date says which code produced a number. The micro projects are tiny and
 AI-written: their numbers are an inclusion check, not a ranking.
@@ -472,7 +472,7 @@ The five experiments were rerun whole on the VM on 2026-10-23 with vocabulary 20
 stability-pilot and mutation-smoke were not part of this round.
 - **The bar (bar-micro: 14 calls and 4 decoys per language).** 11 of 15 tools pass, each in every language it was
   scored in, so no `tool_languages:` narrowing follows: cbomkit, cbomkit-jar, cipherradar, ciphersift, cryptobomforge,
-  cryptoscan, pqcheck, qdarpan, scanoss, securin-xbom, xgrep. Disqualified: cdxgen (0 / 0 / 6 of 14: its Java and
+  cryptoscan, pqcheck, qdarpan, scanoss, securin-xbom, xgrep. Bar failed: cdxgen (0 / 0 / 6 of 14: its Java and
   Python CBOMs name no algorithm, Go exactly the throwaway run of 2026-10-22), cryptarium (0 everywhere: no
   locations), qelens (5 of 14 in Python, on import lines), qscan (5 of 14 in every language: quantum-vulnerable
   crypto only). The decoys catch one tool: CipherRadar reports crypto on the comment and the log message in every
@@ -482,7 +482,7 @@ stability-pilot and mutation-smoke were not part of this round.
   `micro_<date>` record for this run).
 - **cdxgen at 24 GiB.** OOM-killed 8 times (kafka on pilot-small; 2 ICPC repos; 5 pilot-medium repos), each stored
   with output and now read as `oom`: listed in the summary, no CBOM read from it, `--retry-failed` redoes it. The
-  tool is disqualified anyway, so no cap is raised.
+  tool failed the bar anyway, so no cap is raised.
 - **Headline agreement at L4** (exact matcher / RaQuN cross-check): corpus-pilot-small 0.78 / 0.59 on 250 items,
   corpus-icpc 0.78 / 0.58 on 162, corpus-pilot-medium 0.81 / 0.58 on 1'410, the mutation pilot's nine originals
   0.91 / 0.72 on 226. On pilot-medium cbomkit's 342 items go from 0.71 confirmed under the identical name (L0) to
@@ -508,3 +508,42 @@ stability-pilot and mutation-smoke were not part of this round.
   should count algorithm assets only, or show certificates apart.
 - **Decided 2026-10-29:** the observer role goes (the bar replaces it; `role: observer`, `--observers-vote`, the
   `role` columns and the `°` mark are a cleanup); the specs other than bar-micro get the 11 tools by hand.
+
+## Replica test 2026-10-30 (corpus-pilot-medium with and without replicas)
+corpus-pilot-medium (60 repos, 10 tools) was run with replicas (`REPLICAS="cbomkit=3,cipherradar=3,scanoss=2"`, on
+2026-10-30, with the tool versions of 2026-10-30 and the earlier caps: CBOMkit 16, CipherRadar 8 GiB) and compared
+with the run without replicas of 2026-10-29. That baseline ran the older tool versions (also cbomkit-jar, and a 6 GB
+git server), so among the replicated tools only CBOMkit compares cleanly, and among the controls CipherSift, Q-DARPAN
+and pqcheck.
+- **Wall time 1 h 46 min → 56 min.** CBOMkit's three containers ended at minute 56 with 109 busy minutes between
+  them (36 each if shared evenly): its longest job (decred/dcrd, 34 min) started at minute 23, because the queues
+  followed the corpus order. Largest first would have ended the run at about 43 min (a replay of the measured
+  durations); the queues now hold the largest repositories first.
+- **The git server served one request at a time.** fcgiwrap ran as one process, which serves a request until its
+  response ends; with nginx not buffering, a CBOMkit full clone held it for minutes. About 15 jobs that started
+  between minutes 1.5 and 2.1 of the replica run finished together between minutes 5.2 and 6.5, while three CBOMkit
+  containers cloned DependencyTrack, FairEmail and ESAPI in full: Q-DARPAN on jsch took 200 s (2 s without
+  replicas), pqcheck on cowrie 218 s (5 s), xgrep on dependency-track 277 s (17 s). A job's time includes its clone,
+  so the wait counted as run time, for every tool; the baseline shows the same at minute 5, on a smaller scale. The
+  git server now runs 16 fcgiwrap processes.
+- **Replicas leave the times alone.** The median ratio of a (repository, tool) pair's time with replicas over
+  without, for jobs started after minute 7, with a bootstrap 95 % CI: CBOMkit 1.03 (0.99-1.06); the unreplicated
+  tools with an unchanged version CipherSift 1.05, Q-DARPAN 1.10, pqcheck 0.92. CipherRadar (1.12) and SCANOSS
+  (1.19) changed version too (OpenGrep 1.33.1, crypto-finder 0.43.0) and sit in the range of the unreplicated tools
+  whose version changed (1.06-1.12).
+- **Replicas leave the results alone.** CBOMkit and CipherRadar have the same records and items on all 58 pairs,
+  CipherSift and Q-DARPAN on all of theirs; the other differences follow the new versions (pqcheck, at a new pinned
+  commit: fewer records in 31 of 40 repos, the same items; SCANOSS loses Poly1305 in 3 Go repos; CryptobomForge
+  gains EdDSA on XX-Net).
+- **xgrep 0.101.0 scans key and certificate files.** Its records went from 5'711 to 38'206 and its items from 525 to
+  836; the share of its records outside code from 0.03 to 0.49 (`.pem`, `.crt`, `.p12`, `.crl`, `.pub`, `.der`,
+  `.key`, `.jks`; bunkerweb, pyca/cryptography, XX-Net, xipki and pritunl foremost), its certificates from 239 to
+  3'703. It takes 3.3 times as long.
+- **CryptoScan 1.5.0** finished on all 60 repositories (1.4.0 panicked on 9) and lost 5 items on lnbits (Blowfish,
+  CMAC, Poly1305, XChaCha20, XChaCha20-Poly1305).
+- **CipherRadar reached its 8 GiB limit on bunkerweb** (2'269 limit hits, peak 7.9 GiB, the run ok): that peak is
+  the limit's, not the tool's, hence its 12 GiB since. CBOMkit peaked at 12.4 of 16 GiB (thecodearcher/limen), the
+  VM at 41.6 of 121.5 GiB; no OOM kill.
+- **The same five runs fail in both:** CBOMkit's Python parse errors on OctoBot (a UTF-8 byte-order mark) and bandit
+  (example files that do not parse), CipherRadar's timeouts on pycryptodome and pyca/cryptography, SCANOSS's on
+  casdoor. CBOMkit's error now names the backend's message (`cbomkit_scan_error: Parse error at line 1 column 8`).

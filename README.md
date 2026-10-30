@@ -54,14 +54,14 @@ It also offers **benchmarking capabilities** to orchestrate batch CBOM generatio
 BF-CBOM integrates 14 CBOM generator tools for side-by-side comparisons (15 workers: CBOMkit in both of its official distributions).
 Each generator brings a unique methodology for detecting and cataloging cryptographic assets.
 Every tool runs at a pinned version, the latest stable release of 30 October 2026 ([`docs/tool-versions.md`](docs/tool-versions.md)).
-An entry exam on generated micro projects decides which tools take part in the experiments: cdxgen, Cryptarium, qelens and qScan stay below its bar and run on the micro projects only ([`experiments/README.md`](experiments/README.md)).
+A bar exam on generated micro projects decides which tools take part in the experiments: cdxgen, Cryptarium, qelens and qScan stay below its bar and run on the micro projects only ([`experiments/README.md`](experiments/README.md)).
 
 - **[`CBOMKit`](https://github.com/cbomkit/cbomkit)**:
 IBM Research's dedicated CBOM generator for Java, Python and Go, now maintained by the Post-Quantum Cryptography Alliance.
 Uses SonarQube's sonar-cryptography plugin for static analysis and supports compliance policy checks; shipped as a server with a REST API.
 
 - **`CBOMKit` GitHub Action** ([cbomkit-action](https://github.com/cbomkit/cbomkit-action)):
-the same sonar-cryptography engine packaged as a GitHub Action (a jar), run without the server. Both distributions passed the entry exam with identical scores; the experiments after it run the server, which failed on one repository fewer.
+the same sonar-cryptography engine packaged as a GitHub Action (a jar), run without the server. Both distributions passed the bar exam with identical scores; the experiments after it run the server, which failed on one repository fewer.
 
 - **[`cdxgen`](https://github.com/cdxgen/cdxgen)**:
 OWASP's CycloneDX generator, primarily for SBOMs but with CBOM extensions since April 2024. Its crypto output is mostly crypto libraries and key/certificate files; algorithms come with file and line only for JavaScript/TypeScript and Go. For Python and Go repos the worker passes `-t python` / `-t go`, since otherwise cdxgen's code analysis falls back to Java.

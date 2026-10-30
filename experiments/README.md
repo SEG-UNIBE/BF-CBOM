@@ -54,7 +54,7 @@ runs), `corpus-` (real repositories as they are), `mutation-` (real repositories
 | `mutation-pilot.yaml` | the 10 tools run after the bar exam, once | 9 pinned pilot-medium repos, 3 per language | mutation pilot: every catalog snippet once per repo (15 calls, 5 per style) and 15 decoys; 4185 planned results, currently 3348 supported scans |
 
 LLM providers are outside the current experiment scope; their implementation remains available for possible later use.
-Every tool votes. The micro check reports entry-bar verdicts but does not edit `common/tools.yaml` or the specs.
+Every tool votes. The micro check reports the bar exam's verdicts but does not edit `common/tools.yaml` or the specs.
 Job totals include tool/repository pairs recorded as `unsupported` without scanning. `stability-pilot` still includes
 four historical pilot repositories outside the paper languages (TypeScript, JavaScript and C).
 
@@ -284,6 +284,14 @@ experiment.
 - *One job per worker container.* Each worker pops one job from its Redis queue, runs the tool in a subprocess,
   pushes the result and only then takes the next. A batch has as many jobs in flight as there are worker containers
   (with `make up-prod` one per generator, each on a different repository); queued jobs cost only a Redis entry.
+- *The git server serves clones side by side.* Every worker clones its repository from the local git server (nginx,
+  git's smart-HTTP backend through fcgiwrap). 16 fcgiwrap processes serve up to 16 requests at once, more than the
+  workers that clone at once. Until 2026-10-30 one process served one request at a time, so a long full clone
+  (CBOMkit) made every other worker's clone wait, and since a job's time includes its clone, that wait counted as
+  the other tools' run time.
+- *Largest first.* Every tool's queue gets the repositories largest first (`source_bytes` at the pinned commit), so
+  the longest jobs do not start last and set the batch's end. Early on, the remaining-time forecast is therefore too
+  high: its mean so far comes from the largest repositories.
 - *Memory limits are caps, not reservations.* Every worker has a memory limit in `docker-compose.yml`, mirrored by
   `memory_gb` in `common/tools.yaml` (a test keeps them equal; adjust both). Idle workers use little, large jobs can
   reach their caps, and the VM also needs memory for the coordinator, Redis and the git server (`GITSERVER_MEMORY`,
@@ -478,13 +486,13 @@ tool, including tools that did not run there (unsupported, failed):
 | precision | correct locations out of all the tool reported in the micro source file; one is correct on an expected item's line or a line the ground truth marks as related or accepted (a sub-use such as a digest, an import of the item's API) |
 | decoys | the decoys with a crypto record on their lines: false positives with ground truth |
 | F1 | harmonic mean of the lenient recall (over the expected calls) and the precision (over the reported places); 0 when no call was found |
-| bar | `pass` when the tool found at least half of the calls, lenient (the entry bar, 7 of 14) |
+| bar | `pass` when the tool found at least half of the calls, lenient (the bar, 7 of 14) |
 | missed | ids of the expected items the tool did not find (lenient) |
 
-After the rows the command lists each tool's verdict over all its projects: `passed` (the entry bar cleared in at
-least one language), `disqualified` (scored and below the bar wherever scored; the candidates to leave out of the
-further experiments) or `not judged` (no scored run). The same verdict is the `entry_bar` column of
-`micro-run<i>.csv` and of the summary's entry-bar table.
+After the rows the command lists each tool's verdict over all its projects: `bar passed` (the bar cleared in at
+least one language), `bar failed` (scored and below the bar wherever scored; the candidates to leave out of the
+further experiments) or `not judged` (no scored run). The same verdict is the `bar_verdict` column of
+`micro-run<i>.csv` and the `bar exam` column of the summary's "Bar exam" table.
 
 A location window (CryptobomForge's IBM-draft `detectionContext`, the finding ±2 lines) counts at every line it spans.
 
@@ -565,7 +573,7 @@ files and never change these:
 | `bridge-run<i>.csv` | RQ5 -> RQ4 | (language, tool) cells and per language `all` | language, tool, confirmation, f1, n, spearman, kendall_tau |
 | `agreement-exact-run<i>.csv` | matches | (group, dimension) | matcher, repo, snapshot, variant, run, group_id, scope, key, dimension (key_size, mode, padding, curve, digest; location for repo groups), reporting (voters with a value), agreeing (voters carrying the majority value), majority, values |
 | `matchlevels-run<i>.csv` | matches | (matcher, level) | matcher, level, run, repos, items (algorithms by L4 identity), records, k1, k2, k3, k4plus (items by the voter groups of their largest group at the level), share_k2plus, `<dim>_groups` and `<dim>_agree` for key_size, mode, padding, curve, digest (groups with 2+ voters reporting a value admitted at the level; share where all agree), location_groups, location_agree (groups with 2+ located voters; share with 2+ at one call site) |
-| `micro-run<i>.csv` | ground truth | micro project and tool of the spec, also unsupported and failed runs | project, language, tool, run, tailored, status (of the run, `missing` without one), verdict (`pass`, `fail`, `unsupported`, `error`, `missing`), n_items, strict, lenient, repo, recall_strict, recall_lenient, recall_repo, sites_in_file, sites_correct, precision, f1, bar_items, passes_bar, entry_bar (`passed`, `disqualified`, `not judged`, over all scored projects of the tool), missed, repo_missed, repo_extra (families reported that the project does not contain), decoys (count), decoys_hit (ids) |
+| `micro-run<i>.csv` | ground truth | micro project and tool of the spec, also unsupported and failed runs | project, language, tool, run, tailored, status (of the run, `missing` without one), verdict (`pass`, `fail`, `unsupported`, `error`, `missing`), n_items, strict, lenient, repo, recall_strict, recall_lenient, recall_repo, sites_in_file, sites_correct, precision, f1, bar_items, passes_bar, bar_verdict (`bar passed`, `bar failed`, `not judged`, over all scored projects of the tool), missed, repo_missed, repo_extra (families reported that the project does not contain), decoys (count), decoys_hit (ids) |
 | `micro-items-run<i>.csv` | ground truth | (micro project, tool, expected item) of every scored run | project, language, tool, run, item, families, insertion_style (`direct`, `indirect`), callsite_strict, callsite_lenient, repo |
 
 Join keys: records on `(snapshot, variant, run, record_id)`, groups on `(snapshot, variant, run, group_id)`. Group ids

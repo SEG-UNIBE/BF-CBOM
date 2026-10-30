@@ -1,11 +1,11 @@
 """Scoring a tool against the micro projects' ground truth (experiments/corpus/micro/ground_truth.yaml), generated
 from the snippet catalogs by mutation/micro.py; its header states the rules.
 
-This implements the entry bar (`ENTRY_BAR`: a tool finds at least half of a project's calls, lenient, in at least
-one language; below it in every language it was scored on, it is disqualified, `entry_verdict`) and gives recall,
+This implements the bar exam's bar (`BAR`: a tool finds at least half of a project's calls, lenient, in at least
+one language; below it in every language it was scored on, it failed the bar, `bar_verdict`) and gives recall,
 precision and F1 per tool on the micro projects, at two levels (CLAUDE.md, refinement 1):
 - call sites: strict (a record of the item's group on its lines; for a keygen item also a key record) and lenient
-  (also a record of unknown family there); the entry bar uses lenient;
+  (also a record of unknown family there); the bar uses lenient;
 - repository: the item's group reported anywhere in the project, location ignored, so tools without locations get a
   number too. Items sharing a group (two RSA, three AES) are found together at this level.
 Precision is over the places the tool reports in the project's source file (correct: on a call's lines with its
@@ -29,8 +29,8 @@ DEFAULT_TRUTH = Path(
     os.getenv("GROUND_TRUTH_PATH")
     or Path(__file__).resolve().parents[1] / "experiments" / "corpus" / "micro" / "ground_truth.yaml"
 )
-ENTRY_BAR = 0.5  # a tool must find at least half of a project's calls (lenient) in at least one language
-PASSED, DISQUALIFIED, NOT_JUDGED = "passed", "disqualified", "not judged"  # entry_verdict
+BAR = 0.5  # a tool must find at least half of a project's calls (lenient) in at least one language
+BAR_PASSED, BAR_FAILED, NOT_JUDGED = "bar passed", "bar failed", "not judged"  # bar_verdict
 
 
 @dataclass(frozen=True)
@@ -128,8 +128,8 @@ class TruthScore:
 
     @property
     def bar_items(self) -> int:
-        """The entry bar in calls: half of the project's, rounded up (7 of 14)."""
-        return math.ceil(ENTRY_BAR * self.n_assets)
+        """The bar in calls: half of the project's, rounded up (7 of 14)."""
+        return math.ceil(BAR * self.n_assets)
 
     @property
     def passes_bar(self) -> bool:
@@ -173,14 +173,14 @@ class TruthScore:
         }
 
 
-def entry_verdict(scores) -> str:
-    """A tool's verdict over its micro projects (one score per project, None where it has no scored run): passed when
-    it clears the entry bar in at least one language, disqualified when it was scored and clears it nowhere, not
-    judged without any scored run (it failed, timed out or does not support the languages)."""
+def bar_verdict(scores) -> str:
+    """A tool's verdict over its micro projects (one score per project, None where it has no scored run): bar passed
+    when it clears the bar in at least one language, bar failed when it was scored and clears it nowhere, not judged
+    without any scored run (it failed, timed out or does not support the languages)."""
     scored = [s for s in scores if s is not None]
     if not scored:
         return NOT_JUDGED
-    return PASSED if any(s.passes_bar for s in scored) else DISQUALIFIED
+    return BAR_PASSED if any(s.passes_bar for s in scored) else BAR_FAILED
 
 
 @lru_cache(maxsize=4)

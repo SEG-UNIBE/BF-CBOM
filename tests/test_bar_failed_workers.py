@@ -1,4 +1,4 @@
-"""Three workers of tools disqualified by the bar exam (qelens, cryptarium, qScan): command line, output handling
+"""Three workers of tools that failed the bar exam (qelens, cryptarium, qScan): command line, output handling
 and failure reporting. The tools are not installed in the test environment; a fake executable stands in."""
 
 import importlib.util
