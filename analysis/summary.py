@@ -38,7 +38,8 @@ FILES = {
     "type, LLM tokens and costs)",
     "runtime.csv": "per tool and language (and all): repositories, median seconds with a bootstrap CI over "
     "repositories, p90, max, spread across repositories and between reruns, timeouts, hours, seconds per 1k "
-    "source files and Spearman against size",
+    "source files and Spearman against size; peak memory and CPU cores with the same statistics; the memory "
+    "limit, the runs at it, the OOM kills and the runs that may have failed for memory",
     "records-run{i}.csv": "one row per normalised record: every dimension with its raw value and source",
     "micro-run{i}.csv": "one row per (micro project, tool): status, verdict, recall at call sites and repo level",
     "micro-items-run{i}.csv": "one row per (micro project, tool, expected item): found at call site (strict, "
@@ -180,6 +181,11 @@ def _span(seconds: float) -> str:
 def _gib(mb) -> str:
     f = _float(mb)
     return "" if f is None else f"{f / 1024:.1f}"
+
+
+def _cores(v) -> str:
+    f = _float(v)
+    return "" if f is None else f"{f:.1f}"
 
 
 def _true(v) -> bool:
@@ -575,7 +581,6 @@ def _runs(rows: list[dict]) -> list[str]:
     for r in rows:
         by_tool[r["tool"]].append(r)
     statuses = ["ok", "error", "timeout", "oom", "unsupported"]
-    memory = any(r.get("peak_memory_mb") for r in rows)
     table, others = [], []
     for tool in sorted(by_tool):
         rs = by_tool[tool]
@@ -588,11 +593,6 @@ def _runs(rows: list[dict]) -> list[str]:
             versions = ["not run: no repo in its languages"]
         row = [tool] + [c.get(s, 0) or "" for s in statuses] + [other or "", median]
         others.append(other)
-        if memory:
-            peaks = [p for r in rs if (p := _float(r.get("peak_memory_mb"))) is not None]
-            limits = [p for r in rs if (p := _float(r.get("memory_limit_mb"))) is not None]
-            row += [_gib(max(peaks)) if peaks else "", _gib(max(limits)) if limits else ""]
-            row += [sum(_int(r.get("oom_kills")) for r in rs) or ""]
         table.append(row + ["; ".join(versions)])
     header = ["tool", *statuses, "other", "median s"]
     if not any(others):  # statuses outside the four are rare; keep the column only when there are some
@@ -600,8 +600,6 @@ def _runs(rows: list[dict]) -> list[str]:
         header.pop(i)
         for row in table:
             row.pop(i)
-    if memory:
-        header += ["peak GiB", "limit GiB", "OOM kills"]
     lines = [
         "### Runs",
         "",
@@ -612,13 +610,9 @@ def _runs(rows: list[dict]) -> list[str]:
         "run is left out of every table below and `experiment run --retry-failed` redoes it; `unsupported`: the "
         "repository's language is outside the tool's languages, so the tool was not run).",
         "- `median s`: the median duration of the ok runs, in seconds.",
+        "- `tool version`: as the worker recorded it.",
+        "",
     ]
-    if memory:
-        lines += [
-            "- `peak GiB`: the most memory one run of the tool used (its container's working set, sampled every "
-            "second); `limit GiB`: the container's memory limit; `OOM kills`: how often the container ran out of it.",
-        ]
-    lines += ["- `tool version`: as the worker recorded it.", ""]
     lines += md_table([*header, "tool version"], table, "l" + "r" * (len(header) - 1) + "l")
     failed = [r for r in rows if r["status"] not in ("ok", "oom", "unsupported")]
     if failed:
@@ -640,21 +634,76 @@ def _runs(rows: list[dict]) -> list[str]:
             lines.append(f"- `{r['tool']}` on `{r['repo']}` ({r['variant']}, run {r['run']}): {r['workaround']}")
         if len(workarounds) > 25:
             lines.append(f"- ... and {_n(len(workarounds) - 25)} more (runs.csv)")
-    oomed = [r for r in rows if r["status"] == "oom"]
-    if oomed:
-        lines += [
-            "",
-            f"Runs OOM-killed meanwhile, stored with the tool's output but counted as `oom` ({_n(len(oomed))}; our "
-            "memory cap, not the tool's result; left out of the tables, `experiment run --retry-failed` redoes them):",
-            "",
-        ]
-        for r in oomed[:25]:
-            lines.append(
-                f"- `{r['tool']}` on `{r['repo']}` ({r['variant']}, run {r['run']}): {r['oom_kills']} OOM kill(s) "
-                f"at {_gib(r.get('memory_limit_mb'))} GiB"
-            )
-        if len(oomed) > 25:
-            lines.append(f"- ... and {_n(len(oomed) - 25)} more (runs.csv)")
+    return lines + [""]
+
+
+def _memory_limits(runs: list[dict], runtime: list[dict]) -> list[str]:
+    """Whether our memory limits shaped a result (runtime.csv, runs.csv): per tool the limit next to its peaks, the
+    runs that reached it, the OOM kills and the failed runs that may have failed for memory, each of those listed.
+    A check of the setup, not a finding: the paper reports the peaks, never the limits."""
+    every = [r for r in runtime if r["language"] == "all" and r.get("peak_max_mb") not in (None, "")]
+    if not every:
+        return []
+
+    def share(r: dict) -> float | None:
+        peak, limit = _float(r.get("peak_max_mb")), _float(r.get("limit_mb"))
+        return peak / limit if peak is not None and limit else None
+
+    every.sort(key=lambda r: (-(share(r) or 0), r["tool"]))
+    recorded = any(r.get("at_limit") not in (None, "") for r in every)
+    table = [
+        [r["tool"], _gib(r.get("limit_mb")), _gib(r.get("peak_max_mb")), _pct(share(r)), _gib(r.get("peak_p90_mb")),
+         r.get("at_limit") or "", r.get("oom") or "0", r.get("memory_failures") or "0"]
+        for r in every
+    ]  # fmt: skip
+    lines = [
+        "### Memory limits",
+        "",
+        "Whether our memory limits shaped any result: one row per tool over every run it made, closest to its limit "
+        'first. The limits are ours, not the tools\': the peaks are reported under "Run time, memory and CPU", the '
+        "limits only here.",
+        "",
+        "- `limit GiB`: the container's memory limit; `max peak GiB`: the largest working set of a single run, "
+        "`of limit` that as a share of the limit; `p90 peak GiB`: 90 % of the repositories' peaks stay under it.",
+        "- `at limit`: runs whose usage reached the limit at least once; the kernel then reclaims, file cache "
+        "first, so this alone does no harm"
+        + ("" if recorded else " (empty: the workers of this experiment did not record it yet)")
+        + "; `OOM kills`: runs during which the kernel killed a process of the container for memory.",
+        "- `failed for memory`: runs that failed (error, timeout, oom) with an OOM kill, an error saying the tool ran "
+        "out of memory (a Java tool ends at its heap, below the container's limit) or at the limit "
+        "(`memory_failure` in runs.csv); each is listed below the table.",
+        "",
+        *md_table(
+            [
+                "tool",
+                "limit GiB",
+                "max peak GiB",
+                "of limit",
+                "p90 peak GiB",
+                "at limit",
+                "OOM kills",
+                "failed for memory",
+            ],
+            table,
+        ),  # fmt: skip
+        "",
+    ]
+    failed = [r for r in runs if r.get("memory_failure")]
+    if not failed:
+        return lines + ["✅ No run failed for memory.", ""]
+    lines += [
+        f"⛔ Runs that may have failed for memory ({_n(len(failed))}; an `oom` run is stored with the tool's output "
+        "but left out of the tables; `experiment run --retry-failed` redoes them all, after raising the limit):",
+        "",
+    ]
+    for r in failed[:25]:
+        err = f": {r['error']}" if r.get("error") else ""
+        lines.append(
+            f"- `{r['tool']}` on `{r['repo']}` ({r['variant']}, run {r['run']}): {r['status']}, {r['memory_failure']}, "
+            f"peak {_gib(r.get('peak_memory_mb'))} of {_gib(r.get('memory_limit_mb'))} GiB{err}"
+        )
+    if len(failed) > 25:
+        lines.append(f"- ... and {_n(len(failed) - 25)} more (runs.csv)")
     return lines + [""]
 
 
@@ -1394,8 +1443,9 @@ def _rq1(
 
 
 def _runtime(rows: list[dict]) -> list[str]:
-    """What a scan costs (runtime.csv): time and memory per tool in one table, slowest first (the order is the
-    finding), then the remaining time columns and the median per language."""
+    """What a scan costs (runtime.csv): time, memory and CPU per tool in one table, slowest first (the order is the
+    finding), then the remaining time columns and the median per language. The limits are not reported here: they
+    are ours, not the tools' (`_memory_limits`)."""
     every = sorted((r for r in rows if r["language"] == "all" and r.get("median_sec")),
                    key=lambda r: (-(_float(r["median_sec"]) or 0), r["tool"]))  # fmt: skip
     if not every:
@@ -1406,48 +1456,66 @@ def _runtime(rows: list[dict]) -> list[str]:
         return "" if lo is None or hi is None else f"{fmt(lo)} - {fmt(hi)}"
 
     memory = any(r.get("peak_max_mb") not in (None, "") for r in every)
-    recorded = any(r.get("at_limit") not in (None, "") for r in every)
-    header = ["tool", "repos", "median s", "95 % CI s", "p90 s", "spread s", "timeouts"]
+    cpu = any(r.get("cpu_sec_median") not in (None, "") for r in every)
+    header = ["tool", "repos", "median s", "95 % CI s", "p90 s", "timeouts"]
     if memory:
-        header += ["median GiB", "95 % CI GiB", "p90 GiB", "max GiB", "spread GiB", "limit GiB", "at limit", "OOM"]
+        header += ["median GiB", "95 % CI GiB", "p90 GiB", "max GiB"]
+    if cpu:
+        header += ["median CPU s", "95 % CI CPU s", "median cores", "max cores"]
     table = []
     for r in every:
         row = [r["tool"], r["repos"], _num(r["median_sec"]), ci(r, "median_ci_low", "median_ci_high", _num),
-               _num(r.get("p90_sec")), _pct(r.get("spread_cv")), _pct(r.get("timeout_share"))]  # fmt: skip
+               _num(r.get("p90_sec")), _pct(r.get("timeout_share"))]  # fmt: skip
         if memory:
             row += [_gib(r.get("peak_median_mb")), ci(r, "peak_ci_low", "peak_ci_high", _gib),
-                    _gib(r.get("peak_p90_mb")), _gib(r.get("peak_max_mb")), _pct(r.get("peak_spread_cv")),
-                    _gib(r.get("limit_mb")), _n(r["at_limit"]) if r.get("at_limit") not in (None, "") else "",
-                    _n(r.get("oom")) if _float(r.get("oom")) else ""]  # fmt: skip
+                    _gib(r.get("peak_p90_mb")), _gib(r.get("peak_max_mb"))]  # fmt: skip
+        if cpu:
+            row += [_num(r.get("cpu_sec_median")), ci(r, "cpu_sec_ci_low", "cpu_sec_ci_high", _num),
+                    _cores(r.get("cores_median")), _cores(r.get("cores_max"))]  # fmt: skip
         table.append(row)
     lines = [
-        "### Run time and memory",
+        "### Run time, memory and CPU",
         "",
         "What a scan costs: one row per tool over every run it made, all variants and repetitions, slowest first "
-        "(`runtime.csv`). The unit is the repository, so a mutated or repeated repository counts once: its time is "
-        "the median of its ok runs (the worker's wall time for the job, the clone from the local git server "
-        "included), its peak memory the largest of its runs.",
+        "(`runtime.csv`). The unit is the repository, so a mutated or repeated repository counts once: its time and "
+        "its CPU load are the median of its ok runs (the worker's wall time for the job, the clone from the local git "
+        "server included), its peak memory the largest of its runs.",
         "",
-        "- `repos`: repositories with an ok run; `median s` and `median GiB`: the median over them, each with a "
-        f"`95 % CI`, a bootstrap interval of that median over the repositories (resampled {RUNTIME_BOOTSTRAP} times; "
-        f"only with {RUNTIME_MIN_REPOS} or more); `p90`: the value 90 % of the repositories stay under.",
-        "- `spread`: the coefficient of variation of the repositories' values (sd / mean): around 0 the tool needs "
-        "about as much everywhere, above 1 the repository decides.",
+        "- `repos`: repositories with an ok run; `median`: the median over them, each with a `95 % CI`, a bootstrap "
+        f"interval of that median over the repositories (resampled {RUNTIME_BOOTSTRAP} times; only with "
+        f"{RUNTIME_MIN_REPOS} or more); `p90`: the value 90 % of the repositories stay under; `max`: a single run.",
+        "- `runtime.csv` has more columns than are printed: the spread across repositories (`spread_cv`, "
+        "`peak_spread_cv`: sd / mean, around 0 the tool needs about as much everywhere, above 1 the repository "
+        "decides), the p90 and max of CPU s, the CI and p90 of cores.",
         "- `timeouts`: the share of its runs that hit the time limit (their time is the limit, so a high share makes "
         "the median an underestimate).",
     ]
+    if memory or cpu:
+        lines += ["", "<details>", "<summary>How to read memory and CPU</summary>", ""]
     if memory:
         lines += [
-            "- Memory is the container's working set (memory in use less inactive file cache, as `docker stats` shows "
-            "it), sampled every second: the tool, any server it starts and the worker process; `max GiB`: a single "
-            "run. A tool on the Java VM grows its heap towards the ceiling it is given before it collects, so its "
-            "peak also reflects the heap configured for it.",
-            "- `limit GiB`: the container's memory limit; `at limit`: runs whose usage reached it (the kernel then "
-            "reclaims, file cache first); 0 means no run was constrained by its limit, so the peaks are the tools' "
-            "own"
-            + ("" if recorded else " (empty: the workers of this experiment did not record it yet)")
-            + "; `OOM`: runs killed for memory.",
+            "- **Memory (GiB)**: the peak working set of the tool's container during one job (memory in use less "
+            "inactive file cache, as `docker stats` shows it, sampled every second): the tool, any server it starts "
+            "(CBOMkit's backend and Postgres) and our worker. `runs.csv` stores it per run in MiB (`peak_memory_mb`); "
+            "a repository's peak is the largest of its runs.",
+            "- Read it as the RAM to provision: the median for a typical repository, p90 for nine in ten, max for the "
+            "worst seen. A spike shorter than a second can be missed, and a Java tool fills the heap it is given, so "
+            "its peak partly reflects the heap configured for it (`JAVA_OPTS` in `docker-compose.yml`). Whether a "
+            'limit came near is checked in "Memory limits" (preamble).',
         ]
+    if cpu:
+        lines += [
+            "- **Wall time and CPU**: `s` is wall time, the job's duration on the clock. `CPU s` is the container's "
+            "CPU time during the job, summed over its cores (one core busy for one second is 1 s): the work done, "
+            "waiting not counted. `cores` is CPU s over wall time, the mean number of cores busy: 600 s at 2.5 cores "
+            "is 1'500 CPU s.",
+            "- Cores about 1: effectively single-threaded, so more cores do not help but replicas do; clearly above "
+            "1: it parallelises; below 1: it waits (the clone, a server's start, I/O).",
+            "- No CPU limits are set and the tools run side by side, so cores are what a tool got on a shared host, "
+            "not what it could use alone; CPU seconds, the work done, are less affected and compare tools better.",
+        ]
+    if memory or cpu:
+        lines += ["", "</details>"]
     lines += [""] + md_table(header, table) + [""]
 
     more = [
@@ -2822,6 +2890,7 @@ def render(analysis_dir: Path, *, run: int = 1) -> str:
     lines = ["## Preamble", "", "The terms the tables use, the questions they answer, and every stored run.", ""]
     lines += _reading() + _questions()
     lines += _runs(rows("runs.csv"))
+    lines += _memory_limits(rows("runs.csv"), rows("runtime.csv"))
     lines += _tools(rows("tools.csv"))
     lines += _versions(rows("runs.csv"))
     lines += _repositories(spec or {})

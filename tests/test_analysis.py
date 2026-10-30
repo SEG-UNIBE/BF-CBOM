@@ -325,8 +325,9 @@ def test_an_oom_killed_run_is_listed_but_its_cbom_is_not_read(tmp_path, monkeypa
     assert (runs["cbomkit"]["repo_bytes"], runs["cbomkit"]["repo_source_bytes"]) == ("3145728", "1048576")
     assert {u["tool"] for u in _read_csv(out / "units-run1.csv")} == {"cbomkit"}  # its CBOM was not normalised
     summary = (out / "_SUMMARY.md").read_text(encoding="utf-8")
-    assert "| cipherradar |  |  |  | 1 |  |" in summary and "Runs OOM-killed meanwhile" in summary
-    assert "`cipherradar` on `bfcbom/micro-java` (original, run 1): 1 OOM kill(s) at 4.0 GiB" in summary
+    assert "| cipherradar |  |  |  | 1 |  |" in summary and runs["cipherradar"]["memory_failure"] == "oom kill"
+    assert "⛔ Runs that may have failed for memory (1;" in summary
+    assert "`cipherradar` on `bfcbom/micro-java` (original, run 1): oom, oom kill, peak 4.0 of 4.0 GiB" in summary
 
 
 def test_report_is_identical_sequential_and_parallel(tmp_path, monkeypatch, old_truth):
@@ -598,8 +599,16 @@ def test_summary_starts_with_when_how_long_and_how_much_ram(tmp_path, monkeypatc
         in summary
     )
     assert "| worker image ids | 1 recorded in `_run-log.json` (by content, per session) |" in summary
-    header = "| tool | ok | error | timeout | oom | unsupported | median s | peak GiB | limit GiB | OOM kills |"
-    assert header in summary and "| cbomkit | 1 |  |  |  |  | 2 | 2.9 | 4.0 |  |" in summary
+    header = "| tool | ok | error | timeout | oom | unsupported | median s | tool version |"
+    assert header in summary and "| cbomkit | 1 |  |  |  |  | 2 |" in summary
+    limits = summary[summary.index("### Memory limits") :]
+    assert (
+        "| tool | limit GiB | max peak GiB | of limit | p90 peak GiB | at limit | OOM kills | failed for memory |"
+        in limits
+    )
+    assert limits.index("| cbomkit | 4.0 | 2.9 | 0.73 | 2.9 |  | 0 | 0 |") < limits.index("| cipherradar |")
+    assert "(empty: the workers of this experiment did not record it yet)" in limits
+    assert "✅ No run failed for memory." in limits
     runs = {r["tool"]: r for r in _read_csv(exp / "_ANALYSIS" / "runs.csv")}
     assert runs["cbomkit"]["queue_sec"] == "90.0" and runs["cbomkit"]["bfcbom_commit"] == "abc123def456"
 
@@ -707,27 +716,54 @@ def test_runtime_rows_count_each_repository_once_with_spread_ci_and_size():
     assert "size_rho" not in one and "sec_per_1k_source_files" not in one  # one size: nothing to scale by
 
 
-def test_runtime_rows_report_peak_memory_per_repository_and_runs_at_the_limit():
-    from analysis.summary import _runtime
-    from analysis.tables import RUNTIME_COLUMNS, runtime_rows
+def test_runtime_rows_report_peak_memory_and_cpu_per_repository_and_the_limits_apart():
+    from analysis.summary import _memory_limits, _runtime
+    from analysis.tables import RUNTIME_COLUMNS, memory_failure, runtime_rows
 
-    def mem(snapshot, peak, *, hits=0, oom=0, status="ok"):
+    def mem(snapshot, peak, *, cores=1.0, hits=0, oom=0, status="ok", error=None):
+        meta = {"limit_hits": hits, "oom_kills": oom, "error": error}
         return {**_run("t", snapshot, 10.0, status=status), "peak_memory_mb": peak, "memory_limit_mb": 4096.0,
-                "limit_hits": hits, "oom_kills": oom}  # fmt: skip
+                "cpu_seconds": 10.0 * cores, "cpu_cores": cores, **meta,
+                "memory_failure": memory_failure(status, meta)}  # fmt: skip
 
-    runs = [mem("a", 1000.0), mem("a", 3000.0), mem("b", 2000.0), mem("c", 4096.0, hits=5, oom=1, status="oom")]
+    runs = [mem("a", 1000.0, cores=2.0), mem("a", 3000.0, cores=4.0), mem("b", 2000.0, cores=1.0)]
+    runs += [mem("c", 4096.0, hits=5, oom=1, status="oom"), mem("d", 900.0, status="error", error="parse error")]
     row = next(r for r in runtime_rows(runs) if r["language"] == "all")
-    # a repository's peak is its largest run: a 3000, b 2000, c 4096
-    assert (row["peak_median_mb"], row["peak_max_mb"], row["limit_mb"]) == (3000.0, 4096.0, 4096.0)
-    assert (row["at_limit"], row["oom"]) == (1, 1)
-    older = [{k: v for k, v in r.items() if k != "limit_hits"} for r in runs]  # workers that did not record it
-    assert "at_limit" not in next(r for r in runtime_rows(older) if r["language"] == "all")
-    assert row["peak_ci_low"] <= 3000.0 <= row["peak_ci_high"] and row["peak_spread_cv"] > 0  # as for time
-    text = "\n".join(_runtime([{c: ("" if row.get(c) is None else str(row[c])) for c in RUNTIME_COLUMNS}]))
+    # a repository's peak is its largest run: a 3000, b 2000, c 4096, d 900
+    assert (row["peak_median_mb"], row["peak_max_mb"], row["limit_mb"]) == (2500.0, 4096.0, 4096.0)
+    assert (row["at_limit"], row["oom"], row["memory_failures"]) == (1, 1, 1)
+    # CPU over the ok runs, a repository's value the median of its runs: cores a 3.0, b 1.0; CPU s a 30, b 10
+    assert (row["cores_median"], row["cores_max"]) == (2.0, 4.0) and "cores_ci_low" not in row  # two repositories
+    assert (row["cpu_sec_median"], row["cpu_sec_p90"], row["cpu_sec_max"]) == (20.0, 28.0, 40.0)
+    older = [{k: v for k, v in r.items() if k not in ("limit_hits", "cpu_seconds", "cpu_cores")} for r in runs]
+    old = next(r for r in runtime_rows(older) if r["language"] == "all")  # workers that did not record them yet
+    assert "at_limit" not in old and "cores_median" not in old and "cpu_sec_median" not in old
+    assert row["peak_ci_low"] <= 2500.0 <= row["peak_ci_high"] and row["peak_spread_cv"] > 0  # as for time
+    csv_row = {c: ("" if row.get(c) is None else str(row[c])) for c in RUNTIME_COLUMNS}
+    text = "\n".join(_runtime([csv_row]))
     assert "| tool | repos | median s | 95 % CI s |" in text and "| median GiB | 95 % CI GiB |" in text  # one table
+    assert "| p90 s | timeouts | median GiB |" in text and "| max GiB | median CPU s |" in text  # no spread printed
+    assert "| median CPU s | 95 % CI CPU s | median cores | max cores |" in text
+    assert "limit GiB" not in text
     line = next(x for x in text.splitlines() if x.startswith("| t |"))
-    assert "| 2.9 | " in line and line.endswith("| 4.0 | 1 | 1 |")  # median GiB; limit, at limit, OOM
+    assert "| 2.4 | " in line and line.endswith("| 20 |  | 2.0 | 4.0 |")  # median GiB; CPU s, cores
     assert f"| {row['peak_ci_low'] / 1024:.1f} - {row['peak_ci_high'] / 1024:.1f} |" in line
+    csv_runs = [{"repo": r["snapshot"], **{k: ("" if v is None else str(v)) for k, v in r.items()}} for r in runs]
+    limits = "\n".join(_memory_limits(csv_runs, [csv_row]))
+    assert "| t | 4.0 | 4.0 | 1.00 | 3.7 | 1 | 1 | 1 |" in limits  # at limit, OOM kills, failed for memory
+    assert "⛔ Runs that may have failed for memory (1;" in limits and "`t` on `c`" in limits and "`d`" not in limits
+    assert "✅ No run failed for memory." in "\n".join(_memory_limits(csv_runs[:3], [csv_row]))
+
+
+def test_memory_failure_names_why_a_failed_run_may_have_failed_for_memory():
+    from analysis.tables import memory_failure
+
+    assert memory_failure("oom", {"oom_kills": 1, "limit_hits": 3}) == "oom kill"
+    assert memory_failure("error", {"error": "RuntimeError: backend_oom"}) == "out of memory"
+    assert memory_failure("error", {"error": "java.lang.OutOfMemoryError: Java heap space"}) == "out of memory"
+    assert memory_failure("timeout", {"limit_hits": 2}) == "at limit"
+    assert memory_failure("error", {"error": "parse error", "limit_hits": 0}) is None
+    assert memory_failure("ok", {"oom_kills": 0, "limit_hits": 7}) is None  # an ok run did not fail
 
 
 def test_runtime_section_lists_the_slowest_tool_first_with_its_languages():

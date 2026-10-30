@@ -78,11 +78,14 @@ class JobResult(DataClassJsonMixin):
     notes: str | None = None
     # Resources of the worker's container while the job ran (common/memory.py, filled by run_job_with_timeout):
     # peak working set sampled once per second, the container's memory limit, how often usage reached the limit
-    # (0: the limit never constrained the job) and OOM kills during the job.
+    # (0: the limit never constrained the job), OOM kills during the job, the container's CPU time during the job and
+    # that divided by the job's wall time (the mean number of cores busy).
     peak_memory_mb: float | None = None
     memory_limit_mb: float | None = None
     limit_hits: int | None = None
     oom_kills: int | None = None
+    cpu_seconds: float | None = None
+    cpu_cores: float | None = None
     # Structured usage of an LLM run (common/llm_cbom.py:GenerationStats.usage): requests, tokens per kind, the
     # model ids the provider answered with. Present on failed runs too (Trace.fields).
     usage: dict | None = None

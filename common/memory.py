@@ -1,4 +1,5 @@
-"""Memory measurement for workers and the runner (cgroup v2 and /proc/meminfo; best effort, None when unavailable).
+"""Memory and CPU measurement for workers and the runner (cgroup v2 and /proc/meminfo; best effort, None when
+unavailable).
 
 - A worker's container is its own cgroup, so `/sys/fs/cgroup` inside it describes that container: the working set
   (`memory.current` minus `inactive_file`, what `docker stats` shows), the limit (`memory.max`, the compose
@@ -6,7 +7,9 @@
   `JobSampler` samples them while a job runs, so every JobResult carries the peak of the whole container (the tool, its
   servers such as CBOMkit's Postgres, and our worker), sampled once per second: spikes shorter than that can be
   missed. A job with no limit hits ran without the limit ever constraining it; at the limit the kernel reclaims (file
-  cache first), and on a host without swap memory it cannot reclaim ends in an OOM kill.
+  cache first), and on a host without swap memory it cannot reclaim ends in an OOM kill. The container's CPU time
+  (`cpu.stat` `usage_usec`) during the job, divided by the job's wall time, is the mean number of cores it kept busy;
+  no CPU limits are set, so a tool takes what the host gives it.
 - `/proc/meminfo` is not namespaced, so inside any container it describes the Docker VM (or Linux host): total RAM
   and what is in use. The runner samples it for the peak of the whole experiment.
 """
@@ -14,6 +17,7 @@
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
 
 CGROUP_DIR = Path(os.getenv("BF_CBOM_CGROUP_DIR", "/sys/fs/cgroup"))
@@ -60,18 +64,24 @@ def limit_hits(cgroup: Path = CGROUP_DIR) -> int | None:
     return _keyed(_read(cgroup / "memory.events")).get("max")
 
 
+def cpu_usec(cgroup: Path = CGROUP_DIR) -> int | None:
+    """CPU time the container has used since it started, in microseconds (`cpu.stat` `usage_usec`)."""
+    return _keyed(_read(cgroup / "cpu.stat")).get("usage_usec")
+
+
 def mib(n: int | None) -> float | None:
     return None if n is None else round(n / _MIB, 1)
 
 
 class JobSampler:
-    """Peak working set, limit hits and OOM kills of this container between `__init__` and `result()`."""
+    """Peak working set, limit hits, OOM kills and CPU time of this container between `__init__` and `result()`."""
 
     def __init__(self, cgroup: Path | None = None):
         self.cgroup = cgroup = cgroup or CGROUP_DIR
         self.peak: int | None = None
         self.oom_start = oom_kills(cgroup)
         self.hits_start = limit_hits(cgroup)
+        self.cpu_start, self.wall_start = cpu_usec(cgroup), time.monotonic()
         self.sample()
 
     def sample(self) -> None:
@@ -84,11 +94,15 @@ class JobSampler:
         oom_end, hits_end = oom_kills(self.cgroup), limit_hits(self.cgroup)
         oom = None if self.oom_start is None or oom_end is None else oom_end - self.oom_start
         hits = None if self.hits_start is None or hits_end is None else hits_end - self.hits_start
+        cpu_end, wall = cpu_usec(self.cgroup), time.monotonic() - self.wall_start
+        cpu = None if self.cpu_start is None or cpu_end is None else (cpu_end - self.cpu_start) / 1e6
         return {
             "peak_memory_mb": mib(self.peak),
             "memory_limit_mb": mib(limit_bytes(self.cgroup)),
             "limit_hits": hits,
             "oom_kills": oom,
+            "cpu_seconds": None if cpu is None else round(cpu, 1),
+            "cpu_cores": None if cpu is None or wall <= 0 else round(cpu / wall, 2),
         }
 
 

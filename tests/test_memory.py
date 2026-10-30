@@ -9,8 +9,9 @@ from common.worker import run_job_with_timeout
 MIB = 1024 * 1024
 
 
-def _cgroup(d, *, current, inactive=0, limit="max", oom=0, hits=0):
+def _cgroup(d, *, current, inactive=0, limit="max", oom=0, hits=0, cpu_usec=0):
     d.mkdir(exist_ok=True)
+    (d / "cpu.stat").write_text(f"usage_usec {cpu_usec}\nuser_usec 0\nsystem_usec 0\n")
     (d / "memory.current").write_text(f"{current}\n")
     (d / "memory.stat").write_text(f"anon 1\nactive_file 2\ninactive_file {inactive}\n")
     (d / "memory.max").write_text(f"{limit}\n")
@@ -25,13 +26,22 @@ def test_working_set_is_current_minus_inactive_file_like_docker_stats(tmp_path):
     assert memory.limit_bytes(_cgroup(tmp_path / "unlimited", current=1)) is None
 
 
-def test_job_sampler_keeps_the_peak_and_counts_limit_hits_and_oom_kills_during_the_job(tmp_path):
-    cg = _cgroup(tmp_path / "cg", current=200 * MIB, limit=1024 * MIB, oom=1, hits=5)
+def test_job_sampler_keeps_the_peak_and_counts_limit_hits_oom_kills_and_cpu_time_during_the_job(tmp_path, monkeypatch):
+    clock = iter([100.0, 140.0])  # the job's wall time: 40 s
+    monkeypatch.setattr(memory.time, "monotonic", lambda: next(clock))
+    cg = _cgroup(tmp_path / "cg", current=200 * MIB, limit=1024 * MIB, oom=1, hits=5, cpu_usec=7_000_000)
     sampler = memory.JobSampler(cg)
-    _cgroup(cg, current=700 * MIB, limit=1024 * MIB, oom=1, hits=5)
+    _cgroup(cg, current=700 * MIB, limit=1024 * MIB, oom=1, hits=5, cpu_usec=9_000_000)
     sampler.sample()
-    _cgroup(cg, current=300 * MIB, limit=1024 * MIB, oom=2, hits=9)
-    assert sampler.result() == {"peak_memory_mb": 700.0, "memory_limit_mb": 1024.0, "limit_hits": 4, "oom_kills": 1}
+    _cgroup(cg, current=300 * MIB, limit=1024 * MIB, oom=2, hits=9, cpu_usec=97_000_000)
+    assert sampler.result() == {
+        "peak_memory_mb": 700.0,
+        "memory_limit_mb": 1024.0,
+        "limit_hits": 4,
+        "oom_kills": 1,
+        "cpu_seconds": 90.0,
+        "cpu_cores": 2.25,
+    }
 
 
 def test_without_cgroup_files_everything_is_none(tmp_path):
@@ -40,6 +50,8 @@ def test_without_cgroup_files_everything_is_none(tmp_path):
         "memory_limit_mb": None,
         "limit_hits": None,
         "oom_kills": None,
+        "cpu_seconds": None,
+        "cpu_cores": None,
     }
     assert memory.host_memory(tmp_path / "meminfo") == {}
 
@@ -67,6 +79,7 @@ def test_every_job_result_carries_the_containers_resources(tmp_path, monkeypatch
     )
     res = run_job_with_timeout(_ok, instr, 5, worker_name="t")
     assert (res.peak_memory_mb, res.memory_limit_mb, res.limit_hits, res.oom_kills) == (64.0, 512.0, 0, 0)
+    assert res.cpu_seconds == 0.0  # the fake cgroup's counter does not move
     assert json.loads(res.to_json())["peak_memory_mb"] == 64.0
 
 

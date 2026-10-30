@@ -34,7 +34,11 @@ example, voter groups, how family and group are argued),
   `RESULTS_DIR=experiments/results uv run bf-cbom analysis report <exp>`.
 - **The laptop prepares, the VM runs.** Batch runs happen on the VM (64 CPUs, 122 GiB RAM since 2026-10-29, per the run
   logs; 60.5 GiB before) with `EXPERIMENT_MEMORY_BUDGET_GB=0` for now (one wave). Limits are caps, not reservations; the measured peak with all 15 tools at once was 44.8 of
-  60.5 GiB (corpus-pilot-medium, 2026-10-23). Current limits are in `common/tools.yaml` and `docker-compose.yml`.
+  60.5 GiB (corpus-pilot-medium, 2026-10-23). Current limits are in `common/tools.yaml` and `docker-compose.yml`;
+  since 2026-10-30 every worker reaches its peak comfortably, because the paper reports peaks and never limits
+  (CBOMkit 20 GiB with `-Xmx16g`, the heap being its binding limit; CipherRadar 12; xgrep 8; the trials' highest
+  peaks were 12.8, 7.3 and 3.0). corpus-main is to run with `REPLICAS="cbomkit=2"`: with the services, the summed caps
+  are 115 of 121.5 GiB, so every job can reach its cap at once (decided 2026-10-30).
   The laptop is for code, configs and analysing copied exports.
 - **Results are disposable until the paper's runs.** One code path per feature, no compatibility with older result
   layouts; old experiments are rerun, not migrated.
@@ -122,7 +126,8 @@ example, voter groups, how family and group are argued),
   `run_index`, `started_at` / `finished_at`, `notes`, the container's `peak_memory_mb` / `memory_limit_mb` /
   `limit_hits` / `oom_kills` during the job (`common/memory.py`, cgroup v2, sampled every second; `limit_hits` from
   `memory.events` `max`, added 2026-10-30: 0 = the limit never constrained the job; the VM has no swap, so memory
-  beyond the limit ends in an OOM kill) and, for LLM workers, `usage`
+  beyond the limit ends in an OOM kill), its `cpu_seconds` / `cpu_cores` (`cpu.stat` read at the job's start and end;
+  cores = CPU time over wall time; added 2026-10-30) and, for LLM workers, `usage`
   (requests, input / cached / cache-write / output / reasoning tokens, the model ids answered with; kept on failed
   runs).
 - **Tool registry:** `common/tools.yaml` (loader `common/tools_registry.py`): engine family, `voter_group` (tools sharing
@@ -272,7 +277,7 @@ language they were scored in; cdxgen, cryptarium, qelens and qscan disqualified.
 | `pqcheck` | pqcheck | Python, Go | |
 | `qdarpan` | qdarpan | Java, Go, C | the worker adapter moves `qdarpan:location.N` into `evidence.occurrences` |
 | `securin-xbom` | securin-xbom | Java, Python | the registry rule sets it fetches online, frozen unfiltered at a semgrep-rules commit |
-| `cipherradar` | cipherradar | Java, Python, Go, JS | runs outside the clone; Java files with its crash trigger pre-excluded via `.cradarignore` (recorded); 8 GiB (killed at 4 on pycryptodome, bunkerweb, pyca/cryptography, 2026-10-23) |
+| `cipherradar` | cipherradar | Java, Python, Go, JS | runs outside the clone; Java files with its crash trigger pre-excluded via `.cradarignore` (recorded); 12 GiB since 2026-10-30 (killed at 4 on pycryptodome, bunkerweb, pyca/cryptography, 2026-10-23; highest trial peak 7.3 at 8) |
 | `scanoss` | scanoss | Go, C, JS, Rust | crypto-finder with the public open rules; Java/Python rules need an API key (research key requested) |
 | `ciphersift` | ciphersift | Java, Python, Go | benchmark-informed: `tailored_on` the micro projects and the pilot corpus (refinement 13) |
 | `xgrep` | xgrep | Java, Python, Go, JS | |
@@ -309,8 +314,10 @@ use a CBOM reports, counted as records and items, never as assets, which depend 
   traceability), names nobody can read (`resolution`); descriptive, more is not better (`runs.csv`, `units-`,
   `coverage-`, `traceability-run<i>.csv`), and what a scan costs: per tool and language the median time over
   repositories with a bootstrap CI, p90, max, the spread across repositories and between reruns, timeouts and the
-  scaling with source files, and the peak memory per tool with the same statistics (`runtime.csv`, the summary's
-  "Run time and memory", time and memory in one table).
+  scaling with source files, and the peak memory, CPU seconds and mean cores per tool with the same statistics
+  (`runtime.csv`, the summary's "Run time, memory and CPU", one table). The paper reports times, peaks and cores,
+  never our limits; those are checked in the preamble's "Memory limits" (limit next to peak, runs at the limit, OOM
+  kills, every run that may have failed for memory listed: runs.csv `memory_failure`).
 - **RQ2, conformity:** which CBOM standard and version do the generators follow, and how far do their documents
   comply with it in letter and in substance? The declared `bomFormat` / `specVersion` (CryptobomForge: IBM's draft),
   whole-document validity and the error kinds, per-field spec issues, the standard's own fields filled per asset type

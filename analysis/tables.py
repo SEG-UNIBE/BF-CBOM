@@ -16,6 +16,7 @@ from __future__ import annotations
 import csv
 import json
 import random
+import re
 import statistics
 from collections import Counter, defaultdict
 from collections.abc import Iterable
@@ -40,7 +41,8 @@ RUNS_COLUMNS = [
     "repo", "snapshot", "commit", "variant", "variant_commit", "language", "expect_crypto", "repo_files",
     "repo_source_files", "repo_bytes", "repo_source_bytes", "tool", "run", "tailored",
     "status", "duration_sec", "size_bytes", "error", "workaround", "peak_memory_mb", "memory_limit_mb", "limit_hits",
-    "oom_kills", "enqueued_at", "started_at", "finished_at", "queue_sec", "received_at",
+    "oom_kills", "memory_failure", "cpu_seconds", "cpu_cores", "enqueued_at", "started_at", "finished_at", "queue_sec",
+    "received_at",
     "tool_version", "image_ref", "bfcbom_commit", "bom_format", "spec_version",
     "components", "crypto_assets", "algorithm_assets", "certificate_assets", "protocol_assets", "material_assets",
     "other_assets", "located_file_assets", "located_line_assets",
@@ -252,6 +254,26 @@ def _seconds_between(start: str | None, end: str | None) -> float | None:
     return round((t1 - t0).total_seconds(), 1)
 
 
+_OUT_OF_MEMORY = re.compile(r"MemoryError|backend_oom|out of memory", re.IGNORECASE)
+
+
+def memory_failure(status: str, meta: dict) -> str | None:
+    """Whether a run that failed (error, timeout, oom) may have failed for memory, and why: `oom kill` (the kernel
+    killed a process of the container during the job), `out of memory` (its error says so: Java's OutOfMemoryError,
+    which ends a JVM at its heap before the container reaches its limit, CBOMkit's backend_oom, a runtime's "out of
+    memory", Python's MemoryError), `at limit` (its usage reached the container's limit during the job; the kernel
+    reclaims file cache first, so the limit may or may not be the cause). None for every other run."""
+    if status not in ("error", "timeout", "oom"):
+        return None
+    if (meta.get("oom_kills") or 0) > 0:
+        return "oom kill"
+    if _OUT_OF_MEMORY.search(meta.get("error") or ""):
+        return "out of memory"
+    if (meta.get("limit_hits") or 0) > 0:
+        return "at limit"
+    return None
+
+
 def run_rows(
     exp_dir: Path,
     languages: dict[str, str | None] | None = None,
@@ -272,6 +294,7 @@ def run_rows(
         snapshot = cbom_path.parents[2].name
         repo = full_name(snapshot)
         tool = meta.get("worker") or cbom_path.parent.name
+        status = stored_status(meta)
         row = {
             "repo": repo,
             "snapshot": snapshot,
@@ -287,7 +310,7 @@ def run_rows(
             "tool": tool,
             "run": meta.get("run_index"),
             "tailored": repo in tailored.get(tool, ()),
-            "status": stored_status(meta),
+            "status": status,
             "duration_sec": meta.get("duration_sec"),
             "size_bytes": meta.get("size_bytes"),
             "error": error_line(meta.get("error")) or _timeout_text(meta),
@@ -296,6 +319,9 @@ def run_rows(
             "memory_limit_mb": meta.get("memory_limit_mb"),
             "limit_hits": meta.get("limit_hits"),
             "oom_kills": meta.get("oom_kills"),
+            "memory_failure": memory_failure(status, meta),
+            "cpu_seconds": meta.get("cpu_seconds"),
+            "cpu_cores": meta.get("cpu_cores"),
             "enqueued_at": meta.get("enqueued_at"),
             "started_at": meta.get("started_at"),
             "finished_at": meta.get("finished_at"),
@@ -333,8 +359,9 @@ def tool_rows(tools: Iterable[str], registry: dict[str, dict] | None = None) -> 
 RUNTIME_COLUMNS = [
     "tool", "language", "repos", "runs", "timeouts", "timeout_share", "median_sec", "median_ci_low", "median_ci_high",
     "p90_sec", "max_sec", "spread_cv", "rerun_cv", "rerun_pairs", "hours", "sec_per_1k_source_files", "size_rho",
-    "peak_median_mb", "peak_ci_low", "peak_ci_high", "peak_p90_mb", "peak_max_mb", "peak_spread_cv", "limit_mb",
-    "at_limit", "oom",
+    "peak_median_mb", "peak_ci_low", "peak_ci_high", "peak_p90_mb", "peak_max_mb", "peak_spread_cv", "cpu_sec_median",
+    "cpu_sec_ci_low", "cpu_sec_ci_high", "cpu_sec_p90", "cpu_sec_max", "cores_median", "cores_ci_low", "cores_ci_high",
+    "cores_p90", "cores_max", "limit_mb", "at_limit", "oom", "memory_failures",
 ]  # fmt: skip
 RUNTIME_MIN_REPOS = 3  # a CI and a size correlation only over at least this many repositories (score.py's MIN_REPOS)
 RUNTIME_BOOTSTRAP = 1000
@@ -355,6 +382,13 @@ def _cv(values: list[float]) -> float | None:
     return statistics.pstdev(values) / statistics.mean(values)
 
 
+def _median_ci(values: list[float], seed: int) -> tuple[float, float]:
+    """95 % percentile bootstrap interval of the median of `values` (RUNTIME_BOOTSTRAP resamples)."""
+    rng = random.Random(seed)
+    medians = sorted(statistics.median(rng.choice(values) for _ in values) for _ in range(RUNTIME_BOOTSTRAP))
+    return _quantile(medians, 0.025), _quantile(medians, 0.975)
+
+
 def runtime_rows(runs: list[dict], *, seed: int = 20261023) -> list[dict]:
     """Per tool and language (and `all`), how long its scans take, from runs.csv. The unit is the repository: a
     repository's time is the median of its ok runs (all variants and repetitions), so a mutated repository or a
@@ -368,9 +402,14 @@ def runtime_rows(runs: list[dict], *, seed: int = 20261023) -> list[dict]:
     repositories whose sizes differ). Memory, over every run that ran: a repository's peak is the largest
     `peak_memory_mb` of its runs (the container's working set, common/memory.py), `peak_median_mb` with its bootstrap
     CI (`peak_ci_low` / `peak_ci_high`, as for time), `peak_p90_mb` and `peak_spread_cv` over the repositories,
-    `peak_max_mb` the largest of a single run; `limit_mb` the container's limit; `at_limit` the
-    runs whose usage reached the limit (`limit_hits` > 0; empty where the workers did not record it yet), `oom` the
-    runs with an OOM kill. Unsupported runs never ran and are left out."""
+    `peak_max_mb` the largest of a single run. CPU, over the ok runs like time, a repository's value the median of
+    its runs: `cpu_sec_*` from `cpu_seconds` (the container's CPU time during the job, summed over its cores: the
+    work done) and `cores_*` from `cpu_cores` (that over the job's wall time: the mean number of cores busy), each
+    the median over the repositories with its CI, the p90 over them and the max of a single run (empty where the
+    workers did not record it yet). The limits, for checking that they did not shape the numbers:
+    `limit_mb` the container's limit; `at_limit` the runs whose usage reached it (`limit_hits` > 0; empty where the
+    workers did not record it yet), `oom` the runs with an OOM kill, `memory_failures` the failed runs that may have
+    failed for memory (`memory_failure`). Unsupported runs never ran and are left out."""
     from .score import spearman
 
     ran = [r for r in runs if r.get("status") not in (None, "", "unsupported")]
@@ -412,10 +451,8 @@ def runtime_rows(runs: list[dict], *, seed: int = 20261023) -> list[dict]:
             if (cv := _cv(values)) is not None:
                 row["spread_cv"] = round(cv, 2)
         if len(values) >= RUNTIME_MIN_REPOS:
-            rng = random.Random(seed)
-            medians = sorted(statistics.median(rng.choice(values) for _ in values) for _ in range(RUNTIME_BOOTSTRAP))
-            row["median_ci_low"] = round(_quantile(medians, 0.025), 1)
-            row["median_ci_high"] = round(_quantile(medians, 0.975), 1)
+            lo, hi = _median_ci(values, seed)
+            row["median_ci_low"], row["median_ci_high"] = round(lo, 1), round(hi, 1)
         reruns = [cv for v in per_cell.values() if (cv := _cv(v)) is not None]
         if reruns:
             row["rerun_cv"] = round(statistics.median(reruns), 2)
@@ -440,15 +477,30 @@ def runtime_rows(runs: list[dict], *, seed: int = 20261023) -> list[dict]:
             if (cv := _cv(pv)) is not None:
                 row["peak_spread_cv"] = round(cv, 2)
             if len(pv) >= RUNTIME_MIN_REPOS:
-                rng = random.Random(seed)
-                medians = sorted(statistics.median(rng.choice(pv) for _ in pv) for _ in range(RUNTIME_BOOTSTRAP))
-                row["peak_ci_low"] = round(_quantile(medians, 0.025), 1)
-                row["peak_ci_high"] = round(_quantile(medians, 0.975), 1)
+                lo, hi = _median_ci(pv, seed)
+                row["peak_ci_low"], row["peak_ci_high"] = round(lo, 1), round(hi, 1)
+        for key, prefix, digits in (("cpu_seconds", "cpu_sec", 1), ("cpu_cores", "cores", 2)):
+            per: dict[str, list[float]] = defaultdict(list)
+            for r, _ in ok:
+                if r.get(key) not in (None, ""):
+                    per[r["snapshot"]].append(float(r[key]))
+            if not per:
+                continue
+            vals = sorted(statistics.median(v) for v in per.values())
+            row |= {
+                f"{prefix}_median": round(statistics.median(vals), digits),
+                f"{prefix}_p90": round(_quantile(vals, 0.9), digits),
+                f"{prefix}_max": round(max(x for v in per.values() for x in v), digits),
+            }
+            if len(vals) >= RUNTIME_MIN_REPOS:
+                lo, hi = _median_ci(vals, seed)
+                row[f"{prefix}_ci_low"], row[f"{prefix}_ci_high"] = round(lo, digits), round(hi, digits)
         if limits := [float(r["memory_limit_mb"]) for r in rs if r.get("memory_limit_mb") not in (None, "")]:
             row["limit_mb"] = round(max(limits), 1)
         if hits := [int(float(r["limit_hits"])) for r in rs if r.get("limit_hits") not in (None, "")]:
             row["at_limit"] = sum(h > 0 for h in hits)
         row["oom"] = sum(int(float(r.get("oom_kills") or 0)) > 0 for r in rs)
+        row["memory_failures"] = sum(bool(r.get("memory_failure")) for r in rs)
         out.append(row)
     return out
 
