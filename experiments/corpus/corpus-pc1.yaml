@@ -1,0 +1,1137 @@
+generated_at: '2026-10-30T14:38:34Z'
+params:
+  languages:
+  - Java
+  - Python
+  - Go
+  per_cell: 1
+  per_language: 9
+  star_bins:
+  - - 50
+    - 300
+  - - 300
+    - 2000
+  - - 2000
+    - null
+  size_bins_kb:
+  - - 300
+    - 3000
+  - - 3000
+    - 30000
+  - - 30000
+    - 1572864
+  max_repo_size_mb: 1536
+  pushed_since: '2025-10-30'
+  search_date: '2026-10-30'
+  crypto_filter: true
+  exclude_patterns:
+  - cbom
+  - benchmark
+  - sonar-cryptography
+  - cryptobom
+  - crypto-finder
+  - cryptoscan
+  seed: 20261015
+cells:
+- language: Java
+  stars:
+  - 50
+  - 300
+  size_kb:
+  - 300
+  - 3000
+  population: 2440
+  enumerated: 2440
+  tried: 1
+  sampled: 1
+  quota: 1
+- language: Java
+  stars:
+  - 50
+  - 300
+  size_kb:
+  - 3000
+  - 30000
+  population: 2623
+  enumerated: 2623
+  tried: 1
+  sampled: 1
+  quota: 1
+- language: Java
+  stars:
+  - 50
+  - 300
+  size_kb:
+  - 30000
+  - 1572864
+  population: 1914
+  enumerated: 1914
+  tried: 1
+  sampled: 1
+  quota: 1
+- language: Java
+  stars:
+  - 300
+  - 2000
+  size_kb:
+  - 300
+  - 3000
+  population: 553
+  enumerated: 553
+  tried: 6
+  sampled: 1
+  quota: 1
+- language: Java
+  stars:
+  - 300
+  - 2000
+  size_kb:
+  - 3000
+  - 30000
+  population: 1067
+  enumerated: 1067
+  tried: 2
+  sampled: 1
+  quota: 1
+- language: Java
+  stars:
+  - 300
+  - 2000
+  size_kb:
+  - 30000
+  - 1572864
+  population: 1040
+  enumerated: 1040
+  tried: 1
+  sampled: 1
+  quota: 1
+- language: Java
+  stars:
+  - 2000
+  - null
+  size_kb:
+  - 300
+  - 3000
+  population: 91
+  enumerated: 91
+  tried: 2
+  sampled: 1
+  quota: 1
+- language: Java
+  stars:
+  - 2000
+  - null
+  size_kb:
+  - 3000
+  - 30000
+  population: 306
+  enumerated: 306
+  tried: 1
+  sampled: 1
+  quota: 1
+- language: Java
+  stars:
+  - 2000
+  - null
+  size_kb:
+  - 30000
+  - 1572864
+  population: 516
+  enumerated: 516
+  tried: 1
+  sampled: 1
+  quota: 1
+- language: Python
+  stars:
+  - 50
+  - 300
+  size_kb:
+  - 300
+  - 3000
+  population: 13449
+  enumerated: 13449
+  tried: 4
+  sampled: 1
+  quota: 1
+- language: Python
+  stars:
+  - 50
+  - 300
+  size_kb:
+  - 3000
+  - 30000
+  population: 14369
+  enumerated: 14368
+  tried: 2
+  sampled: 1
+  quota: 1
+- language: Python
+  stars:
+  - 50
+  - 300
+  size_kb:
+  - 30000
+  - 1572864
+  population: 9742
+  enumerated: 9743
+  tried: 1
+  sampled: 1
+  quota: 1
+- language: Python
+  stars:
+  - 300
+  - 2000
+  size_kb:
+  - 300
+  - 3000
+  population: 3658
+  enumerated: 3658
+  tried: 1
+  sampled: 1
+  quota: 1
+- language: Python
+  stars:
+  - 300
+  - 2000
+  size_kb:
+  - 3000
+  - 30000
+  population: 4875
+  enumerated: 4875
+  tried: 3
+  sampled: 1
+  quota: 1
+- language: Python
+  stars:
+  - 300
+  - 2000
+  size_kb:
+  - 30000
+  - 1572864
+  population: 3922
+  enumerated: 3922
+  tried: 2
+  sampled: 1
+  quota: 1
+- language: Python
+  stars:
+  - 2000
+  - null
+  size_kb:
+  - 300
+  - 3000
+  population: 668
+  enumerated: 668
+  tried: 5
+  sampled: 1
+  quota: 1
+- language: Python
+  stars:
+  - 2000
+  - null
+  size_kb:
+  - 3000
+  - 30000
+  population: 1348
+  enumerated: 1348
+  tried: 1
+  sampled: 1
+  quota: 1
+- language: Python
+  stars:
+  - 2000
+  - null
+  size_kb:
+  - 30000
+  - 1572864
+  population: 1663
+  enumerated: 1663
+  tried: 1
+  sampled: 1
+  quota: 1
+- language: Go
+  stars:
+  - 50
+  - 300
+  size_kb:
+  - 300
+  - 3000
+  population: 3189
+  enumerated: 3189
+  tried: 2
+  sampled: 1
+  quota: 1
+- language: Go
+  stars:
+  - 50
+  - 300
+  size_kb:
+  - 3000
+  - 30000
+  population: 3175
+  enumerated: 3175
+  tried: 1
+  sampled: 1
+  quota: 1
+- language: Go
+  stars:
+  - 50
+  - 300
+  size_kb:
+  - 30000
+  - 1572864
+  population: 1610
+  enumerated: 1610
+  tried: 1
+  sampled: 1
+  quota: 1
+- language: Go
+  stars:
+  - 300
+  - 2000
+  size_kb:
+  - 300
+  - 3000
+  population: 1197
+  enumerated: 1197
+  tried: 2
+  sampled: 1
+  quota: 1
+- language: Go
+  stars:
+  - 300
+  - 2000
+  size_kb:
+  - 3000
+  - 30000
+  population: 1527
+  enumerated: 1527
+  tried: 1
+  sampled: 1
+  quota: 1
+- language: Go
+  stars:
+  - 300
+  - 2000
+  size_kb:
+  - 30000
+  - 1572864
+  population: 973
+  enumerated: 973
+  tried: 1
+  sampled: 1
+  quota: 1
+- language: Go
+  stars:
+  - 2000
+  - null
+  size_kb:
+  - 300
+  - 3000
+  population: 297
+  enumerated: 297
+  tried: 5
+  sampled: 1
+  quota: 1
+- language: Go
+  stars:
+  - 2000
+  - null
+  size_kb:
+  - 3000
+  - 30000
+  population: 629
+  enumerated: 629
+  tried: 1
+  sampled: 1
+  quota: 1
+- language: Go
+  stars:
+  - 2000
+  - null
+  size_kb:
+  - 30000
+  - 1572864
+  population: 713
+  enumerated: 713
+  tried: 1
+  sampled: 1
+  quota: 1
+stats:
+  searched: 77554
+  requests: 0
+  excluded: 0
+  no_crypto: 24
+  clone_failed: 0
+  unresolved: 0
+excluded:
+- full_name: quantumproxies/quantumproxies.io
+  reason: no first-party crypto usage
+- full_name: in28minutes/spring-unit-testing-with-junit-and-mockito
+  reason: no first-party crypto usage
+- full_name: eclipsesource/megit
+  reason: no first-party crypto usage
+- full_name: piomin/sample-spring-microservices-new
+  reason: no first-party crypto usage
+- full_name: nukc/StateView
+  reason: no first-party crypto usage
+- full_name: shaopx/VideoClipEditViewTest
+  reason: no first-party crypto usage
+- full_name: bigintpro/csdn_downloader
+  reason: no first-party crypto usage
+- full_name: withzombies/bnil-graph
+  reason: no first-party crypto usage
+- full_name: cholmes/qgis_plugin_gpq_downloader
+  reason: no first-party crypto usage
+- full_name: neo4j-labs/rdflib-neo4j
+  reason: no first-party crypto usage
+- full_name: Yaozzz666/DSCF-SR
+  reason: no first-party crypto usage
+- full_name: se-hwan/cusadi
+  reason: no first-party crypto usage
+- full_name: bird-bench/BIRD-Interact
+  reason: no first-party crypto usage
+- full_name: opticspy/lightpipes
+  reason: no first-party crypto usage
+- full_name: zLanqing/codex-claude-academic-skills
+  reason: no first-party crypto usage
+- full_name: cluic/wxauto
+  reason: no first-party crypto usage
+- full_name: greyli/helloflask
+  reason: no first-party crypto usage
+- full_name: randy3k/radian
+  reason: no first-party crypto usage
+- full_name: Contextualist/acp
+  reason: no first-party crypto usage
+- full_name: kreuzwerker/m1-terraform-provider-helper
+  reason: no first-party crypto usage
+- full_name: darccio/mergo
+  reason: no first-party crypto usage
+- full_name: google/starlark-go
+  reason: no first-party crypto usage
+- full_name: gotestyourself/gotestsum
+  reason: no first-party crypto usage
+- full_name: peco/peco
+  reason: no first-party crypto usage
+repos:
+- full_name: ohbus/retail-banking
+  git_url: https://github.com/ohbus/retail-banking.git
+  branch: master
+  language: Java
+  stars: 57
+  size_kb: 777
+  pushed_at: '2026-10-13T07:02:55Z'
+  created_at: '2020-06-11T00:10:41Z'
+  topics:
+  - banking
+  - banking-applications
+  - bootstrap
+  - case-study
+  - consumer
+  - hacktoberfest
+  - ilp
+  - j2ee
+  - java
+  - mvc
+  - mysql
+  - online-banking
+  - retail-banking
+  - spring-boot
+  - sprint
+  - tcs
+  - thymeleaf
+  - web
+  crypto_apis:
+  - JCA
+  commit: 648b784ffdbb7f2ef8f968a23640e35eac6cac88
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 300
+    - 3000
+- full_name: MinecraftForge/Installer
+  git_url: https://github.com/MinecraftForge/Installer.git
+  branch: '2.0'
+  language: Java
+  stars: 72
+  size_kb: 4690
+  pushed_at: '2026-10-03T12:59:27Z'
+  created_at: '2013-06-26T02:34:17Z'
+  topics: []
+  crypto_apis:
+  - JCA
+  - JSSE
+  commit: 87803a77943a1b2d02d69e7c3108042b21f5382d
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 3000
+    - 30000
+- full_name: yomi2539/RWX
+  git_url: https://github.com/yomi2539/RWX.git
+  branch: main
+  language: Java
+  stars: 60
+  size_kb: 121816
+  pushed_at: '2026-10-08T04:47:04Z'
+  created_at: '2026-01-21T10:32:11Z'
+  topics:
+  - kotlin
+  - rts-game
+  - rusted-warfare
+  crypto_apis:
+  - JCA
+  commit: 4b7c4cc609ce6b05dd95e7a51a450d59705553e2
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 30000
+    - 1572864
+- full_name: Rapsssito/react-native-tcp-socket
+  git_url: https://github.com/Rapsssito/react-native-tcp-socket.git
+  branch: master
+  language: Java
+  stars: 397
+  size_kb: 1598
+  pushed_at: '2026-09-10T09:20:20Z'
+  created_at: '2019-10-05T10:22:34Z'
+  topics:
+  - android
+  - ios
+  - net
+  - network
+  - networking
+  - react-native
+  - react-native-library
+  - socket
+  - ssl
+  - tcp
+  - tcp-client
+  - tcp-server
+  - tcp-socket
+  - tls
+  crypto_apis:
+  - JCA
+  - BouncyCastle
+  - JSSE
+  commit: 8a3f47b33fd395092caa0241aa92327802abffad
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 300
+    - 3000
+- full_name: byronka/minum
+  git_url: https://github.com/byronka/minum.git
+  branch: master
+  language: Java
+  stars: 665
+  size_kb: 7280
+  pushed_at: '2026-10-29T21:15:08Z'
+  created_at: '2021-12-20T01:35:16Z'
+  topics:
+  - framework
+  - java
+  - minimalism
+  - minimalist
+  - tdd
+  - web
+  crypto_apis:
+  - JCA
+  - JSSE
+  commit: e76a764174a3d6b19434259a8c81500d08a37efa
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 3000
+    - 30000
+- full_name: jooby-project/jooby
+  git_url: https://github.com/jooby-project/jooby.git
+  branch: main
+  language: Java
+  stars: 1782
+  size_kb: 80452
+  pushed_at: '2026-10-30T00:09:31Z'
+  created_at: '2014-10-20T02:03:16Z'
+  topics:
+  - kotlin
+  - micro-framework
+  - microframework
+  - modular
+  - web-framework
+  - webframework
+  crypto_apis:
+  - JCA
+  - JSSE
+  commit: 536ec6b6dc9520cd88d1dfbc134797a4f5583277
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 30000
+    - 1572864
+- full_name: ashishps1/awesome-system-design-resources
+  git_url: https://github.com/ashishps1/awesome-system-design-resources.git
+  branch: main
+  language: Java
+  stars: 42966
+  size_kb: 2340
+  pushed_at: '2026-02-16T18:32:29Z'
+  created_at: '2023-10-25T01:50:42Z'
+  topics:
+  - awesome
+  - backend
+  - computer-science
+  - distributed-systems
+  - high-level-design
+  - hld
+  - interview
+  - interview-questions
+  - scalability
+  - system-design
+  crypto_apis:
+  - JCA
+  commit: 25724090f7dd7746129b7194b55504f9d06f86ed
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 300
+    - 3000
+- full_name: nageoffer/ragent
+  git_url: https://github.com/nageoffer/ragent.git
+  branch: main
+  language: Java
+  stars: 4403
+  size_kb: 23272
+  pushed_at: '2026-10-25T15:28:51Z'
+  created_at: '2025-11-20T07:22:53Z'
+  topics:
+  - agent
+  - agentic-rag
+  - ai
+  - llm
+  - mcp
+  - rag
+  - springai
+  crypto_apis:
+  - JCA
+  commit: c3b6157730ac1f66a312bcd286c47d3ee6aaac42
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 3000
+    - 30000
+- full_name: apache/gravitino
+  git_url: https://github.com/apache/gravitino.git
+  branch: main
+  language: Java
+  stars: 3339
+  size_kb: 107043
+  pushed_at: '2026-10-30T06:18:05Z'
+  created_at: '2023-04-23T02:09:00Z'
+  topics:
+  - ai-catalog
+  - data-catalog
+  - datalake
+  - federated-query
+  - lakehouse
+  - metadata
+  - metalake
+  - model-catalog
+  - opendatacatalog
+  - skycomputing
+  - stratosphere
+  crypto_apis:
+  - JCA
+  - JSSE
+  commit: bb634defdc5663a8124be5fca1c8d9e52ac096ac
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 30000
+    - 1572864
+- full_name: xaf/qolsysgw
+  git_url: https://github.com/xaf/qolsysgw.git
+  branch: main
+  language: Python
+  stars: 218
+  size_kb: 733
+  pushed_at: '2026-09-27T21:24:51Z'
+  created_at: '2021-11-29T07:08:43Z'
+  topics:
+  - appdaemon
+  - automation
+  - hacs
+  - home-assistant
+  - home-automation
+  - qolsys
+  crypto_apis:
+  - ssl
+  commit: dc0c82852689c1ab2e4e5c86ccb7e1142bfa9efd
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 300
+    - 3000
+- full_name: QingyangZhang/EMPO
+  git_url: https://github.com/QingyangZhang/EMPO.git
+  branch: main
+  language: Python
+  stars: 105
+  size_kb: 17343
+  pushed_at: '2025-11-24T03:30:39Z'
+  created_at: '2025-04-24T13:41:25Z'
+  topics: []
+  crypto_apis:
+  - hashlib
+  commit: c5eccd400ba7a7a1685dedf25eab03780aad855f
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 3000
+    - 30000
+- full_name: PancrePal-xiaoyibao/PancrePal-xiaoyibao
+  git_url: https://github.com/PancrePal-xiaoyibao/PancrePal-xiaoyibao.git
+  branch: main
+  language: Python
+  stars: 210
+  size_kb: 492792
+  pushed_at: '2025-12-12T03:02:13Z'
+  created_at: '2024-05-09T03:55:41Z'
+  topics: []
+  crypto_apis:
+  - pyca
+  - hashlib
+  - ssl
+  - other
+  commit: 71130c6bbbd06085d23b30b55360dfebef2c8ab1
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 30000
+    - 1572864
+- full_name: py-smart-gardena/hass-gardena-smart-system
+  git_url: https://github.com/py-smart-gardena/hass-gardena-smart-system.git
+  branch: master
+  language: Python
+  stars: 319
+  size_kb: 490
+  pushed_at: '2026-10-11T11:12:10Z'
+  created_at: '2020-05-30T16:29:43Z'
+  topics:
+  - gardena
+  - gardena-api
+  - gardena-smart-system
+  - home-assistant
+  - homeassistant
+  crypto_apis:
+  - ssl
+  commit: 316c8b88d13c52c85d9e30103fbd8f6c82b28c0a
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 300
+    - 3000
+- full_name: evo-design/evo
+  git_url: https://github.com/evo-design/evo.git
+  branch: main
+  language: Python
+  stars: 1583
+  size_kb: 11159
+  pushed_at: '2026-03-20T20:58:37Z'
+  created_at: '2024-02-17T19:11:33Z'
+  topics: []
+  crypto_apis:
+  - hashlib
+  commit: 6856bba48bd0b212fb10919bdafc34795338e154
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 3000
+    - 30000
+- full_name: jonfairbanks/local-rag
+  git_url: https://github.com/jonfairbanks/local-rag.git
+  branch: develop
+  language: Python
+  stars: 765
+  size_kb: 57804
+  pushed_at: '2026-10-26T16:36:25Z'
+  created_at: '2024-02-15T07:28:30Z'
+  topics:
+  - large-language-models
+  - llm
+  - ollama
+  - rag
+  - retrieval-augmented-generation
+  crypto_apis:
+  - hashlib
+  commit: 195adafc5642dccb82e089f5e62ba3051525286e
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 30000
+    - 1572864
+- full_name: jhj0517/Whisper-WebUI
+  git_url: https://github.com/jhj0517/Whisper-WebUI.git
+  branch: master
+  language: Python
+  stars: 2900
+  size_kb: 1570
+  pushed_at: '2025-12-29T07:53:10Z'
+  created_at: '2023-03-02T13:42:01Z'
+  topics:
+  - ai
+  - gradio
+  - open-source
+  - python
+  - pytorch
+  - web-ui
+  - whisper
+  crypto_apis:
+  - hashlib
+  commit: c3bb3b18e959826b28b1192486a8d5b361b6a4e0
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 300
+    - 3000
+- full_name: PeterGriffinJin/Search-R1
+  git_url: https://github.com/PeterGriffinJin/Search-R1.git
+  branch: main
+  language: Python
+  stars: 5553
+  size_kb: 3161
+  pushed_at: '2025-11-13T21:56:33Z'
+  created_at: '2025-02-28T15:14:47Z'
+  topics: []
+  crypto_apis:
+  - hashlib
+  commit: 598e61bd1d36895726d28a8d06b3a15bed19f5d3
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 3000
+    - 30000
+- full_name: jeshraghian/snntorch
+  git_url: https://github.com/jeshraghian/snntorch.git
+  branch: master
+  language: Python
+  stars: 2082
+  size_kb: 58995
+  pushed_at: '2026-10-20T06:33:40Z'
+  created_at: '2020-09-28T22:14:20Z'
+  topics:
+  - machine-learning
+  - neural-networks
+  - neuron-models
+  - neuroscience
+  - python
+  - pytorch
+  - snn
+  - spike
+  - spiking
+  - spiking-neural-networks
+  crypto_apis:
+  - hashlib
+  commit: a22b0bf9a3329f81605f5f1e1f967f3609d76ef2
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 30000
+    - 1572864
+- full_name: zovocard/zovo_card_cdk_auto
+  git_url: https://github.com/zovocard/zovo_card_cdk_auto.git
+  branch: master
+  language: Go
+  stars: 92
+  size_kb: 870
+  pushed_at: '2026-10-25T09:43:20Z'
+  created_at: '2026-07-28T14:40:08Z'
+  topics: []
+  crypto_apis:
+  - stdlib
+  - x/crypto
+  commit: ce8a9795b55df0e2b401d26110e582c27f2c9eb4
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 300
+    - 3000
+- full_name: sigstore/scaffolding
+  git_url: https://github.com/sigstore/scaffolding.git
+  branch: main
+  language: Go
+  stars: 89
+  size_kb: 6185
+  pushed_at: '2026-10-29T16:55:06Z'
+  created_at: '2022-01-12T17:02:20Z'
+  topics: []
+  crypto_apis:
+  - stdlib
+  commit: 90cbb802dfae4c2431b94f10077adf8495ce7808
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 3000
+    - 30000
+- full_name: guardian-nexus/AuditKit-Community-Edition
+  git_url: https://github.com/guardian-nexus/AuditKit-Community-Edition.git
+  branch: main
+  language: Go
+  stars: 277
+  size_kb: 35196
+  pushed_at: '2026-10-28T19:31:21Z'
+  created_at: '2025-09-19T03:34:03Z'
+  topics:
+  - 800-53
+  - aws
+  - azure
+  - cis
+  - cmmc
+  - compliance
+  - gcp
+  - golang
+  - m365
+  - pci-dss
+  - security
+  - soc2
+  crypto_apis:
+  - stdlib
+  commit: 799b939129826172f542f3089c6f76441bc58262
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 30000
+    - 1572864
+- full_name: duckbugio/flock
+  git_url: https://github.com/duckbugio/flock.git
+  branch: main
+  language: Go
+  stars: 501
+  size_kb: 1518
+  pushed_at: '2026-10-26T14:56:09Z'
+  created_at: '2026-06-08T15:48:15Z'
+  topics:
+  - ai-agent
+  - anthropic
+  - autonomous-agents
+  - chatbot
+  - claude
+  - claude-code
+  - code-review
+  - golang
+  - llm
+  - self-hosted
+  - telegram-bot
+  - vk-bot
+  crypto_apis:
+  - stdlib
+  commit: ffd5c4715a3134bec5df024adcf95c3c5f4d83fe
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 300
+    - 3000
+- full_name: AlexStocks/getty
+  git_url: https://github.com/AlexStocks/getty.git
+  branch: master
+  language: Go
+  stars: 952
+  size_kb: 16195
+  pushed_at: '2026-10-28T09:07:48Z'
+  created_at: '2016-08-23T02:51:40Z'
+  topics:
+  - asynchronous-network
+  - codec
+  - getty
+  - go
+  - goroutine
+  - json
+  - json-api
+  - json-rpc
+  - micro
+  - microservice
+  - netty
+  - protobuf
+  - protobuf3
+  - protobuffer
+  - rpc
+  - rpc-framework
+  - rpc-service
+  - tcp
+  - websocket
+  - websockets
+  crypto_apis:
+  - stdlib
+  commit: 69d92fef4392bac30b67e4ec8b440647d4528486
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 3000
+    - 30000
+- full_name: hashicorp/terraform-provider-azuread
+  git_url: https://github.com/hashicorp/terraform-provider-azuread.git
+  branch: main
+  language: Go
+  stars: 486
+  size_kb: 44920
+  pushed_at: '2026-10-26T17:45:34Z'
+  created_at: '2019-01-08T16:35:14Z'
+  topics:
+  - azure
+  - azure-active-directory
+  - azuread
+  - azuread-provider
+  - terraform
+  - terraform-provider
+  crypto_apis:
+  - stdlib
+  commit: 722b4cf6673aac8426d92fd891bc04360a1716e2
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 30000
+    - 1572864
+- full_name: ibnaleem/gosearch
+  git_url: https://github.com/ibnaleem/gosearch.git
+  branch: main
+  language: Go
+  stars: 3835
+  size_kb: 2373
+  pushed_at: '2026-10-28T15:10:34Z'
+  created_at: '2024-11-09T23:47:22Z'
+  topics:
+  - cti
+  - cybersecurity
+  - digital-footprint
+  - digital-footprint-lookup
+  - golang
+  - information-gathering
+  - osint
+  - osint-framework
+  - osint-reconnaissance
+  - osint-resources
+  - osint-tool
+  - pentesting
+  - redteam
+  - sherlock
+  - sherlock-alternatives
+  - social-media
+  - username-checker
+  - username-osint
+  - username-scanner
+  - username-search
+  crypto_apis:
+  - stdlib
+  commit: 7c9afe0e1b1c4e935ffa20df6634dcd5d6e9c5d6
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 300
+    - 3000
+- full_name: claudiodangelis/qrcp
+  git_url: https://github.com/claudiodangelis/qrcp.git
+  branch: main
+  language: Go
+  stars: 10523
+  size_kb: 26471
+  pushed_at: '2026-10-01T13:37:29Z'
+  created_at: '2018-01-14T22:35:55Z'
+  topics:
+  - cli
+  - command-line
+  - golang
+  - qrcode
+  - utility
+  crypto_apis:
+  - stdlib
+  commit: 2759e61c5ec9d3976fed7acc74049a34110b245f
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 3000
+    - 30000
+- full_name: gardener/gardener
+  git_url: https://github.com/gardener/gardener.git
+  branch: master
+  language: Go
+  stars: 3479
+  size_kb: 270025
+  pushed_at: '2026-10-30T11:24:34Z'
+  created_at: '2018-01-13T20:57:47Z'
+  topics:
+  - cluster
+  - controller
+  - extensibility
+  - gardener
+  - golang
+  - hcp
+  - hosted-control-planes
+  - hosted-controlplanes
+  - k8s
+  - k8s-in-k8s
+  - kubernetes
+  - kubernetes-cluster
+  - kubernetes-in-kubernetes
+  crypto_apis:
+  - stdlib
+  - x/crypto
+  commit: 2f4cba1764506cc6bea25ac5542ae8f3c87e65b4
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 30000
+    - 1572864
+frame_file: corpus-pc1-frame.yaml
