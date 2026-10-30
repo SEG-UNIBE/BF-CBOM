@@ -457,6 +457,7 @@ make experiment EXP=experiments/mutation-smoke.yaml   # pin, mirror, enqueue, co
 make experiment-status NAME=mutation-smoke
 make board                                               # live board: running experiments, every worker's job, RAM, queue and last result
 make experiment-export NAME=mutation-smoke            # -> experiments/results/mutation-smoke.zip (runs the analysis report first), the only path to the host
+make experiment-export-all                               # every complete experiment (no run missing), one ZIP each, overwriting the old ZIPs
 make experiment-list                                     # experiments stored on the volume
 make experiment-delete NAME=mutation-smoke            # remove one from the volume (asks first; ARGS=--yes skips)
 make corpus ARGS="--per-cell 2"                          # stratified GitHub corpus with pinned commits (3 x 3 cells x 2 per language)

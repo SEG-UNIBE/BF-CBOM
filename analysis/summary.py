@@ -831,8 +831,8 @@ def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
     if tailored:
         lines += [
             "",
-            "`*` = tailored: the tool was tuned on this very project (`tailored_on` in tools.yaml, refinement 13), so "
-            "the number is inflated by construction; the pair is left out of every agreement table below.",
+            "`*` = the tool was developed with this project at hand (`tailored_on` in tools.yaml, refinement 13), so "
+            "its number here says little about other code; the pair is left out of every agreement table below.",
         ]
     if scored:
         t, lg, r = scored[0]
@@ -2145,12 +2145,6 @@ def _mutation(
     return lines
 
 
-TAILORED_CATALOG_NOTE = (
-    "`*` = tuned on the micro projects (`tailored_on` in tools.yaml, refinement 13), which come from the same snippet "
-    "catalog as these mutants: its scores here may be inflated by construction."
-)
-
-
 def _mutation_scores(scores: list[dict]) -> list[str]:
     """Recall, precision and F1 on the planted items (mutation-scores.csv), style `all`."""
     rows = [s for s in scores if s.get("style") == "all"]
@@ -2193,7 +2187,7 @@ def _mutation_scores(scores: list[dict]) -> list[str]:
         table.append(
             [
                 s["language"],
-                s["tool"] + (r"\*" if _true(s.get("tailored")) else ""),
+                s["tool"],
                 s["calls"],
                 ci(_float(s["recall_site"]), _float(s.get("recall_low")), _float(s.get("recall_high"))),
                 _pct(s["recall_group"]),
@@ -2206,8 +2200,6 @@ def _mutation_scores(scores: list[dict]) -> list[str]:
     header = ["language", "tool", "calls", "recall site [95 % CI]", "recall group", "decoys", "hit", "precision",
               "F1 [95 % CI]"]  # fmt: skip
     lines += md_table(header, table, "ll" + "r" * (len(header) - 2))
-    if any(_true(s.get("tailored")) for s in rows):
-        lines += ["", TAILORED_CATALOG_NOTE]
     eg = next((row for row in table if row[8]), None) or next((row for row in table if row[3]), None)
     if eg:
         what = (

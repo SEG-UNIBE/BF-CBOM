@@ -2,6 +2,7 @@
 queues like common/worker.py would, the runner enqueues, collects, stores, resumes, retries and exports."""
 
 import json
+import shutil
 import subprocess
 import threading
 import time
@@ -152,6 +153,16 @@ def test_run_stores_results_resumes_retries_and_exports(world, tmp_path):
     names = zipfile.ZipFile(dest / "e-fake.zip").namelist()
     assert "e-fake/_experiment.yaml" in names and "e-fake/_run-log.json" in names
     assert sum(n.endswith("run1.json") for n in names) == 4
+
+    # --all exports every complete experiment and skips one with runs missing
+    part = results / "e-part"
+    shutil.copytree(exp, part)
+    next(part.glob("o__first@*/original/t1/run1.meta.json")).unlink()
+    every = _run(["export", "--all", "--dest", str(dest), "--no-report"])
+    assert every.exit_code == 0, every.output
+    assert "skipped e-part: 1 run(s) missing" in every.output
+    assert sorted(p.name for p in dest.iterdir()) == ["e-fake.zip"]
+    assert _run(["export", "--dest", str(dest)]).exit_code != 0  # neither a name nor --all
 
 
 def test_overwrite_old_leaves_nothing_of_the_former_run(world):

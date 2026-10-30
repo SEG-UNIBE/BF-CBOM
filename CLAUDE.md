@@ -18,7 +18,7 @@ normalisation, analysis outputs),
   NO_CACHE=1`. Never run plain `docker compose up` or `docker compose run`: the Makefile exports the image tag
   (`VERSION`) and `BASE_IMAGE`; without them compose looks for `:latest` images and tries to build from a nonexistent
   `base`. Every runner command has a target: `experiment`, `experiment-list` / `-status` / `-collect` / `-cancel` /
-  `-delete` / `-export`, `analysis`, `corpus`, `corpus-prune`, `board`; `experiment-attach` joins the terminal of
+  `-delete` / `-export` / `-export-all` (every complete experiment), `analysis`, `corpus`, `corpus-prune`, `board`; `experiment-attach` joins the terminal of
   the running `experiment run` from another shell (detach with Ctrl-P Ctrl-Q, never Ctrl-C). After every pull run `make up-prod` first: the runner
   bakes the CLI and the workers bake `common/`.
 - **Nothing lands on the host unless exported.** Results and git mirrors stay in the named volumes `results-data` and
@@ -632,8 +632,8 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
 13. **Benchmark-informed tools.** A tool adapted while looking at our results (CipherSift: `tailored_on` in
     `tools.yaml`) has inflated scores there by construction, also in agreement-based scoring. Its tailored (tool, repo)
     pairs are marked `tailored` and left out of the ladder, the matchers and the scores by default; the corpus builder excludes
-    those repos; pilot numbers are reported apart; its RQ6 scores are marked `*` (the mutants come from the same
-    catalog); the four decoy kinds added 2026-10-29 post-date its pinned release, so its decoy precision is the one
+    those repos; pilot numbers are reported apart; its RQ6 scores carry no mark (decided 2026-10-30: CipherSift was developed
+    independently by a colleague of the research group; only the entry exam keeps the `*`); the four decoy kinds added 2026-10-29 post-date its pinned release, so its decoy precision is the one
     part of the bar held out for it; the threats state that its rules and the micro ground truth were both written
     by Claude.
 14. **Normalisation can create agreement; report how much.** The vocabulary and the specs were developed on the

@@ -792,16 +792,37 @@ def list_experiments():
 
 @experiment_app.command("export")
 def export(
-    name: str = NAME_ARG,
+    name: str | None = typer.Argument(None, help="Experiment name (omit with --all)"),
     dest: Path = DEST_OPT,
+    all_: bool = typer.Option(False, "--all", help="Every complete experiment (no run missing); overwrites the ZIPs"),
     no_report: bool = typer.Option(False, "--no-report", help="Zip as stored, without running `analysis report`"),
     jobs: int = typer.Option(0, "--jobs", envvar="BF_CBOM_JOBS", help="Worker processes of the report (0 = auto)"),
 ):
     """Zip one experiment (its record, run log, all CBOMs and meta files, _ANALYSIS/ with _SUMMARY.md). The only way
-    data leaves the volume. Runs `analysis report` first, so the CSV tables and _SUMMARY.md in the zip are current."""
-    exp_dir = experiment_dir(name)
-    if not exp_dir.exists():
-        _err(f"no experiment '{name}' under {RESULTS_DIR}")
+    data leaves the volume. Runs `analysis report` first, so the CSV tables and _SUMMARY.md in the zip are current.
+    With `--all`, every experiment whose runs are all stored, one after the other; an incomplete one is skipped."""
+    if all_ == bool(name):
+        _err("name one experiment or pass --all")
+    if not all_:
+        exp_dir = experiment_dir(name)
+        if not exp_dir.exists():
+            _err(f"no experiment '{name}' under {RESULTS_DIR}")
+        _export_one(exp_dir, dest, no_report=no_report, jobs=jobs)
+        return
+    folders = sorted(p for p in RESULTS_DIR.glob("*") if p.is_dir() and is_experiment(p))
+    for exp_dir in folders:
+        missing = overview.build(exp_dir).missing
+        if missing != 0:
+            typer.echo(f"skipped {exp_dir.name}: " + ("no expected run count" if missing is None else
+                                                      f"{missing} run(s) missing"))  # fmt: skip
+            continue
+        _export_one(exp_dir, dest, no_report=no_report, jobs=jobs)
+    if not folders:
+        typer.echo(f"(no experiments under {RESULTS_DIR})")
+
+
+def _export_one(exp_dir: Path, dest: Path, *, no_report: bool, jobs: int) -> None:
+    name = exp_dir.name
     with progress.session():
         if not no_report:
             from misc.cli.analysis_cmd import run_report  # local import: the analysis is not needed for the runs

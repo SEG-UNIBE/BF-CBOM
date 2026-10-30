@@ -163,6 +163,12 @@ experiment-export:
 	mkdir -p experiments/results
 	docker compose run --rm -v "$(CURDIR)/experiments/results:/export" runner experiment export $(NAME) --dest /export $(ARGS)
 
+# make experiment-export-all  -> one ZIP per complete experiment (no run missing), overwriting the ZIPs there;
+# each runs `analysis report` first, as experiment-export does (ARGS=--no-report skips it)
+experiment-export-all:
+	mkdir -p experiments/results
+	docker compose run --rm -v "$(CURDIR)/experiments/results:/export" runner experiment export --all --dest /export $(ARGS)
+
 # make corpus ARGS="--per-cell 2"  -> results volume: corpus/corpus.yaml (export with corpus-export); 3 star bins x
 # 3 size bins x 2 repos = 18 per language by default (--star-bins, --size-bins, --per-cell; common/corpus.py)
 corpus: ensure-env
@@ -199,7 +205,7 @@ $(ENV_DIR)/%.env: $(ENV_DIR)/%.env.template
 
 .PHONY: clean-docker build-base build-all release up-dev up-prod up-prod-pull up-all down board logs ps show-workers \
 	experiment experiment-attach experiment-status experiment-list experiment-collect experiment-cancel \
-	experiment-delete experiment-export corpus corpus-prune corpus-export analysis clean-cache
+	experiment-delete experiment-export experiment-export-all corpus corpus-prune corpus-export analysis clean-cache
 
 # Frees Docker's build cache and dangling images (safe: volumes and tagged images are kept).
 # Repeated rebuilds of the large worker images fill the Docker VM disk ("No space left on device").

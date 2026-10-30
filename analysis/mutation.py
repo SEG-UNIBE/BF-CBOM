@@ -53,7 +53,7 @@ MUTATION_COLUMNS = [
 SCORE_COLUMNS = [
     "tool", "voter_group", "language", "style", "repos", "calls", "found_site", "found_group", "decoys",
     "decoys_hit", "recall_site", "recall_low", "recall_high", "recall_group", "precision", "f1", "f1_low", "f1_high",
-    "supported", "tailored", "offedit_mutants", "offedit_share", "extra_units_median", "extra_sites_median",
+    "supported", "offedit_mutants", "offedit_share", "extra_units_median", "extra_sites_median",
     "baseline_flux", "baseline_changed",
 ]  # fmt: skip
 BRIDGE_COLUMNS = ["language", "tool", "confirmation", "f1", "n", "spearman", "kendall_tau"]
@@ -419,15 +419,12 @@ def score_rows(
     *,
     samples: int = 200,
     seed: int = BOOTSTRAP_SEED,
-    tailored: frozenset[str] = frozenset(),
     baseline: dict[str, dict[str, float]] | None = None,
 ) -> list[dict]:
     """mutation-scores.csv: per (tool, language, style or `all`) the pooled recall on the planted calls (at the
     site: strict; by group: lenient), the precision over the planted items (calls found / (calls found + decoys
     hit); the decoys, style-less, count for every style) and F1, with bootstrap CIs over repositories. Precision and
-    F1 are empty without decoys. `supported` as in score.py (repositories and calls). `tailored`: tools tuned on the
-    micro projects, which come from the same snippet catalog as the mutants (refinement 13), so their scores here are
-    inflated by construction.
+    F1 are empty without decoys. `supported` as in score.py (repositories and calls).
     Changes off the edit (RQ6's side finding, never folded into recall, precision or F1): over the judged mutants of
     the (tool, language), calls and decoys together and style-less like the decoys, `offedit_mutants` with any new
     unit or new located site outside the inserted lines, `offedit_share` of the judged mutants, and the medians of
@@ -487,7 +484,6 @@ def score_rows(
                 "f1_low": None if not f1_ci else round(f1_ci[0], 4),
                 "f1_high": None if not f1_ci else round(f1_ci[1], 4),
                 "supported": ok,
-                "tailored": tool in tailored,
                 "offedit_mutants": len(changed),
                 "offedit_share": round(len(changed) / len(judged), 4) if judged else None,
                 "extra_units_median": median(u for u, s in judged if u or s) if changed else None,

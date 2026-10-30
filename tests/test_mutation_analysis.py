@@ -138,10 +138,8 @@ def test_scores_pool_calls_and_decoys_and_the_bridge_correlates_them_with_confir
     assert (summary["java"]["n"], summary["java"]["spearman"], summary["java"]["kendall_tau"]) == (3, 1.0, 1.0)
     assert summary["all"]["n"] == 3 and len([r for r in bridge if r["tool"] != "all"]) == 6
     assert spearman({"a": 1, "b": 2, "c": 3}, {"a": 3, "b": 2, "c": 1}) == -1.0
-    marked = mu.score_rows(rows, samples=0, tailored=frozenset({"good"}))
-    assert {s["tool"] for s in marked if s["tailored"]} == {"good"}
-    table = "\n".join(sm._mutation_scores(marked))
-    assert "| java | good\\* |" in table and "| java | noisy |" in table and sm.TAILORED_CATALOG_NOTE in table
+    table = "\n".join(sm._mutation_scores(list(scores.values())))
+    assert "| java | good |" in table and "| java | noisy |" in table and "`*`" not in table
     assert spearman({"a": 1, "b": 1, "c": 3}, {"a": 1, "b": 2, "c": 3}) == pytest.approx(0.866, abs=1e-3)  # a tie
     assert spearman({"a": 1, "b": 2}, {"a": 1, "b": 2}) is None
 
