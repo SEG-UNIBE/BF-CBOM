@@ -922,6 +922,11 @@ def corpus_build(
             err=True,
         )
     with progress.session():
+        with progress.step("GitHub API check"):
+            try:
+                typer.echo(corpus_mod.github_check(token), err=True)
+            except RuntimeError as e:
+                _err(str(e))
         lines = {lang: progress.line(lang, total=params.per_language, start=False) for lang in params.languages}
         begun: set[str] = set()
 

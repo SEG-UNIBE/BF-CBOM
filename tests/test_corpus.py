@@ -218,3 +218,20 @@ def test_corpus_covariates_reach_the_experiment_record():
 
     d = spec_to_dict(ExperimentSpec(name="x", repos=[spec], tools=["t"]))
     assert d["repos"][0]["stratum"] == item["stratum"] and d["repos"][0]["topics"] == ["crypto"]
+
+
+def test_github_check_reports_the_quota_and_names_a_rejected_token(monkeypatch):
+    class Resp:
+        def __init__(self, code, data=None):
+            self.status_code, self._data, self.text = code, data or {}, "Bad credentials"
+
+        def json(self):
+            return self._data
+
+    quota = {"resources": {"search": {"remaining": 30, "limit": 30}, "core": {"remaining": 4999, "limit": 5000}}}
+    monkeypatch.setattr(corpus.requests, "get", lambda *a, **k: Resp(200, quota))
+    line = corpus.github_check("t0ken")
+    assert "authenticated" in line and "search 30 of 30" in line and "t0ken" not in line
+    monkeypatch.setattr(corpus.requests, "get", lambda *a, **k: Resp(401))
+    with pytest.raises(RuntimeError, match="rejected the token"):
+        corpus.github_check("t0ken")

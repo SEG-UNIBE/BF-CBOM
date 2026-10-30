@@ -535,6 +535,7 @@ def _tables_step(
         sizes = _sizes(exp_dir, store, languages)
         runs = tbl.run_rows(exp_dir, languages, tailored=tailored_map(), expects=_expects(exp_dir), sizes=sizes)
     write("runs.csv", runs, tbl.RUNS_COLUMNS)
+    write("tools.csv", tbl.tool_rows(r["tool"] for r in runs), tbl.TOOLS_COLUMNS)
     write("runtime.csv", tbl.runtime_rows(runs), tbl.RUNTIME_COLUMNS)
     voter_of = _voter_of(merge_llm)
     norm_rows: list[dict] = []

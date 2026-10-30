@@ -127,7 +127,8 @@ normalisation, analysis outputs),
   `engine-merged` sensitivity ranking), `languages` (the declared support, as shipped; a spec narrows a tool further by hand with
   `tool_languages`),
   `cbom_by` (who writes the CBOM document: the tool, or BF-CBOM for the LLM workers), status, `tailored_on`,
-  `memory_gb` (= the worker's compose memory limit; a test keeps them equal) and `packaging` (how the tool packages
+  `memory_gb` (= the worker's compose memory limit; a test keeps them equal), `vendor`, `url`, `shipped` and
+  `approach` (the summary's "Tools" table, `tools.csv`) and `packaging` (how the tool packages
   its findings into components, a hand label read from its CBOMs, decided 2026-10-30: `per hit`, `per rule`,
   `per algorithm`, `per family`, `no places`, default `unknown`; printed in the summary's "Units per tool" next
   to the measured signature, never derived from it; `analysis/README.md` "Packaging per tool"). No verdict is

@@ -179,6 +179,28 @@ SEARCH_LIMIT = 1000  # GitHub returns at most 1000 results per query
 GITHUB_EPOCH = date(2008, 1, 1)
 
 
+RATE_LIMIT_URL = "https://api.github.com/rate_limit"  # does not count against the quota
+
+
+def github_check(token: str | None) -> str:
+    """One request before the search: is the API reachable, is the token accepted, and how much search quota is
+    left. Returns a one-line summary; raises RuntimeError naming the cause otherwise (never the token)."""
+    try:
+        resp = requests.get(RATE_LIMIT_URL, headers=_headers(token), timeout=30)
+    except requests.RequestException as e:
+        raise RuntimeError(f"GitHub API unreachable: {type(e).__name__}") from None
+    if resp.status_code == 401:
+        raise RuntimeError("GitHub rejected the token (401 Bad credentials): check GITHUB_TOKEN")
+    if resp.status_code != 200:
+        raise RuntimeError(f"GitHub API check failed ({resp.status_code}): {resp.text[:200]}")
+    res = resp.json().get("resources") or {}
+    search, core = res.get("search") or {}, res.get("core") or {}
+    return (
+        f"GitHub API ok ({'authenticated' if token else 'unauthenticated'}): search {search.get('remaining')} of "
+        f"{search.get('limit')} per minute left, core {core.get('remaining')} of {core.get('limit')} per hour"
+    )
+
+
 def _repo(it: dict) -> dict:
     return {
         "full_name": it["full_name"],
@@ -267,8 +289,11 @@ def search_cell(
     name), the cell's total count as the API states it, and the requests it took. `pause` is the wait between
     requests (30 per minute with a token)."""
     q = cell_query(language, stars, size_kb, pushed_since)
-    repos, requests_made = _enumerate(q, token, (GITHUB_EPOCH, date.today()), per_page=per_page, pause=pause, log=log)
     _, total = _search(q, token, page=1, per_page=1)  # the cell's own count, next to the enumeration
+    pages = -(-total // per_page)  # at least one request per page; splits above the API's 1000 add a few
+    log(f"  {language}, {bin_text(*stars)} stars, {bin_text(*size_kb)} KB: {total} repos, >= {pages} requests, "
+        f"about {pages * pause / 60:.0f} min at the search API's rate")  # fmt: skip
+    repos, requests_made = _enumerate(q, token, (GITHUB_EPOCH, date.today()), per_page=per_page, pause=pause, log=log)
     seen: dict[str, dict] = {}
     for r in repos:
         seen.setdefault(r["full_name"], r)

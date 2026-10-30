@@ -758,6 +758,25 @@ def test_repositories_section_counts_by_language_and_size_stratum():
     assert _size_strata([{"full_name": "a/b", "language": "Go", "commit": "ee"}]) == []
 
 
+def test_tools_section_links_each_tool_and_names_vendor_shipping_and_engine():
+    from analysis.summary import _tools
+    from analysis.tables import tool_rows
+    from common.tools_registry import load_tools
+
+    registry = {"cryptobomforge": {"vendor": "Santander Security Research", "url": "https://github.com/x/forge",
+                                   "shipped": "CLI (Python package) over the CodeQL CLI",
+                                   "approach": "CodeQL: data flow"}}  # fmt: skip
+    rows = tool_rows(["cryptobomforge", "testing", "cryptobomforge"], registry)
+    assert [r["tool"] for r in rows] == ["cryptobomforge", "testing"] and rows[1]["vendor"] == ""
+    lines = _tools(rows)
+    assert lines[0] == "### Tools"
+    assert ("| [cryptobomforge](https://github.com/x/forge) | Santander Security Research | CLI (Python package) over "
+            "the CodeQL CLI | CodeQL: data flow |") in lines  # fmt: skip
+    assert "| testing |  |  |  |" in lines and _tools([]) == []
+    shipped = tool_rows(load_tools())  # every registered tool says who ships it and how
+    assert all(r["vendor"] and r["shipped"] and r["approach"] for r in shipped), [r["tool"] for r in shipped]
+
+
 def test_tool_versions_section_lists_what_ran_and_flags_mixed_versions():
     from analysis.summary import _versions
 

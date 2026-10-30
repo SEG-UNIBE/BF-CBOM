@@ -24,7 +24,7 @@ from datetime import datetime
 from pathlib import Path
 
 from common.experiment import iter_results, repo_full_name, stored_status
-from common.tools_registry import tool_packaging
+from common.tools_registry import load_tools, tool_packaging
 
 from .costs import cost_usd, load_prices
 from .groundtruth import TruthProject, TruthScore, entry_verdict
@@ -317,6 +317,17 @@ def run_rows(
 
 
 # ----- run time (RQ2: what a scan costs) -----
+
+TOOLS_COLUMNS = ["tool", "vendor", "url", "shipped", "approach"]
+
+
+def tool_rows(tools: Iterable[str], registry: dict[str, dict] | None = None) -> list[dict]:
+    """tools.csv: who publishes each tool that ran, its project page, how it is shipped and what it is built on, as
+    `common/tools.yaml` records them (empty for a tool outside the registry)."""
+    registry = registry if registry is not None else load_tools()
+    return [{"tool": t, **{c: (registry.get(t) or {}).get(c) or "" for c in TOOLS_COLUMNS[1:]}}
+            for t in sorted(set(tools))]  # fmt: skip
+
 
 RUNTIME_COLUMNS = [
     "tool", "language", "repos", "runs", "timeouts", "timeout_share", "median_sec", "median_ci_low", "median_ci_high",

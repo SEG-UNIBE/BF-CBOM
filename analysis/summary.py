@@ -32,6 +32,8 @@ LEVEL_ORDER = ("L0", "L1", "L2", "L3", "L4")
 RESOLUTION_SHOWN = ["mapped", "ambiguous", "api", "non-crypto", "undefined"]  # analysis/normalize/engine.RESOLUTIONS
 COVERAGE_SHOWN = ["key_size", "mode", "padding", "curve", "digest"]
 FILES = {
+    "tools.csv": "one row per tool that ran: vendor, project page, how it is shipped, what it is built on "
+    "(common/tools.yaml)",
     "runs.csv": "one row per stored run, all repetitions (status, duration, tool version, raw CBOM counts by asset "
     "type, LLM tokens and costs)",
     "runtime.csv": "per tool and language (and all): repositories, median seconds with a bootstrap CI over "
@@ -503,6 +505,24 @@ VERSION_RULE = (
     "at its default branch's last commit on that date; an engine a tool's own build bundles at the version the tool "
     "pins. Runs of older images show older versions here."
 )
+
+
+def _tools(rows: list[dict]) -> list[str]:
+    """Who publishes each tool, how it is shipped and what it is built on (tools.csv, from common/tools.yaml)."""
+    if not rows:
+        return []
+    table = [[f"[{r['tool']}]({r['url']})" if r.get("url") else r["tool"], r.get("vendor") or "",
+              r.get("shipped") or "", r.get("approach") or ""] for r in rows]  # fmt: skip
+    lines = [
+        "### Tools",
+        "",
+        "The tools that ran, as `common/tools.yaml` records them: `vendor` who publishes the tool, `shipped as` how "
+        "it is delivered (a CLI, a server with an API, a GitHub Action, an HTTP API), `engine and approach` what it "
+        "is built on (a third-party engine named first, else `own engine`) and how it detects. The tool name links to "
+        "its project page.",
+        "",
+    ]
+    return lines + md_table(["tool", "vendor", "shipped as", "engine and approach"], table, "llll") + [""]
 
 
 def _versions(rows: list[dict]) -> list[str]:
@@ -2765,6 +2785,7 @@ def render(analysis_dir: Path, *, run: int = 1) -> str:
     lines = ["## Preamble", "", "The terms the tables use, the questions they answer, and every stored run.", ""]
     lines += _reading() + _questions()
     lines += _runs(rows("runs.csv"))
+    lines += _tools(rows("tools.csv"))
     lines += _versions(rows("runs.csv"))
     lines += _repositories(spec or {})
     lines += _negatives(rows("runs.csv"), run)
