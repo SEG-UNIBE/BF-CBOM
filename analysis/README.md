@@ -76,23 +76,34 @@ tool is added or its pinned version changes, together with its spec; `tests/test
 integrated tool has a row. The numbers of an experiment are in its `units-run<i>.csv` and the summary's "Units per
 tool": records per asset, assets per item, the share without a location.
 
-| Tool | One component is | Its places |
-|---|---|---|
-| CBOMkit, cbomkit-jar | an algorithm (registry or JCA name); key material separate, linked through `dependencies` | every occurrence in `evidence.occurrences` |
-| CryptoScan | a category (RSA, ECC, HMAC-SHA2, also a list such as `RSA, ECC, AES`) | every match an occurrence; its `symbol` is the matched text and carries its own values, so one asset can stand for several items |
-| xgrep | an algorithm (registry-style name) | occurrences |
-| SCANOSS | an (algorithm, parameters) pair | every match an occurrence |
-| Q-DARPAN | an algorithm | up to 30+ places, written by the tool into properties `qdarpan:location.N` and copied into occurrences by our worker |
-| qScan ° | an (asset type, algorithm, discriminator) triple | occurrences as `location: <file>:<line>` |
-| CryptobomForge | one entry of CodeQL's crypto inventory (IBM's draft format) | `detectionContext` windows of 5-9 lines |
-| CipherSift | a (rule, name, parameter, OID) combination | occurrences, the `symbol` is the API |
-| CipherRadar | a finding | one occurrence (absolute path of its temporary clone) |
-| pqcheck | a finding (with detector id and confidence); declared dependencies are separate library components, skipped | one occurrence |
-| qelens ° | a finding, many of them on import lines | one occurrence |
-| securin-xbom | a semgrep finding, named after the rule id | one occurrence |
-| cdxgen | an algorithm name (lower case, with OID); also crypto files (certificates, keys) | only for JS/TS (occurrences) and Go (property `cdx:golem:crypto:sourceLocation`); Java and Python algorithms have none |
-| Cryptarium ° | a distinct finding id | none: the CBOM has no locations (only the tool's JSON format has them) |
-| DeepSeek, ChatGPT, Claude | a site the model reported (CycloneDX assembled by our worker, `common/llm_cbom.py`) | one occurrence, file and line checked against the clone |
+Each tool carries a hand label `packaging` in `common/tools.yaml` (decided 2026-10-30; `unknown` until someone has
+read a new tool's output), one of five terms on one axis, the granularity of a component, finest to coarsest: **per
+hit** (one component per place: CipherRadar, pqcheck, securin-xbom, qelens, the LLM assembly), **per rule** (one
+component per rule match on one API with its places, so several components name one algorithm: CipherSift), **per
+algorithm** (one component per algorithm as the tool spells it, parameters included, with all its places: CBOMkit,
+xgrep, SCANOSS, Q-DARPAN, CryptobomForge, cdxgen, qScan), **per family** (one component per coarse family, the
+specific algorithm only at the place: CryptoScan), **no places** (no evidence at all: Cryptarium). The label is read
+from the CBOMs, never derived from the numbers; the numbers of `units-run<i>.csv` are its signature (per hit: records
+= assets; per family: assets per item below 1; per algorithm: 1.2-2 assets per item with places aggregated), and the
+summary's "Units per tool" prints both side by side.
+
+| Tool | Packaging | One component is | Its places |
+|---|---|---|---|
+| CBOMkit, cbomkit-jar | per algorithm | an algorithm (registry or JCA name); key material separate, linked through `dependencies` | every occurrence in `evidence.occurrences` |
+| CryptoScan | per family | a category (RSA, ECC, HMAC-SHA2, also a list such as `RSA, ECC, AES`) | every match an occurrence; its `symbol` is the matched text and carries its own values, so one asset can stand for several items |
+| xgrep | per algorithm | an algorithm (registry-style name) | occurrences |
+| SCANOSS | per algorithm | an (algorithm, parameters) pair | every match an occurrence |
+| Q-DARPAN | per algorithm | an algorithm | up to 30+ places, written by the tool into properties `qdarpan:location.N` and copied into occurrences by our worker |
+| qScan ° | per algorithm | an (asset type, algorithm, discriminator) triple | occurrences as `location: <file>:<line>` |
+| CryptobomForge | per algorithm | one entry of CodeQL's crypto inventory (IBM's draft format) | `detectionContext` windows of 5-9 lines |
+| CipherSift | per rule | a (rule, name, parameter, OID) combination | occurrences, the `symbol` is the API |
+| CipherRadar | per hit | a finding | one occurrence (absolute path of its temporary clone) |
+| pqcheck | per hit | a finding (with detector id and confidence); declared dependencies are separate library components, skipped | one occurrence |
+| qelens ° | per hit | a finding, many of them on import lines | one occurrence |
+| securin-xbom | per hit | a semgrep finding, named after the rule id | one occurrence |
+| cdxgen | per algorithm | an algorithm name (lower case, with OID); also crypto files (certificates, keys) | only for JS/TS (occurrences) and Go (property `cdx:golem:crypto:sourceLocation`); Java and Python algorithms have none |
+| Cryptarium ° | no places | a distinct finding id | none: the CBOM has no locations (only the tool's JSON format has them) |
+| DeepSeek, ChatGPT, Claude | per hit | a site the model reported (CycloneDX assembled by our worker, `common/llm_cbom.py`) | one occurrence, file and line checked against the clone |
 
 Three patterns follow. Tools that list an algorithm once with its places (CBOMkit, CryptoScan, xgrep, SCANOSS,
 Q-DARPAN, qScan, CryptobomForge) have about one asset per item, so their asset counts are close to what they report.

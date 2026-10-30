@@ -284,7 +284,8 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert positions == sorted(positions)  # the sections come in the order of the questions
     assert "| cbomkit | ✅ 11 |" in summary and "| pqcheck | – |" in summary
     assert "| tool | records | line | window | import | file | none | unread | outside code |" in summary
-    assert "| tool | CBOMs | algorithm assets | records | items |" in summary  # algorithm components, not crypto assets
+    assert "| tool | packaging | CBOMs | algorithm assets | records | items |" in summary  # algorithm components
+    assert "| packaging | one component is | signature in this table |" in summary
     # "Per language" counts the items of the matcher x level table (groups only observers are in are no items)
     per_language = summary[summary.index("**Per language**") : summary.index("**exact vs raqun")]
     assert re.search(r"^\| all \| ([\d']+) \|", per_language, flags=re.M).group(1) == exact[-1]["items"]
@@ -565,7 +566,7 @@ def test_reported_section_shows_raw_counts_and_the_repo_matrix():
     ]
     rows[-1]["run"] = "2"
     lines = sm._reported(rows, 1)
-    assert "| t1 | 2 | 43 | 10 | 8 | 2 | 0 | 0 | 0 | 0.60 | 0.50 | 1 | 5 |" in lines
+    assert "| t1 | 2 | 1 | 43 | 10 | 8 | 2 | 0 | 0 | 0 | 5 | 0.60 | 0.50 |" in lines
     assert "| t2 | 0 |  |  |  |  |  |  |  |  |  |  |  |" in lines
     assert "| repo | language | expect | t1 | t2 |" in lines
     assert "| o/a | java |  | 10 | – |" in lines and "| o/b | python | low | 0 | × |" in lines
@@ -744,3 +745,41 @@ def test_runtime_section_lists_the_slowest_tool_first_with_its_languages():
     assert "### Run time" in text
     assert text.index("| slow |") < text.index("| fast |")
     assert "| tool | Java | Python |" in text and "| slow | 600 (3) | 60 (1) |" in text
+
+
+def test_repositories_section_counts_by_language_and_size_stratum():
+    from analysis.summary import _repositories, _size_strata
+
+    repos = [
+        {
+            "full_name": "bfcbom/micro-java",
+            "language": "Java",
+            "commit": "aa",
+            "path": "/x",
+            "checkout_bytes": 6777,
+            "files": 2,
+        },
+        {"full_name": "apache/kafka", "language": "Java", "commit": "bb", "checkout_bytes": 66_498_015},
+        {"full_name": "jpadilla/pyjwt", "language": "Python", "commit": "cc", "checkout_bytes": 2_621_440},
+        {"full_name": "golang-jwt/jwt", "language": "Go", "commit": "dd", "checkout_bytes": 5 * 1024**2},
+    ]
+    lines = _size_strata(repos)
+    assert "the checkout at the pinned commit (`checkout_bytes`" in lines[0]
+    assert "--size-bins 300-3000,3000-30000,30000-" in lines[0]
+    assert "| language | < 0.3 MB | 0.3-3 MB | 3-30 MB | >= 30 MB | all |" in lines
+    assert "| Java | 1 | 0 | 0 | 1 | 2 |" in lines
+    assert "| Python | 0 | 1 | 0 | 0 | 1 |" in lines
+    assert "| Go | 0 | 0 | 1 | 0 | 1 |" in lines
+    assert lines[-2] == "| all | 1 | 1 | 1 | 1 | 4 |"
+    # GitHub's size when every repository has one (a corpus-built spec), else the checkout; an unknown size has a column
+    github = _size_strata([{**r, "size_kb": 40_000} for r in repos])
+    assert "GitHub's repository size" in github[0] and "| all | 0 | 0 | 0 | 4 | 4 |" in github
+    mixed = _size_strata([repos[0], {**repos[1], "checkout_bytes": None}])
+    assert "| language | < 0.3 MB | 0.3-3 MB | 3-30 MB | >= 30 MB | unknown | all |" in mixed
+    assert "| Java | 1 | 0 | 0 | 0 | 1 | 2 |" in mixed
+    # the table sits between the intro and the detailed list; no size at all, no table
+    section = _repositories({"repos": repos})
+    assert section.index("| language | < 0.3 MB | 0.3-3 MB | 3-30 MB | >= 30 MB | all |") < section.index(
+        "| repository | language | files | source files | MiB | source MiB |"
+    )
+    assert _size_strata([{"full_name": "a/b", "language": "Go", "commit": "ee"}]) == []

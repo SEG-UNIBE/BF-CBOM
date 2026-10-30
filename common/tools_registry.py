@@ -16,6 +16,10 @@ TOOLS_YAML = Path(os.getenv("TOOLS_YAML", str(Path(__file__).with_name("tools.ya
 REPO_ROOT = TOOLS_YAML.resolve().parent.parent
 # For tools missing from the registry (dev workers such as `testing`): a small, explicit placeholder.
 DEFAULT_MEMORY_GB = 1.0
+# `packaging`: how a tool packages its findings into CBOM components, a hand label read from its CBOMs
+# (tools.yaml; decided 2026-10-30), finest to coarsest, then the two without a place in the order.
+PACKAGINGS = ("per hit", "per rule", "per algorithm", "per family", "no places", "unknown")
+DEFAULT_PACKAGING = "unknown"
 
 
 @lru_cache(maxsize=4)
@@ -37,6 +41,13 @@ def tool_memory_gb(tool: str, tools: dict[str, dict] | None = None, default: flo
         return float(value) if value is not None else float(default)
     except (TypeError, ValueError):
         return float(default)
+
+
+def tool_packaging(tool: str, tools: dict[str, dict] | None = None) -> str:
+    """The tool's `packaging` label (one of `PACKAGINGS`), `unknown` for a tool without one or outside the registry."""
+    entry = (tools if tools is not None else load_tools()).get(tool) or {}
+    value = str(entry.get("packaging") or DEFAULT_PACKAGING)
+    return value if value in PACKAGINGS else DEFAULT_PACKAGING
 
 
 class VoterMap(dict):

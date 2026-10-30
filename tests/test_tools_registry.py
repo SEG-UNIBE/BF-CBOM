@@ -64,3 +64,14 @@ def test_ciphersift_is_tailored_on_the_pilot_corpus_and_the_micro_projects():
     assert "bfcbom/micro-java" in repos and "apache/kafka" in repos
     assert "curl/curl" in repos  # the full pilot list (pilot-2026-10-08-all.yaml), not only the paper-language one
     assert "authlib/authlib" not in repos  # ICPC is held out
+
+
+def test_every_tool_has_a_packaging_label_and_unknown_is_the_default():
+    tools = reg.load_tools()
+    assert tools and all(tools[t].get("packaging") in reg.PACKAGINGS for t in tools)
+    assert reg.tool_packaging("cipherradar") == "per hit" and reg.tool_packaging("cryptoscan") == "per family"
+    assert reg.tool_packaging("cbomkit") == reg.tool_packaging("cbomkit-jar") == "per algorithm"
+    assert reg.tool_packaging("ciphersift") == "per rule" and reg.tool_packaging("cryptarium") == "no places"
+    assert reg.tool_packaging("testing") == "unknown"  # not in the registry
+    assert reg.tool_packaging("x", {"x": {}}) == "unknown"
+    assert reg.tool_packaging("x", {"x": {"packaging": "odd"}}) == "unknown"

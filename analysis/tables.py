@@ -24,7 +24,7 @@ from datetime import datetime
 from pathlib import Path
 
 from common.experiment import iter_results, repo_full_name, stored_status
-from common.tools_registry import votes
+from common.tools_registry import tool_packaging, votes
 
 from .costs import cost_usd, load_prices
 from .groundtruth import TruthProject, TruthScore, entry_verdict
@@ -93,9 +93,9 @@ AGREEMENT_COLUMNS = [
 ]  # fmt: skip
 LOCATION_KINDS = ("line", "window", "import", "file", "none", "unread")  # analysis/schema.py:location_kind
 UNIT_COLUMNS = [
-    "tool", "role", "cboms", "assets", "records", "items", "records_per_asset_median", "records_per_asset_max",
-    "multi_occurrence_share", "assets_per_item", "unlocated_share", *[f"loc_{k}" for k in LOCATION_KINDS],
-    "outside_code",
+    "tool", "packaging", "role", "cboms", "assets", "records", "items", "records_per_asset_median",
+    "records_per_asset_max", "multi_occurrence_share", "assets_per_item", "unlocated_share",
+    *[f"loc_{k}" for k in LOCATION_KINDS], "outside_code",
 ]  # fmt: skip
 UNIT_REPO_COLUMNS = ["tool", "role", "repo", "language", "assets", "records", "items"]
 MICRO_COLUMNS = [
@@ -622,6 +622,7 @@ def unit_rows(
         rows.append(
             {
                 "tool": tool,
+                "packaging": tool_packaging(tool),
                 "role": "voter" if votes(voter_of, tool) else "observer",
                 "cboms": t["cboms"],
                 "assets": n_assets,

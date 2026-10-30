@@ -20,6 +20,7 @@ from pathlib import Path
 
 import yaml
 
+from common.corpus import CorpusParams, bin_text
 from common.experiment import load_run_log, spec_path
 
 from .rqs import RQ1, RQ1_NOTE, RQ2, RQ3, RQ4, RQ5, RQ6, RQS, STABILITY, STABILITY_NOTE
@@ -417,6 +418,7 @@ def _repositories(spec: dict) -> list[str]:
         "Mutants are variants of these repositories and are not listed.",
         "",
     ]
+    lines += _size_strata(repos)
     if any(r.get("files") is not None for r in repos):
         lines += [
             "- `files`, `source files`: the files at the pinned commit, and those of the repository's language "
@@ -451,6 +453,61 @@ def _repositories(spec: dict) -> list[str]:
     header = [f"{lang} ({_n(len(cells))})" for lang, cells in by_language.items()]
     table = [[col[i] if i < len(col) else "" for col in columns] for i in range(max(map(len, columns)))]
     return lines + md_table(header, table, "l" * len(header)) + [""]
+
+
+def _size_strata(repos: list[dict]) -> list[str]:
+    """Repositories counted by language (rows) and size stratum (columns): the corpus builder's default size bins
+    (`CorpusParams.size_bins_kb`, `make corpus --size-bins`, GitHub's repository size in KB), plus a column below the
+    first bin's floor for the micro projects and other small repositories. The size is GitHub's `size_kb` when every
+    repository has one (a corpus-built spec), else the checkout at the pinned commit (`checkout_bytes`), and the
+    text says which."""
+    bins = CorpusParams().size_bins_kb
+    github = all(r.get("size_kb") for r in repos)
+
+    def kb(r: dict) -> float | None:
+        if github:
+            return float(_int(r["size_kb"]))
+        b = r.get("checkout_bytes")
+        return _int(b) / 1024 if b not in (None, "") else None
+
+    sized = [(r, kb(r)) for r in repos]
+    if not any(v is not None for _, v in sized):
+        return []
+    cols: list[tuple[int, int | None]] = [(0, bins[0][0]), *bins]
+    unknown = any(v is None for _, v in sized)
+
+    def mb(v: int) -> str:
+        return f"{v / 1000:g}"
+
+    labels = [f"< {mb(bins[0][0])} MB"] + [f"{mb(lo)}-{mb(hi)} MB" if hi else f">= {mb(lo)} MB" for lo, hi in bins]
+    labels += ["unknown"] * unknown
+
+    def column(v: float | None) -> int:
+        if v is None:
+            return len(cols)
+        return next(i for i, (lo, hi) in enumerate(cols) if v >= lo and (hi is None or v < hi))
+
+    order = {lang: i for i, lang in enumerate(PAPER_LANGUAGES)}
+    counts: dict[str, Counter] = defaultdict(Counter)
+    for r, v in sized:
+        counts[r.get("language") or "unknown"][column(v)] += 1
+    langs = sorted(counts, key=lambda lang: (order.get(lang, len(order)), lang))
+    table = [[lang, *[counts[lang][i] for i in range(len(labels))], sum(counts[lang].values())] for lang in langs]
+    table.append(["all", *[sum(counts[lang][i] for lang in langs) for i in range(len(labels))], len(repos)])
+    measure = (
+        "GitHub's repository size as the corpus builder recorded it (`size_kb`)"
+        if github
+        else "the checkout at the pinned commit (`checkout_bytes`: the blobs, no history, so smaller than GitHub's "
+        "size of the same repository)"
+    )
+    return [
+        "Repositories by language and size. The columns are the corpus builder's default size strata (`make corpus`, "
+        f"`--size-bins {','.join(bin_text(lo, hi) for lo, hi in bins)}` in KB), with a column below the sampling "
+        f"floor for the micro projects and other small repositories; the size is {measure}.",
+        "",
+        *md_table(["language", *labels, "all"], table, "l" + "r" * (len(labels) + 1)),
+        "",
+    ]
 
 
 def _runs(rows: list[dict]) -> list[str]:
@@ -571,7 +628,7 @@ def _negatives(rows: list[dict], run: int) -> list[str]:
         "as containing little or no first-party cryptography, so what a tool reports there hints at false positives "
         "(a weak prior, not ground truth; ok runs of this repetition). `repos ok`: those with an ok run; `crypto "
         "assets`, `algorithm assets`: summed over them; `empty runs`: runs that reported nothing; `max per repo`: "
-        "the most crypto assets in one of them.",
+        "the most `crypto assets` in one of them.",
         "",
     ]
     lines += md_table(["tool", "repos ok", "crypto assets", "algorithm assets", "empty runs", "max per repo"], table)
@@ -618,31 +675,32 @@ def _reported(rows: list[dict], run: int) -> list[str]:
         with_line = sum(_int(r.get("located_line_assets")) for r in rs)
         counts = [_int(r["crypto_assets"]) for r in rs]
         table.append(
-            [tool, len(rs), sum(_int(r.get("components")) for r in rs), crypto]
+            [tool, len(rs), sum(c == 0 for c in counts), sum(_int(r.get("components")) for r in rs), crypto]
             + [sum(_int(r.get(col)) for r in rs) for col, _ in ASSET_KINDS]
+            + [f"{statistics.median(counts):.0f}"]
             + [_pct(with_file / crypto) if crypto else "", _pct(with_line / crypto) if crypto else ""]
-            + [sum(c == 0 for c in counts), f"{statistics.median(counts):.0f}"]
         )
     lines = ["### What the tools report, as written", ""]
     lines += [
         "What each tool wrote into its CBOMs, counted as written, before any normalisation (original variants, ok "
         "runs only). One row per tool, summed over the repositories.",
         "",
-        "- `repos ok`: repositories with an ok run.",
+        "- `repos ok`: repositories with an ok run; `empty`: the ok runs among them with 0 `crypto assets`.",
         "- `components`: every component of the CBOMs, the dependency listings of inventory tools included.",
         "- `crypto assets`: the components typed as cryptographic assets, then split by the CycloneDX `assetType` "
         "they declare (`algorithm`, `certificate`, `protocol`, `related-crypto-material`; `other`: a value outside "
         'these four); the `algorithm` column is what "Units per tool" below counts as `algorithm assets`.',
-        "- `file`, `file+line`: the share of the crypto assets that name a file, and a file and a line "
+        "- `median`: `crypto assets` per repository (over the ok runs).",
+        "- `file`, `file+line`: the share of the `crypto assets` that name a file, and a file and a line "
         "(`evidence.occurrences`, or `detectionContext` in IBM's draft).",
-        "- `empty`: ok runs that reported no crypto asset; `median`: crypto assets per repository.",
         "",
         "Asset counts follow each tool's packaging, so they compare output formats, not findings: what each tool "
         'found is counted in items below ("Units per tool").',
         "",
     ]
-    header = ["tool", "repos ok", "components", "crypto assets", *[h for _, h in ASSET_KINDS], "file", "file+line",
-              "empty", "median"]  # fmt: skip
+    lines += UNITS_EXAMPLE
+    header = ["tool", "repos ok", "empty", "components", "crypto assets", *[h for _, h in ASSET_KINDS], "median",
+              "file", "file+line"]  # fmt: skip
     lines += md_table(header, table, "l" + "r" * (len(header) - 1))
 
     repos = sorted({(r["repo"], (r.get("language") or ""), r.get("expect_crypto") or "") for r in rows},
@@ -668,7 +726,7 @@ def _reported(rows: list[dict], run: int) -> list[str]:
     matrix.append(totals)
     lines += [
         "",
-        "Crypto assets per repository (rows) and tool (columns), as written; `all` sums each column (ok runs; "
+        "`crypto assets` per repository (rows) and tool (columns), as written; `all` sums each column (ok runs; "
         "– unsupported language, × failed or timed out"
         + (
             ", `expect` = `expect_crypto` from the corpus: `low` marks a negative case where little crypto is "
@@ -1036,6 +1094,144 @@ def _units_per_repo(unit_repos: list[dict]) -> list[str]:
     return lines + [""]
 
 
+# RQ2's collapsible example: the same three findings packaged three ways, so a reader sees why asset counts compare
+# output formats and item counts compare findings (analysis/README.md "Units").
+UNITS_EXAMPLE = [
+    "<details>",
+    "<summary>Why three units: the same findings as CycloneDX JSON, packaged three ways (conceptual example)</summary>",
+    "",
+    "A CycloneDX CBOM is a document with a `components` list. Every entry of that list is a **component**; the ones "
+    "typed `cryptographic-asset` are the **`crypto assets`** (a tool that also inventories libraries writes `library` "
+    "components next to them, counted under `components` only). Each asset says what it is in `cryptoProperties` "
+    "(`assetType`, then `algorithmProperties` and the like) and where it was seen in `evidence.occurrences`, one "
+    "entry per place. A **record** is one asset at one occurrence (an asset without occurrences is one record "
+    "without a location). An **item** is one algorithm in one repository after normalisation, however many assets "
+    "and records carry it.",
+    "",
+    "Say a repository uses AES-256-GCM at two lines of `src/Crypto.java` and SHA-256 at a third. Tool A lists each "
+    "algorithm once with its occurrences (CBOMkit's packaging):",
+    "",
+    "```json",
+    '{ "bomFormat": "CycloneDX", "specVersion": "1.6",',
+    '  "components": [',
+    '    { "type": "cryptographic-asset", "name": "AES-256-GCM",',
+    '      "cryptoProperties": { "assetType": "algorithm",',
+    '        "algorithmProperties": { "primitive": "ae", "mode": "gcm", "parameterSetIdentifier": "256" } },',
+    '      "evidence": { "occurrences": [ { "location": "src/Crypto.java", "line": 42 },',
+    '                                     { "location": "src/Crypto.java", "line": 87 } ] } },',
+    '    { "type": "cryptographic-asset", "name": "SHA-256",',
+    '      "cryptoProperties": { "assetType": "algorithm", "algorithmProperties": { "primitive": "hash" } },',
+    '      "evidence": { "occurrences": [ { "location": "src/Crypto.java", "line": 120 } ] } } ] }',
+    "```",
+    "",
+    "Tool B writes one component per finding (CipherRadar's packaging): three `cryptographic-asset` components, "
+    "`AES-256-GCM` twice with one occurrence each and `SHA-256` once. Tool C writes the two algorithms without any "
+    "`evidence` (a location-free tool). The three documents describe the same code:",
+    "",
+    "| tool | components | crypto assets | records | items | file+line |",
+    "|---|---:|---:|---:|---:|---:|",
+    "| A, one component per algorithm | 2 | 2 | 3 | 2 | 1.00 |",
+    "| B, one component per finding | 3 | 3 | 3 | 2 | 1.00 |",
+    "| C, no occurrences | 2 | 2 | 2 | 2 | 0.00 |",
+    "",
+    "Asset and record counts differ by packaging alone, so they describe the output format (this table). Items are "
+    'the same for all three, so every comparison of what the tools found counts items ("Units per tool", RQ4, RQ5), '
+    "(item, value) pairs for parameters and (item, file:line) pairs for call sites.",
+    "",
+    "</details>",
+    "",
+]
+
+
+# The packaging terms (common/tools.yaml `packaging`, hand labels; `common/tools_registry.py:PACKAGINGS`), finest to
+# coarsest, with the signature each leaves in the "Units per tool" table.
+PACKAGING_TERMS = [
+    ("per hit", "one place", "`records` = `algorithm assets`, `several places` 0.00, `assets per item` far above 1"),
+    ("per rule", "one rule match on one API, with its places",
+     "places aggregated (`several places` well above 0), yet several components per algorithm"),
+    ("per algorithm", "one algorithm as the tool spells it, parameters included, with all its places",
+     "`assets per item` a little above 1 (1.2-2: variants such as AES-128-CBC count apart), `several places` "
+     "about 0.5"),
+    ("per family", "one coarse family, the specific algorithm only at the place",
+     "`assets per item` below 1, many places per component"),
+    ("no places", "an algorithm without any evidence", "`no location` 1.00"),
+    ("unknown", "nobody has read the tool's output yet", ""),
+]  # fmt: skip
+
+# RQ2's second collapsible example, under "Units per tool": real components, trimmed, from the Java micro project's
+# CBOMs (bar-micro), one per packaging, and how the columns of that table count each.
+PACKAGING_EXAMPLE = [
+    "<details>",
+    "<summary>Four packagings as the tools write them (trimmed components from the Java micro project)</summary>",
+    "",
+    "Real components from the Java micro project's CBOMs, trimmed to the keys that matter here. The same source "
+    "file, four ways to package it, and what each row of this table makes of them.",
+    "",
+    "**per algorithm**, one component per algorithm with every place as an occurrence (CBOMkit; also xgrep, SCANOSS, "
+    "Q-DARPAN):",
+    "",
+    "```json",
+    '{ "type": "cryptographic-asset", "name": "SHA-256",',
+    '  "cryptoProperties": { "assetType": "algorithm", "oid": "2.16.840.1.101.3.4.2.1",',
+    '    "algorithmProperties": { "primitive": "hash", "parameterSetIdentifier": "256",',
+    '                             "cryptoFunctions": ["digest"] } },',
+    '  "evidence": { "occurrences": [',
+    '    { "location": "src/main/java/app/CryptoDemo.java", "line": 45,',
+    '      "additionalContext": "java.security.Signature#getInstance(...)" },',
+    '    { "location": "src/main/java/app/CryptoDemo.java", "line": 108,',
+    '      "additionalContext": "javax.crypto.Cipher#getInstance(...)" },',
+    '    "... 4 more" ] } }',
+    "```",
+    "",
+    "One `algorithm` asset, six `records`, one item: `records per asset` 6, counted under `several places`, "
+    "`assets per item` about 1.",
+    "",
+    "**per hit**, one component per finding with its one occurrence (CipherRadar; also pqcheck and securin-xbom):",
+    "",
+    "```json",
+    '{ "type": "cryptographic-asset", "name": "RSA-2048", "bom-ref": "FIND-1",',
+    '  "cryptoProperties": { "assetType": "algorithm",',
+    '    "algorithmProperties": { "algorithmFamily": "RSASSA-PKCS1", "primitive": "pke",',
+    '                             "parameterSetIdentifier": "2048" } },',
+    '  "evidence": { "occurrences": [ { "location": "src/main/java/app/CryptoDemo.java", "line": 21 } ] },',
+    '  "properties": [ { "name": "ruleId", "value": "cbom-java-jca-keypairgen-rsa" } ] }',
+    "```",
+    "",
+    "The CBOM holds six such components for RSA (`RSA` four times, `RSA-2048` twice, at four lines): six assets, "
+    "six `records`, one item, since their `algorithmFamily` field names the same algorithm. `records per asset` "
+    "1 / 1, `several places` 0.00, `assets per item` far above 1: the asset count counts rule hits, not algorithms.",
+    "",
+    "**per family**, one component per coarse family with the detail at the place (CryptoScan):",
+    "",
+    "```json",
+    '{ "type": "cryptographic-asset", "name": "ECC", "bom-ref": "crypto-ecc-3",',
+    '  "cryptoProperties": { "assetType": "algorithm", "algorithmProperties": { "primitive": "other" } },',
+    '  "evidence": { "occurrences": [',
+    '    { "location": "src/main/java/app/CryptoDemo.java", "line": 28, "symbol": "secp256r1" },',
+    '    { "location": "src/main/java/app/CryptoDemo.java", "line": 44, "symbol": "secp256r1" },',
+    '    { "location": "src/main/java/app/CryptoDemo.java", "line": 52, "symbol": "Ed25519" },',
+    '    { "location": "src/main/java/app/CryptoDemo.java", "line": 53, "symbol": "Ed25519" } ] } }',
+    "```",
+    "",
+    "One asset, four `records`, two items (EC P-256 and Ed25519): the `symbol` at the place outranks the "
+    "component's name, so `assets per item` falls below 1.",
+    "",
+    "**no places** (Cryptarium):",
+    "",
+    "```json",
+    '{ "type": "cryptographic-asset", "name": "UNKNOWN", "bom-ref": "crypto/algorithm/8a22896e949a3c61",',
+    '  "cryptoProperties": { "assetType": "algorithm",',
+    '    "algorithmProperties": { "primitive": "other", "cryptoFunctions": ["keygen"] } } }',
+    "```",
+    "",
+    "One asset, one record without a location, counted under `no location`; this one is no item either, since "
+    "`UNKNOWN` names no algorithm (`resolution`: undefined).",
+    "",
+    "</details>",
+    "",
+]
+
+
 def _rq2(
     reported: list[str],
     units: list[dict],
@@ -1060,6 +1256,7 @@ def _rq2(
         table = [
             [
                 _tool(u),
+                u.get("packaging") or "unknown",
                 u["cboms"],
                 u["assets"],
                 u["records"],
@@ -1077,7 +1274,7 @@ def _rq2(
             "How each tool packages its findings: one row per tool (`units-run<i>.csv`), summed over the repositories.",
             "",
             "- `CBOMs`: ok runs read; `algorithm assets`: its components of asset type `algorithm` (the `algorithm` "
-            "column above), not every crypto asset: certificates, protocols and key material are no algorithms and "
+            "column above), not all `crypto assets`: certificates, protocols and key material are no algorithms and "
             "never become items, so this number is below `crypto assets` wherever a tool reports those.",
             "- `records`: their places, one per place a component lists (a place listed under several components "
             "counts once for each).",
@@ -1089,11 +1286,20 @@ def _rq2(
             "found; below 1: a component whose places carry different algorithms (the evidence at a place outranks "
             "the component's name) counts as an item for each.",
             "- `no location`: the share of components without a file.",
+            "- `packaging`: what one component of the tool is, a hand label read from its CBOMs (`common/tools.yaml`; "
+            "finest to coarsest), never derived from the numbers. The numbers are its signature:",
             "",
         ]
-        header = ["tool", "CBOMs", "algorithm assets", "records", "items", "records per asset (median / max)",
-                  "several places", "assets per item", "no location"]  # fmt: skip
-        lines += md_table(header, table) + [""]
+        used = {u.get("packaging") or "unknown" for u in units}
+        lines += md_table(
+            ["packaging", "one component is", "signature in this table"],
+            [[t, what, sign] for t, what, sign in PACKAGING_TERMS if t in used],
+            "lll",
+        ) + [""]
+        lines += PACKAGING_EXAMPLE
+        header = ["tool", "packaging", "CBOMs", "algorithm assets", "records", "items",
+                  "records per asset (median / max)", "several places", "assets per item", "no location"]  # fmt: skip
+        lines += md_table(header, table, "ll" + "r" * (len(header) - 2)) + [""]
         lines += _units_per_repo(unit_repos)
         lines += _places(units)
     if cov:
@@ -1293,7 +1499,7 @@ def _conformity(schema: list[dict], meaningful: list[dict], conf: list[dict], so
             "CycloneDX defines fields of its own for each asset type (for an algorithm: `primitive`, "
             "`parameterSetIdentifier`, `mode`, `padding`, ...). How often does a tool fill them, and how often does "
             "it give the same information somewhere else? One table per asset type, one row per tool, one column per "
-            "field; `assets` = the tool's crypto assets of that type.",
+            "field; `assets` = the tool's `crypto assets` of that type.",
             "",
             "- A cell `A / B`: A = the share of those assets with the value in the standard's own field; B = the "
             "share with the value anywhere: that field, or the name (also what it implies: AES is a block cipher), "

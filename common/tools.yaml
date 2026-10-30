@@ -25,12 +25,19 @@
 #   hand-written projects up to 2026-10-21, 7/14 on the generated ones since 2026-10-22; below it in every language
 #   a tool is `disqualified`);
 #   scored from the normalised records since 2026-10-18.
+# `packaging`: how the tool packages its findings, read from its CBOMs by hand (decided 2026-10-30), one of
+#   `per hit` (one component per place), `per rule` (one component per rule match on one API, with its places),
+#   `per algorithm` (one component per algorithm as the tool spells it, parameters included, with all its places),
+#   `per family` (one component per coarse family, the specific algorithm only at the place), `no places` (no
+#   evidence at all); `unknown` for a tool whose output nobody has read yet (the default). Shown in the summary's
+#   "Units per tool" next to the measured signature (records per asset, assets per item); never derived from it.
 # `memory_gb`: the worker's compose memory limit (docker-compose.yml, kept equal by a test); the batch
 #   runner sums it over the tools it feeds at once to stay within EXPERIMENT_MEMORY_BUDGET_GB (waves).
 tools:
   cbomkit:
     micro_2026-10-17: {java: 11/11, python: 5/11, go: 8/11}
     engine: sonar-cryptography      # IBM/PQCA sonar-cryptography plugin; the action jar and the server image share it
+    packaging: per algorithm    # one component per algorithm (name and parameter set), every occurrence listed
     memory_gb: 16
     approach: syntax tree + resolution of provider strings (JCA, BouncyCastle, pyca/cryptography, Go std)
     cbom_by: tool
@@ -46,6 +53,7 @@ tools:
   cbomkit-jar:
     micro_2026-10-17: {java: 11/11, python: 5/11, go: 8/11}
     engine: sonar-cryptography      # cbomkit-action v2.3.0 jar (cbomkit-lib 1.3.0, sonar-cryptography 1.7.0): the packaging the pilot graded
+    packaging: per algorithm    # the same engine, the same packaging
     memory_gb: 8
     approach: syntax tree + resolution of provider strings (JCA, BouncyCastle, pyca/cryptography, Go std)
     cbom_by: tool
@@ -59,6 +67,7 @@ tools:
     # decides: at least 7/14 in one language on the generated projects keeps it a voter, else `role: observer`
     micro_2026-10-17: {java: 0/11, python: 0/11, go: 0/11, javascript: 4/11}
     engine: cdxgen
+    packaging: per algorithm    # one component per algorithm; one location at most (Go, a property), none in Java and Python
     memory_gb: 24                   # 4 OOM-killed Gradle on bisq/bisq2 (2026-10-18); 8 still on Chat2DB, bisq, bisq2, kafka (2026-10-19); 16 on 8 of 60 pilot-medium repos (2026-10-23)
     approach: dependency manifests + evidence (atom); crypto output is mostly libraries and certificates
     cbom_by: tool
@@ -74,6 +83,7 @@ tools:
   cryptobomforge:
     micro_2026-10-17: {python: 8/11, c: 8/11}   # read from its IBM-draft windows since 2026-10-18 (before: 0/11, the call-site extraction did not read them)
     engine: codeql                  # Santander cryptobom-forge on CodeQL crypto queries
+    packaging: per algorithm    # one component per variant (AES, AES-128-CBC, AES-128-CBC-PKCS7 apart), its windows as places
     memory_gb: 6
     approach: data flow (CodeQL)
     cbom_by: tool                   # its own IBM pre-standard draft `1.4-cbom-1.0` (bomFormat CBOM, type crypto-asset), not CycloneDX
@@ -83,6 +93,7 @@ tools:
   deepseek:
     micro_2026-10-17: {java: 11/11, python: 11/11, go: 11/11, javascript: 11/11, c: 9/11}
     engine: llm                     # provider adapters share prompts and file selection (common/llm_cbom.py, Phase 2)
+    packaging: per hit          # our assembly: one component per asset the model names, with its one file and line
     memory_gb: 1
     approach: LLM reading pre-filtered source files
     cbom_by: bf-cbom                # assembled by the worker from the model's structured answer
@@ -93,6 +104,7 @@ tools:
     pilot: {java: fail, python: fail}   # graded on the OLD url-only worker (no code, no locations); superseded by the rewrite
   chatgpt:
     engine: llm
+    packaging: per hit          # as deepseek (common/llm_cbom.py)
     memory_gb: 1
     approach: LLM reading pre-filtered source files (same prompts and file selection as deepseek)
     cbom_by: bf-cbom                # assembled by the worker from the model's structured answer
@@ -102,6 +114,7 @@ tools:
     status: integrated              # needs OPENAI_API_KEY (compose profile llm)
   claude:
     engine: llm
+    packaging: per hit          # as deepseek (common/llm_cbom.py)
     memory_gb: 1
     approach: LLM reading pre-filtered source files (same prompts and file selection as deepseek)
     cbom_by: bf-cbom                # assembled by the worker from the model's structured answer
@@ -111,6 +124,7 @@ tools:
     status: integrated              # needs ANTHROPIC_API_KEY (compose profile llm)
   cryptoscan:
     engine: cryptoscan               # CSNP CryptoScan 1.4.0, regex pattern catalogue (90+ patterns)
+    packaging: per family       # one component per category (RSA, ECC, ...), the matched text at each place carries the algorithm
     memory_gb: 2
     approach: patterns
     cbom_by: tool                   # `--format cbom` emits CycloneDX 1.6 with evidence.occurrences
@@ -122,6 +136,7 @@ tools:
   pqcheck:
     micro_2026-10-17: {python: 8/11, go: 8/11}
     engine: pqcheck                 # github.com/Rafael-Ryu/pqcheck 0.1.0 (Apache-2.0), tree-sitter + go/types
+    packaging: per hit          # one component per finding, one occurrence
     memory_gb: 4
     approach: syntax tree (tree-sitter), Go via go/types when a Go toolchain is present
     cbom_by: tool
@@ -131,6 +146,7 @@ tools:
   qdarpan:
     micro_2026-10-17: {java: 11/11, go: 9/11, c: 7/11}
     engine: q-darpan                # github.com/RohanExploit/q-darpan 72a4edd (Apache-2.0), tree-sitter
+    packaging: per algorithm    # one component per algorithm, its places as occurrences (moved there by our worker adapter)
     memory_gb: 4
     approach: syntax tree (tree-sitter)
     cbom_by: tool                   # CycloneDX 1.7, but locations only in custom properties qdarpan:location.N (adapter moves them to evidence.occurrences)
@@ -140,6 +156,7 @@ tools:
   securin-xbom:
     micro_2026-10-17: {java: 9/11, python: 8/11}   # with the frozen registry rule sets (2026-10-15 without them: 6/11, 7/11)
     engine: semgrep-rules           # github.com/securin-public/securin-xbom a270c5f (Apache-2.0), ~13 semgrep rule files
+    packaging: per hit          # one component per rule match, one occurrence
     memory_gb: 4
     approach: patterns (semgrep)
     cbom_by: tool
@@ -152,6 +169,7 @@ tools:
   cipherradar:
     micro_2026-10-17: {java: 11/11, python: 8/11, go: 9/11, javascript: 9/11}   # its C families are guesses (C is outside its languages)
     engine: opengrep-rules          # github.com/nk-sentinel/cipherradar efa5d9d, opengrep rules + tree-sitter + YARA
+    packaging: per hit          # one component per finding, one occurrence
     memory_gb: 8                    # 4 killed it (rc=-9) on pycryptodome, bunkerweb, pyca/cryptography (2026-10-23)
     approach: patterns (opengrep) + syntax tree
     cbom_by: tool                   # CycloneDX 1.7
@@ -165,6 +183,7 @@ tools:
   ciphersift:
     micro_2026-10-17: {java: 11/11, python: 11/11, go: 11/11}   # tailored on these projects, see tailored_on
     engine: ciphersift              # CipherSift v1.2.0 (SEG-UNIBE, Apache-2.0): clean-room reimplementation of the approach of Crypsy (Näther & Hirsch, arXiv 2608.04857) for Java, Python and Go
+    packaging: per rule         # one component per rule match on one API, its places as occurrences; several rules name one algorithm
     memory_gb: 4
     approach: syntax tree (tree-sitter) + YAML rules (name and constant resolution, wrapper propagation)
     cbom_by: tool                   # CycloneDX 1.7, family in algorithmProperties.algorithmFamily
@@ -182,6 +201,7 @@ tools:
   scanoss:
     micro_2026-10-17: {go: 10/11, javascript: 3/11, c: 7/11}   # open rules (2 JavaScript rule files); Java/Python unsupported without a key
     engine: opengrep-rules          # SCANOSS crypto-finder 0.37.1 on opengrep 1.22.0, rules scanoss/open-crypto-rules@c5f32b7b
+    packaging: per algorithm    # one component per (algorithm, parameters), every match an occurrence
     memory_gb: 4
     approach: patterns (opengrep) + call graph
     cbom_by: tool                   # `--format cyclonedx`; declares CycloneDX 1.7 (its docs still say 1.6)
@@ -198,6 +218,7 @@ tools:
   xgrep:
     micro_2026-10-17: {java: 11/11, python: 10/11, go: 10/11, javascript: 9/11}
     engine: mondoo-xgrep            # proprietary binary (free of charge) from the public npm package, pinned 0.86.0
+    packaging: per algorithm    # one component per algorithm (AES-128 and AES-256 apart), its places as occurrences
     memory_gb: 4
     approach: syntax tree + data flow
     cbom_by: tool
@@ -207,6 +228,7 @@ tools:
   # ---- blocked on access (CLAUDE.md, Phase 2)
   cryptoscope:
     engine: ibm-cryptoscope
+    packaging: unknown          # no output seen
     approach: data flow
     cbom_by: unknown
     languages: [java]
@@ -216,6 +238,7 @@ tools:
   # the AI-made micro ground truth; their data is harvested, they do not vote (`role`, above)
   qelens:
     engine: qelens                  # qelens/cbom (ex keylens, MPL-2.0), crate `cbom` 0.1.2
+    packaging: per hit          # one component per finding on an import line, one occurrence
     memory_gb: 4
     approach: syntax tree (tree-sitter), dependency lockfiles
     cbom_by: tool                   # `--format cyclonedx` (specVersion 1.6; its docs say 1.5)
@@ -225,6 +248,7 @@ tools:
     pilot: {java: borderline, python: fail, go: fail, c: fail, javascript: fail}
   cryptarium:
     engine: cryptarium              # sgoveia/cryptarium v0.3.0 (Apache-2.0)
+    packaging: no places        # its CBOM carries no evidence at all (only its own JSON format has locations)
     memory_gb: 4
     approach: syntax tree (tree-sitter) + YAML rule packs (embedded); also certificates, keys, nginx/SSH/JWT configs
     cbom_by: tool
@@ -234,6 +258,7 @@ tools:
     pilot: {java: fail, python: fail, go: fail, c: fail, javascript: fail}
   qscan:
     engine: qscan                   # quantakrypto/pqc-tools, npm @quantakrypto/qscan 0.12.0 (Apache-2.0)
+    packaging: per algorithm    # one component per (asset type, algorithm, discriminator), its places as occurrences
     memory_gb: 4
     approach: patterns (own TypeScript detectors); dependency manifests, keys, TLS and IaC configs
     cbom_by: tool                   # `--format cbom` (CycloneDX 1.6)

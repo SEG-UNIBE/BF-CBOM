@@ -115,8 +115,11 @@ normalisation, analysis outputs),
   `analysis/README.md` "Voter groups"), `merge_group`, `engine_family` (a shared pattern engine only, merged in the
   `engine-merged` sensitivity ranking), `languages` (the declared support, as shipped; a spec narrows a tool further by hand with
   `tool_languages`),
-  `cbom_by` (who writes the CBOM document: the tool, or BF-CBOM for the LLM workers), status, `tailored_on` and
-  `memory_gb` (= the worker's compose memory limit; a test keeps them equal). The verdict lines `micro_2026-10-17`
+  `cbom_by` (who writes the CBOM document: the tool, or BF-CBOM for the LLM workers), status, `tailored_on`,
+  `memory_gb` (= the worker's compose memory limit; a test keeps them equal) and `packaging` (how the tool packages
+  its findings into components, a hand label read from its CBOMs, decided 2026-10-30: `per hit`, `per rule`,
+  `per algorithm`, `per family`, `no places`, default `unknown`; printed in the summary's "Units per tool" next
+  to the measured signature, never derived from it; `analysis/README.md` "Packaging per tool"). The verdict lines `micro_2026-10-17`
   and `pilot` are stale history and go with the observer cleanup: the bar's record is the bar-micro export, and
   nothing in code reads a verdict.
 - **Memory budget (waves):** `EXPERIMENT_MEMORY_BUDGET_GB` (laptop default 14, 0 = unlimited) caps the summed
