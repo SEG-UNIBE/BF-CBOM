@@ -32,8 +32,8 @@ example, voter groups, how family and group are argued),
   both into `experiments/results/` on the host. These CLI commands run inside the `runner` container.
   An unzipped export can be analysed on the host:
   `RESULTS_DIR=experiments/results uv run bf-cbom analysis report <exp>`.
-- **The laptop prepares, the VM runs.** Batch runs happen on the 64 GB VM with `EXPERIMENT_MEMORY_BUDGET_GB=0` for
-  now (one wave). Limits are caps, not reservations; the measured peak with all 15 tools at once was 44.8 of
+- **The laptop prepares, the VM runs.** Batch runs happen on the VM (64 CPUs, 122 GiB RAM since 2026-10-29, per the run
+  logs; 60.5 GiB before) with `EXPERIMENT_MEMORY_BUDGET_GB=0` for now (one wave). Limits are caps, not reservations; the measured peak with all 15 tools at once was 44.8 of
   60.5 GiB (corpus-pilot-medium, 2026-10-23). Current limits are in `common/tools.yaml` and `docker-compose.yml`.
   The laptop is for code, configs and analysing copied exports.
 - **Results are disposable until the paper's runs.** One code path per feature, no compatibility with older result
@@ -141,7 +141,7 @@ example, voter groups, how family and group are argued),
   `EXPERIMENT_REPLICAS="tool=N,..."` counts replicas started with `docker compose up -d --scale` (`experiments/README.md`
   "Parallelism and memory").
 - **Later: memory-gated scheduling** (noted 2026-10-19, not built; the user may move the stack to Kubernetes
-  instead). Waves cap the *sum of limits*, so a 64 GB VM runs at ~21 GiB: each worker runs one job and most jobs use
+  instead). Waves cap the *sum of limits*, so the former 64 GB VM ran at ~21 GiB: each worker runs one job and most jobs use
   a fraction of their cap. The design to turn RAM into throughput: replace waves by an admission loop that dispatches
   a job when host used + the expected memory of the running jobs + the new job's cap fits the budget (expected =
   p95 of the stored `peak_memory_mb` per tool x1.25, else the cap); concurrency from replicas (`experiment plan`
@@ -233,7 +233,7 @@ example, voter groups, how family and group are argued),
     (rich's thread, the store's `git cat-file` pipes), load the vocabulary themselves and return plain dataclasses in
     input order, so every file is byte-identical to `--jobs 1`, the matchers' timings aside (a test checks it). Memory bounds the pool, not CPUs:
     the runner's cap is `RUNNER_MEMORY` (Makefile, 8g; 2g was OOM-killed on corpus-pilot-medium; on the VM
-    `make experiment-export NAME=<exp> BF_CBOM_JOBS=16 RUNNER_MEMORY=32g`), and the snapshot store keeps at most 64 MB
+    `make experiment-export-all BF_CBOM_JOBS=32 RUNNER_MEMORY=96g` with no experiment running), and the snapshot store keeps at most 64 MB
     of file lines.
   - Commands: `report` (everything, one pass), `normalize`, `schema`, `levels`, `micro`, `tables`, `score`. The UI's
     Experiments page shows stored experiments read-only.

@@ -22,8 +22,9 @@ CORPUS_MAX_REPO_SIZE_MB ?=
 # up to 8 worker processes (--jobs, misc/cli/parallel.py), each with one parsed CBOM or one repository's records
 # plus numpy and scikit-learn; 2g was killed on corpus-pilot-medium (exit 137, 2026-10-23).
 RUNNER_MEMORY ?= 8g
-# Worker processes of `analysis report` (--jobs; 0 = auto: min(CPUs, 8) for a step with 16+ items). On the 64 GB VM:
-#   make experiment-export NAME=<exp> BF_CBOM_JOBS=16 RUNNER_MEMORY=32g
+# Worker processes of `analysis report` (--jobs; 0 = auto: min(CPUs, 8) for a step with 16+ items). On the VM (64 CPUs,
+# 122 GiB), with no experiment running: make experiment-export-all BF_CBOM_JOBS=32 RUNNER_MEMORY=96g
+# (or export both in the VM's shell profile: `?=` lets the environment win)
 BF_CBOM_JOBS ?= 0
 # Export everything defined above to downstream commands for cross-shell support
 .EXPORT_ALL_VARIABLES:
@@ -183,7 +184,8 @@ corpus-prune:
 
 corpus-export:
 	mkdir -p experiments/results
-	docker compose run --rm -v "$(CURDIR)/experiments/results:/export" runner sh -c 'cp /data/results/corpus/*.yaml /export/'
+	docker compose run --rm --no-deps --entrypoint sh -v "$(CURDIR)/experiments/results:/export" runner \
+		-c 'cp -v /data/results/corpus/*.yaml /export/'
 
 # make analysis ARGS="report stability-pilot"  /  ARGS="micro bar-micro"  -> results volume: <exp>/_ANALYSIS/
 analysis:

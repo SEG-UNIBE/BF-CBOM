@@ -57,7 +57,7 @@ Every tool votes. The micro check reports entry-bar verdicts but does not edit `
 Job totals include tool/repository pairs recorded as `unsupported` without scanning. `stability-pilot` still includes
 four historical pilot repositories outside the paper languages (TypeScript, JavaScript and C).
 
-**Second pilot (60 repositories).** On the 64 GB VM, after `make up-prod`:
+**Second pilot (60 repositories).** On the VM, after `make up-prod`:
 
 ```sh
 make experiment EXP=experiments/corpus-pilot-medium.yaml EXPERIMENT_MEMORY_BUDGET_GB=0
@@ -384,8 +384,10 @@ matches in a process pool, one CBOM or one repository per task: `--jobs N` (env 
 takes it too). `0`, the default, is auto: `min(CPUs, 8)` workers for a step with 16 or more items, else sequential;
 `1` is sequential. The results do not depend on it: every table, the summary and the normalised CBOMs are byte-identical
 to `--jobs 1` (the matchers' timing columns aside). In the runner the pool is bounded by `RUNNER_MEMORY` (Makefile, default 8g); both are Makefile variables
-(`make experiment-export NAME=<exp> BF_CBOM_JOBS=16 RUNNER_MEMORY=32g` on the 64 GB VM). A worker the cap kills ends
-the report, so lower the jobs or raise the cap.
+(on the VM, 64 CPUs and 122 GiB since 2026-10-29, with no experiment running: `make experiment-export-all
+BF_CBOM_JOBS=32 RUNNER_MEMORY=96g`; both are `?=` in the Makefile, so exporting them in the VM's shell profile makes
+them the default there). A worker the cap kills ends the report, so lower the jobs or raise the cap. Beyond some 16
+workers the matching step gains little: it has one task per repository, and the largest repository bounds it.
 
 **RaQuN** (matcher (c), `analysis/matchers/raqun.py`) runs next to the exact matcher, always in the runner image
 (the `raqun` extra, PyQuN from the user's fork) and on the host after `uv sync --extra raqun` (`--raqun/--no-raqun`
