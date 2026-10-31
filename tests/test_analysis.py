@@ -540,8 +540,8 @@ def test_reported_section_shows_raw_counts_and_the_repo_matrix():
     ]
     rows[-1]["run"] = "2"
     lines = sm._reported(rows, 1)
-    assert "| t1 | 2 | 1 | 43 | 10 | 8 | 2 | 0 | 0 | 0 | 5 | 0.60 | 0.50 |" in lines
-    assert "| t2 | 0 |  |  |  |  |  |  |  |  |  |  |  |" in lines
+    assert "| t1 | 2 | 1 | 0 | 43 | 10 | 8 | 2 | 0 | 0 | 0 | 5 | 0.60 | 0.50 |" in lines
+    assert "| t2 | 0 |  | 1 |  |  |  |  |  |  |  |  |  |  |" in lines  # its one run timed out: failed
     assert "| repo | language | expect | t1 | t2 |" in lines
     assert "| o/a | java |  | 10 | – |" in lines and "| o/b | python | low | 0 | × |" in lines
     assert "| all |  |  | 10 |  |" in lines
@@ -588,19 +588,27 @@ def test_summary_starts_with_when_how_long_and_how_much_ram(tmp_path, monkeypatc
     summary = (exp / "_ANALYSIS" / "_SUMMARY.md").read_text(encoding="utf-8")
     assert summary.index("| repositories |") < summary.index("## Contents") < summary.index("### Runs")
     assert "| ran | 2026-10-18 08:00 UTC to 2026-10-18 10:30 UTC |" in summary
-    assert "| duration | 2 h 30 min in 1 runner session |" in summary
+    assert "| duration | 2 h 30 min in 1 runner session (1 completed) |" in summary
+    assert "| sessions |" not in summary
     assert "| host | 20.0 GiB RAM, 10 CPUs (Docker VM) |" in summary
     assert "| memory budget | 14 GiB -> 2 wave(s) (last session) |" in summary
     assert "| peak RAM in use | 15.0 GiB of 20.0 GiB (0.75) on the VM" in summary
     assert "| peak RAM of a job | 2.9 GiB: `cbomkit` on `bfcbom/micro-java`" in summary
     assert "| queue wait |" not in summary  # a batch enqueues everything at once: the wait is only the position
+    # the workers' images and the runner were built from different commits: which is which, and the mark
     assert (
-        "| BF-CBOM commit | `abc123def456`, `abc123def456-dirty` (`-dirty`: built from uncommitted changes) |"
-        in summary
+        "| BF-CBOM commit | workers `abc123def456` (2 runs); runner `abc123def456-dirty` ⛔ the workers ran another "
+        "build than the runner (`make up-prod` rebuilds them; the board shows each) (`-dirty`: built from "
+        "uncommitted changes) |" in summary
     )
+    from analysis.summary import _commits
+
+    same = _commits([{"bfcbom_commit": "c1"}] * 3, [{"runner_commit": "c1"}])
+    assert same == [["BF-CBOM commit", "`c1` (workers and runner)"]]
+    assert _commits([{"bfcbom_commit": "c1"}], []) == [["BF-CBOM commit", "workers `c1` (1 runs)"]]
     assert "| worker image ids | 1 recorded in `_run-log.json` (by content, per session) |" in summary
     header = "| tool | ok | error | timeout | oom | unsupported | median s | tool version |"
-    assert header in summary and "| cbomkit | 1 |  |  |  |  | 2 |" in summary
+    assert header in summary and "| cbomkit | 1 |  |  |  |  | 1.5 |" in summary
     limits = summary[summary.index("### Memory limits") :]
     assert (
         "| tool | limit GiB | max peak GiB | of limit | p90 peak GiB | at limit | OOM kills | failed for memory |"
@@ -660,6 +668,25 @@ def test_workaround_line_collects_the_recorded_setup_workarounds():
     expected = ".cradarignore a/B.java (files CipherRadar crashes on)"
     assert workaround_line(notes) == expected
     assert workaround_line("cradar cmd: cradar scan\n") is None and workaround_line(None) is None
+
+
+def test_xgreps_own_words_on_limiting_its_analysis_become_the_runs_tool_warning():
+    from analysis.tables import tool_warning_line
+    from workers.xgrep.main import limits
+
+    stderr = (
+        "scanning 3'201 files\n"
+        "codebase is very large; skipping cross-file analysis (graph build + interfile passes) to keep scan "
+        "time/memory bounded \n"
+        " reporting intra-file findings only (set XGREP_MAX_GRAPH_FILES=0 to force it, or raise the budget)\n"
+        " reporting intra-file findings only (set XGREP_MAX_GRAPH_FILES=0 to force it, or raise the budget)\n"
+        "done: 146 components\n"
+    )
+    found = limits(stderr)
+    assert len(found) == 2 and found[0].startswith("codebase is very large") and found[1].startswith("reporting")
+    assert limits("scanning 12 files\ndone\n") == []
+    notes = "xgrep cmd: xgrep sbom x\n" + "".join(f"tool warning: {line}\n" for line in found)
+    assert tool_warning_line(notes) == ";".join(found) and tool_warning_line("xgrep cmd: x") is None
 
 
 def test_every_integrated_tool_declares_its_packaging():
@@ -813,27 +840,44 @@ def test_repositories_section_counts_by_language_and_size_stratum():
             "checkout_bytes": 6777,
             "files": 2,
         },
-        {"full_name": "apache/kafka", "language": "Java", "commit": "bb", "checkout_bytes": 66_498_015},
-        {"full_name": "jpadilla/pyjwt", "language": "Python", "commit": "cc", "checkout_bytes": 2_621_440},
-        {"full_name": "golang-jwt/jwt", "language": "Go", "commit": "dd", "checkout_bytes": 5 * 1024**2},
+        {
+            "full_name": "apache/kafka",
+            "language": "Java",
+            "commit": "bb",
+            "checkout_bytes": 66_498_015,
+            "stars": 31_000,
+        },
+        {
+            "full_name": "jpadilla/pyjwt",
+            "language": "Python",
+            "commit": "cc",
+            "checkout_bytes": 2_621_440,
+            "stars": 1_500,
+        },
+        {"full_name": "golang-jwt/jwt", "language": "Go", "commit": "dd", "checkout_bytes": 5 * 1024**2, "stars": 120},
     ]
     lines = _size_strata(repos)
     assert "the checkout at the pinned commit (`checkout_bytes`" in lines[0]
     assert "--size-bins 300-3000,3000-30000,30000-" in lines[0]
-    assert "| language | < 0.3 MB | 0.3-3 MB | 3-30 MB | >= 30 MB | all |" in lines
-    assert "| Java | 1 | 0 | 0 | 1 | 2 |" in lines
-    assert "| Python | 0 | 1 | 0 | 0 | 1 |" in lines
-    assert "| Go | 0 | 0 | 1 | 0 | 1 |" in lines
-    assert lines[-2] == "| all | 1 | 1 | 1 | 1 | 4 |"
+    assert "--star-bins 50-300,300-2000,2000-" in lines[0]
+    # sizes, an empty column, then stars; the micro project has no star count
+    assert ("| language | < 0.3 MB | 0.3-3 MB | 3-30 MB | >= 30 MB | all |  | < 50 stars | 50-300 stars "
+            "| 300-2000 stars | >= 2000 stars | stars unknown |") in lines  # fmt: skip
+    assert "| Java | 1 | 0 | 0 | 1 | 2 |  | 0 | 0 | 0 | 1 | 1 |" in lines
+    assert "| Python | 0 | 1 | 0 | 0 | 1 |  | 0 | 0 | 1 | 0 | 0 |" in lines
+    assert "| Go | 0 | 0 | 1 | 0 | 1 |  | 0 | 1 | 0 | 0 | 0 |" in lines
+    assert lines[-2] == "| all | 1 | 1 | 1 | 1 | 4 |  | 0 | 1 | 1 | 1 | 1 |"
     # GitHub's size when every repository has one (a corpus-built spec), else the checkout; an unknown size has a column
     github = _size_strata([{**r, "size_kb": 40_000} for r in repos])
-    assert "GitHub's repository size" in github[0] and "| all | 0 | 0 | 0 | 4 | 4 |" in github
+    assert "GitHub's repository size" in github[0] and "| all | 0 | 0 | 0 | 4 | 4 |  | 0 | 1 | 1 | 1 | 1 |" in github
+    starred = _size_strata([{**r, "stars": 10} for r in repos])  # every star count known: no unknown column
+    assert "| all | 1 | 1 | 1 | 1 | 4 |  | 4 | 0 | 0 | 0 |" in starred
     mixed = _size_strata([repos[0], {**repos[1], "checkout_bytes": None}])
-    assert "| language | < 0.3 MB | 0.3-3 MB | 3-30 MB | >= 30 MB | unknown | all |" in mixed
-    assert "| Java | 1 | 0 | 0 | 0 | 1 | 2 |" in mixed
+    assert "| language | < 0.3 MB | 0.3-3 MB | 3-30 MB | >= 30 MB | size unknown | all |  |" in mixed[2]
+    assert "| Java | 1 | 0 | 0 | 0 | 1 | 2 |  | 0 | 0 | 0 | 1 | 1 |" in mixed
     # the table sits between the intro and the detailed list; no size at all, no table
     section = _repositories({"repos": repos})
-    assert section.index("| language | < 0.3 MB | 0.3-3 MB | 3-30 MB | >= 30 MB | all |") < section.index(
+    assert section.index(next(x for x in section if x.startswith("| language | < 0.3 MB"))) < section.index(
         "| repository | language | files | source files | MiB | source MiB |"
     )
     assert _size_strata([{"full_name": "a/b", "language": "Go", "commit": "ee"}]) == []
@@ -872,9 +916,46 @@ def test_tool_versions_section_lists_what_ran_and_flags_mixed_versions():
          "bfcbom_commit": "abc123"},
         {"tool": "cdxgen", "tool_version": "", "image_ref": "", "bfcbom_commit": ""},  # unsupported: nothing ran
     ]  # fmt: skip
-    lines = _versions(rows)
+    tools = [{"tool": "xgrep", "version": "0.101.0", "version_url": "https://example.org/xgrep/0.101.0"},
+             {"tool": "pqcheck", "version": "c0ccf5b", "version_url": ""}]  # fmt: skip
+    lines = _versions(rows, tools)
     assert lines[0] == "### Tool versions" and "30 October 2026" in lines[2]
-    assert "| xgrep | `xgrep 0.101.0` | `bf-cbom/worker-xgrep:1.0.4` | `abc123` | 2 |" in lines
+    assert ("| xgrep | [0.101.0](https://example.org/xgrep/0.101.0) | `xgrep 0.101.0` | `bf-cbom/worker-xgrep:1.0.4` "
+            "| `abc123` | 2 |") in lines  # fmt: skip
     assert not any(line.startswith("| cdxgen") for line in lines)
-    assert any("⛔" in line and "`pqcheck`" in line and "xgrep" not in line for line in lines)
+    assert any("⛔" in line and "disagree" in line and "`pqcheck`" in line and "xgrep" not in line for line in lines)
+    # one pqcheck run recorded another commit than tools.yaml names
+    assert any("⛔" in line and "did not record" in line and "`pqcheck`" in line for line in lines)
+    assert "✅ Every run recorded the `version` `common/tools.yaml` names." in _versions(rows[:2], tools)
+    assert not any("✅" in line or "did not record" in line for line in _versions(rows))  # no versions named
     assert _versions([]) == []
+
+
+def test_a_runs_version_string_names_the_version_as_a_token_or_a_commits_start():
+    from analysis.summary import ran_version
+
+    assert ran_version("cbomkit 2.3.0 (sonar-cryptography 1.7.0)", "2.3.0")
+    assert ran_version("cbomkit-action v2.3.0 (sonar-cryptography 1.7.0)", "2.3.0")
+    assert ran_version("cryptobom-forge 1.1.0; codeql 2.27.3", "1.1.0")
+    assert not ran_version("cdxgen 12.3.0", "2.3.0") and not ran_version("x 2.3.01", "2.3.0")
+    assert not ran_version("x 2.3.0.1", "2.3.0")
+    assert ran_version("cradar efa5d9de322c9120b15acc2e958dc6c1c4e609e1 opengrep 1.33.1", "efa5d9d")
+    assert not ran_version("cradar 0efa5d9de322 opengrep", "efa5d9d") and not ran_version("", "efa5d9d")
+
+
+def test_every_integrated_tool_names_the_version_its_dockerfile_pins():
+    """`version` in common/tools.yaml is what the paper reports; it must be the version the worker's Dockerfile pins,
+    with the page that shows it."""
+    from common.tools_registry import load_tools
+
+    root = Path(__file__).resolve().parents[1]
+    checked = 0
+    for name, entry in load_tools(root / "common" / "tools.yaml").items():
+        if entry.get("status") != "integrated" or entry.get("cbom_by") != "tool":
+            continue  # the LLM workers report their model, which every run records
+        version, url = entry.get("version"), entry.get("version_url")
+        assert version and str(url or "").startswith("https://"), f"{name}: version and version_url"
+        dockerfile = (root / "docker" / f"Dockerfile.worker-{name}").read_text(encoding="utf-8")
+        assert str(version) in dockerfile, f"{name}: {version} is not what docker/Dockerfile.worker-{name} pins"
+        checked += 1
+    assert checked >= 12

@@ -10,7 +10,10 @@ Without either, `files` and `read` return None and the analysis reports the colu
 
 Files are read through one long-lived `git cat-file --batch` process per bare repository (one request per file on
 its stdin, no fork): a `git show` per file costs ~16 ms of process start against ~0.4 ms this way, and a report reads
-every located record's file twice (the traceability check and the records' places).
+every located record's file twice (the traceability check and the records' places). A file is read as a checkout
+shows it, which is what the tools scanned: a symlink inside the repository as its target (`--follow-symlinks`; read
+as the link's one-line text, Aegis's linked test vectors had their tools' lines past the end, 2026-10-31), and its
+lines numbered at `\\n` only, as git and the tools number them (`split_lines`).
 """
 
 from __future__ import annotations
@@ -25,6 +28,18 @@ from common.experiment import GIT_MIRROR_DIR, RepoSpec, mirror_path, publish_fix
 SNAPSHOT_CACHE_DIR = Path(os.getenv("SNAPSHOT_CACHE_DIR", str(Path.home() / ".cache" / "bf-cbom" / "snapshots")))
 _CACHE_BYTES = 64 * 2**20  # split lines kept in memory, summed over files: a bound by count let 512 bundled
 # megabyte files of one repository (MaxKey's front-end) exceed the runner's 2 GB on 2026-10-23
+
+
+_LINK_REPLIES = (b"symlink", b"dangling", b"loop", b"notdir")  # --follow-symlinks: a link it cannot resolve in the tree
+
+
+def split_lines(text: str) -> list[str]:
+    """A file's lines as git and the tools number them: split at `\\n` only, a trailing `\\r` dropped. `str.splitlines`
+    also splits at a form feed, a lone `\\r` or `\\u2028`, which shifts every later line against the tools' numbers."""
+    lines = text.split("\n")
+    if lines[-1] == "":
+        lines.pop()
+    return [line[:-1] if line.endswith("\r") else line for line in lines]
 
 
 def _git(args: list[str], *, timeout: float = 600) -> subprocess.CompletedProcess:
@@ -74,12 +89,14 @@ class SnapshotStore:
             pass
 
     def _cat(self, bare: Path, spec: str) -> bytes | None:
-        """One blob (`<commit>:<path>`) through the bare repo's `git cat-file --batch` process, started on first use;
-        None when the object is missing or no blob (a directory). A broken process is dropped and restarted."""
+        """One blob (`<commit>:<path>`) through the bare repo's `git cat-file --batch --follow-symlinks` process,
+        started on first use: a symlink inside the tree reads as its target; None when the object is missing, no blob
+        (a directory) or a link that leaves the tree or resolves to nothing. A broken process is dropped and
+        restarted."""
         proc = self._batches.get(bare)
         if proc is None or proc.poll() is not None:
             proc = subprocess.Popen(
-                ["git", "-C", str(bare), "cat-file", "--batch"],
+                ["git", "-C", str(bare), "cat-file", "--batch", "--follow-symlinks"],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
@@ -88,8 +105,15 @@ class SnapshotStore:
         try:
             proc.stdin.write(spec.encode("utf-8", errors="surrogateescape") + b"\n")
             proc.stdin.flush()
-            header = proc.stdout.readline().rstrip(b"\n").split()
-            if len(header) != 3:  # `<spec> missing` or `<spec> ambiguous`
+            line = proc.stdout.readline().rstrip(b"\n")
+            if line.endswith((b" missing", b" ambiguous")):  # `<spec> missing`; the path may hold spaces
+                return None
+            kind, _, size = line.partition(b" ")
+            if kind in _LINK_REPLIES:  # `<kind> <size>`, then the link's text and a newline
+                proc.stdout.read(int(size) + 1)
+                return None
+            header = line.split()
+            if len(header) != 3:
                 return None
             data = proc.stdout.read(int(header[2]))
             proc.stdout.read(1)  # the newline after the content
@@ -175,7 +199,7 @@ class SnapshotStore:
             self._lines.move_to_end(key)
             return self._lines[key][0]
         text = self._text(full_name, commit, path)
-        lines, size = (text.splitlines(), len(text)) if text is not None else (None, 0)
+        lines, size = (split_lines(text), len(text)) if text is not None else (None, 0)
         if size <= self._cache_bytes:
             self._lines[key] = (lines, size)
             self._cached_bytes += size

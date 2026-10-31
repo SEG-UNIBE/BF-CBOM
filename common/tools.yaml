@@ -25,6 +25,11 @@
 # `approach`, `vendor`, `url`, `shipped`: what the tool is built on (a third-party engine named first) and how it
 #   detects, who publishes it, its project page and how it is shipped (CLI, server, GitHub Action, HTTP API); read
 #   from the tools' own pages (2026-10-30), printed in the summary's "Tools" table (tools.csv).
+# `version`, `version_url`: the version the paper reports, the tool's own (engines in docs/tool-versions.md): its
+#   release, or the first 7 characters of the pinned commit when it has none; and the page that shows that version
+#   (the release, else the tag, the commit or the package version), the paper's citation. Kept with the pin in
+#   docker/Dockerfile.worker-<tool> (a test checks the Dockerfile names it); the summary's "Tool versions" table
+#   links it and checks every run recorded it (tools.csv).
 # `memory_gb`: the worker's compose memory limit (docker-compose.yml, kept equal by a test); the batch
 #   runner sums it over the tools it feeds at once to stay within EXPERIMENT_MEMORY_BUDGET_GB (waves).
 tools:
@@ -35,6 +40,8 @@ tools:
     approach: "sonar-cryptography (SonarQube plugin): syntax tree + resolution of provider strings (JCA, BouncyCastle, pyca/cryptography, Go std)"
     vendor: PQCA (Linux Foundation)
     url: "https://github.com/cbomkit/cbomkit"
+    version: "2.3.0"
+    version_url: "https://github.com/cbomkit/cbomkit/releases/tag/2.3.0"
     shipped: server (REST API and web UI), Docker image
     cbom_by: tool
     languages: [java, python, go]   # 2.1.10 had no Go analyser (0/11 on micro-go); 2.3.0 has the action jar's engine
@@ -52,6 +59,8 @@ tools:
     approach: "sonar-cryptography (SonarQube plugin): syntax tree + resolution of provider strings (JCA, BouncyCastle, pyca/cryptography, Go std)"
     vendor: PQCA (Linux Foundation)
     url: "https://github.com/cbomkit/cbomkit-action"
+    version: "2.3.0"
+    version_url: "https://github.com/cbomkit/cbomkit-action/releases/tag/v2.3.0"
     shipped: GitHub Action (Docker image running a jar)
     cbom_by: tool
     languages: [java, python, go]
@@ -65,6 +74,8 @@ tools:
     approach: atom (code analysis) and golem (Go type checking) + dependency manifests; crypto output is mostly libraries and certificates
     vendor: OWASP cdxgen
     url: "https://github.com/cdxgen/cdxgen"
+    version: "13.5.0"
+    version_url: "https://github.com/cdxgen/cdxgen/releases/tag/v13.5.0"
     shipped: CLI (npm package, Docker image)
     cbom_by: tool
     languages: [java, python, javascript, go]   # crypto locations: JS/TS occurrences and Go sourceLocation properties
@@ -82,6 +93,8 @@ tools:
     approach: "CodeQL: data flow, CodeQL's crypto inventory queries"
     vendor: Santander Security Research
     url: "https://github.com/Santandersecurityresearch/cryptobom-forge"
+    version: "1.1.0"
+    version_url: "https://github.com/Santandersecurityresearch/cryptobom-forge/releases/tag/1.1.0"
     shipped: CLI (Python package) over the CodeQL CLI
     cbom_by: tool                   # its own IBM pre-standard draft `1.4-cbom-1.0` (bomFormat CBOM, type crypto-asset), not CycloneDX
     languages: [python, c]          # upstream CodeQL crypto queries exist for Python and C/C++ only (no Java query)
@@ -132,6 +145,8 @@ tools:
     approach: "own engine: regex patterns (90+)"
     vendor: CSNP (CyberSecurity Non-Profit)
     url: "https://github.com/csnp/cryptoscan"
+    version: "1.5.0"
+    version_url: "https://github.com/csnp/cryptoscan/releases/tag/v1.5.0"
     shipped: CLI (Go binary)
     cbom_by: tool                   # `--format cbom` emits CycloneDX 1.6 with evidence.occurrences
     languages: [java, python, go, javascript, typescript, c, cpp, rust, csharp, ruby, php]
@@ -145,6 +160,8 @@ tools:
     approach: syntax tree (tree-sitter), Go via go/types when a Go toolchain is present
     vendor: Rafael Ryu (individual)
     url: "https://github.com/Rafael-Ryu/pqcheck"
+    version: "0.1.0"
+    version_url: "https://github.com/Rafael-Ryu/pqcheck/releases/tag/pqcheck-v0.1.0"
     shipped: CLI (Python package, built from source; a Go helper for Go)
     cbom_by: tool
     languages: [python, go]
@@ -156,6 +173,8 @@ tools:
     approach: syntax tree (tree-sitter)
     vendor: Rohan Gaikwad (individual)
     url: "https://github.com/RohanExploit/q-darpan"
+    version: "72a4edd"
+    version_url: "https://github.com/RohanExploit/q-darpan/commit/72a4eddfcc8c115d168be4ec26107fb539020675"
     shipped: CLI (Python package, built from source)
     cbom_by: tool                   # CycloneDX 1.7, but locations only in custom properties qdarpan:location.N (adapter moves them to evidence.occurrences)
     languages: [java, go, c]
@@ -167,6 +186,8 @@ tools:
     approach: "Semgrep: pattern rules (its own and semgrep.dev registry rule sets)"
     vendor: Securin
     url: "https://github.com/securin-public/securin-xbom"
+    version: "a270c5f"
+    version_url: "https://github.com/securin-public/securin-xbom/commit/a270c5ffd393d904efc1d5ad51f406dabe197117"
     shipped: CLI (Python package, built from source)
     cbom_by: tool
     languages: [java, python]
@@ -181,6 +202,8 @@ tools:
     approach: "OpenGrep: pattern rules, plus tree-sitter and YARA-X passes"
     vendor: nk-sentinel (individual)
     url: "https://github.com/nk-sentinel/cipherradar"
+    version: "efa5d9d"
+    version_url: "https://github.com/nk-sentinel/cipherradar/commit/efa5d9de322c9120b15acc2e958dc6c1c4e609e1"
     shipped: CLI (Go binary, built from source)
     cbom_by: tool                   # CycloneDX 1.7
     languages: [java, python, go, javascript]   # Java: nil-pointer crash on `new ECGenParameterSpec(<identifier>)` (jjwt, Keycloak) is worked around in the worker (files with the trigger pre-excluded via .cradarignore, recorded in the notes; the tool itself is not patched)
@@ -196,6 +219,8 @@ tools:
     approach: syntax tree (tree-sitter) + YAML rules (name and constant resolution, wrapper propagation)
     vendor: SEG, University of Bern
     url: "https://github.com/SEG-UNIBE/ciphersift"
+    version: "1.2.0"
+    version_url: "https://github.com/SEG-UNIBE/ciphersift/tree/v1.2.0"
     shipped: CLI (Java jar)
     cbom_by: tool                   # CycloneDX 1.7, family in algorithmProperties.algorithmFamily
     languages: [java, python, go]
@@ -216,6 +241,8 @@ tools:
     approach: "OpenGrep: pattern rules (scanoss/open-crypto-rules) + call graph"
     vendor: SCANOSS
     url: "https://github.com/scanoss/crypto-finder"
+    version: "0.43.0"
+    version_url: "https://github.com/scanoss/crypto-finder/releases/tag/v0.43.0"
     shipped: CLI (Go binary)
     cbom_by: tool                   # `--format cyclonedx`; declares CycloneDX 1.7 (its docs still say 1.6)
     languages: [go, c, javascript, rust]   # what the open rules cover; Java/Python rules only through the API with a key
@@ -234,6 +261,8 @@ tools:
     approach: "own engine (proprietary): syntax tree (tree-sitter) + data flow"
     vendor: Mondoo
     url: "https://xgrep.ai"
+    version: "0.101.0"
+    version_url: "https://www.npmjs.com/package/@mondoohq/xgrep/v/0.101.0"
     shipped: CLI (proprietary binary, npm package)
     cbom_by: tool
     languages: [java, python, go, javascript]
@@ -258,6 +287,8 @@ tools:
     approach: syntax tree (tree-sitter), dependency lockfiles
     vendor: qelens
     url: "https://github.com/qelens/cbom"
+    version: "0.1.2"
+    version_url: "https://crates.io/crates/cbom/0.1.2"
     shipped: CLI (Rust crate)
     cbom_by: tool                   # `--format cyclonedx` (specVersion 1.6; its docs say 1.5)
     languages: [python, javascript] # its SUPPORTED_LANGUAGES.md; Rust only through Cargo.lock
@@ -269,6 +300,8 @@ tools:
     approach: syntax tree (tree-sitter) + YAML rule packs (embedded); also certificates, keys, nginx/SSH/JWT configs
     vendor: sgoveia (individual)
     url: "https://github.com/sgoveia/cryptarium"
+    version: "0.3.0"
+    version_url: "https://github.com/sgoveia/cryptarium/releases/tag/v0.3.0"
     shipped: CLI (Go binary)
     cbom_by: tool
     languages: [java, python, go, javascript, c]
@@ -280,6 +313,8 @@ tools:
     approach: patterns (own TypeScript detectors); dependency manifests, keys, TLS and IaC configs
     vendor: QuantaKrypto
     url: "https://github.com/quantakrypto/pqc-tools"
+    version: "0.12.0"
+    version_url: "https://www.npmjs.com/package/@quantakrypto/qscan/v/0.12.0"
     shipped: CLI (npm package)
     cbom_by: tool                   # `--format cbom` (CycloneDX 1.6)
     languages: [java, python, go, javascript, c, rust, csharp, ruby, php]   # of its 14 claimed languages, those in our list

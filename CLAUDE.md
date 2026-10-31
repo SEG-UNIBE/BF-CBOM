@@ -27,8 +27,10 @@ example, voter groups, how family and group are argued),
   `-delete` / `-export` / `-export-all` (every complete experiment), `analysis`, `corpus`, `corpus-prune`, `board`; `experiment-attach` joins the terminal of
   the running `experiment run` from another shell (detach with Ctrl-P Ctrl-Q, never Ctrl-C). After every pull run `make up-prod` first: the runner
   bakes the CLI and the workers bake `common/`; the board's header names the checkout's commit, its `build` column
-  each worker's (read from the containers, `BOARD_BUILDS`), and a red line every container built from another commit.
-  Until 2026-10-31 `SERIAL_BUILD=0` built no prod worker (its `--profile` flags replaced `COMPOSE_PROFILES`).
+  each worker's (read from the containers, `BOARD_BUILDS`), and a red line every container built from another commit;
+  `make experiment` refuses to start when a worker of the spec or the git server was built from another commit than
+  the runner (`EXPERIMENT_BUILDS`, recorded per session as `builds`; `foreign_builds`). Until 2026-10-31
+  `SERIAL_BUILD=0` built no prod worker (its `--profile` flags replaced `COMPOSE_PROFILES`).
   corpus-pilot-medium of 2026-10-30 ran the workers of 4c87e32 under the runner of 5efece4 (no CPU recorded).
 - **Nothing lands on the host unless exported.** Results and git mirrors stay in the named volumes `results-data` and
   `git-data`; `make experiment-export` exports experiments and `make corpus-export` exports sampled corpus YAMLs,
@@ -144,7 +146,10 @@ example, voter groups, how family and group are argued),
   `approach` (the summary's "Tools" table, `tools.csv`) and `packaging` (how the tool packages
   its findings into components, a hand label read from its CBOMs, decided 2026-10-30: `per hit`, `per rule`,
   `per algorithm`, `per family`, `no places`, default `unknown`; printed in the summary's "Units per tool" next
-  to the measured signature, never derived from it; `analysis/README.md` "Packaging per tool"). No verdict is
+  to the measured signature, never derived from it; `analysis/README.md` "Packaging per tool"), `version` and
+  `version_url` (decided 2026-10-31: the version the paper reports, the tool's own, its release or 7 characters of
+  the pinned commit without one, and the page that shows it, the paper's citation; a test checks the Dockerfile pins
+  it; the summary's "Tool versions" links it and checks every run recorded it). No verdict is
   recorded there: the bar's record is the bar-micro export, and nothing in code reads a verdict.
 - **Memory budget (waves):** `EXPERIMENT_MEMORY_BUDGET_GB` (laptop default 14, 0 = unlimited) caps the summed
   `memory_gb` of the tools fed at once; the rest run in later waves. Runner and UI plan waves with
@@ -206,7 +211,11 @@ example, voter groups, how family and group are argued),
     (`admits:`; `engine.py:_admit`), a cipher-suite name yields its bulk cipher with `protocol: TLS`
     (`cipher_suites:`). A tool's own field is never checked or dropped.
   - `schema.py`: RQ2 (whole-document validation, meaningful shares) and RQ1's traceability; `snapshots.py` reads a pinned
-    commit's files from the git mirror or a cache fetched with `--fetch` (a fixture: published from its local directory).
+    commit's files from the git mirror or a cache fetched with `--fetch` (a fixture: published from its local directory),
+    as a checkout shows them, which is what the tools scanned: a symlink inside the tree as its target
+    (`--follow-symlinks`; until 2026-10-31 read as the link's one line, so Aegis's linked test files had lines past the
+    end) and lines numbered at `\n` only, as git and the tools number them (`split_lines`; `str.splitlines` also broke
+    at form feeds).
   - `levels.py`: the L0-L4 ladder on a fixed unit (refinement 14): `level_matches` clusters a repo's records level
     by level; the exact matcher, the ladder and the tools-per-item distribution share it.
   - `matchers/`: n-way matchers on the records, `exact.py` and `raqun.py`, compared by `compare.py` (Phase 3).
@@ -286,7 +295,7 @@ language they were scored in; cdxgen, cryptarium, qelens and qscan failed it. Th
 | `cipherradar` | cipherradar | Java, Python, Go, JS | runs outside the clone; Java files with its crash trigger pre-excluded via `.cradarignore` (recorded); 12 GiB since 2026-10-30 (killed at 4 on pycryptodome, bunkerweb, pyca/cryptography, 2026-10-23; highest trial peak 7.3 at 8) |
 | `scanoss` | scanoss | Go, C, JS, Rust | crypto-finder with the public open rules; Java/Python rules need an API key (research key requested) |
 | `ciphersift` | ciphersift | Java, Python, Go | benchmark-informed: `tailored_on` the micro projects and the pilot corpus (refinement 13) |
-| `xgrep` | xgrep | Java, Python, Go, JS | 0.101.0 (pinned 2026-10-30) also reports key and certificate files (`.pem`, `.crt`, `.p12`, ...): on corpus-pilot-medium its records went from 5.7k to 38k, half of them outside code (0.86.0: 0.03), at 3.3 times the time |
+| `xgrep` | xgrep | Java, Python, Go, JS | 0.101.0 (pinned 2026-10-30) also reports key and certificate files (`.pem`, `.crt`, `.p12`, ...): on corpus-pilot-medium its records went from 5.7k to 38k, half of them outside code (0.86.0: 0.03), at 3.3 times the time. Two limits of its own, read from the binary (2026-10-31), defaults kept as shipped: a 500 ms wall-clock limit per regex match that counts as "no match" (`XGREP_REGEX_MATCH_TIMEOUT`), so a loaded host can drop findings in large files (FairEmail: 11 places in its two largest files missing in the replica test's busier run, same image); and a graph budget above which it skips its cross-file analysis (`XGREP_MAX_GRAPH_FILES`, `XGREP_MAX_CROSSFILE_NODES`, 0 forces it), which the worker records from its stderr (`tool warning:` notes, runs.csv `tool_warning`) |
 | `qelens` | qelens | Python, JS | failed the bar (5 of 14 in Python); crate `cbom` 0.1.2, CycloneDX on stdout; many findings on import lines; category names such as `HASHING (see usage)` stay `undefined` |
 | `cryptarium` | cryptarium | Java, Python, Go, JS, C | failed the bar (0 everywhere: no locations); v0.3.0, `-deterministic`; its CBOM has no locations (only its JSON format has them; benchmarked as shipped) |
 | `qscan` | qscan | Java, Python, Go, JS, C, Rust, C#, Ruby, PHP | failed the bar (5 of 14 in every language); quantakrypto npm 0.12.0, offline (no `--triage`/`--audit`); quantum-vulnerable crypto only; exit 1 = findings |

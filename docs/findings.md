@@ -547,3 +547,29 @@ and pqcheck.
 - **The same five runs fail in both:** CBOMkit's Python parse errors on OctoBot (a UTF-8 byte-order mark) and bandit
   (example files that do not parse), CipherRadar's timeouts on pycryptodome and pyca/cryptography, SCANOSS's on
   casdoor. CBOMkit's error now names the backend's message (`cbomkit_scan_error: Parse error at line 1 column 8`).
+
+## Rerun 2026-10-30 (corpus-pilot-medium, largest first, no replicas)
+
+The whole spec again (`--overwrite-old`), one container per tool, every tool's queue largest repositories first.
+The workers ran the images of the replica test's second run (the same image ids, built from an earlier commit than
+the runner), so CPU time was not recorded; the board now shows each container's build and `make experiment` refuses
+mixed builds.
+
+- **Largest first works:** every tool took its repositories in exact size order (Spearman 1.00 against the source
+  bytes; 0.05 in corpus order). The wall time stayed at 1:45: CipherRadar, not CBOMkit, ends the batch, 104 min of
+  work of which 59 are its two timeouts (pycryptodome, pyca/cryptography); CBOMkit's lane is 80 min, SCANOSS's 57.
+- **No memory limit came near:** 0 limit hits (CipherRadar on bunkerweb peaked at 8.1 of 12 GiB, CBOMkit at 12.9 of
+  20 GiB on DefectDojo); the VM's peak in use was 24.9 of 121.5 GiB.
+- **The results repeat:** 599 of 600 runs have the same status and counts as the replica test's second run on the
+  same images. The exception is xgrep on FairEmail: 11 places in its two largest files (`FragmentCompose.java`,
+  `MessageHelper.java`) that the busier earlier run did not report. xgrep 0.101.0 limits every regex match to 500 ms
+  of wall time and reads a match that runs out as "no match" (its own rule comments; the variable
+  `XGREP_REGEX_MATCH_TIMEOUT`), so on a loaded host it can miss findings in large files. It also skips its
+  cross-file analysis on a codebase above its graph budget (`XGREP_MAX_GRAPH_FILES`, `XGREP_MAX_CROSSFILE_NODES`),
+  which it says on stderr; the worker now records that in the run (`tool_warning` in `runs.csv`). Both stay at their
+  shipped defaults.
+- **Traceability read symlinks as their text.** 26 records of CipherRadar and CryptoScan (Aegis, certbot,
+  gocryptfs) named lines past the end of their file. In Aegis those files are symlinks (its `androidTest` vectors
+  link to the `test` ones), which the tools follow in the checkout and the snapshot reader returned as the link's
+  one line; certbot and gocryptfs are to be checked with the next report on the VM. Files are now read as a checkout
+  shows them. The other 7 `unread` records are CipherRadar's places inside JAR files (`x.jar!/...`).

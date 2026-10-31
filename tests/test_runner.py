@@ -165,6 +165,24 @@ def test_run_stores_results_resumes_retries_and_exports(world, tmp_path):
     assert _run(["export", "--dest", str(dest)]).exit_code != 0  # neither a name nor --all
 
 
+def test_run_refuses_workers_or_a_git_server_built_from_another_commit(world, monkeypatch):
+    spec, results = world["spec"], world["results"]
+    monkeypatch.setenv("EXPERIMENT_IMAGE_IDS", "bf-cbom/gitserver:1.0.3=sha256:" + "2" * 64)
+    # what make reads from the running containers: t1 runs an older build, t2 and the git server the runner's
+    monkeypatch.setenv("EXPERIMENT_BUILDS", "gitserver=abc123def456,worker-t1=4c87e3273be6,worker-t2=abc123def456,"
+                       "worker-other=4c87e3273be6")  # fmt: skip
+    refused = CliRunner().invoke(experiment_cmd.experiment_app, ["run", str(spec), "--idle-timeout", "5"])
+    assert refused.exit_code == 2 and "worker-t1 4c87e3273be6" in refused.output and "make up-prod" in refused.output
+    assert "worker-other" not in refused.output  # not in the spec
+    assert not (results / "e-fake").exists() and not world["workers"].seen  # nothing pinned, nothing enqueued
+    monkeypatch.setenv("EXPERIMENT_BUILDS", "gitserver=abc123def456,worker-t1=abc123def456,worker-t2=abc123def456")
+    ran = _run(["run", str(spec), "--idle-timeout", "20"])
+    assert ran.exit_code == 0, ran.output
+    (session,) = ex.load_run_log(results / "e-fake")
+    assert session["builds"]["worker-t1"] == ["abc123def456"] and session["gitserver_image"] == "sha256:" + "2" * 64
+    assert experiment_cmd.foreign_builds(["t1"], {"worker-t1": ["x"]}, None) == {}  # no runner commit: no check
+
+
 def test_overwrite_old_leaves_nothing_of_the_former_run(world):
     spec, results, r = world["spec"], world["results"], world["redis"]
     assert _run(["run", str(spec), "--idle-timeout", "20"]).exit_code == 0
@@ -187,7 +205,8 @@ def test_overwrite_old_leaves_nothing_of_the_former_run(world):
     out = _run(["run", str(spec), "--idle-timeout", "20", "--overwrite-old"])
     assert out.exit_code == 0, out.output
     assert "removed the experiment folder (5 stored run(s)) and cancelled 1 pending job(s)" in out.output
-    assert "0 run(s) already on disk, 0 still pending from an earlier run, 4 to enqueue" in out.output
+    expected = "0 run(s) already on disk, 0 unsupported (not run), 0 still pending from an earlier run, 4 to enqueue"
+    assert expected in out.output
     assert len(world["workers"].seen) == 8  # every run of the spec again
     assert len(list(exp.glob("*/*/*/run1.meta.json"))) == 4 and not stale_tool.exists() and not norm.exists()
     assert not (exp / ex.ANALYSIS_DIR / "_SUMMARY.md").exists() and not (exp / "lock.json").exists()

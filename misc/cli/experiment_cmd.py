@@ -31,6 +31,7 @@ from common.experiment import (
     ExperimentError,
     PlannedJob,
     Snapshot,
+    count_unsupported,
     expected_jobs,
     experiment_dir,
     is_experiment,
@@ -55,6 +56,7 @@ from coordinator.redis_io import (
     now_iso,
 )
 from misc.cli import overview, progress
+from misc.cli.stack_cmd import parse_builds
 
 experiment_app = typer.Typer(
     help="Batch experiments (reproducible, resumable; results stay on the results-data volume)",
@@ -128,17 +130,34 @@ def _descriptor(job: PlannedJob) -> str:
     )
 
 
-def worker_image_ids(tools: list[str], env: str | None = None) -> dict[str, str]:
-    """{tool: image id} of the worker images on the host, from EXPERIMENT_IMAGE_IDS as the Makefile's `experiment`
-    target sets it (`repo:tag=id,...` from `docker images --no-trunc`): the images that run the jobs, by content."""
+def image_ids(env: str | None = None) -> dict[str, str]:
+    """{image name: image id} of the BF-CBOM images on the host, from EXPERIMENT_IMAGE_IDS as the Makefile's
+    `experiment` target sets it (`repo:tag=id,...` from `docker images --no-trunc`): `worker-cdxgen`, `gitserver`."""
     raw = os.getenv("EXPERIMENT_IMAGE_IDS", "") if env is None else env
-    by_tool = {}
+    out = {}
     for item in raw.split(","):
         ref, _, image_id = item.strip().partition("=")
         name = ref.rsplit(":", 1)[0].rsplit("/", 1)[-1]  # bf-cbom/worker-cdxgen:1.0.3 -> worker-cdxgen
-        if name.startswith("worker-") and image_id:
-            by_tool[name[len("worker-") :]] = image_id
-    return {t: by_tool[t] for t in tools if t in by_tool}
+        if name and image_id:
+            out[name] = image_id
+    return out
+
+
+def worker_image_ids(tools: list[str], env: str | None = None) -> dict[str, str]:
+    """{tool: image id} of the worker images on the host (`image_ids`): the images tagged for the jobs, by content.
+    The containers may still run older ones; `EXPERIMENT_BUILDS` says what they were built from."""
+    ids = image_ids(env)
+    return {t: ids[f"worker-{t}"] for t in tools if f"worker-{t}" in ids}
+
+
+def foreign_builds(tools: list[str], builds: dict[str, list[str]], own: str | None) -> dict[str, list[str]]:
+    """{service: commits} of the spec's workers and the git server whose running containers were built from another
+    commit than the runner (`own`; EXPERIMENT_BUILDS as `misc/cli/stack_cmd.py:parse_builds` reads it); none
+    without the runner's commit. A worker without a running container has nothing to compare."""
+    if not own:
+        return {}
+    services = ["gitserver", *(f"worker-{t}" for t in tools)]
+    return {s: c for s in services if (c := [x for x in builds.get(s, []) if x != own])}
 
 
 def _err(msg: str, code: int = 1):
@@ -163,6 +182,9 @@ class _Session:
             "runner_image": os.getenv("BF_CBOM_IMAGE"),
             "runner_commit": os.getenv("BF_CBOM_COMMIT"),  # `-dirty` = built from uncommitted changes
             "images": worker_image_ids(list(tools)),
+            "gitserver_image": image_ids().get("gitserver"),
+            # what the running containers were built from (make reads each container's BF_CBOM_COMMIT)
+            "builds": parse_builds(os.getenv("EXPERIMENT_BUILDS", "")),
             "host": {
                 "cpus": os.cpu_count(),
                 "ram_total_mb": self.host.total_mb,
@@ -350,6 +372,11 @@ def run(
         fg=typer.colors.BLUE,
         err=True,
     )
+    own = os.getenv("BF_CBOM_COMMIT")
+    if foreign := foreign_builds(spec.tools, parse_builds(os.getenv("EXPERIMENT_BUILDS", "")), own):
+        listed = ", ".join(f"{s} {', '.join(c)}" for s, c in sorted(foreign.items()))
+        _err(f"built from another commit than the runner ({own}): {listed}. Their runs would measure other code; "
+             "rebuild with `make up-prod` (`make board` shows each container's build)", 2)  # fmt: skip
     r = _redis(redis_host, redis_port)
     overwritten = 0
     if overwrite_old:  # nothing of a former run is left: the spec alone decides what runs (its pinned commits)
@@ -406,8 +433,11 @@ def run(
     )
     covered = {(j.snapshot.full_name, j.snapshot.variant, j.tool, j.run_index) for j in pending.values()}
     jobs = [j for j in jobs if (j.snapshot.full_name, j.snapshot.variant, j.tool, j.run_index) not in covered]
+    # `skipped` holds the unsupported markers too (the board counts them as done); the text counts them apart
+    unsupported_runs = count_unsupported(spec, snapshots, exp_dir)
     typer.secho(
-        f"{skipped} run(s) already on disk, {len(pending)} still pending from an earlier run, {len(jobs)} to enqueue",
+        f"{skipped - unsupported_runs} run(s) already on disk, {unsupported_runs} unsupported (not run), "
+        f"{len(pending)} still pending from an earlier run, {len(jobs)} to enqueue",
         fg=typer.colors.BLUE,
         err=True,
     )
@@ -473,7 +503,8 @@ def run(
         replicas=replicas,
         jobs_enqueued=len(jobs),
         jobs_pending_before=len(pending),
-        jobs_on_disk_before=skipped,
+        jobs_on_disk_before=skipped - unsupported_runs,
+        unsupported=unsupported_runs,
         runs_overwritten=overwritten,
     )
     outcome = "interrupted"

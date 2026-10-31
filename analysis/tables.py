@@ -40,7 +40,8 @@ ASSET_COMPONENT_TYPES = ("cryptographic-asset", "crypto-asset")  # the latter: I
 RUNS_COLUMNS = [
     "repo", "snapshot", "commit", "variant", "variant_commit", "language", "expect_crypto", "repo_files",
     "repo_source_files", "repo_bytes", "repo_source_bytes", "tool", "run", "tailored",
-    "status", "duration_sec", "size_bytes", "error", "workaround", "peak_memory_mb", "memory_limit_mb", "limit_hits",
+    "status", "duration_sec", "size_bytes", "error", "workaround", "tool_warning", "peak_memory_mb", "memory_limit_mb",
+    "limit_hits",
     "oom_kills", "memory_failure", "cpu_seconds", "cpu_cores", "enqueued_at", "started_at", "finished_at", "queue_sec",
     "received_at",
     "tool_version", "image_ref", "bfcbom_commit", "bom_format", "spec_version",
@@ -122,17 +123,25 @@ def _timeout_text(meta: dict) -> str | None:
 
 
 WORKAROUND_PREFIX = "workaround: "
+TOOL_WARNING_PREFIX = "tool warning: "
+
+
+def _note_lines(notes: str | None, prefix: str) -> str | None:
+    found = [ln.strip()[len(prefix) :] for ln in (notes or "").splitlines() if ln.strip().startswith(prefix)]
+    return LIST_SEP.join(found) or None
 
 
 def workaround_line(notes: str | None) -> str | None:
     """The recorded setup workarounds of a run (worker note lines starting with `workaround: `: CipherRadar's
     `.cradarignore` of the files it crashes on), joined; None when there is none."""
-    found = [
-        ln.strip()[len(WORKAROUND_PREFIX) :]
-        for ln in (notes or "").splitlines()
-        if ln.strip().startswith(WORKAROUND_PREFIX)
-    ]
-    return LIST_SEP.join(found) or None
+    return _note_lines(notes, WORKAROUND_PREFIX)
+
+
+def tool_warning_line(notes: str | None) -> str | None:
+    """What the tool said about limiting its own analysis (worker note lines starting with `tool warning: `, the
+    tool's words from its output: xgrep skipping its cross-file analysis on a large repository), joined; None when
+    it said nothing."""
+    return _note_lines(notes, TOOL_WARNING_PREFIX)
 
 
 def error_line(text: str | None) -> str | None:
@@ -315,6 +324,7 @@ def run_rows(
             "size_bytes": meta.get("size_bytes"),
             "error": error_line(meta.get("error")) or _timeout_text(meta),
             "workaround": workaround_line(meta.get("notes")),
+            "tool_warning": tool_warning_line(meta.get("notes")),
             "peak_memory_mb": meta.get("peak_memory_mb"),
             "memory_limit_mb": meta.get("memory_limit_mb"),
             "limit_hits": meta.get("limit_hits"),
@@ -345,12 +355,13 @@ def run_rows(
 
 # ----- run time (RQ1: what a scan costs) -----
 
-TOOLS_COLUMNS = ["tool", "vendor", "url", "shipped", "approach"]
+TOOLS_COLUMNS = ["tool", "vendor", "url", "shipped", "approach", "version", "version_url"]
 
 
 def tool_rows(tools: Iterable[str], registry: dict[str, dict] | None = None) -> list[dict]:
-    """tools.csv: who publishes each tool that ran, its project page, how it is shipped and what it is built on, as
-    `common/tools.yaml` records them (empty for a tool outside the registry)."""
+    """tools.csv: who publishes each tool that ran, its project page, how it is shipped, what it is built on and the
+    version the paper reports with the page that shows it, as `common/tools.yaml` records them (empty for a tool
+    outside the registry)."""
     registry = registry if registry is not None else load_tools()
     return [{"tool": t, **{c: (registry.get(t) or {}).get(c) or "" for c in TOOLS_COLUMNS[1:]}}
             for t in sorted(set(tools))]  # fmt: skip

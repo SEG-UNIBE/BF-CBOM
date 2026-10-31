@@ -426,6 +426,7 @@ def test_mark_unsupported_records_meta_and_plan_skips_it(tmp_path: Path):
     ids = iter(f"id{i}" for i in range(10))
     jobs, skipped = ex.plan_jobs(spec, [snap], exp_dir, new_id=lambda: next(ids))
     assert {j.tool for j in jobs} == {"cryptoscan"} and skipped == 2
+    assert ex.count_unsupported(spec, [snap], exp_dir) == 2  # all of `skipped` are markers, none a stored run
     jobs, _ = ex.plan_jobs(spec, [snap], exp_dir, new_id=lambda: next(ids), retry_failed=True)
     assert {j.tool for j in jobs} == {"cryptoscan"}  # unsupported runs are never retried
     assert [(m["worker"], m["status"]) for m, _ in ex.iter_results(exp_dir)] == [("cbomkit", "unsupported")] * 2

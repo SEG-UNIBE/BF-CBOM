@@ -892,6 +892,18 @@ def mark_unsupported(
     return recorded
 
 
+def count_unsupported(spec: ExperimentSpec, snapshots: list[Snapshot], exp_dir: Path) -> int:
+    """The spec's runs stored as `unsupported` (markers, not runs; `plan_jobs` skips them, so its count holds them)."""
+    return sum(
+        1
+        for snap in snapshots
+        for tool in spec.tools
+        for i in range(1, spec.repetitions + 1)
+        if (meta := result_paths(exp_dir, snap.full_name, snap.commit, snap.variant, tool, i)[1]).exists()
+        and _stored_status(meta) == UNSUPPORTED
+    )
+
+
 def write_result(exp_dir: Path, job: PlannedJob, result: JobResult) -> Path:
     """Persist one JobResult: the CBOM body as run<i>.json (pretty, sorted) and everything else as meta."""
     cbom_path, meta_path = job.paths(exp_dir)

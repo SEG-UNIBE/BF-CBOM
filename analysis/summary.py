@@ -33,8 +33,8 @@ LEVEL_ORDER = ("L0", "L1", "L2", "L3", "L4")
 RESOLUTION_SHOWN = ["mapped", "ambiguous", "api", "non-crypto", "undefined"]  # analysis/normalize/engine.RESOLUTIONS
 COVERAGE_SHOWN = ["key_size", "mode", "padding", "curve", "digest"]
 FILES = {
-    "tools.csv": "one row per tool that ran: vendor, project page, how it is shipped, what it is built on "
-    "(common/tools.yaml)",
+    "tools.csv": "one row per tool that ran: vendor, project page, how it is shipped, what it is built on, the "
+    "version the paper reports and the page that shows it (common/tools.yaml)",
     "runs.csv": "one row per stored run, all repetitions (status, duration, tool version, raw CBOM counts by asset "
     "type, LLM tokens and costs)",
     "runtime.csv": "per tool and language (and all): repositories, median seconds with a bootstrap CI over "
@@ -318,12 +318,14 @@ def _experiment(
             for e in sessions
             if (e_start := _ts(e.get("started_at"))) and (e_end := _ts(e.get("finished_at") or e.get("updated_at")))
         )
+        n = len(sessions)
+        statuses = Counter(str(e.get("status") or "?") for e in sessions)
+        outcomes = ", ".join(f"{c} {k}" for k, c in sorted(statuses.items()))
         if s_start and s_end:
             table.append(["ran", f"{_when(min(s_start))} to {_when(max(s_end))}"])
-            n = len(sessions)
-            table.append(["duration", f"{_span(active)} in {n} runner session{'' if n == 1 else 's'}"])
-        outcomes = Counter(str(e.get("status") or "?") for e in sessions)
-        table.append(["sessions", ", ".join(f"{n} {k}" for k, n in sorted(outcomes.items()))])
+            table.append(["duration", f"{_span(active)} in {n} runner session{'' if n == 1 else 's'} ({outcomes})"])
+        else:
+            table.append(["sessions", f"{n} ({outcomes})"])
     tool_time = sum(_float(r.get("duration_sec")) or 0 for r in ran)
     if ran:
         table.append(["tool time", f"{_span(tool_time)} summed over {_n(len(ran))} runs (excluding unsupported)"])
@@ -361,11 +363,7 @@ def _experiment(
     images = sorted({r["image_ref"].rsplit(":", 1)[-1] for r in ran if r.get("image_ref") and ":" in r["image_ref"]})
     if images:
         table.append(["BF-CBOM version", f"{', '.join(images)} (image tag; the commit below identifies the build)"])
-    commits = sorted({r["bfcbom_commit"] for r in ran if r.get("bfcbom_commit")})
-    commits += sorted({e["runner_commit"] for e in sessions if e.get("runner_commit")} - set(commits))
-    if commits:
-        dirty = " (`-dirty`: built from uncommitted changes)" if any(c.endswith("-dirty") for c in commits) else ""
-        table.append(["BF-CBOM commit", ", ".join(f"`{c}`" for c in commits) + dirty])
+    table += _commits(ran, sessions)
     image_ids = {t: i for e in sessions for t, i in (e.get("images") or {}).items()}
     if image_ids:
         table.append(["worker image ids", f"{len(image_ids)} recorded in `_run-log.json` (by content, per session)"])
@@ -381,6 +379,27 @@ def _experiment(
                           "lists inside a cell"])  # fmt: skip
     lines += md_table(["", ""], table, "ll")
     return lines + [""]
+
+
+def _commits(ran: list[dict], sessions: list[dict]) -> list[list]:
+    """The overview's commit row: the commits the workers' images were built from (runs.csv `bfcbom_commit`, with
+    their runs) and the runner's (the run log); ⛔ when the workers ran another build than the runner, whose code
+    then differs from the code that planned and stored the runs."""
+    workers = Counter(r["bfcbom_commit"] for r in ran if r.get("bfcbom_commit"))
+    runner = sorted({e["runner_commit"] for e in sessions if e.get("runner_commit")})
+    if not workers and not runner:
+        return []
+    every = set(workers) | set(runner)
+    dirty = " (`-dirty`: built from uncommitted changes)" if any(c.endswith("-dirty") for c in every) else ""
+    if len(every) == 1 and workers and runner:
+        (c,) = every
+        return [["BF-CBOM commit", f"`{c}` (workers and runner){dirty}"]]
+    parts = ["workers " + ", ".join(f"`{c}` ({_n(n)} runs)" for c, n in sorted(workers.items()))] if workers else []
+    parts += ["runner " + ", ".join(f"`{c}`" for c in runner)] if runner else []
+    text = "; ".join(parts)
+    if runner and set(workers) - set(runner):
+        text += " ⛔ the workers ran another build than the runner (`make up-prod` rebuilds them; the board shows each)"
+    return [["BF-CBOM commit", text + dirty]]
 
 
 PAPER_LANGUAGES = ("Java", "Python", "Go")  # the folded table's column order (CLAUDE.md "Paper languages")
@@ -459,12 +478,15 @@ def _repositories(spec: dict) -> list[str]:
 
 
 def _size_strata(repos: list[dict]) -> list[str]:
-    """Repositories counted by language (rows) and size stratum (columns): the corpus builder's default size bins
-    (`CorpusParams.size_bins_kb`, `make corpus --size-bins`, GitHub's repository size in KB), plus a column below the
-    first bin's floor for the micro projects and other small repositories. The size is GitHub's `size_kb` when every
-    repository has one (a corpus-built spec), else the checkout at the pinned commit (`checkout_bytes`), and the
-    text says which."""
-    bins = CorpusParams().size_bins_kb
+    """Repositories counted by language (rows) and stratum (columns): first the corpus builder's default size bins
+    (`CorpusParams.size_bins_kb`, `make corpus --size-bins`, GitHub's repository size in KB), then, after an empty
+    column, its default star bins (`CorpusParams.star_bins`, `--star-bins`), each with a column below the first bin's
+    floor for the micro projects and other small repositories and an `unknown` column where a value is missing. The
+    size is GitHub's `size_kb` when every repository has one (a corpus-built spec), else the checkout at the pinned
+    commit (`checkout_bytes`), and the text says which; the stars are the corpus builder's `stars`, absent from a
+    hand-picked corpus."""
+    params = CorpusParams()
+    size_bins, star_bins = params.size_bins_kb, params.star_bins
     github = all(r.get("size_kb") for r in repos)
 
     def kb(r: dict) -> float | None:
@@ -473,42 +495,70 @@ def _size_strata(repos: list[dict]) -> list[str]:
         b = r.get("checkout_bytes")
         return _int(b) / 1024 if b not in (None, "") else None
 
-    sized = [(r, kb(r)) for r in repos]
-    if not any(v is not None for _, v in sized):
+    def stars(r: dict) -> float | None:
+        return float(_int(r["stars"])) if r.get("stars") not in (None, "") else None
+
+    sized = [(r, kb(r), stars(r)) for r in repos]
+    if not any(z is not None or s is not None for _, z, s in sized):
         return []
-    cols: list[tuple[int, int | None]] = [(0, bins[0][0]), *bins]
-    unknown = any(v is None for _, v in sized)
 
     def mb(v: int) -> str:
         return f"{v / 1000:g}"
 
-    labels = [f"< {mb(bins[0][0])} MB"] + [f"{mb(lo)}-{mb(hi)} MB" if hi else f">= {mb(lo)} MB" for lo, hi in bins]
-    labels += ["unknown"] * unknown
+    def strata(bins: list, label, values: list[float | None]) -> tuple[list[str], list[int]]:
+        """The labels of the floor column, the bins and `unknown` (when a value is missing), and each value's
+        column."""
+        cols = [(0, bins[0][0]), *bins]
+        labels = [label(None, bins[0][0])] + [label(lo, hi) for lo, hi in bins]
+        unknown = any(v is None for v in values)
+        labels += [label(None, None)] * unknown
+        index = [len(cols) if v is None else next(i for i, (lo, hi) in enumerate(cols)
+                                                  if v >= lo and (hi is None or v < hi)) for v in values]  # fmt: skip
+        return labels, index
 
-    def column(v: float | None) -> int:
-        if v is None:
-            return len(cols)
-        return next(i for i, (lo, hi) in enumerate(cols) if v >= lo and (hi is None or v < hi))
+    def size_label(lo, hi) -> str:
+        if lo is None:
+            return f"< {mb(hi)} MB" if hi else "size unknown"
+        return f"{mb(lo)}-{mb(hi)} MB" if hi else f">= {mb(lo)} MB"
 
+    def star_label(lo, hi) -> str:
+        if lo is None:
+            return f"< {hi} stars" if hi else "stars unknown"
+        return f"{lo}-{hi} stars" if hi else f">= {lo} stars"
+
+    size_labels, size_col = strata(size_bins, size_label, [z for _, z, _ in sized])
+    star_labels, star_col = strata(star_bins, star_label, [s for _, _, s in sized])
     order = {lang: i for i, lang in enumerate(PAPER_LANGUAGES)}
-    counts: dict[str, Counter] = defaultdict(Counter)
-    for r, v in sized:
-        counts[r.get("language") or "unknown"][column(v)] += 1
-    langs = sorted(counts, key=lambda lang: (order.get(lang, len(order)), lang))
-    table = [[lang, *[counts[lang][i] for i in range(len(labels))], sum(counts[lang].values())] for lang in langs]
-    table.append(["all", *[sum(counts[lang][i] for lang in langs) for i in range(len(labels))], len(repos)])
+    by_size: dict[str, Counter] = defaultdict(Counter)
+    by_stars: dict[str, Counter] = defaultdict(Counter)
+    for (r, _, _), z, s in zip(sized, size_col, star_col, strict=True):
+        lang = r.get("language") or "unknown"
+        by_size[lang][z] += 1
+        by_stars[lang][s] += 1
+    langs = sorted(by_size, key=lambda lang: (order.get(lang, len(order)), lang))
+
+    def row(name: str, size: Counter, star: Counter, n: int) -> list:
+        return [name, *[size[i] for i in range(len(size_labels))], n, "", *[star[i] for i in range(len(star_labels))]]
+
+    table = [row(lang, by_size[lang], by_stars[lang], sum(by_size[lang].values())) for lang in langs]
+    table.append(row("all", sum(by_size.values(), Counter()), sum(by_stars.values(), Counter()), len(repos)))
     measure = (
         "GitHub's repository size as the corpus builder recorded it (`size_kb`)"
         if github
         else "the checkout at the pinned commit (`checkout_bytes`: the blobs, no history, so smaller than GitHub's "
         "size of the same repository)"
     )
+    header = ["language", *size_labels, "all", "", *star_labels]
+    size_arg, star_arg = (",".join(bin_text(lo, hi) for lo, hi in bins) for bins in (size_bins, star_bins))
     return [
-        "Repositories by language and size. The columns are the corpus builder's default size strata (`make corpus`, "
-        f"`--size-bins {','.join(bin_text(lo, hi) for lo, hi in bins)}` in KB), with a column below the sampling "
-        f"floor for the micro projects and other small repositories; the size is {measure}.",
+        "Repositories by language, size and stars. The size columns are the corpus builder's default size strata "
+        f"(`make corpus`, `--size-bins {size_arg}` in KB), the star columns after the empty one its default star "
+        f"strata (`--star-bins {star_arg}`), each with a column below the sampling floor for the micro projects and "
+        "other small repositories. The "
+        f"size is {measure}; the stars are those the corpus builder recorded when it drew the repository (`stars`), "
+        "unknown for a hand-picked corpus.",
         "",
-        *md_table(["language", *labels, "all"], table, "l" + "r" * (len(labels) + 1)),
+        *md_table(header, table, "l" + "r" * (len(header) - 1)),
         "",
     ]
 
@@ -539,31 +589,57 @@ def _tools(rows: list[dict]) -> list[str]:
     return lines + md_table(["tool", "vendor", "shipped as", "engine and approach"], table, "llll") + [""]
 
 
-def _versions(rows: list[dict]) -> list[str]:
-    """What ran, per tool, as every stored run recorded it (`tool_version`, `image_ref`, `bfcbom_commit` in runs.csv):
-    one row per tool, several values joined when the runs disagree, which the text then flags."""
+def ran_version(recorded: str, version: str) -> bool:
+    """Whether a run's `tool_version` string names `version`: a release as a whole token (`2.3.0`, `v2.3.0`; not
+    `12.3.0`), a commit's first characters as the start of the recorded SHA."""
+    if re.fullmatch(r"[0-9a-f]{7,40}", version):
+        return re.search(rf"(?<![0-9a-f]){version}", recorded) is not None
+    return re.search(rf"(?<![\w.])v?{re.escape(version)}(?![\w.])", recorded) is not None
+
+
+def _versions(rows: list[dict], tools: list[dict] | None = None) -> list[str]:
+    """What ran, per tool: the version the paper reports, linked to the page that shows it (tools.csv `version`,
+    `version_url`, from common/tools.yaml), then as every stored run recorded it (`tool_version`, `image_ref`,
+    `bfcbom_commit` in runs.csv): one row per tool, several values joined when the runs disagree, which the text then
+    flags, as it flags runs that did not record the version tools.yaml names."""
     ran = [r for r in rows if r.get("tool_version") or r.get("image_ref")]
     if not ran:
         return []
     by_tool: dict[str, list[dict]] = defaultdict(list)
     for r in ran:
         by_tool[r["tool"]].append(r)
-    table, mixed = [], []
+    named = {t["tool"]: t for t in tools or [] if t.get("version")}
+    table, mixed, other = [], [], []
     for tool in sorted(by_tool):
         rs = by_tool[tool]
         cells = [sorted({r.get(k) or "" for r in rs} - {""}) for k in ("tool_version", "image_ref", "bfcbom_commit")]
         if any(len(c) > 1 for c in cells):
             mixed.append(tool)
-        table.append([tool, *["; ".join(f"`{v}`" for v in c) for c in cells], len(rs)])
+        entry = named.get(tool) or {}
+        version = entry.get("version") or ""
+        if version and not all(ran_version(r.get("tool_version") or "", version) for r in rs):
+            other.append(tool)
+        shown = f"[{version}]({entry['version_url']})" if version and entry.get("version_url") else version
+        table.append([tool, shown, *["; ".join(f"`{v}`" for v in c) for c in cells], len(rs)])
     lines = [
         "### Tool versions",
         "",
-        "What ran, as every stored run recorded it: the tool's version string (for a tool built from source, its "
-        "pinned commit), the worker image and the BF-CBOM commit the image was built from (`-dirty`: built with "
-        "uncommitted changes). " + VERSION_RULE,
+        "What ran. `version`: the version the paper reports, the tool's own (its release, or the first characters of "
+        "the pinned commit when it has none; engines in `docs/tool-versions.md`), linked to the page that shows it "
+        "(`common/tools.yaml`, tools.csv). Then as every stored run recorded it: `recorded as` the worker's version "
+        "string, the worker image, the BF-CBOM commit the image was built from (`-dirty`: built with uncommitted "
+        "changes) and the runs that recorded these values (all variants and repetitions; unsupported runs record "
+        "none). " + VERSION_RULE,
         "",
     ]
-    lines += md_table(["tool", "tool version", "image", "BF-CBOM commit", "runs"], table, "llllr")
+    lines += md_table(["tool", "version", "recorded as", "image", "BF-CBOM commit", "runs"], table, "lllllr")
+    if named.keys() & by_tool.keys():
+        lines += [""]
+        if other:
+            lines.append(f"⛔ Runs of {', '.join(f'`{t}`' for t in other)} did not record the `version` "
+                         "`common/tools.yaml` names: an older image, or a pin moved without tools.yaml.")  # fmt: skip
+        else:
+            lines.append("✅ Every run recorded the `version` `common/tools.yaml` names.")
     if mixed:
         lines += [
             "",
@@ -586,7 +662,7 @@ def _runs(rows: list[dict]) -> list[str]:
         c = Counter(r["status"] for r in rs)
         other = sum(n for s, n in c.items() if s not in statuses)
         durations = [d for r in rs if r["status"] == "ok" and (d := _float(r.get("duration_sec"))) is not None]
-        median = f"{statistics.median(durations):.0f}" if durations else ""
+        median = _num(statistics.median(durations)) if durations else ""
         versions = sorted({r["tool_version"] for r in rs if r.get("tool_version")})
         if not versions and c.get("unsupported") == len(rs):
             versions = ["not run: no repo in its languages"]
@@ -633,6 +709,18 @@ def _runs(rows: list[dict]) -> list[str]:
             lines.append(f"- `{r['tool']}` on `{r['repo']}` ({r['variant']}, run {r['run']}): {r['workaround']}")
         if len(workarounds) > 25:
             lines.append(f"- ... and {_n(len(workarounds) - 25)} more (runs.csv)")
+    warned = sorted((r for r in rows if r.get("tool_warning")), key=_by_tool)
+    if warned:
+        lines += [
+            "",
+            f"Runs on which the tool said it limited its own analysis ({_n(len(warned))}; its words from its output, "
+            "`tool_warning` in runs.csv; the run is ok, but the tool analysed less than it can):",
+            "",
+        ]
+        for r in warned[:25]:
+            lines.append(f"- `{r['tool']}` on `{r['repo']}` ({r['variant']}, run {r['run']}): {r['tool_warning']}")
+        if len(warned) > 25:
+            lines.append(f"- ... and {_n(len(warned) - 25)} more (runs.csv)")
     return lines + [""]
 
 
@@ -787,15 +875,16 @@ def _reported(rows: list[dict], run: int) -> list[str]:
     table = []
     for tool in tools:
         rs = [r for r in ok if r["tool"] == tool]
+        failed = sum(r["tool"] == tool and r["status"] not in ("ok", "unsupported") for r in rows)
         if not rs:
-            table.append([tool, 0] + [""] * (len(ASSET_KINDS) + 6))
+            table.append([tool, 0, "", failed] + [""] * (len(ASSET_KINDS) + 5))
             continue
         crypto = sum(_int(r["crypto_assets"]) for r in rs)
         with_file = sum(_int(r.get("located_file_assets")) for r in rs)
         with_line = sum(_int(r.get("located_line_assets")) for r in rs)
         counts = [_int(r["crypto_assets"]) for r in rs]
         table.append(
-            [tool, len(rs), sum(c == 0 for c in counts), sum(_int(r.get("components")) for r in rs), crypto]
+            [tool, len(rs), sum(c == 0 for c in counts), failed, sum(_int(r.get("components")) for r in rs), crypto]
             + [sum(_int(r.get(col)) for r in rs) for col, _ in ASSET_KINDS]
             + [f"{statistics.median(counts):.0f}"]
             + [_pct(with_file / crypto) if crypto else "", _pct(with_line / crypto) if crypto else ""]
@@ -805,7 +894,9 @@ def _reported(rows: list[dict], run: int) -> list[str]:
         "What each tool wrote into its CBOMs, counted as written, before any normalisation (original variants, ok "
         "runs only). One row per tool, summed over the repositories.",
         "",
-        "- `repos ok`: repositories with an ok run; `empty`: the ok runs among them with 0 `crypto assets`.",
+        "- `repos ok`: repositories with an ok run; `empty`: the ok runs among them with 0 `crypto assets`; "
+        '`failed`: repositories whose run failed (error, timeout, oom; listed under "Runs without a result"), so '
+        "`repos ok` + `failed` are the repositories the tool ran on.",
         "- `components`: every component of the CBOMs, the dependency listings of inventory tools included.",
         "- `crypto assets`: the components typed as cryptographic assets, then split by the CycloneDX `assetType` "
         "they declare (`algorithm`, `certificate`, `protocol`, `related-crypto-material`; `other`: a value outside "
@@ -819,8 +910,8 @@ def _reported(rows: list[dict], run: int) -> list[str]:
         "",
     ]
     lines += UNITS_EXAMPLE
-    header = ["tool", "repos ok", "empty", "components", "crypto assets", *[h for _, h in ASSET_KINDS], "median",
-              "file", "file+line"]  # fmt: skip
+    header = ["tool", "repos ok", "empty", "failed", "components", "crypto assets", *[h for _, h in ASSET_KINDS],
+              "median", "file", "file+line"]  # fmt: skip
     lines += md_table(header, table, "l" + "r" * (len(header) - 1))
 
     repos = sorted({(r["repo"], (r.get("language") or ""), r.get("expect_crypto") or "") for r in rows},
@@ -1140,8 +1231,10 @@ def _decoys(rows: list[dict], langs: list[str], tools: list[str]) -> list[str]:
 LOCATION_KINDS = ("line", "window", "import", "file", "none", "unread")  # analysis/schema.py:location_kind
 
 
-def _places(units: list[dict]) -> list[str]:
-    """What kind of place each tool's algorithm records name (units-run<i>.csv `loc_<kind>`)."""
+def _places(units: list[dict], *, snapshots: bool = True) -> list[str]:
+    """What kind of place each tool's algorithm records name (units-run<i>.csv `loc_<kind>`); `snapshots`: whether the
+    report could read the snapshot files (traceability-run<i>.csv has `file_exists`), which says why records are
+    `unread`."""
     if not units or f"loc_{LOCATION_KINDS[0]}" not in units[0]:
         return []
     table = []
@@ -1159,7 +1252,9 @@ def _places(units: list[dict]) -> list[str]:
         "- `window`: a span of several lines (CryptobomForge's 5-9-line windows).",
         "- `import`: one line holding an import statement.",
         "- `file`: a file without a line; `none`: no location.",
-        "- `unread`: one line in a file that could not be read here, so its kind is unknown.",
+        "- `unread`: one line the snapshot does not show, so its kind is unknown: the file is not in the snapshot (a "
+        "place inside an archive, `x.jar!/...`), the line lies past the file's end, or the snapshot files are not "
+        "available here.",
         "- `outside code`: of the records with a file, the share whose file is not a source file of the repository's "
         "language (`.java`, `.kt`, `.scala`, `.groovy`; `.py`; `.go`): fixtures, test vectors, configuration, "
         "documentation, other languages. The agreement analyses count these places like any other, since the tools "
@@ -1169,7 +1264,12 @@ def _places(units: list[dict]) -> list[str]:
         "A tool that points at the import or a window places the same use elsewhere than a tool that points at the "
         "call; the call-site matching window (±2 lines) absorbs only part of that.",
     ]
-    if unread:
+    if unread and snapshots:
+        lines[-1] += (
+            f" {_n(unread)} records are `unread`: their file is not in the snapshot or has no such line "
+            "(`file_exists`, `line_in_range` in traceability-run<i>.csv)."
+        )
+    elif unread:
         lines[-1] += (
             f" {_n(unread)} records are `unread`: the snapshot files are on the VM's git mirror (`analysis report` "
             "there, or `--fetch` for a copied export)."
@@ -1421,7 +1521,7 @@ def _rq1(
                   "records per asset (median / max)", "several places", "assets per item", "no location"]  # fmt: skip
         lines += md_table(header, table, "ll" + "r" * (len(header) - 2)) + [""]
         lines += _units_per_repo(unit_repos)
-        lines += _places(units)
+        lines += _places(units, snapshots=any(r.get("file_exists") not in (None, "") for r in trace))
     if cov:
         by_tool: dict[str, dict[str, dict]] = defaultdict(dict)
         for r in cov:
@@ -1468,24 +1568,25 @@ def _runtime(rows: list[dict]) -> list[str]:
         lo, hi = _float(r.get(low)), _float(r.get(high))
         return "" if lo is None or hi is None else f"{fmt(lo)} - {fmt(hi)}"
 
-    memory = any(r.get("peak_max_mb") not in (None, "") for r in every)
-    cpu = any(r.get("cpu_sec_median") not in (None, "") for r in every)
-    header = ["tool", "repos", "median s", "95 % CI s", "p90 s", "timeouts"]
-    if memory:
-        header += ["median GiB", "95 % CI GiB", "p90 GiB", "max GiB"]
-    if cpu:
-        header += ["median CPU s", "95 % CI CPU s", "median cores", "max cores"]
+    # the memory and CPU columns always show; `–` where runs.csv has no value (an image from before the measurement)
+    header = ["tool", "repos", "median s", "95 % CI s", "p90 s", "timeouts", "median GiB", "95 % CI GiB", "p90 GiB",
+              "max GiB", "median CPU s", "95 % CI CPU s", "median cores", "max cores"]  # fmt: skip
     table = []
     for r in every:
         row = [r["tool"], r["repos"], _num(r["median_sec"]), ci(r, "median_ci_low", "median_ci_high", _num),
                _num(r.get("p90_sec")), r.get("timeouts") or "0"]  # fmt: skip
-        if memory:
+        if r.get("peak_max_mb") not in (None, ""):
             row += [_gib(r.get("peak_median_mb")), ci(r, "peak_ci_low", "peak_ci_high", _gib),
                     _gib(r.get("peak_p90_mb")), _gib(r.get("peak_max_mb"))]  # fmt: skip
-        if cpu:
+        else:
+            row += ["–"] * 4
+        if r.get("cpu_sec_median") not in (None, ""):
             row += [_num(r.get("cpu_sec_median")), ci(r, "cpu_sec_ci_low", "cpu_sec_ci_high", _num),
                     _cores(r.get("cores_median")), _cores(r.get("cores_max"))]  # fmt: skip
+        else:
+            row += ["–"] * 4
         table.append(row)
+    unmeasured = [r["tool"] for r in every if r.get("cpu_sec_median") in (None, "")]
     lines = [
         "### Run time, memory and CPU",
         "",
@@ -1503,33 +1604,39 @@ def _runtime(rows: list[dict]) -> list[str]:
         '- `timeouts`: its runs that hit the time limit, as in "Runs". They have no time of their own, so the '
         "median, its CI and p90 leave them out and understate the tool on the repositories it timed out on; `hours` "
         "counts them at about the limit.",
+        "- `–`: not recorded in `runs.csv` (`peak_memory_mb`, `cpu_seconds`): the worker's image predates that "
+        "measurement."
+        + (
+            f" CPU is not recorded for {'any tool' if len(unmeasured) == len(every) else ', '.join(unmeasured)} "
+            "here: rebuild the workers (`make up-prod`) and rerun to have it."
+            if unmeasured
+            else ""
+        ),
+        "",
+        "<details>",
+        "<summary>How to read memory and CPU</summary>",
+        "",
     ]
-    if memory or cpu:
-        lines += ["", "<details>", "<summary>How to read memory and CPU</summary>", ""]
-    if memory:
-        lines += [
-            "- **Memory (GiB)**: the peak working set of the tool's container during one job (memory in use less "
-            "inactive file cache, as `docker stats` shows it, sampled every second): the tool, any server it starts "
-            "(CBOMkit's backend and Postgres) and our worker. `runs.csv` stores it per run in MiB (`peak_memory_mb`); "
-            "a repository's peak is the largest of its runs.",
-            "- Read it as the RAM to provision: the median for a typical repository, p90 for nine in ten, max for the "
-            "worst seen. A spike shorter than a second can be missed, and a Java tool fills the heap it is given, so "
-            "its peak partly reflects the heap configured for it (`JAVA_OPTS` in `docker-compose.yml`). Whether a "
-            'limit came near is checked in "Memory limits" (preamble).',
-        ]
-    if cpu:
-        lines += [
-            "- **Wall time and CPU**: `s` is wall time, the job's duration on the clock. `CPU s` is the container's "
-            "CPU time during the job, summed over its cores (one core busy for one second is 1 s): the work done, "
-            "waiting not counted. `cores` is CPU s over wall time, the mean number of cores busy: 600 s at 2.5 cores "
-            "is 1'500 CPU s.",
-            "- Cores about 1: effectively single-threaded, so more cores do not help but replicas do; clearly above "
-            "1: it parallelises; below 1: it waits (the clone, a server's start, I/O).",
-            "- No CPU limits are set and the tools run side by side, so cores are what a tool got on a shared host, "
-            "not what it could use alone; CPU seconds, the work done, are less affected and compare tools better.",
-        ]
-    if memory or cpu:
-        lines += ["", "</details>"]
+    lines += [
+        "- **Memory (GiB)**: the peak working set of the tool's container during one job (memory in use less "
+        "inactive file cache, as `docker stats` shows it, sampled every second): the tool, any server it starts "
+        "(CBOMkit's backend and Postgres) and our worker. `runs.csv` stores it per run in MiB (`peak_memory_mb`); "
+        "a repository's peak is the largest of its runs.",
+        "- Read it as the RAM to provision: the median for a typical repository, p90 for nine in ten, max for the "
+        "worst seen. A spike shorter than a second can be missed, and a Java tool fills the heap it is given, so "
+        "its peak partly reflects the heap configured for it (`JAVA_OPTS` in `docker-compose.yml`). Whether a "
+        'limit came near is checked in "Memory limits" (preamble).',
+        "- **Wall time and CPU**: `s` is wall time, the job's duration on the clock. `CPU s` is the container's "
+        "CPU time during the job, summed over its cores (one core busy for one second is 1 s): the work done, "
+        "waiting not counted. `cores` is CPU s over wall time, the mean number of cores busy: 600 s at 2.5 cores "
+        "is 1'500 CPU s.",
+        "- Cores about 1: effectively single-threaded, so more cores do not help but replicas do; clearly above "
+        "1: it parallelises; below 1: it waits (the clone, a server's start, I/O).",
+        "- No CPU limits are set and the tools run side by side, so cores are what a tool got on a shared host, "
+        "not what it could use alone; CPU seconds, the work done, are less affected and compare tools better.",
+        "",
+        "</details>",
+    ]
     lines += [""] + md_table(header, table) + [""]
 
     more = [
@@ -2862,6 +2969,9 @@ def _files(info: dict, run: int) -> list[str]:
     listed: set[str] = set()
     for title, patterns in groups:
         names = [p.format(i=run) for p in patterns if p.format(i=run) in counts]
+        if title == STABILITY and not any(_int(counts[n]) for n in names):  # one repetition: nothing to compare
+            listed |= set(names)
+            continue
         if not names:
             continue
         lines += [f"**{title}**", ""]
@@ -2906,7 +3016,7 @@ def render(analysis_dir: Path, *, run: int = 1) -> str:
     lines += _runs(rows("runs.csv"))
     lines += _memory_limits(rows("runs.csv"), rows("runtime.csv"))
     lines += _tools(rows("tools.csv"))
-    lines += _versions(rows("runs.csv"))
+    lines += _versions(rows("runs.csv"), rows("tools.csv"))
     lines += _repositories(spec or {})
     lines += _negatives(rows("runs.csv"), run)
     lines += _micro(rows("micro-run{i}.csv"), rows("micro-items-run{i}.csv"))

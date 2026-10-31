@@ -67,6 +67,7 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - BF_CBOM_IMAGE=bf-cbom/runner:${VERSION:-latest}  # recorded per session (_run-log.json runner_image)
       - RESULTS_DIR=/data/results
       - GIT_MIRROR_DIR=/srv/git
       - GITSERVER_URL=http://gitserver

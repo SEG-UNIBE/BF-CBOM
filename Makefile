@@ -125,23 +125,30 @@ down: export COMPOSE_PROFILES := all
 down:
 	docker compose down --remove-orphans
 
+# `service=commit,...` for every running container of the stack, read from the container's own BF_CBOM_COMMIT (the
+# commit its image was built from), so it says what really runs: the board shows it, `make experiment` refuses to
+# run on workers or a git server built from another commit than the runner
+CONTAINER_BUILDS = $$(ids=$$(docker ps -q --filter label=com.docker.compose.project=bf-cbom); test -z "$$ids" || docker inspect --format '{{index .Config.Labels "com.docker.compose.service"}} {{join .Config.Env " "}}' $$ids | sed -n 's/^\([^ ]*\) .*BF_CBOM_COMMIT=\([^ ]*\).*/\1=\2/p' | sort -u | paste -sd, -)
+
 # The live board of the running stack (misc/cli/stack_cmd.py): experiments, workers, queues; ARGS="--once" prints one
 # snapshot. BOARD_SERVICES: every container of the stack, running or exited, so a crashed worker shows as down.
-# BOARD_CHECKOUT: this checkout's commit, what `make up-prod` builds; BOARD_BUILDS: `service=commit` per running
-# container, read from the container's own BF_CBOM_COMMIT, so the board shows what really runs.
+# BOARD_CHECKOUT: this checkout's commit, what `make up-prod` builds; BOARD_BUILDS: CONTAINER_BUILDS.
 board: ensure-env
 	docker compose run --rm -e TERM -e COLORTERM -e BF_CBOM_VERSION=$(VERSION) -e BOARD_CHECKOUT=$(BF_CBOM_COMMIT) \
 		-e BOARD_SERVICES="$$(docker ps -a --filter label=com.docker.compose.project=bf-cbom --format '{{.Label "com.docker.compose.service"}}' | sort -u | paste -sd, -)" \
-		-e BOARD_BUILDS="$$(ids=$$(docker ps -q --filter label=com.docker.compose.project=bf-cbom); test -z "$$ids" || docker inspect --format '{{index .Config.Labels "com.docker.compose.service"}} {{join .Config.Env " "}}' $$ids | sed -n 's/^\([^ ]*\) .*BF_CBOM_COMMIT=\([^ ]*\).*/\1=\2/p' | sort -u | paste -sd, -)" \
+		-e BOARD_BUILDS="$(CONTAINER_BUILDS)" \
 		runner stack board $(ARGS)
 
 # ---- Batch experiments (results stay in the results-data volume; see experiments/README.md) ----
 # make experiment EXP=experiments/mutation-smoke.yaml
-# EXPERIMENT_IMAGE_IDS: the worker images on this host by content (recorded per session in <exp>/_run-log.json).
+# EXPERIMENT_IMAGE_IDS: the images on this host by content (recorded per session in <exp>/_run-log.json);
+# EXPERIMENT_BUILDS: CONTAINER_BUILDS, recorded too, and the run refuses to start when a worker of the spec or
+# the git server was built from another commit than the runner (`make up-prod` rebuilds them).
 # Replicas come from `make up-prod REPLICAS=...`; the run counts them and the memory budget counts each one.
 experiment: ensure-env
 	EXPERIMENT_IMAGE_IDS="$$(docker images --no-trunc --format '{{.Repository}}:{{.Tag}}={{.ID}}' --filter 'reference=bf-cbom/*:$(VERSION)' | paste -sd ',' -)" \
-	docker compose run --rm -e EXPERIMENT_IMAGE_IDS runner experiment run /app/$(EXP) $(ARGS)
+	EXPERIMENT_BUILDS="$(CONTAINER_BUILDS)" \
+	docker compose run --rm -e EXPERIMENT_IMAGE_IDS -e EXPERIMENT_BUILDS runner experiment run /app/$(EXP) $(ARGS)
 
 # make experiment-attach  -> join the terminal of the `experiment run` of this stack from another shell: its progress
 # board and the result lines from now on. Detach with Ctrl-P Ctrl-Q; Ctrl-C interrupts the run as in its own terminal.

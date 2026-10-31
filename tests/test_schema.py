@@ -162,6 +162,30 @@ def test_snapshot_store_reads_the_mirror_or_fetches_into_the_cache(tmp_path):
     assert "README.md" in fetched.files("o/r", sha)
 
 
+def test_snapshot_store_reads_files_as_a_checkout_shows_them(tmp_path):
+    src = tmp_path / "src"
+    (src / "test").mkdir(parents=True)
+    (src / "test" / "vectors.py").write_text("a = 1\nb = hashlib.sha256()\n")
+    (src / "test" / "linked.py").symlink_to("vectors.py")  # a link inside the tree: the tools scan its target
+    (src / "outside.py").symlink_to("../../etc/hosts")  # leaves the tree
+    (src / "dangling.py").symlink_to("nope.py")
+    (src / "with space.py").write_text("x\n")
+    (src / "feed.py").write_bytes(b"one\x0cstill one\r\ntwo\n")  # a form feed is no line break for git or the tools
+    _git("init", "-q", "-b", "main", cwd=src)
+    _git("-c", "user.name=t", "-c", "user.email=t@t", "add", ".", cwd=src)
+    _git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "init", cwd=src)
+    sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=src, capture_output=True, text=True).stdout.strip()
+    (tmp_path / "m" / "o").mkdir(parents=True)
+    _git("clone", "-q", "--bare", str(src), str(tmp_path / "m" / "o" / "r.git"), cwd=tmp_path)
+    store = SnapshotStore(mirror_dir=tmp_path / "m", cache_dir=tmp_path / "cache")
+    assert store.lines("o/r", sha, "test/linked.py") == ["a = 1", "b = hashlib.sha256()"]
+    assert store.lines("o/r", sha, "outside.py") is None and store.lines("o/r", sha, "dangling.py") is None
+    assert store.lines("o/r", sha, "missing file.py") is None and store.lines("o/r", sha, "with space.py") == ["x"]
+    assert store.lines("o/r", sha, "feed.py") == ["one\x0cstill one", "two"]
+    assert len(store._batches) == 1  # the replies above left the one cat-file process in step
+    store.close()
+
+
 def test_snapshot_store_publishes_a_fixture_from_its_directory(tmp_path):
     from common.experiment import RepoSpec, fixture_dir, publish_fixture
 

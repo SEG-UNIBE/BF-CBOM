@@ -51,8 +51,11 @@ as 13,996).
   (`location_kind` in `records-run<i>.csv`, per tool in `units-run<i>.csv` and the summary's "Places per tool";
   `schema.py:location_kind`): `line` a single line of code that is not an import (in practice the call or the
   declaration), `window` a span of several lines, `import` a single line holding an import statement, `file` a file
-  without a line, `none` no location, `unread` a single line whose file the snapshot files available to the
-  analysis do not hold (the VM's mirror has them; `--fetch` for a copied export). A tool that reports the import
+  without a line, `none` no location, `unread` a single line the snapshot does not show: its file is not in the
+  snapshot (a place inside an archive, `x.jar!/...`), the line lies past the file's end, or the snapshot files are not
+  available to the analysis (the VM's mirror has them; `--fetch` for a copied export). Files are read as a checkout
+  shows them, which is what the tools scanned: a symlink inside the repository as its target, the lines numbered at
+  `\n` only, as git and the tools number them (`analysis/snapshots.py`). A tool that reports the import
   line places the same use elsewhere than one that reports the call, which the ±2-line window absorbs only in part.
   Next to the kind, every located record says whether its file is a source file of the repository's language
   (`in_scope`; per tool `outside_code` in `units-run<i>.csv`, the share "outside code" of "Places per tool"): on

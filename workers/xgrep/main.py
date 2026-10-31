@@ -63,6 +63,24 @@ def run_xgrep(repo_path: Path, out_file: Path, home: Path, trace: Trace, *, time
         raise RuntimeError(f"xgrep_no_output rc={proc.returncode}: {tail[:800]}")
     if proc.returncode != 0:
         trace.add(f"xgrep exit code {proc.returncode} (output written): {tail[:300]}")
+    for line in limits(proc.stderr or ""):
+        trace.add(f"tool warning: {line}")
+
+
+# xgrep's own words when it analyses less than it can: above its graph budget it skips the cross-file analysis
+# ("codebase is very large; skipping cross-file analysis ... reporting intra-file findings only (set
+# XGREP_MAX_GRAPH_FILES=0 to force it, or raise the budget)"; 0.101.0). Defaults stay as shipped; the run records it.
+LIMIT_LINE = re.compile(r"cross-file|intra-file|budget", re.IGNORECASE)
+
+
+def limits(stderr: str, *, most: int = 5) -> list[str]:
+    """The distinct lines of xgrep's stderr that say it limited its analysis, in order, at most `most`."""
+    out: list[str] = []
+    for line in stderr.splitlines():
+        line = line.strip()[:300]
+        if line and LIMIT_LINE.search(line) and line not in out:
+            out.append(line)
+    return out[:most]
 
 
 def _produce(instr: JobInstruction, trace: Trace) -> tuple[str, float]:
