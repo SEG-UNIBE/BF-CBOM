@@ -26,7 +26,10 @@ example, voter groups, how family and group are argued),
   `base`. Every runner command has a target: `experiment`, `experiment-list` / `-status` / `-collect` / `-cancel` /
   `-delete` / `-export` / `-export-all` (every complete experiment), `analysis`, `corpus`, `corpus-prune`, `board`; `experiment-attach` joins the terminal of
   the running `experiment run` from another shell (detach with Ctrl-P Ctrl-Q, never Ctrl-C). After every pull run `make up-prod` first: the runner
-  bakes the CLI and the workers bake `common/`.
+  bakes the CLI and the workers bake `common/`; the board's header names the checkout's commit, its `build` column
+  each worker's (read from the containers, `BOARD_BUILDS`), and a red line every container built from another commit.
+  Until 2026-10-31 `SERIAL_BUILD=0` built no prod worker (its `--profile` flags replaced `COMPOSE_PROFILES`).
+  corpus-pilot-medium of 2026-10-30 ran the workers of 4c87e32 under the runner of 5efece4 (no CPU recorded).
 - **Nothing lands on the host unless exported.** Results and git mirrors stay in the named volumes `results-data` and
   `git-data`; `make experiment-export` exports experiments and `make corpus-export` exports sampled corpus YAMLs,
   both into `experiments/results/` on the host. These CLI commands run inside the `runner` container.

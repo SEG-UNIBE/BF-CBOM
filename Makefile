@@ -66,14 +66,18 @@ release:
 # Helper to build all services (of the active profile) with the correct base tag.
 # SERIAL_BUILD=1 (default) builds one service at a time to avoid OOM in the Docker VM;
 # use SERIAL_BUILD=0 for a faster parallel build on machines with plenty of RAM.
+# The profiles built: the target's (COMPOSE_PROFILES, e.g. prod) plus the runner's (tools) and the LLM workers'. Given
+# as --profile flags they would replace COMPOSE_PROFILES: the parallel build then left out every prod worker, and
+# `make up-prod` recreated the workers from their old images (fixed 2026-10-31; `make board` shows each build).
 SERIAL_BUILD ?= 1
+BUILD_PROFILES = $(if $(COMPOSE_PROFILES),$(COMPOSE_PROFILES)$(comma))tools,llm
 build-all: ensure-env build-base
 ifeq ($(SERIAL_BUILD),1)
-	@for svc in $$(docker compose config --services) runner worker-chatgpt worker-claude; do \
-		echo ">>> building $$svc"; docker compose --profile tools --profile llm build $(NO_CACHE_FLAG) $$svc || exit 1; \
+	@for svc in $$(COMPOSE_PROFILES=$(BUILD_PROFILES) docker compose config --services); do \
+		echo ">>> building $$svc"; COMPOSE_PROFILES=$(BUILD_PROFILES) docker compose build $(NO_CACHE_FLAG) $$svc || exit 1; \
 	done
 else
-	docker compose --profile tools --profile llm build $(NO_CACHE_FLAG)
+	COMPOSE_PROFILES=$(BUILD_PROFILES) docker compose build $(NO_CACHE_FLAG)
 endif
 
 # Dev: only the explicitly listed dev workers
@@ -123,9 +127,12 @@ down:
 
 # The live board of the running stack (misc/cli/stack_cmd.py): experiments, workers, queues; ARGS="--once" prints one
 # snapshot. BOARD_SERVICES: every container of the stack, running or exited, so a crashed worker shows as down.
+# BOARD_CHECKOUT: this checkout's commit, what `make up-prod` builds; BOARD_BUILDS: `service=commit` per running
+# container, read from the container's own BF_CBOM_COMMIT, so the board shows what really runs.
 board: ensure-env
-	docker compose run --rm -e TERM -e COLORTERM -e BF_CBOM_VERSION=$(VERSION) \
+	docker compose run --rm -e TERM -e COLORTERM -e BF_CBOM_VERSION=$(VERSION) -e BOARD_CHECKOUT=$(BF_CBOM_COMMIT) \
 		-e BOARD_SERVICES="$$(docker ps -a --filter label=com.docker.compose.project=bf-cbom --format '{{.Label "com.docker.compose.service"}}' | sort -u | paste -sd, -)" \
+		-e BOARD_BUILDS="$$(ids=$$(docker ps -q --filter label=com.docker.compose.project=bf-cbom); test -z "$$ids" || docker inspect --format '{{index .Config.Labels "com.docker.compose.service"}} {{join .Config.Env " "}}' $$ids | sed -n 's/^\([^ ]*\) .*BF_CBOM_COMMIT=\([^ ]*\).*/\1=\2/p' | sort -u | paste -sd, -)" \
 		runner stack board $(ARGS)
 
 # ---- Batch experiments (results stay in the results-data volume; see experiments/README.md) ----

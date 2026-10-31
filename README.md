@@ -438,7 +438,7 @@ Ruff is configured in `pyproject.toml` for both formatting and linting; unit tes
 
 Every worker refreshes a short-lived `worker:<name>:alive` key in Redis (see `common/worker.py`): its state, the job it runs and since when, the container's memory and limit, and its last result.
 The Setup page pre-selects only live workers, the Execution page warns before starting jobs for a worker that is down, and the Analysis page disables matching when the `pyqun` matcher is not running.
-The live board (`make board`, `misc/cli/stack_cmd.py`) shows the same keys for every worker, together with the queues (`jobs:<worker>`) and the running experiments.
+The live board (`make board`, `misc/cli/stack_cmd.py`) shows the same keys for every worker, together with the queues (`jobs:<worker>`), the running experiments and the commit each container was built from, in red when it is not the checkout's.
 
 ### Job States
 

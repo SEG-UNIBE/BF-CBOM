@@ -266,9 +266,13 @@ budget.
 stored, so after `ARGS=--no-wait` it moves once `make experiment-collect` runs):
 - every running experiment with a bar, results stored out of expected, its wave, the failures so far and the time
   left (the same forecast as the runner's board; `≥` while a tool has no result yet);
-- every worker: busy, idle or down, the job it runs (repo, run, experiment) and for how long, the container's RAM
-  against its limit, the jobs queued for it and its last result;
-- whether Redis, the git server and the UI answer, and the host's RAM.
+- every worker: busy, idle or down, the commit its containers were built from (`build`, red when it is not the
+  checkout's), the job it runs (repo, run, experiment) and for how long, the container's RAM against its limit, the
+  jobs queued for it and its last result;
+- the checkout's commit, whether Redis, the git server and the UI answer, and the host's RAM; when a running container
+  (a worker, the git server, the runner) was built from another commit than the checkout, a red line names it, and
+  `make up-prod` rebuilds it. Check it after every pull: the stored runs carry each image's commit
+  (`bfcbom_commit`), and an experiment run on old images measures the old code.
 
 `Ctrl+C` closes the board; the experiment and the stack go on (`make up-prod` opens the board by itself once the
 stack is up; `make logs` shows the containers' raw logs, `make down` stops the stack).

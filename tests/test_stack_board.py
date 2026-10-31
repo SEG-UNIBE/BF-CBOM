@@ -130,6 +130,27 @@ def test_board_without_experiments_or_redis():
     assert "Redis does not answer" in _text(down) and "redis ✗" in _text(down)
 
 
+def test_board_shows_each_workers_build_and_names_those_off_the_checkout(monkeypatch):
+    r = _world()
+    monkeypatch.setenv("BOARD_CHECKOUT", "5efece4e1870")
+    monkeypatch.setenv("BF_CBOM_COMMIT", "5efece4e1870")  # the runner image the board itself runs in
+    monkeypatch.setenv("BOARD_BUILDS", "gitserver=5efece4e1870,worker-cbomkit=4c87e3273be6,"
+                       "worker-cbomkit=5efece4e1870,worker-cdxgen=5efece4e1870,misc-pyqun=4c87e3273be6")  # fmt: skip
+    snap = stack_cmd.snapshot(r, SERVICES, probe=lambda url: True, now=NOW)
+    assert snap.builds["worker-cbomkit"] == ["4c87e3273be6", "5efece4e1870"]  # two replicas, two builds
+    assert snap.builds["runner"] == ["5efece4e1870"]
+    text = _text(snap)
+    assert "checkout 5efece4e1870" in text
+    assert "✗ built from another commit than the checkout: 4c87e3273be6: misc-pyqun, worker-cbomkit" in text
+    rows = {line.split()[0]: " ".join(line.split()) for line in text.splitlines() if line.split()}
+    assert "busy 4c87e32 5efece4 apache/kafka" in rows["cbomkit"] and "idle 5efece4 0.3/16.0" in rows["cdxgen"]
+    monkeypatch.setenv("BOARD_BUILDS", "gitserver=5efece4e1870,worker-cbomkit=5efece4e1870")  # all rebuilt
+    assert "another commit" not in _text(stack_cmd.snapshot(r, SERVICES, probe=lambda url: True, now=NOW))
+    monkeypatch.delenv("BOARD_CHECKOUT")  # started without make: the builds show, nothing is compared
+    monkeypatch.setenv("BOARD_BUILDS", "worker-cbomkit=4c87e3273be6")
+    assert "another commit" not in _text(stack_cmd.snapshot(r, SERVICES, probe=lambda url: True, now=NOW))
+
+
 def test_board_once_prints_one_snapshot(monkeypatch):
     r = _world()
     monkeypatch.setattr(stack_cmd.redis, "Redis", lambda **_: r)

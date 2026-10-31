@@ -1,8 +1,9 @@
 """The stack board (`bf-cbom stack board`, `make board`; `make up-prod` opens it once the stack is up): a live view of
 what the running stack does, read from Redis only, so it runs in the runner like every command.
 
-- Header: the logo on a wide terminal, the version and commit, the UI's address, whether Redis, the git server and
-  the UI answer, the host's RAM and CPUs.
+- Header: the logo on a wide terminal, the version and the checkout's commit (what `make up-prod` builds), the UI's
+  address, whether Redis, the git server and the UI answer, the host's RAM and CPUs; below it a red line naming every
+  running container built from another commit (`BOARD_BUILDS`, read by make from each container's `BF_CBOM_COMMIT`).
 - Experiments: every running or stalled experiment (the status hash `exp:<name>` the runner writes) and every
   running UI inspection, with a bar, the results stored, the wave, the failures and the remaining time
   (`progress.forecast`: per tool its jobs left times its mean duration so far, from what the runner records in
@@ -10,7 +11,8 @@ what the running stack does, read from Redis only, so it runs in the runner like
   run moves: it depends on the totals and the number of waves, never on the current values.
 - Workers: one row per worker service (`BOARD_SERVICES`, every container of the stack as make lists it, so a crashed
   worker shows as down), from its heartbeats (`common/worker.py:publish_heartbeat`, one per container): busy / idle /
-  down (with replicas, `busy 2/3`: containers busy of those alive), the longest-running job and its origin
+  down (with replicas, `busy 2/3`: containers busy of those alive), the commit its containers were built from (red
+  when it is not the checkout's), the longest-running job and its origin
   (`jobs:routing`), for how long, the containers' RAM against their limits (summed over replicas), the jobs queued
   and the last result.
 
@@ -65,7 +67,9 @@ LONGEST_CLOCK = clock(99 * 3600)  # the widest clock the experiments table makes
 class Snapshot:
     now: float
     version: str = ""
-    commit: str = ""
+    commit: str = ""  # the runner image's: the board runs in it
+    checkout: str = ""  # the host checkout's, what `make up-prod` builds (BOARD_CHECKOUT)
+    builds: dict[str, list[str]] = field(default_factory=dict)  # service -> the commits its containers were built from
     redis_ok: bool = False
     git_ok: bool = False
     ui_ok: bool = False
@@ -82,6 +86,33 @@ def worker_names(services: list[str]) -> list[str]:
         if s.startswith(("worker-", "misc-")):
             out.append(HEARTBEAT_NAMES.get(s, s.split("-", 1)[1]))
     return out
+
+
+def parse_builds(raw: str) -> dict[str, list[str]]:
+    """BOARD_BUILDS (`service=commit,...`, one entry per running container's build) as {service: [commits]}; replicas
+    built from different commits give a service several."""
+    out: dict[str, list[str]] = {}
+    for item in raw.split(","):
+        service, _, commit = item.strip().partition("=")
+        if service and commit and commit not in out.setdefault(service, []):
+            out[service].append(commit)
+    return {s: sorted(c) for s, c in out.items()}
+
+
+def stale(snap: Snapshot) -> dict[str, list[str]]:
+    """{commit: [services]} of the running containers built from another commit than the checkout; none when the
+    checkout is unknown (a board started without make)."""
+    out: dict[str, list[str]] = {}
+    for service, commits in sorted(snap.builds.items()):
+        for c in commits:
+            if snap.checkout and c != snap.checkout:
+                out.setdefault(c, []).append(service)
+    return out
+
+
+def _short(commit: str) -> str:
+    """A commit as the build column shows it: 7 characters, `-dirty` kept."""
+    return commit[:7] + ("-dirty" if commit.endswith("-dirty") else "")
 
 
 def _probe(url: str) -> bool:
@@ -105,6 +136,10 @@ def snapshot(r: redis.Redis, services: list[str], *, probe=None, now: float | No
     snap = Snapshot(now=time.time() if now is None else now)
     snap.version = os.getenv("BF_CBOM_VERSION", "")
     snap.commit = os.getenv("BF_CBOM_COMMIT", "")
+    snap.checkout = os.getenv("BOARD_CHECKOUT", "")
+    snap.builds = parse_builds(os.getenv("BOARD_BUILDS", ""))
+    if snap.commit and snap.commit not in snap.builds.get("runner", []):  # `make experiment` runs this image too
+        snap.builds["runner"] = sorted([*snap.builds.get("runner", []), snap.commit])
     snap.host, snap.cpus = host_memory(), os.cpu_count()
     snap.git_ok, snap.ui_ok = probe(f"{GITSERVER_URL}/healthz"), probe(f"{COORDINATOR_URL}/_stcore/health")
     try:
@@ -114,6 +149,7 @@ def snapshot(r: redis.Redis, services: list[str], *, probe=None, now: float | No
     snap.redis_ok = True
 
     names = worker_names(services)
+    service_of = {worker_names([s])[0]: s for s in services if worker_names([s])}
     seen = {k.split(":")[1] for k in r.scan_iter(match="worker:*:alive", count=500)}
     names += sorted(seen - set(names))
     pipe = r.pipeline()
@@ -147,6 +183,7 @@ def snapshot(r: redis.Redis, services: list[str], *, probe=None, now: float | No
                 "origin": lead["origin"] if lead else None,
                 "queued": queued[n],
                 "replicas": replicas,
+                "builds": snap.builds.get(service_of.get(n, f"worker-{n}"), []),
             }
         )
 
@@ -255,9 +292,11 @@ def _check(ok: bool) -> Text:
 
 
 def header(snap: Snapshot, width: int, height: int) -> list:
-    """The logo when it fits beside everything else (15 lines, 130 columns), then one line of facts."""
+    """The logo when it fits beside everything else (15 lines, 130 columns), then one line of facts and, when a
+    running container was built from another commit than the checkout, a red line naming them by commit."""
     out = []
-    rows = 10 + len(snap.workers) + max(len(snap.experiments), 1)
+    old = stale(snap)
+    rows = 10 + bool(old) + len(snap.workers) + max(len(snap.experiments), 1)
     if width >= LOGO_WIDTH and height >= rows + LOGO_HEIGHT:
         try:
             out.append(Text.from_ansi(LOGO.read_text(encoding="utf-8").rstrip("\n")))
@@ -267,7 +306,9 @@ def header(snap: Snapshot, width: int, height: int) -> list:
     line.append("BF-CBOM", style="bold bright_red")
     if snap.version:
         line.append(f" {snap.version}", style="bold")
-    if snap.commit:
+    if snap.checkout:
+        line.append(f" · checkout {snap.checkout}", style="dim")
+    elif snap.commit:
         line.append(f" · {snap.commit[:12]}", style="dim")
     line.append(" · UI ")
     line.append(UI_ADDRESS, style="underline cyan")
@@ -280,7 +321,17 @@ def header(snap: Snapshot, width: int, height: int) -> list:
         line.append(f" · {snap.cpus} CPUs")
     line.append(" · " + time.strftime("%H:%M:%S UTC", time.gmtime(snap.now)), style="dim")
     out.append(line)
+    if old:
+        warn = Text("✗ ", style="bold red")
+        warn.append(f"built from another commit than the checkout: {_old_builds(old)}", style="red")
+        warn.append(" · make up-prod rebuilds them", style="dim")
+        out.append(warn)
     return out
+
+
+def _old_builds(old: dict[str, list[str]]) -> str:
+    """`4c87e3273be6: gitserver, worker-cbomkit; ...`, the commits in order."""
+    return "; ".join(f"{c}: {', '.join(services)}" for c, services in sorted(old.items()))
 
 
 def experiments_table(snap: Snapshot, width: int = 160) -> Table | Text:
@@ -322,6 +373,9 @@ def workers_table(snap: Snapshot) -> Table:
     t = Table(box=None, pad_edge=False, show_header=True, header_style="bold", expand=True)
     t.add_column("worker", no_wrap=True, min_width=max((len(w["name"]) for w in snap.workers), default=6))
     t.add_column("state", no_wrap=True, min_width=5)
+    builds = any(w.get("builds") for w in snap.workers)  # make reads them from the containers (BOARD_BUILDS)
+    if builds:
+        t.add_column("build", no_wrap=True, min_width=7)
     t.add_column("job", no_wrap=True, overflow="ellipsis", ratio=3, min_width=8)
     t.add_column("for", justify="right", no_wrap=True, min_width=8)
     t.add_column("RAM GiB", justify="right", no_wrap=True, min_width=9)
@@ -368,7 +422,11 @@ def workers_table(snap: Snapshot) -> Table:
             last.append(f" {lr.get('repo') or ''}", style="dim")
         queued = Text(count(w["queued"] or 0), style="" if w["queued"] else "dim")
         started = (info or {}).get("started") or 0  # busy: the longest-running job first
-        rows.append(((order, started, w["name"]), [w["name"], state, job, since, ram, queued, last]))
+        commits = w.get("builds") or []
+        build = Text(" ".join(_short(c) for c in commits))
+        build.stylize("bold red" if snap.checkout and any(c != snap.checkout for c in commits) else "dim")
+        cells = [w["name"], state, *([build] if builds else []), job, since, ram, queued, last]
+        rows.append(((order, started, w["name"]), cells))
     for _, cells in sorted(rows, key=lambda x: x[0]):
         t.add_row(*cells)
     return t
