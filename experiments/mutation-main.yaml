@@ -9,8 +9,7 @@
 #   make corpus-export    # then commit experiments/results/mutation-main.yaml as experiments/corpus/mutation-main.yaml
 #   git pull && make up-prod
 #   make experiment EXP=experiments/mutation-main.yaml EXPERIMENT_MEMORY_BUDGET_GB=0 ARGS="--overwrite-old"
-#   make analysis ARGS="report mutation-main --baseline stability-pilot"
-#   make experiment-export NAME=mutation-main ARGS="--no-report"
+#   make experiment-export NAME=mutation-main    # runs the report first; once, no noise floor (decided 2026-10-31)
 name: mutation-main
 description: 'the mutation run of RQ5: the 30 smallest clean repositories per language of corpus-main, every snippet in every style and as many decoys'
 tools: [cbomkit, cdxgen, cipherradar, ciphersift, cryptobomforge, cryptoscan, pqcheck, qdarpan, scanoss, securin-xbom, xgrep]  # the bar exam of 2026-10-31 (bar-micro export) passed 12, of which cbomkit-jar is left out (CBOMkit runs as its server distribution, decided 2026-10-30); cryptarium, qelens, qscan failed the bar

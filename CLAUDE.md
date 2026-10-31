@@ -380,9 +380,14 @@ use a CBOM reports, counted as records and items, never as assets, which depend 
   rate and F1 over tool x language cells, Kendall tau between the two rankings. The tools ranked by F1 is one line
   here. **Changes off the edit** are measured and reported as a finding, never folded into F1: the share of judged
   mutants where the tool reports something new outside the inserted lines, with the medians of extra units and sites,
-  read against the tool's run-to-run noise floor from a stability experiment (`report --baseline <exp>`). Caveats the
+  as measured, without a noise floor (every experiment of the paper runs once, below; `report --baseline <exp>` can
+  still join one from a stability experiment for our own reading). Caveats the
   paper states: planted calls are plain uses of the catalog's APIs, precision covers the decoy kinds, insertions are
   easier than real findings (`mutation-`, `mutation-scores`, `bridge-run<i>.csv`).
+
+**The paper reports three experiments, each run once** (decided 2026-10-30 and 2026-10-31): bar-micro, corpus-main and
+mutation-main. Run-to-run stability stays out of the paper entirely: no stability experiment, no repeated originals in
+mutation-main, no noise floor. stability-pilot remains a spec for our own determinism check.
 
 Decisions: a spec is a spec (repos, tools, repetitions, mutation) and its name says the kind (`bar-`, `stability-`,
 `corpus-`, `mutation-`; no numbers that could read as an RQ), the analysis is one code path on any spec, ground truth
@@ -451,8 +456,8 @@ where they declare support, but no analysis, figure or tuning effort goes into t
   e0-llm-smoke, e0-phase2-smoke and the runs under the old spec names e0-micro, e0-stability, e1-pilot-corpus,
   e1-icpc-corpus, e1-pilot-60, e4-mutation-smoke; corpus-main sampled (2026-10-30: pc6, 162 repos,
   1242 supported scans; 7 of its 54 Python repos use pyca, 22 of its 54 Go repos x/crypto); bar-micro and
-  stability-pilot rerun on the pins of 2026-10-30 (every export so far ran on the old versions) -> the corpus-main run -> stability-pilot's export as `report --baseline` for mutation-main -> the rater
-  study and mutation-main -> Phase 6.
+  stability-pilot rerun on the pins of 2026-10-30 (every export so far ran on the old versions) -> the corpus-main run -> `make corpus-smallest` and mutation-main (once, no baseline) -> the rater
+  study -> Phase 6.
 
 ## Phases 1-3 (done 2026-10-15 to 2026-10-18)
 What exists and the decisions behind it. Numbers: `docs/findings.md`.
@@ -630,7 +635,7 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
   check.
 - **The runs:** `bar-micro` (every tool once on the three micro projects: the verdicts; the bar-exam table
   shows all 15 tools), `stability-pilot` (every tool 3× on the micro projects and ten small pilot repos:
-  determinism and run-to-run variance, needed before any agreement claim; its timings decide replicas and pruning),
+  determinism and run-to-run variance for our own check, not in the paper, decided 2026-10-31),
   `corpus-main` (the stratified sample, 18 or 27 repos per language by `--per-cell` 2 or 3, the tools and their languages as the user set them after the bar exam: RQ1-RQ4), `mutation-main` (per language the 30 smallest repos of
   corpus-main by source size, 15 calls and 15 decoys each: RQ5; `mutation-smoke` first). Also on the known items: the voter groups'
   independence (tools that miss the same mutants more often than chance share a blind spot, `analysis/README.md`
