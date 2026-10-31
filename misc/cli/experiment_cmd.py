@@ -318,12 +318,17 @@ class _Board:
         progress.update(self.all, item=" · ".join(parts))
 
 
+# Longer than the longest worker limit (WORKER_TIMEOUT_SEC: one hour for the tools, two for the LLM workers), so a
+# scan that runs to its limit never reads as a stalled experiment (1800 s did, on corpus-main, 2026-10-31).
+IDLE_TIMEOUT_SEC = 7500
+
+
 @experiment_app.command("run")
 def run(
     spec_path: Path = SPEC_ARG,
     redis_host: str = REDIS_HOST_OPT,
     redis_port: int = REDIS_PORT_OPT,
-    idle_timeout: int = typer.Option(1800, help="Stop waiting after this many seconds without any new result"),
+    idle_timeout: int = typer.Option(IDLE_TIMEOUT_SEC, help="Stop waiting after so many seconds without a new result"),
     requeue_pending: bool = typer.Option(False, "--requeue-pending", help="Re-issue jobs a previous run left pending"),
     no_wait: bool = typer.Option(
         False, "--no-wait", help="Enqueue and return; collect later with `experiment collect`"
@@ -720,7 +725,7 @@ def collect(
     name: str = typer.Argument(..., help="Experiment name"),
     redis_host: str = REDIS_HOST_OPT,
     redis_port: int = REDIS_PORT_OPT,
-    idle_timeout: int = typer.Option(1800),
+    idle_timeout: int = typer.Option(IDLE_TIMEOUT_SEC),
 ):
     """Resume collecting results for jobs that are still pending (after `run --no-wait` or an interrupted run)."""
     r = _redis(redis_host, redis_port)

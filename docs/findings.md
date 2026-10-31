@@ -644,3 +644,14 @@ once (decided 2026-10-31); this is our own determinism check.
   OOM-killed (the summary's "Memory limits"), since the memory limits differ per tool (2 to 24 GiB) and an OOM kill
   counts as the tool's failure.
 
+## corpus-main, first attempt (2026-10-31, cancelled)
+Every tool but CBOMkit finished; CBOMkit had done 8 of its 162 jobs after 4.5 hours, when the run was cancelled. Its
+queue runs largest first, so those 8 were corpus-main's largest repositories, some of them at the one-hour limit.
+Two faults of our setup came with it, both fixed before the rerun:
+- **The runner gave up waiting:** it marks an experiment stalled after `idle_timeout` seconds without a result,
+  1800 by default, below the one-hour worker limit of the same day. It is 7500 s now (`IDLE_TIMEOUT_SEC`), longer
+  than any worker's limit.
+- **A timed-out CBOMkit scan was not stopped:** the job's timeout kills the worker's process group, not the CBOMkit
+  server in the same container, so the server could go on scanning beside the next job. The worker now restarts
+  the server after a timeout, and the next job waits for it outside its measured time.
+CBOMkit is rerun on every repository (`--rerun cbomkit`); the other tools' runs stay.

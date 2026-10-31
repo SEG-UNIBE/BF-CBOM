@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+import subprocess
 import threading
 import time
 import uuid
@@ -16,6 +17,8 @@ from common.worker import build_handle_instruction, run_worker
 # Worker name and timeout settings
 NAME = os.path.basename(os.path.dirname(__file__))
 TIMEOUT_SEC = int(os.getenv("WORKER_TIMEOUT_SEC", "300"))
+# How long a job waits for a backend the previous job restarted (the entrypoint allows it 120 s to answer)
+RESTART_WAIT_SEC = float(os.getenv("CBOMKIT_RESTART_WAIT_SEC", "180"))
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -344,6 +347,13 @@ class CbomKitClient:
             time.sleep(0.25)
         return False
 
+    def wait_restarted(self, max_wait: float) -> None:
+        """Wait until the backend answers and the entrypoint has cleared its OOM sentinel, as after a restart."""
+        deadline = time.monotonic() + max_wait
+        self._wait_backend_ready(max_wait=max_wait)
+        while self._backend_oom_flagged() and time.monotonic() < deadline:
+            time.sleep(0.5)
+
     def get_cbom(self, repo_id: str):
         url = f"{self.base}/api/v1/cbom/{repo_id}"
         return _http_get_json(url, timeout=30)
@@ -567,12 +577,14 @@ class CbomKitClient:
             if st not in (200, 204, 404):
                 logger.warning("CBOM delete returned %s for id=%s: %s", st, rid, (body or "")[:120])
 
-    def generate_cbom(self, git_url, branch="main", commit: str | None = None) -> tuple[str | None, float, str | None]:
+    def generate_cbom(
+        self, git_url, branch="main", commit: str | None = None, budget: float | None = None
+    ) -> tuple[str | None, float, str | None]:
         start = time.monotonic()
         # 1) Snapshot last/1 before scan (sequential change detection)
         before = self._get_last_raw()
         # 2) Trigger via WebSocket and wait until Finished (within budget)
-        budget = max(5.0, float(str(max(10, TIMEOUT_SEC - 5))))
+        budget = max(5.0, budget if budget is not None else float(max(10, TIMEOUT_SEC - 5)))
         ws_started, ws_finished, trig_err = self.trigger_scan_ws(git_url, branch, budget)
 
         if not ws_started:
@@ -649,13 +661,25 @@ class CbomKitClient:
         return None, time.monotonic() - start, "cbom_not_available"
 
 
+def stop_backend() -> None:
+    """Kill the CBOMkit backend; the entrypoint restarts it with a fresh Postgres. A job's timeout kills only the
+    worker's process group, so a scan that ran out of time would otherwise go on in the backend beside the next
+    job's scan, taking its heap and CPUs (decided 2026-10-31, after corpus-main's largest repos timed out)."""
+    subprocess.run(["pkill", "-KILL", "-f", "quarkus-run.jar"], check=False, capture_output=True)
+
+
 def _produce(instr: JobInstruction, trace: Trace) -> str | tuple[str, float]:
+    t0 = time.monotonic()
     logger.info("[%s] Running on repo %s", NAME, instr.repo_info.full_name)
     client = CbomKitClient()
+    # A backend the previous job restarted comes up first; this wait is not the scan's time and leaves the scan
+    # its budget short of the job's limit, so a timeout still ends here and not in the job's hard kill.
+    client.wait_restarted(max_wait=RESTART_WAIT_SEC)
     payload, duration, err = client.generate_cbom(
         git_url=instr.repo_info.git_url,
         branch=instr.repo_info.branch,
         commit=instr.repo_info.commit,
+        budget=TIMEOUT_SEC - 5 - (time.monotonic() - t0),
     )
     if payload is not None:
         return payload, duration
@@ -663,8 +687,9 @@ def _produce(instr: JobInstruction, trace: Trace) -> str | tuple[str, float]:
         trace.add(
             f"cbomkit WebSocket did not signal 'Finished' within budget: "
             f"repo={instr.repo_info.full_name} branch={instr.repo_info.branch} "
-            f"worker_timeout_sec={TIMEOUT_SEC}"
+            f"worker_timeout_sec={TIMEOUT_SEC}; backend restarted, so the scan does not run on into the next job"
         )
+        stop_backend()
         raise TimeoutError(err)
     if err and str(err).startswith("scan_error:"):
         # Deterministic backend failure (clone/checkout/scan error); no point in waiting for the timeout
