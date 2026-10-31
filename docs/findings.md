@@ -617,3 +617,16 @@ Every tool once on the three micro projects, every container built from one comm
   places are false ones. The same places lower its strong traceability (0.67) and its location rate (0.61), and in the
   mutation runs they will show as changes off the edit at the callers of each mutant's host.
 
+## stability-pilot 2026-10-31 (the tool versions of 2026-10-30, with replicas)
+Every eligible tool three times on the micro projects and ten small pilot repositories (cbomkit 3, cipherradar 3 and
+scanoss 2 containers; one build for every container; 35 minutes). Not part of the paper, which runs every experiment
+once (decided 2026-10-31); this is our own determinism check.
+- **Identical results:** all 11 tools report the same items in every run on every repository (Jaccard 1.00, flux
+  0.00, no repository changed), cdxgen 13.5.0 included for the first time (4 Go repositories). Together with the
+  repeat of corpus-pilot-medium (599 of 600 runs alike, 2026-10-30), a five-run stability requirement in the bar exam
+  would have failed no tool.
+- **One timeout from our limit:** CryptobomForge timed out on curl (C) in run 1 at its 600 s limit, which run 1 met in
+  the experiment's first seconds, when every tool and replica started at once; runs 2 and 3 took 429 and 433 s. Its
+  limit was the lowest of all workers and is 1800 s now (`docker-compose.yml`), so that corpus-main's large Python
+  repositories (pilot-medium: 170 s on 24 MB of source) are not cut by our setup.
+
