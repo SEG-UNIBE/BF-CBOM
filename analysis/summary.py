@@ -6,10 +6,11 @@ plus the stored spec and run log (`_experiment.yaml`, `_run-log.json`), so it ca
 for plots; this file is for reading.
 
 One layout everywhere (2026-10-31, CLAUDE.md "Summary layout"): a subsection is its heading,
-one to three sentences, the table, its visible checks (`_check`: ✅ ⛔ ⚠️), then collapsibles in a fixed order:
-`📋 Columns` (`_columns`, one bullet per column), `💡 Example` (`_example`), `📖 <topic>` (`_background`) and
-`🗂️ <list> (N)` (`_run_list`). The Markdown has one sentence per line and no semicolons in its prose;
-`style_issues` checks both.
+one to three sentences, the table, its visible checks (`_check` with `OK`, `FAIL` or `CAVEAT`), then collapsibles in
+a fixed order: Columns (`_columns`, one bullet per column), Example (`_example`), a background topic (`_background`)
+and a list (`_run_list`), each caption starting with its mark (`COLUMNS`, `EXAMPLE`, `BACKGROUND`, `LIST`). The marks
+are set once, under "helpers" below, and nothing else in this file writes one. The Markdown has one sentence per line
+and no semicolons in its prose; `style_issues` checks both.
 """
 
 from __future__ import annotations
@@ -108,8 +109,10 @@ FILES = {
 
 # ----- helpers -----
 
-COLUMNS, EXAMPLE, BACKGROUND, LIST = "📋", "💡", "📖", "🗂️"  # the collapsibles' captions start with these
-OK, FAIL, CAVEAT = "✅", "⛔", "⚠️"  # visible checks under a table
+# The summary's marks, set here only: every block, the bar exam's verdicts and "How to read this summary" take them
+# from here (a test keeps each in this file once).
+COLUMNS, EXAMPLE, BACKGROUND, LIST = "📋", "💡", "📖", "🗂️"  # the captions of the collapsibles
+OK, FAIL, CAVEAT = "✅", "⛔", "⚠️"  # the visible checks under a table: a verdict, a caveat
 RUN_LIST_MAX = 25
 
 
@@ -146,28 +149,29 @@ def _details(caption: str, body: list[str]) -> list[str]:
 
 
 def _columns(items: Iterable[tuple]) -> list[str]:
-    """`📋 Columns`: one bullet per column (`(name, sentence, ...)`), a homogeneous series in one bullet."""
+    """Columns: one bullet per column (`(name, sentence, ...)`), a homogeneous series in one bullet."""
     return _details(f"{COLUMNS} Columns", _bullets(items))
 
 
 def _example(*sentences: str) -> list[str]:
-    """`💡 Example`: the reading of one cell of the table above, with its numbers."""
+    """Example: the reading of one cell of the table above, with its numbers."""
     return _details(f"{EXAMPLE} Example", _text(*sentences))
 
 
 def _background(topic: str, body: list[str]) -> list[str]:
-    """`📖 <topic>`: method, definitions, conceptual examples."""
+    """A background topic: method, definitions, conceptual examples."""
     return _details(f"{BACKGROUND} {topic}", body)
 
 
 def _check(mark: str, *sentences: str) -> list[str]:
-    """A visible check under a table: ✅ / ⛔ a verdict, ⚠️ a caveat needed to read the table correctly."""
+    """A visible check under a table: `OK` / `FAIL` a verdict, `CAVEAT` a caveat needed to read the table correctly."""
     first, *rest = [s for s in sentences if s]
     return [f"{mark} {first}", *rest, ""]
 
 
 def _run_list(title: str, items: list[str]) -> list[str]:
-    """`🗂️ <title> (N)`: one bullet per item, at most RUN_LIST_MAX and a line for the rest (runs.csv has them all)."""
+    """A list `<title> (N)`: one bullet per item, at most RUN_LIST_MAX and a line for the rest (runs.csv has them
+    all)."""
     if not items:
         return []
     shown = [f"- {x}" for x in items[:RUN_LIST_MAX]]
@@ -324,8 +328,8 @@ def _false(v) -> bool:
     return str(v).strip().lower() == "false"
 
 
-VERDICT_MARK = {"pass": "✅", "fail": "⛔"}  # a micro project's verdict in the bar exam's table
-BAR_MARK = {BAR_PASSED: "✅", BAR_FAILED: "⛔"}  # the tool's verdict over its micro projects
+VERDICT_MARK = {"pass": OK, "fail": FAIL}  # a micro project's verdict in the bar exam's table
+BAR_MARK = {BAR_PASSED: OK, BAR_FAILED: FAIL}  # the tool's verdict over its micro projects
 
 
 def _lang_key(lang: str) -> tuple[int, str]:
@@ -380,10 +384,10 @@ def _reading() -> list[str]:
         code=False,
     )  # fmt: skip
     lines += _text(
-        "Every section shows its table first, then its checks: ✅ and ⛔ a verdict, ⚠️ a caveat needed to read the "
-        "table.",
-        "Below them, collapsed: 📋 the columns, 💡 an example read from the table, 📖 the background and 🗂️ the runs "
-        "a check counts.",
+        f"Every section shows its table first, then its checks: {OK} and {FAIL} a verdict, {CAVEAT} a caveat needed to "
+        "read the table.",
+        f"Below them, collapsed: {COLUMNS} the columns, {EXAMPLE} an example read from the table, {BACKGROUND} the "
+        f"background and {LIST} the runs a check counts.",
         "The cells use these marks:",
     )
     lines += _bullets(
@@ -522,8 +526,8 @@ def _experiment(
 
 def _commits(ran: list[dict], sessions: list[dict]) -> list[list]:
     """The overview's commit row: the commits the workers' images were built from (runs.csv `bfcbom_commit`, with
-    their runs) and the runner's (the run log), and ⛔ when the workers ran another build than the runner, whose code
-    then differs from the code that planned and stored the runs."""
+    their runs) and the runner's (the run log), and `FAIL` when the workers ran another build than the runner, whose
+    code then differs from the code that planned and stored the runs."""
     workers = Counter(r["bfcbom_commit"] for r in ran if r.get("bfcbom_commit"))
     runner = sorted({e["runner_commit"] for e in sessions if e.get("runner_commit")})
     if not workers and not runner:
@@ -537,7 +541,8 @@ def _commits(ran: list[dict], sessions: list[dict]) -> list[list]:
     parts += ["runner " + ", ".join(f"`{c}`" for c in runner)] if runner else []
     text = ", ".join(parts)
     if runner and set(workers) - set(runner):
-        text += " ⛔ the workers ran another build than the runner (`make up-prod` rebuilds them, the board shows each)"
+        text += f" {FAIL} the workers ran another build than the runner"
+        text += " (`make up-prod` rebuilds them, the board shows each)"
     return [["BF-CBOM commit", text + dirty]]
 
 

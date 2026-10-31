@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from analysis.groundtruth import load_ground_truth, project_for_repo
+from analysis.summary import CAVEAT, COLUMNS, FAIL, LIST, OK
 
 FIXTURES = Path(__file__).parent / "fixtures" / "pilot"
 
@@ -285,7 +286,7 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
         assert section in summary, section
     positions = [summary.index(s) for s in sections]
     assert positions == sorted(positions)  # the sections come in the order of the questions
-    assert "| cbomkit | ✅ 11 |" in summary and "| pqcheck | – |" in summary
+    assert f"| cbomkit | {OK} 11 |" in summary and "| pqcheck | – |" in summary
     assert "| tool | records | line | window | import | file | none | unread | outside code |" in summary
     assert "| tool | packaging | CBOMs | algorithm assets | records | items |" in summary  # algorithm components
     assert "| packaging | one component is | signature in this table |" in summary
@@ -295,7 +296,7 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert re.search(r"^\| all \| ([\d']+) \|", per_language, flags=re.M).group(1) == exact[-1]["items"]
     # the record carries the repository's size, so the Repositories table is flat (no commit in it: no /tree link)
     assert "| [bfcbom/micro-java](https://github.com/bfcbom/micro-java) | Java | 3 | 2 | 3.0 | 1.0 |" in summary
-    assert "<summary>🗂️ Units per repository (1)</summary>" in summary
+    assert f"<summary>{LIST} Units per repository (1)</summary>" in summary
     meaningful = summary.index("### Meaningful")
     assert meaningful < summary.index("#### Asset type `algorithm`", meaningful) < summary.index("### Where the info")
     assert "#### RQ4 Agreement" in summary[summary.index("## Files") :]  # files by question
@@ -330,8 +331,8 @@ def test_an_oom_killed_run_is_listed_but_its_cbom_is_not_read(tmp_path, monkeypa
     assert {u["tool"] for u in _read_csv(out / "units-run1.csv")} == {"cbomkit"}  # its CBOM was not normalised
     summary = (out / "_SUMMARY.md").read_text(encoding="utf-8")
     assert "| cipherradar |  |  |  | 1 |  |" in summary and runs["cipherradar"]["memory_failure"] == "oom kill"
-    assert "⛔ 1 run may have failed for memory." in summary
-    assert "<summary>🗂️ Runs that may have failed for memory (1)</summary>" in summary
+    assert f"{FAIL} 1 run may have failed for memory." in summary
+    assert f"<summary>{LIST} Runs that may have failed for memory (1)</summary>" in summary
     assert "`cipherradar` on `bfcbom/micro-java` (original, run 1): oom, oom kill, peak 4.0 of 4.0 GiB" in summary
 
 
@@ -492,7 +493,8 @@ def test_summary_markdown_from_csv_rows():
     lines = sm._micro(rows, [])
     assert sm.style_issues("\n".join(lines)) == []
     assert "| tool | java | go | bar exam |" in lines  # paper languages first, then the tool's verdict
-    assert lines.index("| good | ✅ 11 | – | ✅ bar passed |") < lines.index("| weak | ⛔ 2 | error | ⛔ bar failed |")
+    passed, failed = f"| good | {OK} 11 | – | {OK} bar passed |", f"| weak | {FAIL} 2 | error | {FAIL} bar failed |"
+    assert lines.index(passed) < lines.index(failed)
     verdicts = lines[lines.index("### Verdicts") :]  # the hand-over into the later specs
     assert verdicts[2] == "1 of 2 tools pass the bar, 1 failed it (weak)."
     assert verdicts[3].startswith("Every passed tool ") and "no `tool_languages:` entry follows" in verdicts[3]
@@ -604,8 +606,8 @@ def test_summary_starts_with_when_how_long_and_how_much_ram(tmp_path, monkeypatc
     assert "| queue wait |" not in summary  # a batch enqueues everything at once: the wait is only the position
     # the workers' images and the runner were built from different commits: which is which, and the mark
     assert (
-        "| BF-CBOM commit | workers `abc123def456` (2 runs), runner `abc123def456-dirty` ⛔ the workers ran another "
-        "build than the runner (`make up-prod` rebuilds them, the board shows each) (`-dirty`: built from "
+        f"| BF-CBOM commit | workers `abc123def456` (2 runs), runner `abc123def456-dirty` {FAIL} the workers ran "
+        "another build than the runner (`make up-prod` rebuilds them, the board shows each) (`-dirty`: built from "
         "uncommitted changes) |" in summary
     )
     from analysis.summary import _commits
@@ -623,7 +625,7 @@ def test_summary_starts_with_when_how_long_and_how_much_ram(tmp_path, monkeypatc
     )
     assert limits.index("| cbomkit | 4.0 | 2.9 | 0.73 | 2.9 |  | 0 | 0 |") < limits.index("| cipherradar |")
     assert "Empty: the workers of this experiment did not record it yet." in limits
-    assert "✅ No run failed for memory." in limits
+    assert f"{OK} No run failed for memory." in limits
     runs = {r["tool"]: r for r in _read_csv(exp / "_ANALYSIS" / "runs.csv")}
     assert runs["cbomkit"]["queue_sec"] == "90.0" and runs["cbomkit"]["bfcbom_commit"] == "abc123def456"
 
@@ -786,15 +788,15 @@ def test_runtime_rows_report_peak_memory_and_cpu_per_repository_and_the_limits_a
     csv_runs = [{"repo": r["snapshot"], **{k: ("" if v is None else str(v)) for k, v in r.items()}} for r in runs]
     limits = "\n".join(_memory_limits(csv_runs, [csv_row]))
     assert "| t | 4.0 | 4.0 | 1.00 | 3.7 | 1 | 1 | 1 |" in limits  # at limit, OOM kills, failed for memory
-    assert "⛔ 1 run may have failed for memory." in limits and "`t` on `c`" in limits and "`d`" not in limits
+    assert f"{FAIL} 1 run may have failed for memory." in limits and "`t` on `c`" in limits and "`d`" not in limits
     assert "reached the limit and still finished" not in limits  # c is listed as a failure, not twice
     # an ok run at the limit is listed apart: its peak is the limit's, not the tool's
     capped = {**csv_runs[2], "repo": "e", "limit_hits": "3", "peak_memory_mb": "4096.0"}
     ok = "\n".join(_memory_limits([*csv_runs[:3], capped], [csv_row]))
-    assert "⚠️ 1 run reached the limit and still finished." in ok
-    assert "<summary>🗂️ Runs at the limit that finished (1)</summary>" in ok
+    assert f"{CAVEAT} 1 run reached the limit and still finished." in ok
+    assert f"<summary>{LIST} Runs at the limit that finished (1)</summary>" in ok
     assert "- `t` on `e` (original, run 1): ok, peak 4.0 of 4.0 GiB, 3 limit hits" in ok
-    assert ok.index("still finished") < ok.index("✅ No run failed for memory.")
+    assert ok.index("still finished") < ok.index(f"{OK} No run failed for memory.")
 
 
 def test_runs_without_a_result_are_listed_by_tool_then_repository():
@@ -866,7 +868,7 @@ def test_repositories_section_counts_by_language_and_size_stratum():
     ]
     lines = _size_strata(repos)
     text = "\n".join(lines)  # the table first, the strata explained in its collapsed columns
-    assert lines[0].startswith("| language |") and "<summary>📋 Columns</summary>" in text
+    assert lines[0].startswith("| language |") and f"<summary>{COLUMNS} Columns</summary>" in text
     assert "the checkout at the pinned commit (`checkout_bytes`" in text
     assert "--size-bins 300-3000,3000-30000,30000-" in text and "--star-bins 50-300,300-2000,2000-" in text
     # sizes, an empty column, then stars; the micro project has no star count
@@ -933,11 +935,11 @@ def test_tool_versions_section_lists_what_ran_and_flags_mixed_versions():
     assert ("| xgrep | [0.101.0](https://example.org/xgrep/0.101.0) | `xgrep 0.101.0` | `bf-cbom/worker-xgrep:1.0.4` "
             "| `abc123` | 2 |") in lines  # fmt: skip
     assert not any(line.startswith("| cdxgen") for line in lines)
-    assert any("⛔" in line and "disagree" in line and "`pqcheck`" in line and "xgrep" not in line for line in lines)
+    assert any(FAIL in line and "disagree" in line and "`pqcheck`" in line and "xgrep" not in line for line in lines)
     # one pqcheck run recorded another commit than tools.yaml names
-    assert any("⛔" in line and "did not record" in line and "`pqcheck`" in line for line in lines)
-    assert "✅ Every run recorded the `version` `common/tools.yaml` names." in _versions(rows[:2], tools)
-    assert not any("✅" in line or "did not record" in line for line in _versions(rows))  # no versions named
+    assert any(FAIL in line and "did not record" in line and "`pqcheck`" in line for line in lines)
+    assert f"{OK} Every run recorded the `version` `common/tools.yaml` names." in _versions(rows[:2], tools)
+    assert not any(OK in line or "did not record" in line for line in _versions(rows))  # no versions named
     assert _versions([]) == []
 
 

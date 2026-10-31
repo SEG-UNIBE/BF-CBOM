@@ -256,6 +256,9 @@ example, voter groups, how family and group are argued),
     code), no e.g./i.e., links instead of quoted section names; backticks for names, fields, statuses and every
     value a tool wrote, bold for defined terms. Build blocks with the helpers (`_text`, `_columns`, `_example`,
     `_background`, `_check`, `_run_list`, `_link`); `summary.style_issues` checks the rules and the tests run it.
+    The seven marks are set once, as constants among `summary.py`'s helpers (`COLUMNS`, `EXAMPLE`, `BACKGROUND`,
+    `LIST`, `OK`, `FAIL`, `CAVEAT`), and nothing else in `analysis/` writes one (a test checks it), so changing one
+    there changes every summary.
   - **In parallel** (2026-10-23): `report` normalises, validates and matches in a process pool, one CBOM or one
     repository per task (`misc/cli/parallel.py:pmap`, the tasks in `analysis/tasks.py`; `--jobs`, env `BF_CBOM_JOBS`;
     0 = auto, min(CPUs, 8) for a step with 16 or more items, else sequential). The workers are spawned, never forked

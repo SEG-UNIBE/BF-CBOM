@@ -287,7 +287,7 @@ def test_not_judged_counts_the_planted_calls_by_status():
     rows = [{"tool": t, "language": "java", "kind": "call", "style": "direct", "status": st}
             for t, st in statuses]  # fmt: skip
     text = "\n".join(sm._mutation([mutant], rows, []))
-    assert "⚠️ Not judged: 3 planted call × tool, by the status of the run on the mutant" in text
+    assert f"{sm.CAVEAT} Not judged: 3 planted call × tool, by the status of the run on the mutant" in text
     assert "2 unsupported (the language is outside the tool’s), 1 original error." in text
 
 
