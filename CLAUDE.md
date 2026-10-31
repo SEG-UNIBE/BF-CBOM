@@ -243,7 +243,9 @@ example, voter groups, how family and group are argued),
   - `groundtruth.py`: micro recall at call sites and at repo level, precision (over the places a tool reports, decoys
     included) and F1, the bar (`BAR`: half the calls, lenient, in one language) and each tool's verdict
     (`bar passed`, `bar failed`, `not judged`: `bar_verdict`), field-by-field comparison with `expected`.
-  - `tables.py` (flat CSV tables), `summary.py` (`_SUMMARY.md`, rendered from the CSVs only). RQ1's "Places per
+  - `tables.py` (flat CSV tables), `summary.py` (`_SUMMARY.md`, rendered from the CSVs only: the overview, the preamble
+    and the bar exam, and `render`, which puts every section in order; the questions' sections in `summary_rqs.py`,
+    the layout's blocks, the marks and `style_issues` in `summary_blocks.py`, which imports neither). RQ1's "Places per
     tool" ends with `outside code`: the share of a tool's located algorithm records whose file is not a source file
     of the repo's language (`in_scope`; fixtures, test vectors, configuration); the analyses count those places like
     any other (decided 2026-10-23: the tools are benchmarked on the repositories as they are, no scope filter), the
@@ -255,8 +257,8 @@ example, voter groups, how family and group are argued),
     Markdown source has one sentence per line and no semicolons in prose or cell joins (data keeps its own, in
     code), no e.g./i.e., links instead of quoted section names; backticks for names, fields, statuses and every
     value a tool wrote, bold for defined terms. Build blocks with the helpers (`_text`, `_columns`, `_example`,
-    `_background`, `_check`, `_run_list`, `_link`); `summary.style_issues` checks the rules and the tests run it.
-    The seven marks are set once, as constants among `summary.py`'s helpers (`COLUMNS`, `EXAMPLE`, `BACKGROUND`,
+    `_background`, `_check`, `_run_list`, `_link`); `summary_blocks.style_issues` checks the rules and the tests run it.
+    The seven marks are set once, as constants in `summary_blocks.py` (`COLUMNS`, `EXAMPLE`, `BACKGROUND`,
     `LIST`, `OK`, `FAIL`, `CAVEAT`), and nothing else in `analysis/` writes one (a test checks it), so changing one
     there changes every summary.
   - **In parallel** (2026-10-23): `report` normalises, validates and matches in a process pool, one CBOM or one

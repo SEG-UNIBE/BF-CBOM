@@ -269,7 +269,6 @@ def alias_tokens(vocab: Vocabulary | None = None) -> frozenset[str]:
     return frozenset(k for k in keys if len(k) >= 3 and k not in vocab.noise)
 
 
-LOCATION_KINDS = ("line", "window", "import", "file", "none", "unread")
 # An import statement, by file extension (a line inside Go's `import ( ... )` block is a quoted path on its own)
 _IMPORT_LINE = {
     ".java": re.compile(r"^\s*import\s+(static\s+)?[\w.]+(\.\*)?\s*;"),
@@ -285,9 +284,9 @@ for _ext, _same in ((".ts", ".js"), (".mjs", ".js"), (".cjs", ".js"), (".jsx", "
 
 
 def location_kind(rec, store: SnapshotStore, repo: str, commit: str | None) -> str:
-    """What kind of place a record names (LOCATION_KINDS): `none` no file, `file` a file without a line, `window` a
-    span of several lines, `import` a single line holding an import statement, `line` any other single line (in
-    practice the call or the declaration), `unread` a single line whose file the snapshot does not have here (no
+    """What kind of place a record names (tables.py LOCATION_KINDS): `none` no file, `file` a file without a line,
+    `window` a span of several lines, `import` a single line holding an import statement, `line` any other single line
+    (in practice the call or the declaration), `unread` a single line whose file the snapshot does not have here (no
     mirror and no `--fetch`, or a file missing at the commit)."""
     if not rec.file:
         return "none"

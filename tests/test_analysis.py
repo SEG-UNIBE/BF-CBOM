@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from analysis.groundtruth import load_ground_truth, project_for_repo
-from analysis.summary import CAVEAT, COLUMNS, FAIL, LIST, OK
+from analysis.summary_blocks import CAVEAT, COLUMNS, FAIL, LIST, OK
 
 FIXTURES = Path(__file__).parent / "fixtures" / "pilot"
 
@@ -266,7 +266,7 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert info["rows"]["items-run1.csv"] == len(algos) and info["vocabulary"]["algorithms"]
     summary = (out / "_SUMMARY.md").read_text(encoding="utf-8")
     assert summary.startswith("# Analysis Summary of Experiment `exp-tables`\n")
-    from analysis.summary import style_issues
+    from analysis.summary_blocks import style_issues
 
     assert style_issues(summary) == []  # one sentence per line, no semicolons, every collapsible captioned
     toc = summary[summary.index("## Contents") : summary.index("## Preamble")]
@@ -421,7 +421,7 @@ def test_repositories_section_links_pinned_commits_folds_by_language_or_lists_si
 
 
 def test_spellings_per_identity_count_distinct_raw_values_per_tool():
-    from analysis.summary import _spellings
+    from analysis.summary_rqs import _spellings
 
     def row(tool, raw, mapped, status="mapped", asset_type="algorithm"):
         return {"tool": tool, "raw": raw, "mapped": mapped, "status": status, "asset_type": asset_type}
@@ -469,16 +469,16 @@ def test_export_runs_the_report_and_zips_the_summary(tmp_path, monkeypatch):
 
 
 def test_summary_markdown_from_csv_rows():
-    from analysis import summary as sm
+    from analysis import summary as sm, summary_blocks as sb, summary_rqs as sr
 
-    assert sm.md_table(["a", "b"], [["x|y", 1]]) == ["| a | b |", "| --- | ---: |", "| x\\|y | 1 |"]
+    assert sb.md_table(["a", "b"], [["x|y", 1]]) == ["| a | b |", "| --- | ---: |", "| x\\|y | 1 |"]
     # numbers get ' between thousands, in cells and through `_n`; other text stays as it is
-    assert sm.md_table(["n", "x"], [[13043, "1234.5"]])[2] == "| 13'043 | 1'234.5 |"
+    assert sb.md_table(["n", "x"], [[13043, "1234.5"]])[2] == "| 13'043 | 1'234.5 |"
     values = (999, "-1000", "1.4.0", "2026-10-21", None)
-    assert [sm._n(v) for v in values] == ["999", "-1'000", "1.4.0", "2026-10-21", ""]
+    assert [sb._n(v) for v in values] == ["999", "-1'000", "1.4.0", "2026-10-21", ""]
     # CycloneDX's asset types in the standard's order, then a value outside them
     types = ["unknown", "related-crypto-material", "algorithm", "certificate"]
-    assert sm._asset_types(types) == ["algorithm", "certificate", "related-crypto-material", "unknown"]
+    assert sr._asset_types(types) == ["algorithm", "certificate", "related-crypto-material", "unknown"]
     base = {"n_items": "11"}
     weak = {**base, "tool": "weak", "bar_verdict": "bar failed"}
     good = {**base, "tool": "good", "bar_verdict": "bar passed"}
@@ -491,7 +491,7 @@ def test_summary_markdown_from_csv_rows():
         {**good, "language": "go", "verdict": "unsupported"},
     ]  # fmt: skip
     lines = sm._micro(rows, [])
-    assert sm.style_issues("\n".join(lines)) == []
+    assert sb.style_issues("\n".join(lines)) == []
     assert "| tool | java | go | bar exam |" in lines  # paper languages first, then the tool's verdict
     passed, failed = f"| good | {OK} 11 | – | {OK} bar passed |", f"| weak | {FAIL} 2 | error | {FAIL} bar failed |"
     assert lines.index(passed) < lines.index(failed)
@@ -505,7 +505,7 @@ def test_summary_markdown_from_csv_rows():
 
 
 def test_reported_section_shows_raw_counts_and_the_repo_matrix():
-    from analysis import summary as sm
+    from analysis import summary_rqs as sr
 
     def row(repo, tool, status, lang="Java", expect="", **counts):
         r = {"repo": repo, "language": lang, "expect_crypto": expect, "tool": tool, "run": "1", "variant": "original",
@@ -548,13 +548,13 @@ def test_reported_section_shows_raw_counts_and_the_repo_matrix():
         row("o/a", "t1", "ok", components=99, crypto_assets=99),  # a second repetition is not counted
     ]
     rows[-1]["run"] = "2"
-    lines = sm._reported(rows, 1)
+    lines = sr._reported(rows, 1)
     assert "| t1 | 2 | 1 | 0 | 43 | 10 | 8 | 2 | 0 | 0 | 0 | 5 | 0.60 | 0.50 |" in lines
     assert "| t2 | 0 |  | 1 |  |  |  |  |  |  |  |  |  |  |" in lines  # its one run timed out: failed
     assert "| repo | language | expect | t1 | t2 |" in lines
     assert "| o/a | java |  | 10 | – |" in lines and "| o/b | python | low | 0 | × |" in lines
     assert "| all |  |  | 10 |  |" in lines
-    assert "expect" not in "\n".join(sm._reported([r for r in rows if r["repo"] == "o/a"], 1))
+    assert "expect" not in "\n".join(sr._reported([r for r in rows if r["repo"] == "o/a"], 1))
 
 
 def test_summary_starts_with_when_how_long_and_how_much_ram(tmp_path, monkeypatch):
@@ -753,7 +753,8 @@ def test_runtime_rows_count_each_repository_once_with_spread_ci_and_size():
 
 
 def test_runtime_rows_report_peak_memory_and_cpu_per_repository_and_the_limits_apart():
-    from analysis.summary import _memory_limits, _runtime
+    from analysis.summary import _memory_limits
+    from analysis.summary_rqs import _runtime
     from analysis.tables import RUNTIME_COLUMNS, memory_failure, runtime_rows
 
     def mem(snapshot, peak, *, cores=1.0, hits=0, oom=0, status="ok", error=None):
@@ -826,7 +827,7 @@ def test_memory_failure_names_why_a_failed_run_may_have_failed_for_memory():
 
 
 def test_runtime_section_lists_the_slowest_tool_first_with_its_languages():
-    from analysis.summary import _rq1
+    from analysis.summary_rqs import _rq1
     from analysis.tables import RUNTIME_COLUMNS, runtime_rows
 
     runs = [_run("fast", s, 10.0, source=50) for s in "abc"] + [_run("slow", s, 600.0, source=50) for s in "abc"]

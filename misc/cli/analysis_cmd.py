@@ -42,6 +42,7 @@ from analysis.normalize import (
 )
 from analysis.snapshots import SnapshotStore
 from analysis.stability import STABILITY_COLUMNS, baseline_flux, stability_rows
+from analysis.summary_blocks import read_csv
 from analysis.tasks import write_json
 from common.experiment import (
     ORIGINAL_VARIANT,
@@ -680,7 +681,7 @@ def _baseline(name: str | None) -> dict[str, dict[str, float]] | None:
     path = analysis_dir(_experiment(name)) / "stability.csv"
     if not path.exists():
         _err(f"--baseline {name}: no {path.name} in its _ANALYSIS (run `report` on it first, with repeated runs)")
-    rows = baseline_flux(sm.read_csv(path))
+    rows = baseline_flux(read_csv(path))
     if not rows:
         _err(f"--baseline {name}: its stability.csv has no rows (the experiment needs repetitions > 1)")
     return rows

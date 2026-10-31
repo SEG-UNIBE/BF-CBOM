@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from analysis import mutation as mu, summary as sm
+from analysis import mutation as mu, summary_blocks as sb, summary_rqs as sr
 from analysis.normalize.record import NormRecord
 from analysis.score import spearman
 from common.experiment import MutationSpec, RepoSpec, ensure_mirror, publish_fixture, repo_dir_name, save_mutants
@@ -138,7 +138,7 @@ def test_scores_pool_calls_and_decoys_and_the_bridge_correlates_them_with_confir
     assert (summary["java"]["n"], summary["java"]["spearman"], summary["java"]["kendall_tau"]) == (3, 1.0, 1.0)
     assert summary["all"]["n"] == 3 and len([r for r in bridge if r["tool"] != "all"]) == 6
     assert spearman({"a": 1, "b": 2, "c": 3}, {"a": 3, "b": 2, "c": 1}) == -1.0
-    table = "\n".join(sm._mutation_scores(list(scores.values())))
+    table = "\n".join(sr._mutation_scores(list(scores.values())))
     assert "| java | good |" in table and "| java | noisy |" in table and "`*`" not in table
     assert spearman({"a": 1, "b": 1, "c": 3}, {"a": 1, "b": 2, "c": 3}) == pytest.approx(0.866, abs=1e-3)  # a tie
     assert spearman({"a": 1, "b": 2}, {"a": 1, "b": 2}) is None
@@ -274,7 +274,7 @@ def test_report_judges_mutants_and_keeps_them_out_of_the_agreement_tables(tmp_pa
     assert len({r["variant"] for r in rows("runs.csv")}) == 3  # runs.csv lists every stored run
     assert (exp / snapshot / mid / "cbomkit" / "run1.norm.json").exists()  # mutants are normalised too
     summary = (out / "_SUMMARY.md").read_text()
-    assert sm.style_issues(summary) == []  # the RQ5 sections keep the layout too
+    assert sb.style_issues(summary) == []  # the RQ5 sections keep the layout too
     assert "## RQ5 Detection" in summary and "```diff" in summary and f"`{mid}`" in summary
     assert "### Recall, precision and F1 on the planted items" in summary and "the bridge to RQ4" in summary
     assert "### Changes off the edit" in summary
@@ -286,8 +286,8 @@ def test_not_judged_counts_the_planted_calls_by_status():
     statuses = (("a", "ok"), ("b", "unsupported"), ("c", "unsupported"), ("d", "original error"))
     rows = [{"tool": t, "language": "java", "kind": "call", "style": "direct", "status": st}
             for t, st in statuses]  # fmt: skip
-    text = "\n".join(sm._mutation([mutant], rows, []))
-    assert f"{sm.CAVEAT} Not judged: 3 planted call × tool, by the status of the run on the mutant" in text
+    text = "\n".join(sr._mutation([mutant], rows, []))
+    assert f"{sb.CAVEAT} Not judged: 3 planted call × tool, by the status of the run on the mutant" in text
     assert "2 unsupported (the language is outside the tool’s), 1 original error." in text
 
 
@@ -317,7 +317,7 @@ def test_changes_off_the_edit_are_counted_apart_from_detection_and_read_against_
     assert (t["recall_site"], t["precision"], t["f1"]) == (1.0, 1.0, 1.0)  # the off-edit changes do not touch them
     assert (quiet["offedit_mutants"], quiet["offedit_share"], quiet["baseline_flux"]) == (0, 0.0, None)
     assert scores[("t", "direct")]["offedit_mutants"] == 2  # style-less, like the decoys
-    text = "\n".join(sm._offedit(list(scores.values())))
+    text = "\n".join(sr._offedit(list(scores.values())))
     assert "### Changes off the edit" in text and "| java | t | 4 | 2 | 0.50 | 0.5 | 1.5 | 0.25 (0.10) |" in text
     assert "| java | quiet | 1 | 0 | 0.00 |  |  |  |" in text
     # read back from mutation.csv, the lists are text

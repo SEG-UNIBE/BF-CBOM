@@ -94,7 +94,7 @@ AGREEMENT_COLUMNS = [
     "matcher", "repo", "snapshot", "variant", "run", "group_id", "scope", "key", "dimension", "reporting",
     "agreeing", "majority", "values",
 ]  # fmt: skip
-LOCATION_KINDS = ("line", "window", "import", "file", "none", "unread")  # analysis/schema.py:location_kind
+LOCATION_KINDS = ("line", "window", "import", "file", "none", "unread")  # what analysis/schema.py:location_kind returns
 UNIT_COLUMNS = [
     "tool", "packaging", "cboms", "assets", "records", "items", "records_per_asset_median",
     "records_per_asset_max", "multi_occurrence_share", "assets_per_item", "unlocated_share",

@@ -63,7 +63,7 @@ RQS = (RQ1, RQ2, RQ3, RQ4, RQ5)
 
 BAR_EXAM = "Bar exam"
 BAR_EXAM_TABLES = ("micro-run{i}.csv", "micro-items-run{i}.csv")
-# the notes are sentences, one per line in the summary (analysis/summary.py `_text`)
+# the notes are sentences, one per line in the summary (analysis/summary_blocks.py `_text`)
 BAR_EXAM_NOTE = (
     "Before the questions, a preparatory step selects the subject tools.",
     "It has two parts: the tool search (where and when the candidates were looked for, and which requirements each "

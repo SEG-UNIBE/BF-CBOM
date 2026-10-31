@@ -746,7 +746,7 @@ def test_sources_rows_say_where_each_dimension_lives():
     """RQ2's "where the information lives": per (tool, dimension, kind of source) the algorithm assets whose value came
     from a standard field, the name, a property, ... and the share of the tool's algorithm assets
     (sources-run<i>.csv)."""
-    from analysis import summary as sm
+    from analysis import summary_rqs as sr
     from analysis.normalize.report import SOURCES_COLUMNS
 
     bom = _bom(
@@ -762,5 +762,5 @@ def test_sources_rows_say_where_each_dimension_lives():
     assert (by[("primitive", "field")]["count"], by[("primitive", "field")]["share"]) == (2, 1.0)
     assert (by[("mode", "name")]["count"], by[("padding", "field")]["count"]) == (1, 1)
     assert by[("family", "name")]["count"] == 2 and ("family", "field") not in by  # 1.6 has no algorithmFamily
-    text = "\n".join(sm._sources(rows))
+    text = "\n".join(sr._sources(rows))
     assert "### Where the information lives" in text and "| cbomkit | 2 | 0.00 (name 1.00) | 1.00 |" in text
