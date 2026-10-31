@@ -82,7 +82,7 @@ tree-sitter scanner for Java, Go and C/C++ (Apache-2.0), CycloneDX 1.7. Its loca
 semgrep-rule scanner for Java and Python (Apache-2.0), CycloneDX 1.6. Runs offline: the semgrep registry rule sets it would fetch online are frozen in the image at a pinned semgrep-rules commit, unfiltered.
 
 - **[`CipherRadar`](https://github.com/nk-sentinel/cipherradar)**:
-opengrep rules plus tree-sitter (`cradar` CLI, built from source), CycloneDX 1.7, many languages. Known crash on some Java EC parameter code is worked around automatically with `.cradarignore` and recorded in the result notes.
+opengrep rules plus tree-sitter (`cradar` CLI, built from source), CycloneDX 1.7, many languages. Its Java pass crashes on some EC parameter code (`new ECGenParameterSpec(<identifier>)`), and the run then fails; `CRADAR_EXCLUDE_CRASHERS=1` leaves those files out through `.cradarignore` instead, recorded in the result notes.
 
 - **[`xgrep`](https://mondoo.com/docs/xgrep/code-scanning/cbom)** (Mondoo):
 tree-sitter and data-flow scanner for Java, Python, Go and JS/TS, CycloneDX 1.6. Free of charge but proprietary: the worker fetches the pinned npm package (verified by its sha512) at build time.

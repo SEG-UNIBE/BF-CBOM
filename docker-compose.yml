@@ -209,7 +209,7 @@ services:
       - REDIS_HOST=redis
       - BF_CBOM_IMAGE=bf-cbom/worker-cbomkit:${VERSION:-latest}
       - REDIS_PORT=6379
-      - WORKER_TIMEOUT_SEC=2700  # keycloak 469-551 s, kafka 363 s (2.3.0); pilot used 45 min
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
       - CBOMKIT_HEALTH_WAIT_SEC=20
       # Leave 4 GiB of the container limit for native JVM memory and the worker/backend processes. The heap is the
       # binding limit (a full heap ends the job as a failure, not an OOM kill), so -Xmx rises with the limit: 12g in
@@ -245,7 +245,7 @@ services:
       - REDIS_HOST=redis
       - BF_CBOM_IMAGE=bf-cbom/worker-cdxgen:${VERSION:-latest}
       - REDIS_PORT=6379
-      - WORKER_TIMEOUT_SEC=1800  # e1-icpc-corpus at 600: Sentinel, Sa-Token timed out (Maven), Chat2DB took 574 s
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
       - CDXGEN_DEBUG_MODE=debug
     env_file: docker/env/worker-cdxgen.env
     restart: on-failure:3
@@ -395,7 +395,7 @@ services:
       - REDIS_HOST=redis
       - BF_CBOM_IMAGE=bf-cbom/worker-cryptoscan:${VERSION:-latest}
       - REDIS_PORT=6379
-      - WORKER_TIMEOUT_SEC=600
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
     env_file: docker/env/worker-cryptoscan.env
     restart: on-failure:3
     deploy:
@@ -424,7 +424,7 @@ services:
       - REDIS_HOST=redis
       - BF_CBOM_IMAGE=bf-cbom/worker-pqcheck:${VERSION:-latest}
       - REDIS_PORT=6379
-      - WORKER_TIMEOUT_SEC=900
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
     env_file: docker/env/worker-pqcheck.env
     restart: on-failure:3
     deploy:
@@ -453,7 +453,7 @@ services:
       - REDIS_HOST=redis
       - BF_CBOM_IMAGE=bf-cbom/worker-qdarpan:${VERSION:-latest}
       - REDIS_PORT=6379
-      - WORKER_TIMEOUT_SEC=900
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
     env_file: docker/env/worker-qdarpan.env
     restart: on-failure:3
     deploy:
@@ -482,7 +482,7 @@ services:
       - REDIS_HOST=redis
       - BF_CBOM_IMAGE=bf-cbom/worker-securin-xbom:${VERSION:-latest}
       - REDIS_PORT=6379
-      - WORKER_TIMEOUT_SEC=1800
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
     env_file: docker/env/worker-securin-xbom.env
     restart: on-failure:3
     deploy:
@@ -511,7 +511,7 @@ services:
       - REDIS_HOST=redis
       - BF_CBOM_IMAGE=bf-cbom/worker-cipherradar:${VERSION:-latest}
       - REDIS_PORT=6379
-      - WORKER_TIMEOUT_SEC=1800
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
     env_file: docker/env/worker-cipherradar.env
     restart: on-failure:3
     deploy:
@@ -542,7 +542,7 @@ services:
       - REDIS_HOST=redis
       - BF_CBOM_IMAGE=bf-cbom/worker-xgrep:${VERSION:-latest}
       - REDIS_PORT=6379
-      - WORKER_TIMEOUT_SEC=2700
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
     env_file: docker/env/worker-xgrep.env
     restart: on-failure:3
     deploy:
@@ -572,7 +572,7 @@ services:
       - REDIS_HOST=redis
       - BF_CBOM_IMAGE=bf-cbom/worker-ciphersift:${VERSION:-latest}
       - REDIS_PORT=6379
-      - WORKER_TIMEOUT_SEC=1800
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
     env_file: docker/env/worker-ciphersift.env
     restart: on-failure:3
     deploy:
@@ -602,7 +602,7 @@ services:
       - REDIS_HOST=redis
       - BF_CBOM_IMAGE=bf-cbom/worker-scanoss:${VERSION:-latest}
       - REDIS_PORT=6379
-      - WORKER_TIMEOUT_SEC=1800
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
     env_file: docker/env/worker-scanoss.env
     restart: on-failure:3
     deploy:
@@ -632,7 +632,7 @@ services:
       - REDIS_HOST=redis
       - BF_CBOM_IMAGE=bf-cbom/worker-cbomkit-jar:${VERSION:-latest}
       - REDIS_PORT=6379
-      - WORKER_TIMEOUT_SEC=2700
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
       - CBOMKIT_HEAP=6g
     env_file: docker/env/worker-cbomkit-jar.env
     restart: on-failure:3
@@ -662,7 +662,7 @@ services:
       - REDIS_HOST=redis
       - BF_CBOM_IMAGE=bf-cbom/worker-qelens:${VERSION:-latest}
       - REDIS_PORT=6379
-      - WORKER_TIMEOUT_SEC=900
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
     env_file: docker/env/worker-qelens.env
     restart: on-failure:3
     deploy:
@@ -691,7 +691,7 @@ services:
       - REDIS_HOST=redis
       - BF_CBOM_IMAGE=bf-cbom/worker-cryptarium:${VERSION:-latest}
       - REDIS_PORT=6379
-      - WORKER_TIMEOUT_SEC=900
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
     env_file: docker/env/worker-cryptarium.env
     restart: on-failure:3
     deploy:
@@ -720,7 +720,7 @@ services:
       - REDIS_HOST=redis
       - BF_CBOM_IMAGE=bf-cbom/worker-qscan:${VERSION:-latest}
       - REDIS_PORT=6379
-      - WORKER_TIMEOUT_SEC=900
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
     env_file: docker/env/worker-qscan.env
     restart: on-failure:3
     deploy:
@@ -779,9 +779,7 @@ services:
       - REDIS_HOST=redis
       - BF_CBOM_IMAGE=bf-cbom/worker-cryptobomforge:${VERSION:-latest}
       - REDIS_PORT=6379
-      # 600 timed out on curl under the start-up load of stability-pilot (2026-10-31; its other runs took 429 and 433 s)
-      # and leaves no margin for corpus-main's large Python repos (pilot-medium: 170 s on 24 MB of source)
-      - WORKER_TIMEOUT_SEC=1800
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
       - AVAILABLE_LANGUAGES=python,c  # crypto queries exist for Python and C/C++ only
       - CODEQL_RAM_MB=4096
     env_file: docker/env/worker-cryptobomforge.env

@@ -84,7 +84,8 @@ example, voter groups, how family and group are argued),
 ## How it works
 - **Coordinator and workers.** Streamlit UI on :8501 (`coordinator/`); Redis is the job queue (`jobs:<worker>` /
   `results:<worker>`); one Docker image per generator (`workers/<tool>/main.py`) on `common/worker.py:run_worker`. A
-  worker runs each job in a killable subprocess (hard timeout), publishes `worker:<name>:alive` heartbeats (state,
+  worker runs each job in a killable subprocess (hard timeout: one hour for every tool since 2026-10-31,
+  `WORKER_TIMEOUT_SEC`, so failure rates compare tools under one budget), publishes `worker:<name>:alive` heartbeats (state,
   the job with its start, the container's memory and limit, the last result; read by the UI and the board), marks the
   job running via the routing hash `jobs:routing` (`common/jobs.py:mark_job_running`; a job the hash no longer lists,
   cancelled or deleted while queued, is skipped) and pushes the `JobResult` to
@@ -311,7 +312,7 @@ repository level: its Java algorithms carry no location); `--include-crypto --ev
 | `pqcheck` | pqcheck | Python, Go | |
 | `qdarpan` | qdarpan | Java, Go, C | the worker adapter moves `qdarpan:location.N` into `evidence.occurrences` |
 | `securin-xbom` | securin-xbom | Java, Python | the registry rule sets it fetches online, frozen unfiltered at a semgrep-rules commit |
-| `cipherradar` | cipherradar | Java, Python, Go, JS | runs outside the clone; Java files with its crash trigger pre-excluded via `.cradarignore` (recorded); 12 GiB since 2026-10-30 (killed at 4 on pycryptodome, bunkerweb, pyca/cryptography, 2026-10-23; highest trial peak 7.3 at 8) |
+| `cipherradar` | cipherradar | Java, Python, Go, JS | runs outside the clone; its Java pass crashes on `new ECGenParameterSpec(<identifier>)` and the run fails (since 2026-10-31; `CRADAR_EXCLUDE_CRASHERS=1` pre-excludes those files via `.cradarignore`, recorded, off in every run); 12 GiB since 2026-10-30 (killed at 4 on pycryptodome, bunkerweb, pyca/cryptography, 2026-10-23; highest trial peak 7.3 at 8) |
 | `scanoss` | scanoss | Go, C, JS, Rust | crypto-finder with the public open rules; Java/Python rules need an API key (research key requested) |
 | `ciphersift` | ciphersift | Java, Python, Go | benchmark-informed: `tailored_on` the micro projects and the pilot corpus (refinement 13) |
 | `xgrep` | xgrep | Java, Python, Go, JS | 0.101.0 (pinned 2026-10-30) also reports key and certificate files (`.pem`, `.crt`, `.p12`, ...): on corpus-pilot-medium its records went from 5.7k to 38k, half of them outside code (0.86.0: 0.03), at 3.3 times the time. Two limits of its own, read from the binary (2026-10-31), defaults kept as shipped: a 500 ms wall-clock limit per regex match that counts as "no match" (`XGREP_REGEX_MATCH_TIMEOUT`), so a loaded host can drop findings in large files (FairEmail: 11 places in its two largest files missing in the replica test's busier run, same image); and a graph budget above which it skips its cross-file analysis (`XGREP_MAX_GRAPH_FILES`, `XGREP_MAX_CROSSFILE_NODES`, 0 forces it), which the worker records from its stderr (`tool warning:` notes, runs.csv `tool_warning`) |
@@ -729,12 +730,13 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
       current pinned releases, robust workers (cwd outside the clone, timeouts, failure reporting), and everything
       that changes results in `tool_version` or the run notes.
     - *No repairs:* no source patches, no rewriting of a tool's input or output, no rule filtering, no files added to
-      scanned repos. A crash is a result about the tool. The one intervention (sharpened 2026-10-20): when a crash
-      on a specific file ends the whole scan, that file is left out through the tool's *own* exclusion mechanism, by
-      its exact path, and recorded in the run notes (`workaround:` lines, the `workaround` column of runs.csv):
-      CipherRadar's `.cradarignore`. Without such a mechanism the run fails (CryptoScan 1.4.0: its `--exclude`
-      matches basenames only). A tool that runs but finds less is never steered (CBOMkit's `src/` indexing stays
-      off). Effects of each, for the paper: `docs/findings.md` "Interventions".
+      scanned repos. A crash, like a timeout, is a result about the tool: the run fails (decided 2026-10-31 for
+      corpus-main and mutation-main). The former intervention (2026-10-20 to 2026-10-31), leaving out a file a crash
+      ends the whole scan on through the tool's *own* exclusion mechanism, recorded in the run notes (`workaround:`
+      lines, the `workaround` column of runs.csv), stays in the code, off: CipherRadar's `.cradarignore`
+      (`CRADAR_EXCLUDE_CRASHERS`). A tool that runs but finds less is never steered (CBOMkit's `src/` indexing stays
+      off). A debug rerun only diagnoses a result and never replaces it; an error in our setup means a new run of
+      that tool on every repository, recorded. Effects of each, for the paper: `docs/findings.md` "Interventions".
     - *Analysis:* our analysis reads every location format a tool uses.
     - *Check a 0 before accepting it:* rerun the tool in a throwaway container with its debug output and find the
       cause; distinguish *by design* (cdxgen gives no Java locations) from *our setup* (cdxgen without `-t` never

@@ -375,7 +375,7 @@ when a tool crashes on a specific file and the crash ends the whole scan, that f
 reports the crash). A tool that runs but finds less is never steered (that is a finding about the tool), and nothing
 else in its input changes (decided 2026-10-20). Numbers: the VM run of 2026-10-20 (12 repos, run 1; items are voters'
 L4 identities per repository, CipherSift and observers left out).
-- **CipherRadar `.cradarignore` (kept).** The Java pass dies with a nil pointer on `new ECGenParameterSpec(
+- **CipherRadar `.cradarignore` (off since 2026-10-31, below).** The Java pass dies with a nil pointer on `new ECGenParameterSpec(
   <identifier>)` and writes no CBOM. The worker lists the Java files with that trigger in `.cradarignore`,
   CipherRadar's own ignore file: 1 file in jjwt (`EcSignatureAlgorithm.java`), 9 in keycloak (6 of them tests).
   Without it CipherRadar fails on 2 of the 4 Java repos and loses all 23 of its items there (8 + 15, of its 127).
@@ -627,6 +627,20 @@ once (decided 2026-10-31); this is our own determinism check.
   would have failed no tool.
 - **One timeout from our limit:** CryptobomForge timed out on curl (C) in run 1 at its 600 s limit, which run 1 met in
   the experiment's first seconds, when every tool and replica started at once; runs 2 and 3 took 429 and 433 s. Its
-  limit was the lowest of all workers and is 1800 s now (`docker-compose.yml`), so that corpus-main's large Python
-  repositories (pilot-medium: 170 s on 24 MB of source) are not cut by our setup.
+  limit was the lowest of all workers; since 2026-10-31 every tool has one hour (below).
+
+## Corpus and mutation runs: one time limit, no interventions (decided 2026-10-31)
+- **One time limit:** every tool worker has `WORKER_TIMEOUT_SEC=3600` (`docker-compose.yml`), replacing the
+  per-tool limits of 600 s (CryptoScan) to 2700 s (CBOMkit, xgrep), so a timeout means the same for every tool and
+  the failure rates compare tools under one budget. bar-micro stays as run: no tool came near a limit there.
+- **No interventions:** CipherRadar's `.cradarignore` (above) is off (`CRADAR_EXCLUDE_CRASHERS`, default 0), so a
+  crash, like a timeout, is the tool's result and the run fails. Expected effect: CipherRadar fails on the Java
+  repositories containing `new ECGenParameterSpec(<identifier>)` (the pilot: 2 of 4 Java repositories), and by the
+  selection rule of mutation-main each such failure keeps the repository out of mutation-main for every tool. No
+  planted call triggers it (the catalog's curve is the literal `"secp256r1"`), and bar-micro and stability-pilot
+  recorded no exclusion. A rerun with debug output only diagnoses an empty or failed result and never replaces a
+  recorded one; only an error in our setup leads to a new run of that tool on every repository, recorded as such.
+- **To count after corpus-main:** CipherRadar's Java failures with this crash, and every run at its memory limit or
+  OOM-killed (the summary's "Memory limits"), since the memory limits differ per tool (2 to 24 GiB) and an OOM kill
+  counts as the tool's failure.
 

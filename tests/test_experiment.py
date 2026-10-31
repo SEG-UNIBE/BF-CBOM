@@ -522,3 +522,4 @@ def test_smallest_clean_corpus_takes_the_smallest_repos_where_every_supported_to
     # t1 ran 6 repos at 0.1 h each (10 runs per repo in the mutation experiment), the selection 3 of them
     assert out["projection"] == {"variants": 10, "hours": {"t1": [6.0, 3.0], "t2": [4.0, 2.0]}}
     assert out["selected_from"] == "corpus-x" and "smallest source size" in out["rule"]
+    assert out["short"] == {"Python": 1}  # Python has one clean repo, fewer than 2: taken, and said

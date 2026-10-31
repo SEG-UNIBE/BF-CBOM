@@ -2,11 +2,12 @@
 
 Pilot verdict (2026-10-08): pass on Python, Go and JavaScript; borderline on Java because the Java
 pass crashes (nil pointer in constant propagation) on `new ECGenParameterSpec(<identifier>)`
-(jjwt, Keycloak, santuario). The tool is run as released (no source patch). Before the first run the
-worker lists every `*.java` file containing the crash trigger (`new ECGenParameterSpec(<identifier>)`)
-in `.cradarignore` (CRADAR_PREFILTER, default on; this reproduces the pilot's hand-made ignore lists
-exactly, and the crash output names no file, so reading the culprit from the output cannot work); the
-output-based retry is kept as a last fallback. Excluded files are recorded in the result notes.
+(jjwt, Keycloak, santuario). The tool is run as released (no source patch), and a crash is its result: the run
+fails (decided 2026-10-31 for the corpus and mutation runs). CRADAR_EXCLUDE_CRASHERS=1 switches on the former
+workaround: before the first run the worker lists every `*.java` file containing the crash trigger
+(`new ECGenParameterSpec(<identifier>)`) in `.cradarignore` (this reproduces the pilot's hand-made ignore lists
+exactly, and the crash output names no file, so reading the culprit from the output cannot work), and a crash is
+retried without the file the output names, as a last fallback. Excluded files are recorded in the result notes.
 Command as the pilot ran it:
 `cradar --verbose scan <repo> -o out.json --validate --no-baseline --passes 1,2`.
 
@@ -32,7 +33,8 @@ TIMEOUT_SEC = int(os.getenv("WORKER_TIMEOUT_SEC", "1800"))
 BINARY = os.getenv("CRADAR_BIN", "cradar")
 EXTRA_ARGS = os.getenv("CRADAR_ARGS", "").split()
 MAX_IGNORE_RETRIES = int(os.getenv("CRADAR_MAX_IGNORE_RETRIES", "20"))
-PREFILTER = os.getenv("CRADAR_PREFILTER", "1") == "1"  # pre-exclude Java files with the known crash trigger
+# off: a crash fails the run; on: files with the known crash trigger, and files a crash names, go into .cradarignore
+EXCLUDE_CRASHERS = os.getenv("CRADAR_EXCLUDE_CRASHERS", "0") == "1"
 # cradar 1.x crashes in the Java pass on `new ECGenParameterSpec(<identifier>)` (nil constant propagator)
 EC_CRASH = re.compile(r"new\s+ECGenParameterSpec\s*\(\s*[A-Za-z_$][\w$]*\s*[,)]")
 # Go panics print the goroutine stack; the scanned file shows up in the "scanning"/"processing" lines
@@ -88,7 +90,7 @@ def prefilter_crashers(repo_path: Path) -> list[str]:
 
 
 def run_cradar(repo_path: Path, out_file: Path, home: Path, trace: Trace, *, deadline: float) -> list[str]:
-    """Run cradar, retrying with a growing .cradarignore on crashes. Returns the ignored files."""
+    """Run cradar (with EXCLUDE_CRASHERS: again with a growing .cradarignore on crashes). Returns the ignored files."""
     env = os.environ.copy()
     env.update(
         {
@@ -101,7 +103,7 @@ def run_cradar(repo_path: Path, out_file: Path, home: Path, trace: Trace, *, dea
             "DO_NOT_TRACK": "1",
         }
     )
-    ignored = prefilter_crashers(repo_path) if PREFILTER else []
+    ignored = prefilter_crashers(repo_path) if EXCLUDE_CRASHERS else []
     if ignored:
         with (repo_path / ".cradarignore").open("a", encoding="utf-8") as fh:
             fh.write("".join(f + "\n" for f in ignored))
@@ -130,7 +132,7 @@ def run_cradar(repo_path: Path, out_file: Path, home: Path, trace: Trace, *, dea
                 tail = "\n".join(output.strip().splitlines()[-5:])
                 trace.add(f"cradar exit code {proc.returncode} (output written): {tail[:300]}")
             return ignored
-        culprit = _crashed_file(output, repo_path)
+        culprit = _crashed_file(output, repo_path) if EXCLUDE_CRASHERS else None
         if culprit is None or culprit in ignored:
             tail = "\n".join(output.strip().splitlines()[-10:])
             raise RuntimeError(f"cradar_no_output rc={proc.returncode}: {tail[:800]}")

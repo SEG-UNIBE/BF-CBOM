@@ -207,7 +207,7 @@ tools:
     version_url: "https://github.com/nk-sentinel/cipherradar/commit/efa5d9de322c9120b15acc2e958dc6c1c4e609e1"
     shipped: CLI (Go binary, built from source)
     cbom_by: tool                   # CycloneDX 1.7
-    languages: [java, python, go, javascript]   # Java: nil-pointer crash on `new ECGenParameterSpec(<identifier>)` (jjwt, Keycloak) is worked around in the worker (files with the trigger pre-excluded via .cradarignore, recorded in the notes; the tool itself is not patched)
+    languages: [java, python, go, javascript]   # Java: nil-pointer crash on `new ECGenParameterSpec(<identifier>)` (jjwt, Keycloak) fails the run; the worker's .cradarignore workaround (CRADAR_EXCLUDE_CRASHERS) is off since 2026-10-31
     voter_group: cipherradar        # own voter: its rules share no rule with securin-xbom's or SCANOSS's (3 bare API names in Go)
     engine_family: semgrep          # opengrep (a semgrep fork) for its rule pass, plus tree-sitter and YARA-X passes
     status: integrated             # workers/cipherradar

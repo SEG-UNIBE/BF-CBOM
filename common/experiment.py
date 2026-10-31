@@ -963,7 +963,8 @@ def smallest_clean_corpus(exp_dir: Path, *, per_language: int, variants: int, re
     timeout or OOM kill, or a missing run, excludes the repository for every tool (listed under `excluded`). The repos
     keep their pinned commits, so the mutants are made on the code the corpus run scanned. `projection`: per tool the
     summed hours of its runs times `variants` (the runs a repository gets in the mutation experiment), over every
-    repository and over the selection, so the length of a tool's lane with one container."""
+    repository and over the selection, so the length of a tool's lane with one container. `short`: every language
+    with fewer clean repositories than `per_language`, and how many it has (all of them are taken; no fallback)."""
     spec = load_spec(spec_path(exp_dir))
     registry = registry if registry is not None else load_tools()
     status: dict[tuple[str, str], str | None] = {}
@@ -987,10 +988,12 @@ def smallest_clean_corpus(exp_dir: Path, *, per_language: int, variants: int, re
             excluded.append({"full_name": repo.full_name, "language": repo.language, "reason": reason, "runs": failed})
         else:
             clean.append(repo)
-    selected = []
+    selected, short = [], {}
     for language in dict.fromkeys(r.language for r in spec.repos):
         ranked = sorted((r for r in clean if r.language == language), key=lambda r: (r.source_bytes, r.full_name))
         selected += ranked[:per_language]
+        if len(ranked) < per_language:
+            short[language] = len(ranked)
 
     def hours(repos: list[RepoSpec]) -> dict[str, float]:
         lane = {t: 0.0 for t in spec.tools}
@@ -1007,6 +1010,7 @@ def smallest_clean_corpus(exp_dir: Path, *, per_language: int, variants: int, re
             "supported tool's run on the original was ok"
         ),
         "projection": {"variants": variants, "hours": {t: [every[t], chosen[t]] for t in spec.tools}},
+        "short": short,
         "excluded": excluded,
         "repos": [_record_entry(r) for r in selected],
     }

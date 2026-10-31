@@ -1047,6 +1047,12 @@ def corpus_smallest(
     counts = Counter(r.get("language") for r in corpus["repos"])
     typer.echo(f"wrote {len(corpus['repos'])} repos ({', '.join(f'{k} {v}' for k, v in counts.items())}) to {out}")
     typer.echo(f"excluded {len(corpus['excluded'])} repos with a failed run (listed under `excluded` in the file)")
+    for language, n in corpus["short"].items():
+        typer.secho(
+            f"warning: {language} has only {n} clean repos, fewer than --per-language {per_language}; all {n} taken",
+            fg=typer.colors.YELLOW,
+            err=True,
+        )
     hours = corpus["projection"]["hours"]
     for label, i in (("every repository", 0), ("the selection", 1)):
         slowest = max(hours, key=lambda t: hours[t][i])

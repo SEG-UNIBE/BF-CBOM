@@ -134,7 +134,8 @@ The mutation run, `mutation-main.yaml`, takes its corpus from corpus-main's reco
 `make corpus-smallest ARGS="--from corpus-main --out /data/results/corpus/mutation-main.yaml"` writes per language the
 30 repositories with the smallest source size (at the pinned commit) among those where every supported tool's run on
 the original was ok, with their commits, the excluded repositories and the projected length of the mutation run over
-every repository and over the selection (31 runs per repository, one container per tool). `make corpus-export`
+every repository and over the selection (31 runs per repository, one container per tool). A language with fewer than
+30 clean repositories keeps all of them, with a warning and its count under `short` in the file. `make corpus-export`
 copies it to `experiments/results/`, and it is committed as `experiments/corpus/mutation-main.yaml`.
 
 ## Spec format
