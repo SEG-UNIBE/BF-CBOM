@@ -37,5 +37,5 @@ rerunning bar-micro.
 Notes:
 - **pqcheck.** The pinned release `v0.1.0` predates the default branch by about 20 fix commits, and both carry the version string 0.1.0. The rule takes the release.
 - **CipherRadar.** Its tags are release candidates only (`v0.4.0-rc.4`, `v0.5.0-rc.1`), so the rule takes the default branch.
-- **cdxgen.** It moved from 12.8.5 to 13.5.0 across a major version. Its invocation flags (`--include-crypto`, `--evidence`, `-t`, `--no-install-deps`) are unchanged in 13.5.0's CLI reference.
-- **Bar exam.** cdxgen, Cryptarium, qelens and qScan failed the bar exam and run on bar-micro only.
+- **cdxgen.** It moved from 12.8.5 to 13.5.0 across a major version. Its invocation flags (`--include-crypto`, `--evidence`, `-t`, `--no-install-deps`) are unchanged in 13.5.0's CLI reference, but without `-t` 13.x no longer falls back to Java for its code analysis, so Java repositories get `-t java` (`docs/findings.md`, 2026-10-31).
+- **Bar exam.** Cryptarium, qelens and qScan failed the bar exam and run on bar-micro only. cdxgen passed it in Go (bar-micro of 2026-10-31) and runs there only.

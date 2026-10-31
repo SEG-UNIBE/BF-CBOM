@@ -10,9 +10,11 @@ example, voter groups, how family and group are argued),
 `docs/pilot-2026-10-08/` (the colleague's pilot).
 
 ## Rules
-- **Current scope and wording (2026-10-22, bar 2026-10-23, CBOMkit 2026-10-30):** describe BF-CBOM publicly as
+- **Current scope and wording (2026-10-22, bar 2026-10-31, CBOMkit 2026-10-30):** describe BF-CBOM publicly as
   integrating **14 CBOM generator tools**, CBOMkit in both of its official distributions (server and GitHub Action,
-  15 workers), of which **10 are eligible** after the bar exam (the specs name them by hand). Both CBOMkit
+  15 workers), of which **11 are eligible** after the bar exam (the specs name them by hand; cdxgen in Go only,
+  `tool_languages`). Eligibility is per tool and language: a tool below the bar in a language is "not eligible" there,
+  never "disqualified". Both CBOMkit
   distributions passed with identical scores; the later specs run the server only (`cbomkit`: one failed run fewer
   on corpus-pilot-medium, 58 vs 57 of 60, otherwise identical results, although at about twice the RAM, peak 13 vs
   6.8 GB; decided 2026-10-30). LLM providers are
@@ -43,7 +45,9 @@ example, voter groups, how family and group are argued),
   since 2026-10-30 every worker reaches its peak comfortably, because the paper reports peaks and never limits
   (CBOMkit 20 GiB with `-Xmx16g`, the heap being its binding limit; CipherRadar 12; xgrep 8; the trials' highest
   peaks were 12.8, 7.3 and 3.0). corpus-main is to run with `REPLICAS="cbomkit=2"`: with the services, the summed caps
-  are 115 of 121.5 GiB, so every job can reach its cap at once (decided 2026-10-30).
+  are 115 of 121.5 GiB, so every job can reach its cap at once (decided 2026-10-30). With cdxgen (eligible in Go since
+  the bar of 2026-10-31, 24 GiB) they are 139: open whether its cap goes down to what its Go runs need (its Go peaks
+  from the next corpus run) or the plan accepts it.
   The laptop is for code, configs and analysing copied exports.
 - **Results are disposable until the paper's runs.** One code path per feature, no compatibility with older result
   layouts; old experiments are rerun, not migrated.
@@ -290,15 +294,18 @@ each tool's invocation and caveats are in the table below, the details in its `w
 `docker/Dockerfile.worker-<tool>`. **The bar exam decides who plays, by hand** (decided 2026-10-22): a tool is
 eligible in the languages where it passed the bar, and a tool below the bar in every language is `bar failed`; the
 user reads the bar-micro report and writes that into the specs (`tool_languages:`, the `tools` list). No code
-couples the verdicts to the specs and nothing records them but the export. Bar of 2026-10-23: 11 eligible in every
-language they were scored in; cdxgen, cryptarium, qelens and qscan failed it. The transitional observer role
+couples the verdicts to the specs and nothing records them but the export. Bar of 2026-10-31 (the versions of
+2026-10-30): 12 pass, 11 of them in every language they were scored in and cdxgen in Go only (9 of 14; Java 0, its Java
+algorithms carry no location); cryptarium, qelens and qscan failed it (bar of 2026-10-23: cdxgen failed too, with
+12.8.5). The transitional observer role
 (2026-10-19) was removed on 2026-10-30: every tool votes.
 
 | Worker | Voter group | Languages | Invocation and caveats |
 |---|---|---|---|
 | `cbomkit` | cbomkit | Java, Python, Go | CBOMkit server image, cloned through the git server over TLS; Python covers pyca only; modules need a build file and `src/`; large repos need ~45 min and a 16 GB heap |
 | `cbomkit-jar` | cbomkit | Java, Python, Go | cbomkit-action, source only, the same engine; runs on bar-micro only since 2026-10-30 (the server's results were the same, with one failed run fewer); the indexing risk (build file without `src/`) is noted, `CBOMKIT_ENSURE_SRC=1` stays off |
-| `cdxgen` | cdxgen | Java, JS, Go | the languages its README claims crypto for (Java keystores and certificates, JS/TS, Go through golem), no Python (2026-10-31); bar-micro of 2026-10-31: 9 of 14 in Go, 0 in Java (run without `-t`, see below); `--include-crypto --evidence`, `-t java` / `-t go` for those repos, the README's `cbom -t java` (13.x picks the language from the packages the BOM lists without `-t` and skipped its code analysis on micro-java, which has none; 12.x fell back to Java; the `cbom` command finds nothing in Go, `--profile research` adds nothing; checked 2026-10-22); algorithms carry locations only for JS/TS (occurrences) and Go (property `cdx:golem:crypto:sourceLocation`, one per asset); Go analysis type-checks, so a module's imports resolve only with its `go.sum`, network and a writable module cache (a GOPATH per job: under `cap_drop` root cannot create the image's; until 2026-10-22 every Go repo with a dependency gave nothing); Java with `-t java` gives algorithms without locations (micro-java: `aes`, `des`, `hmacSHA`, `sha-256`, 13.5.0, checked 2026-10-31 in a throwaway container, the same in the plain upstream image); atom 3.1.1 crashes on micro-python (`Failed to enhance CPG`), moot since Python is not claimed; lines saying its code analysis was skipped or failed are recorded as `tool warning:` notes (`analysis_warnings`); 24 GiB (OOM-killed at 8 on Chat2DB, bisq, bisq2, kafka; at 16 on 8 of 60 pilot-medium repos, 2026-10-23) |
+| `cdxgen` | cdxgen | Java, JS, Go | the languages its README claims crypto for (Java keystores and certificates, JS/TS, Go through golem), no Python (2026-10-31); bar-micro of 2026-10-31 (rerun with `-t java`): eligible in Go (9 of 14), not in Java (0 at the call sites, 6 at
+repository level: its Java algorithms carry no location); `--include-crypto --evidence`, `-t java` / `-t go` for those repos, the README's `cbom -t java` (13.x picks the language from the packages the BOM lists without `-t` and skipped its code analysis on micro-java, which has none; 12.x fell back to Java; the `cbom` command finds nothing in Go, `--profile research` adds nothing; checked 2026-10-22); algorithms carry locations only for JS/TS (occurrences) and Go (property `cdx:golem:crypto:sourceLocation`, one per asset); Go analysis type-checks, so a module's imports resolve only with its `go.sum`, network and a writable module cache (a GOPATH per job: under `cap_drop` root cannot create the image's; until 2026-10-22 every Go repo with a dependency gave nothing); Java with `-t java` gives algorithms without locations (micro-java: `aes`, `des`, `hmacSHA`, `sha-256`, 13.5.0, checked 2026-10-31 in a throwaway container, the same in the plain upstream image); atom 3.1.1 crashes on micro-python (`Failed to enhance CPG`), moot since Python is not claimed; lines saying its code analysis was skipped or failed are recorded as `tool warning:` notes (`analysis_warnings`); 24 GiB (OOM-killed at 8 on Chat2DB, bisq, bisq2, kafka; at 16 on 8 of 60 pilot-medium repos, 2026-10-23) |
 | `cryptobomforge` | cryptobomforge | Python, C | CodeQL's crypto inventory queries, C with `--build-mode none`; writes IBM's draft `1.4-cbom-1.0`, not CycloneDX, also when CodeQL finds nothing (every stored CBOM is the tool's; the worker's placeholder for that case went 2026-10-20) |
 | `deepseek`, `chatgpt`, `claude` | one each, `merge_group: llm` | all five | `common/llm_cbom.py` (below), CycloneDX 1.7 assembled by us; `chatgpt` / `claude` need `make up-prod EXTRA_PROFILES=llm` and a key in `docker/env/worker-<provider>.env`; a request that fails after the provider's retries fails the job (no partial CBOMs), `LLM_MAX_CHUNKS` 1000, `LLM_CONCURRENCY` 4 |
 | `cryptoscan` | cryptoscan | eleven | always `--include-quantum-safe`; skips folders named demo, example, sample; 1.4.0 panicked on specific files and the run failed (its `--exclude` could not name one exact file, so no workaround; `docs/findings.md` "Interventions"); 1.5.0 (pinned 2026-10-30) says such lines no longer end the scan and skips vendor, venv and target folders by default; on corpus-pilot-medium 1.5.0 failed on no repo (1.4.0: 9) |
@@ -390,12 +397,11 @@ a "quorum" question and a meta-question on the method.
 mutation harness); every other language (C, JavaScript/TypeScript, Rust, ...) is irrelevant for now: tools still run
 where they declare support, but no analysis, figure or tuning effort goes into those languages.
 
-## Status (updated 2026-10-29)
-- **Current experiment scope:** 15 CBOM generator tools integrated; the bar exam of 2026-10-23 passes 11 of them
-  (`docs/findings.md` "Export review 2026-10-24"), confirmed by the rerun with eight decoys (bar-micro export of
-  2026-10-29: the same 11 pass, the same 4 fail, the gap between the lowest pass and the highest fail is 8 vs 6 of
-  14). Every spec but bar-micro lists 10 of the 11, `cbomkit-jar` left out since 2026-10-30 (no `tool_languages` needed: every passed tool passes in every language
-  it was scored in). LLM providers are excluded for now; the provider workers and their analysis support remain implemented.
+## Status (updated 2026-10-31)
+- **Current experiment scope:** 15 CBOM generator tools integrated; the bar exam of 2026-10-31 (bar-micro export, the
+  tool versions of 2026-10-30) passes 12 of them: 11 in every language they were scored in, cdxgen in Go only
+  (`docs/findings.md` "2026-10-31, cdxgen 13.5.0 in Java and Python"). Every spec but bar-micro lists 11 of the 12,
+  `cbomkit-jar` left out since 2026-10-30, with `tool_languages: {cdxgen: [go]}`. LLM providers are excluded for now; the provider workers and their analysis support remain implemented.
 - **Exports of 2026-10-24 reviewed:** bar-micro, corpus-pilot-small, corpus-icpc, corpus-pilot-medium and
   mutation-pilot, rerun whole with vocabulary 2026-10-23.2 and the caps of 2026-10-23 (cdxgen 24 GiB, CipherRadar
   8 GiB), sizes recorded at pin time. Headline agreement at L4 0.78-0.81 (exact matcher) against RaQuN's 0.58-0.59;
@@ -423,7 +429,8 @@ where they declare support, but no analysis, figure or tuning effort goes into t
   foremost; CBOMkit and most 1.6 tools carry family and parameters in names, CipherRadar and CryptobomForge in
   fields; cdxgen changes untouched Java code in 30 % of the mutants, CipherRadar in 8-14 %).
 - **Paper thread (discussed 2026-10-29):** step 0 "Subject tools" before the RQs (see "Research questions"); the
-  paper owns that the bar requires a located finding (it decides cryptarium by construction) and that CipherSift
+  paper owns that the bar requires a located finding (it decides cryptarium by construction, and cdxgen in Java) and
+  that CipherSift
   passes trivially (only its decoy precision on the four new kinds is held out). To write: `docs/tool-selection.md`,
   the candidate table with every tool's fate; "eligible" wording in the summary's bar section. Open: whether the
   four tools that failed the bar appear after step 0 (the proposal: one table and done).

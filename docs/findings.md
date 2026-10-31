@@ -142,6 +142,9 @@ capabilities) and of the plain upstream image, with the same results in both:
   `tool warning:` notes (`tool_warning` in `runs.csv`), so a silent skip shows in the summary.
 - Seen without effect on the CBOM: the upstream image lacks the `atom_tools` Python module cdxgen calls for an OpenAPI
   step in Java.
+- **Rerun** (bar-micro, 2026-10-31, commit fd08573, Java with `-t java`): Java 0 at the call sites and 6 of 14 at
+  repository level (the four algorithms cover AES three times, 3DES, SHA-256 and HMAC-SHA256), Go 9 of 14 as before,
+  Python unsupported. No run recorded a tool warning.
 
 ### 2026-10-22, micro ground truth v2: generated from the snippet catalog, with decoys
 On e0-micro of 2026-10-22, 18 of the 226 misses had a record of the item's family within two lines: the hand-written
@@ -598,3 +601,19 @@ mixed builds.
   link to the `test` ones), which the tools follow in the checkout and the snapshot reader returned as the link's
   one line; certbot and gocryptfs are to be checked with the next report on the VM. Files are now read as a checkout
   shows them. The other 7 `unread` records are CipherRadar's places inside JAR files (`x.jar!/...`).
+
+## Bar exam 2026-10-31 (bar-micro, the tool versions of 2026-10-30)
+Every tool once on the three micro projects, every container built from one commit, CPU recorded for every run.
+- **Verdicts:** 12 of 15 tools pass. 11 pass in every language they were scored in: cbomkit, cbomkit-jar, cipherradar,
+  ciphersift, cryptobomforge, cryptoscan, pqcheck, qdarpan, scanoss, securin-xbom, xgrep. cdxgen passes in Go only
+  (9 of 14, 12.8.5: 6) and is below the bar in Java (0: its Java algorithms carry no location). cryptarium (0
+  everywhere: no locations), qelens (5 of 14 in Python, on import lines) and qscan (5 of 14 everywhere) failed it.
+  The later specs list the eligible tools but cbomkit-jar, with `tool_languages: {cdxgen: [go]}`.
+- **Decoys:** as before, only CipherRadar reports crypto on one, the comment and the log message in every language.
+- **xgrep 0.101.0 reports each algorithm also where its function is called.** Its precision on the micro projects
+  fell from 1.00 (0.86.0) to 0.79 / 0.66 / 0.62 (Java / Python / Go) with recall unchanged: its wrapper resolution
+  adds an occurrence at the call of the function that holds the crypto (`step01()` in `main`, context `crypto/rsa
+  (resolved via wrapper step01 at main.go:24)`). The ground truth counts only the function's own lines, so these
+  places are false ones. The same places lower its strong traceability (0.67) and its location rate (0.61), and in the
+  mutation runs they will show as changes off the edit at the callers of each mutant's host.
+

@@ -6,6 +6,8 @@
 #   make analysis ARGS="report corpus-pilot-small"
 name: corpus-pilot-small
 description: pilot corpus rerun through BF-CBOM (location-aware agreement across tools), paper languages only
-tools: [cbomkit, cipherradar, ciphersift, cryptobomforge, cryptoscan, pqcheck, qdarpan, scanoss, securin-xbom, xgrep]  # the bar exam of 2026-10-29 (bar-micro export) passed 11, of which cbomkit-jar is left out (CBOMkit runs as its server distribution, decided 2026-10-30); cdxgen, cryptarium, qelens, qscan failed the bar
+tools: [cbomkit, cdxgen, cipherradar, ciphersift, cryptobomforge, cryptoscan, pqcheck, qdarpan, scanoss, securin-xbom, xgrep]  # the bar exam of 2026-10-31 (bar-micro export) passed 12, of which cbomkit-jar is left out (CBOMkit runs as its server distribution, decided 2026-10-30); cryptarium, qelens, qscan failed the bar
+tool_languages:  # cdxgen is eligible in Go only (9 of 14); in Java it is below the bar (0: its Java algorithms carry no location), Python is not one of its languages
+  cdxgen: [go]
 repetitions: 1
 corpus: corpus/pilot-2026-10-08.yaml
