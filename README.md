@@ -64,7 +64,7 @@ Uses SonarQube's sonar-cryptography plugin for static analysis and supports comp
 the same sonar-cryptography engine packaged as a GitHub Action (a jar), run without the server. Both distributions passed the bar exam with identical scores; the experiments after it run the server, which failed on one repository fewer.
 
 - **[`cdxgen`](https://github.com/cdxgen/cdxgen)**:
-OWASP's CycloneDX generator, primarily for SBOMs but with CBOM extensions since April 2024. Its crypto output is mostly crypto libraries and key/certificate files; algorithms come with file and line only for JavaScript/TypeScript and Go. For Python and Go repos the worker passes `-t python` / `-t go`, since otherwise cdxgen's code analysis falls back to Java.
+OWASP's CycloneDX generator, primarily for SBOMs but with CBOM extensions since April 2024. Its crypto output is mostly crypto libraries and key/certificate files; algorithms come with file and line only for JavaScript/TypeScript and Go. It runs on the languages its README claims crypto support for (Java keystores and certificates, JavaScript/TypeScript, Go through golem), not on Python. For Java and Go repos the worker passes `-t java` / `-t go`, the README's own CBOM call, since without one cdxgen picks the language from the packages it finds and skips its code analysis when there are none.
 
 - **[`CryptobomForge`](https://github.com/Santandersecurityresearch/cryptobom-forge)**:
 Santander Security Research's CLI tool that turns CodeQL SARIF output into a CBOM (IBM's pre-standard draft format). The worker runs CodeQL's experimental crypto queries, which exist for Python and C/C++ only.

@@ -796,6 +796,7 @@ VERDICT_MARK = {"pass": OK, "fail": FAIL}  # a micro project's verdict in the ba
 
 
 BAR_MARK = {BAR_PASSED: OK, BAR_FAILED: FAIL}  # the tool's verdict over its micro projects
+BAR_SHOWN = {BAR_PASSED: "passed", BAR_FAILED: "failed"}  # the verdict as the bar table shows it (data unchanged)
 
 
 def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
@@ -867,8 +868,9 @@ def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
              "found in their functions.",
              "`–`: not run, a language the tool does not support, `error`: the run failed or timed out."),
             ("bar exam", "the tool's verdict.",
-             "`bar passed`: it clears the bar in at least one language.",
-             "`bar failed`: it was scored and clears it nowhere, a candidate to leave out of the later specs.",
+             f"`{BAR_SHOWN[BAR_PASSED]}`: it clears the bar in at least one language.",
+             f"`{BAR_SHOWN[BAR_FAILED]}`: it was scored and clears it nowhere, a candidate to leave out of the later "
+             "specs.",
              "`not judged`: without any scored run."),
         ]
     )  # fmt: skip
@@ -958,9 +960,9 @@ def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
 
 
 def _bar_cell(verdict: str) -> str:
-    """The tool's bar verdict with its mark (`bar passed`, `bar failed`; `not judged` has none)."""
+    """The tool's bar verdict with its mark, shown as `passed` or `failed` (`not judged` has no mark)."""
     mark = BAR_MARK.get(verdict)
-    return f"{mark} {verdict}" if mark else verdict
+    return f"{mark} {BAR_SHOWN[verdict]}" if mark else verdict
 
 
 def _handover(rows: list[dict], tools: list[str], langs: list[str]) -> list[str]:

@@ -105,7 +105,7 @@ summary's "Units per tool" prints both side by side.
 | pqcheck | per hit | a finding (with detector id and confidence); declared dependencies are separate library components, skipped | one occurrence |
 | qelens | per hit | a finding, many of them on import lines | one occurrence |
 | securin-xbom | per hit | a semgrep finding, named after the rule id | one occurrence |
-| cdxgen | per algorithm | an algorithm name (lower case, with OID); also crypto files (certificates, keys) | only for JS/TS (occurrences) and Go (property `cdx:golem:crypto:sourceLocation`); Java and Python algorithms have none |
+| cdxgen | per algorithm | an algorithm name (lower case, with OID); also crypto files (certificates, keys) | only for JS/TS (occurrences) and Go (property `cdx:golem:crypto:sourceLocation`); Java algorithms have none (Python is not scanned: cdxgen claims no Python crypto) |
 | Cryptarium | no places | a distinct finding id | none: the CBOM has no locations (only the tool's JSON format has them) |
 | DeepSeek, ChatGPT, Claude | per hit | a site the model reported (CycloneDX assembled by our worker, `common/llm_cbom.py`) | one occurrence, file and line checked against the clone |
 

@@ -67,9 +67,8 @@ tools:
     voter_group: cbomkit            # one voter together with cbomkit; a separate tool in every other table
     status: integrated              # workers/cbomkit-jar; source-only scan (CBOMKIT_JAVA_REQUIRE_BUILD=false), CBOMKIT_LANGUAGES from the repo language
   cdxgen:
-    # failed the bar exam (2026-10-23); integrated, run on bar-micro only
     engine: cdxgen
-    packaging: per algorithm    # one component per algorithm; one location at most (Go, a property), none in Java and Python
+    packaging: per algorithm    # one component per algorithm; one location at most (Go, a property), none in Java
     memory_gb: 24                   # 4 OOM-killed Gradle on bisq/bisq2 (2026-10-18); 8 still on Chat2DB, bisq, bisq2, kafka (2026-10-19); 16 on 8 of 60 pilot-medium repos (2026-10-23)
     approach: atom (code analysis) and golem (Go type checking) + dependency manifests, its crypto output mostly libraries and certificates
     vendor: OWASP cdxgen
@@ -78,14 +77,16 @@ tools:
     version_url: "https://github.com/cdxgen/cdxgen/releases/tag/v13.5.0"
     shipped: CLI (npm package, Docker image)
     cbom_by: tool
-    languages: [java, python, javascript, go]   # crypto locations: JS/TS occurrences and Go sourceLocation properties
+    # the CBOM support its README claims (13.5.0): Java keystores and certificates, JS/TS source-level algorithms, and
+    # Go through golem (docs/GO_EVINSE_GOLEM.md); no Python crypto, so Python is left out (2026-10-31)
+    languages: [java, javascript, go]   # crypto locations: JS/TS occurrences and Go sourceLocation properties
     status: integrated              # image 13.5.0 (11.7.0 found nothing on any micro project)
     notes: >
       Algorithms with file/line for JS/TS (occurrences) and Go (cdx:golem:crypto:sourceLocation, one per asset).
-      Python algorithms have no locations; Java's atom analysis has no crypto-generate sinks and yields none.
-      The worker passes --include-crypto --evidence and -t python / -t go for those languages. Go analysis needs
-      resolvable imports, network and a writable module cache; each job has its own GOPATH since 2026-10-22.
-      Earlier Go runs need to be redone. See docs/findings.md for the fixture and worker setup fixes.
+      Java: keystores and certificates as claimed, code-level algorithms without locations at most. The worker
+      passes --include-crypto --evidence and -t java / -t go for those languages (13.x has no Java fallback without
+      -t). Go analysis needs resolvable imports, network and a writable module cache; each job has its own GOPATH
+      since 2026-10-22. See docs/findings.md for the fixture and worker setup fixes.
   cryptobomforge:
     engine: codeql                  # Santander cryptobom-forge on CodeQL crypto queries
     packaging: per algorithm    # one component per variant (AES, AES-128-CBC, AES-128-CBC-PKCS7 apart), its windows as places

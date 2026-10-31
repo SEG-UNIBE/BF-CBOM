@@ -493,7 +493,7 @@ def test_summary_markdown_from_csv_rows():
     lines = sm._micro(rows, [])
     assert sb.style_issues("\n".join(lines)) == []
     assert "| tool | java | go | bar exam |" in lines  # paper languages first, then the tool's verdict
-    passed, failed = f"| good | {OK} 11 | – | {OK} bar passed |", f"| weak | {FAIL} 2 | error | {FAIL} bar failed |"
+    passed, failed = f"| good | {OK} 11 | – | {OK} passed |", f"| weak | {FAIL} 2 | error | {FAIL} failed |"
     assert lines.index(passed) < lines.index(failed)
     verdicts = lines[lines.index("### Verdicts") :]  # the hand-over into the later specs
     assert verdicts[2] == "1 of 2 tools pass the bar, 1 failed it (weak)."

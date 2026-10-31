@@ -118,6 +118,31 @@ gave none in e0-stability, e1-pilot-corpus and e0-micro.
   micro-go gives 8 crypto assets again, 6/11 at call sites with our scorer (the old worker: 0). Every cdxgen Go run before 2026-10-22 is rerun. Go modules are now
   downloaded per run, so large Go repos (vault) take longer.
 
+### 2026-10-31, cdxgen 13.5.0 in Java and Python: what it claims, and how it is called
+bar-micro of 2026-10-31 (cdxgen 13.5.0) gave 9 of 14 in Go (12.8.5: 6) and nothing at all in Java and Python: the
+Java CBOM had no component, not even the project's, and the Python one only the `cryptography` library, where 12.8.5
+had algorithms without locations in both. Checked in throwaway containers of the worker image (compose's
+capabilities) and of the plain upstream image, with the same results in both:
+- **What cdxgen claims.** Its README (12.8.5 and 13.5.0 alike) gives its CBOM as "Java keystores and certificates,
+  plus JavaScript and TypeScript source-level algorithm inventory" (`cbom -t java`, that is `cdxgen -t java
+  --include-crypto`), and its Go guide (`docs/GO_EVINSE_GOLEM.md`) renders golem's crypto evidence as
+  `cryptographic-asset` components. It claims no Python crypto, so Python left cdxgen's `languages` (Python repos are
+  `unsupported` for it now).
+- **Java: our setup error with 13.x.** Without `-t`, 12.x ran its code analysis as Java. 13.x picks the language from
+  the packages the BOM lists and skips the step when it lists none ("Skipping the evidence analysis since the BOM lists
+  no package in a language it supports. Pass -t to choose the language."). micro-java's `pom.xml` declares no
+  dependency (JCA is part of the JDK), and the worker passed `-t` for Python and Go only. With `-t java`, the README's
+  call, micro-java gives four algorithms (`aes`, `des`, `hmacSHA`, `sha-256`) without locations, which count at
+  repository level only. Fixed: Java repos get `-t java` (`workers/cdxgen/main.py`). The skip hits any Java repo whose
+  BOM lists no Maven package, so every cdxgen Java run of 13.5.0 so far is rerun.
+- **Python: atom crashes.** With `-t python`, atom 3.1.1 (bundled since cdxgen 13.0.0) fails ("Failed to enhance CPG:
+  java.util.NoSuchElementException: next on empty iterator") and writes no slice, so there is no algorithm. The plain
+  upstream image, as its own user, fails the same way, so this is not our setup. Moot now that Python is not scanned.
+- **Recorded from now on:** the lines saying cdxgen's code analysis was skipped or failed go into the run as
+  `tool warning:` notes (`tool_warning` in `runs.csv`), so a silent skip shows in the summary.
+- Seen without effect on the CBOM: the upstream image lacks the `atom_tools` Python module cdxgen calls for an OpenAPI
+  step in Java.
+
 ### 2026-10-22, micro ground truth v2: generated from the snippet catalog, with decoys
 On e0-micro of 2026-10-22, 18 of the 226 misses had a record of the item's family within two lines: the hand-written
 ground truth caused them, not the tools.

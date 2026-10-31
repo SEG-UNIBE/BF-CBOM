@@ -14,17 +14,29 @@ from common.worker import build_handle_instruction, run_worker
 NAME = os.path.basename(os.path.dirname(__file__))
 TIMEOUT_SEC = int(os.getenv("WORKER_TIMEOUT_SEC", "120"))  # default 120s for repo scan
 
-# cdxgen's code-level crypto analysis (the evidence step, atom) runs for the project types given with -t and
-# falls back to Java without one, so Python and Go repos need their -t (micro-python: 0 -> 5 algorithms,
-# micro-go: 0 -> 6, 2026-10-17). JavaScript/TypeScript must run without -t: its source-level crypto
-# inventory (the only one with file/line) runs only in the default all-types mode. Java: the same either way.
+# cdxgen's code-level crypto analysis (the evidence step) runs for the project type given with -t. Without one, 12.x
+# fell back to Java; 13.x picks the language from the packages the BOM lists and skips the step when it lists none
+# ("Pass -t to choose the language"), so a Java repo without Maven packages got no analysis at all (micro-java,
+# bar-micro of 2026-10-31). Java and Go repos therefore get their -t, the README's own CBOM call (`cbom -t java` =
+# `cdxgen -t java --include-crypto`). JavaScript/TypeScript must run without -t: its source-level crypto inventory
+# (the only one with file/line) runs only in the default all-types mode. Python is not in cdxgen's `languages`: its
+# README claims no Python crypto (common/tools.yaml).
 # Go (golem) type-checks through go/packages: an import resolves only when the repo's go.sum pins it, and golem's
 # `go list` then downloads the module itself, also with --no-install-deps (needs network). cdxgen's `cbom` command
 # finds no Go asset (it never runs golem) and --profile research adds none (checked 2026-10-22, docs/findings.md).
 # The image's GOPATH (/opt/app-root/go) cannot be created under cap_drop ALL (root without DAC_OVERRIDE, /opt not
 # writable), so `go list` failed and every Go module with a dependency yielded no asset until 2026-10-22: each job
 # gets its own GOPATH in its work dir (`go_env`), writable (-modcacherw) so the cleanup can delete it.
-_PROJECT_TYPE = {"python": "python", "go": "go"}
+_PROJECT_TYPE = {"java": "java", "go": "go"}
+
+# cdxgen's own words when its code analysis was skipped or failed (13.5.0): the evidence step without a language
+# ("Skipping the evidence analysis since the BOM lists no package in a language it supports. Pass -t to choose the
+# language."), atom crashing ("Failure: Failed to enhance CPG: ...", "WARN: atom exited with status 1; the analysis
+# may be incomplete.", "atom reported a failure and produced no reachables slice for python.", micro-python,
+# 2026-10-31). The run records them as tool warnings; the JVM's deprecation WARNINGs and the purl messages every run
+# prints are not among them.
+WARNING_LINE = re.compile(r"^(Skipping the evidence analysis|WARN: atom exited|atom reported a failure|Failure: )")
+_ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -34,6 +46,17 @@ logger = logging.getLogger(NAME)
 def project_type_for(main_language: str | None) -> str | None:
     """The -t value for a repo's main language, or None (all project types, cdxgen's default)."""
     return _PROJECT_TYPE.get((main_language or "").strip().lower())
+
+
+def analysis_warnings(output: str, *, most: int = 5) -> list[str]:
+    """The distinct lines of cdxgen's output that say its code analysis was skipped or failed, in order, at most
+    `most`."""
+    out: list[str] = []
+    for line in _ANSI.sub("", output).splitlines():
+        line = line.strip()[:300]
+        if line and WARNING_LINE.match(line) and line not in out:
+            out.append(line)
+    return out[:most]
 
 
 def go_env(work_root: Path) -> dict[str, str]:
@@ -141,6 +164,8 @@ class CdxgenClient:
                 f"stderr_tail: {stderr_tail or '(empty)'}\n"
                 f"stdout_tail: {stdout_tail or '(empty)'}"
             )
+        for line in analysis_warnings(f"{proc.stdout or ''}\n{proc.stderr or ''}"):
+            trace.add(f"tool warning: {line}")
 
     def generate_cbom(
         self,
