@@ -779,7 +779,9 @@ services:
       - REDIS_HOST=redis
       - BF_CBOM_IMAGE=bf-cbom/worker-cryptobomforge:${VERSION:-latest}
       - REDIS_PORT=6379
-      - WORKER_TIMEOUT_SEC=600
+      # 600 timed out on curl under the start-up load of stability-pilot (2026-10-31; its other runs took 429 and 433 s)
+      # and leaves no margin for corpus-main's large Python repos (pilot-medium: 170 s on 24 MB of source)
+      - WORKER_TIMEOUT_SEC=1800
       - AVAILABLE_LANGUAGES=python,c  # crypto queries exist for Python and C/C++ only
       - CODEQL_RAM_MB=4096
     env_file: docker/env/worker-cryptobomforge.env
