@@ -480,3 +480,45 @@ def test_source_files_counts_the_languages_code_and_everything_without_a_languag
     paths = ["src/A.java", "src/b.kt", "README.md", "x/y.py", "go.mod"]
     assert (source_files(paths, "Java"), source_files(paths, "python"), source_files(paths, "go")) == (2, 1, 0)
     assert source_files(paths, None) == 5
+
+
+def test_smallest_clean_corpus_takes_the_smallest_repos_where_every_supported_tool_ran_ok(tmp_path: Path):
+    # mutation-main's corpus (decided 2026-10-31): per language the smallest repos (source size) among those where
+    # every supported tool's run on the original is ok; one failure of any kind excludes the repo for every tool
+    def repo(name, lang, size):
+        return {"full_name": f"o/{name}", "language": lang, "branch": "main", "commit": name[0] * 40,
+                **({"source_bytes": size} if size is not None else {})}  # fmt: skip
+
+    repos = [repo("a1", "Java", 100), repo("b2", "Java", 50), repo("c3", "Java", 10), repo("d4", "Java", None),
+             repo("e5", "Java", 5), repo("f6", "Python", 30)]  # fmt: skip
+    spec = ex.spec_from_dict({"name": "corpus-x", "tools": ["t1", "t2"], "repos": repos})
+    exp_dir = tmp_path / "corpus-x"
+    ex.write_spec_copy(exp_dir, spec)
+    runs = {
+        ("a1", "t1"): "ok",
+        ("a1", "t2"): "ok",
+        ("b2", "t1"): "ok",
+        ("b2", "t2"): "ok",
+        ("c3", "t2"): "ok",
+        ("c3", "t1"): "timeout",
+        ("d4", "t1"): "ok",
+        ("d4", "t2"): "ok",
+        ("e5", "t1"): "ok",
+        ("f6", "t1"): "ok",
+    }
+    for (name, tool), status in runs.items():
+        d = exp_dir / f"o__{name}@{name[0] * 12}" / "original" / tool
+        d.mkdir(parents=True)
+        meta = {"status": status, "worker": tool, "duration_sec": 360.0}
+        if name == "e5":
+            meta["oom_kills"] = 1  # stored ok but OOM-killed meanwhile: read as oom
+        (d / "run1.meta.json").write_text(json.dumps(meta))
+    registry = {"t1": {"languages": ["java", "python"]}, "t2": {"languages": ["java"]}}  # t2 never runs on Python
+    out = ex.smallest_clean_corpus(exp_dir, per_language=2, variants=10, registry=registry)
+    assert [r["full_name"] for r in out["repos"]] == ["o/b2", "o/a1", "o/f6"]
+    assert out["repos"][0]["commit"] == "b" * 40 and "variants" not in out["repos"][0]
+    assert {e["full_name"]: e["runs"] for e in out["excluded"]} == {
+        "o/c3": ["t1:timeout"], "o/d4": [], "o/e5": ["t1:oom", "t2:missing"]}  # fmt: skip
+    # t1 ran 6 repos at 0.1 h each (10 runs per repo in the mutation experiment), the selection 3 of them
+    assert out["projection"] == {"variants": 10, "hours": {"t1": [6.0, 3.0], "t2": [4.0, 2.0]}}
+    assert out["selected_from"] == "corpus-x" and "smallest source size" in out["rule"]

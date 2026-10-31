@@ -42,6 +42,7 @@ from common.experiment import (
     remove_experiment,
     resolve_snapshots,
     save_run_log_entry,
+    smallest_clean_corpus,
     write_result,
 )
 from common.memory import HostSampler
@@ -1017,3 +1018,40 @@ def corpus_prune(
     target = out or source.with_name(source.stem + "-pruned.yaml")
     target.write_text(yaml.safe_dump(pruned, sort_keys=False), encoding="utf-8")
     typer.echo(f"kept {len(pruned['repos'])} repos, pruned {len(pruned['pruned'])}: {target}")
+
+
+SMALLEST_FROM_OPT = typer.Option(..., "--from", help="Corpus experiment whose record and runs the selection reads")
+SMALLEST_PER_LANGUAGE_OPT = typer.Option(30, "--per-language", help="Repositories per language")
+SMALLEST_VARIANTS_OPT = typer.Option(
+    31, "--variants", help="Runs per repository in the mutation experiment, for the projection (1 + calls + decoys)"
+)
+SMALLEST_OUT_OPT = typer.Option(..., "--out", "-o", help="Output corpus YAML")
+
+
+@corpus_app.command("smallest")
+def corpus_smallest(
+    from_experiment: str = SMALLEST_FROM_OPT,
+    per_language: int = SMALLEST_PER_LANGUAGE_OPT,
+    variants: int = SMALLEST_VARIANTS_OPT,
+    out: Path = SMALLEST_OUT_OPT,
+):
+    """The corpus of a mutation experiment: per language the smallest repositories (source size) of a corpus
+    experiment among those where every supported tool's run was ok, at their pinned commits, and the projected
+    length of the mutation run over every repository and over the selection (mutation-main, decided 2026-10-31)."""
+    exp_dir = experiment_dir(from_experiment)
+    if not is_experiment(exp_dir):
+        _err(f"no experiment '{from_experiment}' under {RESULTS_DIR}")
+    corpus = smallest_clean_corpus(exp_dir, per_language=per_language, variants=variants)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(yaml.safe_dump(corpus, sort_keys=False), encoding="utf-8")
+    counts = Counter(r.get("language") for r in corpus["repos"])
+    typer.echo(f"wrote {len(corpus['repos'])} repos ({', '.join(f'{k} {v}' for k, v in counts.items())}) to {out}")
+    typer.echo(f"excluded {len(corpus['excluded'])} repos with a failed run (listed under `excluded` in the file)")
+    hours = corpus["projection"]["hours"]
+    for label, i in (("every repository", 0), ("the selection", 1)):
+        slowest = max(hours, key=lambda t: hours[t][i])
+        total = sum(h[i] for h in hours.values())
+        typer.echo(
+            f"projected with {variants} runs per repository, one container per tool, {label}: slowest lane "
+            f"{slowest} {hours[slowest][i]:.1f} h ({hours[slowest][i] / 24:.1f} days), all tools {total:.1f} tool-hours"
+        )

@@ -1,5 +1,5 @@
-# Second pilot: 60 pinned projects (20 Java, 20 Python, 20 Go), all 15 CBOM generator tools, once.
-# 900 tool/repository pairs; unsupported language combinations are recorded without scanning.
+# Second pilot: 60 pinned projects (20 Java, 20 Python, 20 Go), the 11 eligible tools (cdxgen in Go only), once.
+# 660 tool/repository pairs; unsupported language combinations are recorded without scanning.
 # Run on the 64 GB VM after make up-prod:
 #   make experiment EXP=experiments/corpus-pilot-medium.yaml EXPERIMENT_MEMORY_BUDGET_GB=0
 #   make analysis ARGS="report corpus-pilot-medium"

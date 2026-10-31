@@ -28,6 +28,7 @@ make experiment-export-all                              # every complete experim
 make corpus ARGS="--per-cell 3"                         # stratified GitHub corpus -> results volume corpus/corpus.yaml + corpus-frame.yaml
 make corpus ARGS="--frame /data/results/corpus/corpus-frame.yaml --per-cell 2 --out /data/results/corpus/corpus-pc2.yaml"   # redraw from a stored frame, no search (without --out it replaces corpus.yaml)
 make corpus-prune ARGS="--in /data/results/corpus/corpus.yaml --from stability-pilot"   # drop repos a tool timed out on
+make corpus-smallest ARGS="--from corpus-main --out /data/results/corpus/mutation-main.yaml"   # mutation-main's corpus: the 30 smallest clean repos per language, pinned
 make corpus-export                                      # corpus YAMLs (sample and frame) -> experiments/results/
 make analysis ARGS="report bar-micro"                 # the analysis alone (below), into <exp>/_ANALYSIS/
 make board                                              # live board of the stack: experiments, workers, queues (ARGS=--once: one snapshot)
@@ -51,6 +52,7 @@ runs), `corpus-` (real repositories as they are), `mutation-` (real repositories
 | `corpus-icpc.yaml` | the 11 eligible tools (cdxgen in Go only) | 23 projects of the ICPC 2026 paper (`experiments/corpus/icpc-2026.yaml`, HEAD of 2026-10-18) | held-out counterpart of the pilot corpus: none of these repos was used to tune the vocabulary, the specs or CipherSift; six are marked `expect_crypto: low` (negative cases) |
 | `corpus-main.yaml` | the 11 eligible tools (cdxgen in Go only), once | the stratified GitHub sample of 2026-10-30 (`experiments/corpus/corpus-pc6.yaml`): 54 repos each in Java, Python and Go, 6 per cell | the paper's corpus run (RQ1-RQ4); 1620 tool/repository pairs, 1242 supported scans |
 | `mutation-smoke.yaml` | the 11 eligible tools (cdxgen in Go only) | pyjwt, jjwt, golang-jwt (pilot), 3 mutants each | the mutation harness end to end: the RSA-2048 keygen inserted in each style; CBOMkit and CryptoScan should find the direct one at its line (`mutation.csv`) |
+| `mutation-main.yaml` | the 11 eligible tools (cdxgen in Go only), once | per language the 30 repos of corpus-main with the smallest source size where every supported tool ran ok, at its pinned commits (`make corpus-smallest` after corpus-main) | RQ5: every snippet in every style and as many decoys (15 + 15 per repo, 31 variants), reported with `--baseline stability-pilot` |
 | `mutation-pilot.yaml` | the 11 eligible tools (cdxgen in Go only), once | 9 pinned pilot-medium repos, 3 per language | mutation pilot: every catalog snippet once per repo (15 calls, 5 per style) and 15 decoys; 4185 planned results, currently 3348 supported scans |
 
 LLM providers are outside the current experiment scope; their implementation remains available for possible later use.
@@ -127,11 +129,13 @@ make experiment-export NAME=mutation-pilot
 
 After a change to one worker, `make experiment EXP=experiments/mutation-smoke.yaml ARGS="--rerun <tool>"` redoes
 its runs on three small repos and their mutants, one repo per paper language; its micro check, the same on
-`bar-micro.yaml` (3 jobs). The corpus run on the full corpus (Java, Python and Go) and the mutation run on its
-subset have no specs yet; the corpus spec needs the corpus from `make corpus`
-first, pruned with
-`make corpus-prune ARGS="--in /data/results/corpus/corpus.yaml --from stability-pilot"` to drop repos a tool
-timed out on.
+`bar-micro.yaml` (3 jobs). The corpus run is `corpus-main.yaml` (the corpus `experiments/corpus/corpus-pc6.yaml`).
+The mutation run, `mutation-main.yaml`, takes its corpus from corpus-main's record: after corpus-main,
+`make corpus-smallest ARGS="--from corpus-main --out /data/results/corpus/mutation-main.yaml"` writes per language the
+30 repositories with the smallest source size (at the pinned commit) among those where every supported tool's run on
+the original was ok, with their commits, the excluded repositories and the projected length of the mutation run over
+every repository and over the selection (31 runs per repository, one container per tool). `make corpus-export`
+copies it to `experiments/results/`, and it is committed as `experiments/corpus/mutation-main.yaml`.
 
 ## Spec format
 

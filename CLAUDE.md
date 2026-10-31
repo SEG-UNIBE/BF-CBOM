@@ -26,7 +26,7 @@ example, voter groups, how family and group are argued),
   NO_CACHE=1`. Never run plain `docker compose up` or `docker compose run`: the Makefile exports the image tag
   (`VERSION`) and `BASE_IMAGE`; without them compose looks for `:latest` images and tries to build from a nonexistent
   `base`. Every runner command has a target: `experiment`, `experiment-list` / `-status` / `-collect` / `-cancel` /
-  `-delete` / `-export` / `-export-all` (every complete experiment), `analysis`, `corpus`, `corpus-prune`, `board`; `experiment-attach` joins the terminal of
+  `-delete` / `-export` / `-export-all` (every complete experiment), `analysis`, `corpus`, `corpus-prune`, `corpus-smallest`, `board`; `experiment-attach` joins the terminal of
   the running `experiment run` from another shell (detach with Ctrl-P Ctrl-Q, never Ctrl-C). After every pull run `make up-prod` first: the runner
   bakes the CLI and the workers bake `common/`; the board's header names the checkout's commit, its `build` column
   each worker's (read from the containers, `BOARD_BUILDS`), and a red line every container built from another commit;
@@ -388,8 +388,14 @@ Decisions: a spec is a spec (repos, tools, repetitions, mutation) and its name s
 `corpus-`, `mutation-`; no numbers that could read as an RQ), the analysis is one code path on any spec, ground truth
 exists in the micro projects and the mutants only; no funnel: tools are never dropped after RQ1 (volume is not
 quality) or RQ2 (a format property), findings carry forward as covariates and every analysis scopes per dimension by
-what a tool reports; mutants are hosted on the local git server; mutation-main is ~30 repos per language among the
-smaller ones of corpus-main, ~10 calls and ~10 decoys each, sized after the corpus run's timings. Dropped 2026-10-29:
+what a tool reports; mutants are hosted on the local git server; mutation-main (decided 2026-10-31) takes per language
+the 30 repositories of corpus-main with the smallest source size (`source_bytes` at corpus-main's pinned commits, which
+it reuses) among those where every supported tool's run on the original was ok (one failure of any kind excludes a
+repository for every tool; `make corpus-smallest`, `common/experiment.py:smallest_clean_corpus`, which also prints the
+projected run length), with the full mutation offering (every snippet in every style and as many decoys: `per_repo: 15`,
+`decoys: equal`, `snippets: all`, 31 variants per repository); RQ5's numbers then hold for smaller code, which the
+paper states, with the projected length of a mutation run over the whole corpus as the reason (from corpus-main's
+measured times). Dropped 2026-10-29:
 a "quorum" question and a meta-question on the method.
 
 **Paper languages (decided 2026-10-20):** the paper analyses Java, Python and Go (Go added the same day, with the
@@ -592,8 +598,8 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
   round-robin over the decoy kinds, `direct` only; each a commit on the pinned commit (fixed author and date: the SHA
   depends only on the content), a branch `bfcbom/ins-<snippet>-<style>-<hash>` in the base mirror. `mutants.json`
   records file, host, call line, spans, line shifts, the inserts (a missing branch is rebuilt from them with the same
-  SHA), `decoy` and the patch (Phase 6's mutant patches). mutation-main: ~30 repos per language among the smaller
-  ones of corpus-main, ~10 calls and ~10 decoys each.
+  SHA), `decoy` and the patch (Phase 6's mutant patches). mutation-main: per language the 30 repositories of
+  corpus-main with the smallest source size, 15 calls and 15 decoys each (see "Research questions").
 - **Ground truth from mutation** (`analysis/mutation.py`; `mutation.csv`, `mutation-rates.csv`,
   `mutation-scores.csv`, `bridge-run<i>.csv`): per (mutant, tool) against the same tool on the original, counting
   only new records (an original finding moved by the inserted lines is not new). A planted call: found at the site
@@ -625,8 +631,8 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
 - **The runs:** `bar-micro` (every tool once on the three micro projects: the verdicts; the bar-exam table
   shows all 15 tools), `stability-pilot` (every tool 3× on the micro projects and ten small pilot repos:
   determinism and run-to-run variance, needed before any agreement claim; its timings decide replicas and pruning),
-  `corpus-main` (the stratified sample, 18 or 27 repos per language by `--per-cell` 2 or 3, the tools and their languages as the user set them after the bar exam: RQ1-RQ4), `mutation-main` (~30 repos per language from corpus-main,
-  ~10 calls and ~10 decoys each: RQ5; `mutation-smoke` first). Also on the known items: the voter groups'
+  `corpus-main` (the stratified sample, 18 or 27 repos per language by `--per-cell` 2 or 3, the tools and their languages as the user set them after the bar exam: RQ1-RQ4), `mutation-main` (per language the 30 smallest repos of
+  corpus-main by source size, 15 calls and 15 decoys each: RQ5; `mutation-smoke` first). Also on the known items: the voter groups'
   independence (tools that miss the same mutants more often than chance share a blind spot, `analysis/README.md`
   "Voter groups").
 - **Threats addressed explicitly:** shared blind spots (engine grouping), inserted calls being easier than real ones

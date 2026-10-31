@@ -1,6 +1,7 @@
 # Mutation smoke: the mutation harness end to end (CLAUDE.md "Verification still to do"). One small pilot repository per
 # paper language (the development set, not held out) gets three insertion mutants of the RSA-2048 key generation, one
-# per style (direct, wrapper, indirect); all 15 tools scan the originals and the mutants once. Expected: at least
+# per style (direct, wrapper, indirect); the 11 eligible tools (cdxgen in Go only) scan the originals and the mutants
+# once. Expected: at least
 # CBOMkit and CryptoScan report the direct insertion at the recorded file and line in all three repositories
 # (`mutation.csv`, the patches in `_SUMMARY.md` to check the mutants read as plausible code).
 #   make experiment EXP=experiments/mutation-smoke.yaml EXPERIMENT_MEMORY_BUDGET_GB=0

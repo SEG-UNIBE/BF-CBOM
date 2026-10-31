@@ -1,6 +1,6 @@
 # All tools on the 23 projects of the ICPC 2026 paper, pinned at their HEAD of 2026-10-18 (experiments/corpus/icpc-2026.yaml).
 # Held-out counterpart of corpus-pilot-small. Large repos (bisq, bisq2, Chat2DB, paperless-ngx) push CBOMkit towards its
-# timeout. The current spec runs all 15 CBOM generator tools.
+# timeout. The current spec runs the 11 eligible tools (cdxgen in Go only).
 #   make experiment EXP=experiments/corpus-icpc.yaml
 #   make experiment-export NAME=corpus-icpc        # runs the analysis report first
 name: corpus-icpc

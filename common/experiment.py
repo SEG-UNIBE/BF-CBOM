@@ -951,6 +951,67 @@ def iter_results(exp_dir: Path, spec: ExperimentSpec | None = None):
         yield meta, meta_path.with_name(meta_path.name.replace(".meta.json", ".json"))
 
 
+def _record_entry(repo: RepoSpec) -> dict:
+    """A record's repo as a corpus entry: its pin and sizes, no variants."""
+    return {k: v for k, v in asdict(repo).items() if v not in (None, [], "") and k != "variants"}
+
+
+def smallest_clean_corpus(exp_dir: Path, *, per_language: int, variants: int, registry: dict | None = None) -> dict:
+    """The corpus of a mutation experiment drawn from a corpus experiment's record (mutation-main from corpus-main,
+    decided 2026-10-31): per language the `per_language` repositories with the smallest source size (`source_bytes` at
+    the pinned commit) among those where every supported tool's first run on the original is stored `ok`. One error,
+    timeout or OOM kill, or a missing run, excludes the repository for every tool (listed under `excluded`). The repos
+    keep their pinned commits, so the mutants are made on the code the corpus run scanned. `projection`: per tool the
+    summed hours of its runs times `variants` (the runs a repository gets in the mutation experiment), over every
+    repository and over the selection, so the length of a tool's lane with one container."""
+    spec = load_spec(spec_path(exp_dir))
+    registry = registry if registry is not None else load_tools()
+    status: dict[tuple[str, str], str | None] = {}
+    seconds: dict[tuple[str, str], float] = {}
+    for meta, cbom in iter_results(exp_dir, spec):
+        if cbom.parents[1].name != ORIGINAL_VARIANT or cbom.name != "run1.json":
+            continue
+        key = (repo_full_name(cbom.parents[2].name), cbom.parent.name)
+        status[key] = stored_status(meta)
+        seconds[key] = float(meta.get("duration_sec") or 0.0)
+
+    def supported(repo: RepoSpec) -> list[str]:
+        return [t for t in spec.tools if tool_supports(t, repo.language, registry, only=spec.tool_languages.get(t))]
+
+    clean, excluded = [], []
+    for repo in spec.repos:
+        failed = [f"{t}:{status.get((repo.full_name, t)) or 'missing'}" for t in supported(repo)
+                  if status.get((repo.full_name, t)) != "ok"]  # fmt: skip
+        if failed or repo.source_bytes is None:
+            reason = f"a failed run in {spec.name}" if failed else "no source size in the record"
+            excluded.append({"full_name": repo.full_name, "language": repo.language, "reason": reason, "runs": failed})
+        else:
+            clean.append(repo)
+    selected = []
+    for language in dict.fromkeys(r.language for r in spec.repos):
+        ranked = sorted((r for r in clean if r.language == language), key=lambda r: (r.source_bytes, r.full_name))
+        selected += ranked[:per_language]
+
+    def hours(repos: list[RepoSpec]) -> dict[str, float]:
+        lane = {t: 0.0 for t in spec.tools}
+        for r in repos:
+            for t in supported(r):
+                lane[t] += seconds.get((r.full_name, t), 0.0) * variants / 3600
+        return {t: round(h, 1) for t, h in lane.items()}
+
+    every, chosen = hours(spec.repos), hours(selected)
+    return {
+        "selected_from": spec.name,
+        "rule": (
+            f"per language the {per_language} repositories with the smallest source size among those where every "
+            "supported tool's run on the original was ok"
+        ),
+        "projection": {"variants": variants, "hours": {t: [every[t], chosen[t]] for t in spec.tools}},
+        "excluded": excluded,
+        "repos": [_record_entry(r) for r in selected],
+    }
+
+
 def spec_to_dict(spec: ExperimentSpec) -> dict:
     return {
         "name": spec.name,

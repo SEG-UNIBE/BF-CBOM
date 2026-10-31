@@ -202,6 +202,12 @@ corpus: ensure-env
 corpus-prune:
 	docker compose run --rm runner experiment corpus prune $(ARGS)
 
+# make corpus-smallest ARGS="--from corpus-main --out /data/results/corpus/mutation-main.yaml"  -> per language the 30
+# smallest repos (source size) where every supported tool's run was ok, at their pinned commits, and the projected
+# length of the mutation run (then `make corpus-export`, and the file goes to experiments/corpus/)
+corpus-smallest:
+	docker compose run --rm runner experiment corpus smallest $(ARGS)
+
 corpus-export:
 	mkdir -p experiments/results
 	docker compose run --rm --no-deps --entrypoint sh -v "$(CURDIR)/experiments/results:/export" runner \

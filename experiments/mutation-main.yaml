@@ -1,0 +1,26 @@
+# The paper's mutation run (RQ5), decided 2026-10-31: per language the 30 repositories of corpus-main with the smallest
+# source size among those where every supported tool's run on the original was ok (one failure of any kind excludes a
+# repository for every tool), at corpus-main's pinned commits. The full mutation offering: every catalog snippet once,
+# five per style, and as many decoys, so 1 + 15 + 15 = 31 variants per repository. RQ5's numbers hold for smaller code;
+# the reason is the length of a mutation run over the whole corpus, which the selection step projects from
+# corpus-main's measured times.
+# After corpus-main, on the VM:
+#   make corpus-smallest ARGS="--from corpus-main --out /data/results/corpus/mutation-main.yaml"
+#   make corpus-export    # then commit experiments/results/mutation-main.yaml as experiments/corpus/mutation-main.yaml
+#   git pull && make up-prod
+#   make experiment EXP=experiments/mutation-main.yaml EXPERIMENT_MEMORY_BUDGET_GB=0 ARGS="--overwrite-old"
+#   make analysis ARGS="report mutation-main --baseline stability-pilot"
+#   make experiment-export NAME=mutation-main ARGS="--no-report"
+name: mutation-main
+description: 'the mutation run of RQ5: the 30 smallest clean repositories per language of corpus-main, every snippet in every style and as many decoys'
+tools: [cbomkit, cdxgen, cipherradar, ciphersift, cryptobomforge, cryptoscan, pqcheck, qdarpan, scanoss, securin-xbom, xgrep]  # the bar exam of 2026-10-31 (bar-micro export) passed 12, of which cbomkit-jar is left out (CBOMkit runs as its server distribution, decided 2026-10-30); cryptarium, qelens, qscan failed the bar
+tool_languages:  # cdxgen is eligible in Go only (9 of 14); in Java it is below the bar (0: its Java algorithms carry no location), Python is not one of its languages
+  cdxgen: [go]
+repetitions: 1
+mutation:
+  per_repo: 15
+  decoys: equal
+  styles: [direct, wrapper, indirect]
+  snippets: all
+  seed: 1
+corpus: corpus/mutation-main.yaml  # written by `make corpus-smallest` from corpus-main's record (see above)
