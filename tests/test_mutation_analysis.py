@@ -274,6 +274,7 @@ def test_report_judges_mutants_and_keeps_them_out_of_the_agreement_tables(tmp_pa
     assert len({r["variant"] for r in rows("runs.csv")}) == 3  # runs.csv lists every stored run
     assert (exp / snapshot / mid / "cbomkit" / "run1.norm.json").exists()  # mutants are normalised too
     summary = (out / "_SUMMARY.md").read_text()
+    assert sm.style_issues(summary) == []  # the RQ5 sections keep the layout too
     assert "## RQ5 Detection" in summary and "```diff" in summary and f"`{mid}`" in summary
     assert "### Recall, precision and F1 on the planted items" in summary and "the bridge to RQ4" in summary
     assert "### Changes off the edit" in summary
@@ -286,8 +287,8 @@ def test_not_judged_counts_the_planted_calls_by_status():
     rows = [{"tool": t, "language": "java", "kind": "call", "style": "direct", "status": st}
             for t, st in statuses]  # fmt: skip
     text = "\n".join(sm._mutation([mutant], rows, []))
-    assert "Not judged (3 planted call × tool" in text
-    assert "2 unsupported (the language is outside the tool’s); 1 original error." in text
+    assert "⚠️ Not judged: 3 planted call × tool, by the status of the run on the mutant" in text
+    assert "2 unsupported (the language is outside the tool’s), 1 original error." in text
 
 
 def test_changes_off_the_edit_are_counted_apart_from_detection_and_read_against_the_baseline():

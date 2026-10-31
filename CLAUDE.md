@@ -248,6 +248,14 @@ example, voter groups, how family and group are argued),
     of the repo's language (`in_scope`; fixtures, test vectors, configuration); the analyses count those places like
     any other (decided 2026-10-23: the tools are benchmarked on the repositories as they are, no scope filter), the
     share is for the discussion.
+  - **Summary layout** (decided 2026-10-31): every subsection is its heading, one to three sentences, the table,
+    its visible checks (✅ ⛔ a verdict, ⚠️ a caveat), then collapsibles below in this order: `📋 Columns` (one
+    bullet per column, a homogeneous series such as `L0` … `L4` in one), `💡 Example`, `📖 <topic>` (background),
+    `🗂️ <list> (N)` (run lists with the count visible above, long per-repository tables, mutant patches). The
+    Markdown source has one sentence per line and no semicolons in prose or cell joins (data keeps its own, in
+    code), no e.g./i.e., links instead of quoted section names; backticks for names, fields, statuses and every
+    value a tool wrote, bold for defined terms. Build blocks with the helpers (`_text`, `_columns`, `_example`,
+    `_background`, `_check`, `_run_list`, `_link`); `summary.style_issues` checks the rules and the tests run it.
   - **In parallel** (2026-10-23): `report` normalises, validates and matches in a process pool, one CBOM or one
     repository per task (`misc/cli/parallel.py:pmap`, the tasks in `analysis/tasks.py`; `--jobs`, env `BF_CBOM_JOBS`;
     0 = auto, min(CPUs, 8) for a step with 16 or more items, else sequential). The workers are spawned, never forked

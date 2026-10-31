@@ -71,7 +71,7 @@ tools:
     engine: cdxgen
     packaging: per algorithm    # one component per algorithm; one location at most (Go, a property), none in Java and Python
     memory_gb: 24                   # 4 OOM-killed Gradle on bisq/bisq2 (2026-10-18); 8 still on Chat2DB, bisq, bisq2, kafka (2026-10-19); 16 on 8 of 60 pilot-medium repos (2026-10-23)
-    approach: atom (code analysis) and golem (Go type checking) + dependency manifests; crypto output is mostly libraries and certificates
+    approach: atom (code analysis) and golem (Go type checking) + dependency manifests, its crypto output mostly libraries and certificates
     vendor: OWASP cdxgen
     url: "https://github.com/cdxgen/cdxgen"
     version: "13.5.0"
@@ -106,7 +106,7 @@ tools:
     approach: LLM reading pre-filtered source files
     vendor: DeepSeek
     url: "https://api-docs.deepseek.com"
-    shipped: HTTP API; CBOM assembled by BF-CBOM
+    shipped: HTTP API, CBOM assembled by BF-CBOM
     cbom_by: bf-cbom                # assembled by the worker from the model's structured answer
     languages: [java, python, go, javascript, c]
     voter_group: deepseek           # each LLM is its own voter; `--merge-llm` merges them into `merge_group`
@@ -119,7 +119,7 @@ tools:
     approach: LLM reading pre-filtered source files (same prompts and file selection as deepseek)
     vendor: OpenAI
     url: "https://platform.openai.com/docs"
-    shipped: HTTP API; CBOM assembled by BF-CBOM
+    shipped: HTTP API, CBOM assembled by BF-CBOM
     cbom_by: bf-cbom                # assembled by the worker from the model's structured answer
     languages: [java, python, go, javascript, c]
     voter_group: chatgpt
@@ -132,7 +132,7 @@ tools:
     approach: LLM reading pre-filtered source files (same prompts and file selection as deepseek)
     vendor: Anthropic
     url: "https://docs.anthropic.com"
-    shipped: HTTP API; CBOM assembled by BF-CBOM
+    shipped: HTTP API, CBOM assembled by BF-CBOM
     cbom_by: bf-cbom                # assembled by the worker from the model's structured answer
     languages: [java, python, go, javascript, c]
     voter_group: claude
@@ -162,7 +162,7 @@ tools:
     url: "https://github.com/Rafael-Ryu/pqcheck"
     version: "0.1.0"
     version_url: "https://github.com/Rafael-Ryu/pqcheck/releases/tag/pqcheck-v0.1.0"
-    shipped: CLI (Python package, built from source; a Go helper for Go)
+    shipped: CLI (Python package, built from source, with a Go helper for Go)
     cbom_by: tool
     languages: [python, go]
     status: integrated             # workers/pqcheck
@@ -297,7 +297,7 @@ tools:
     engine: cryptarium              # sgoveia/cryptarium v0.3.0 (Apache-2.0)
     packaging: no places        # its CBOM carries no evidence at all (only its own JSON format has locations)
     memory_gb: 4
-    approach: syntax tree (tree-sitter) + YAML rule packs (embedded); also certificates, keys, nginx/SSH/JWT configs
+    approach: syntax tree (tree-sitter) + YAML rule packs (embedded), also certificates, keys, nginx/SSH/JWT configs
     vendor: sgoveia (individual)
     url: "https://github.com/sgoveia/cryptarium"
     version: "0.3.0"
@@ -310,7 +310,7 @@ tools:
     engine: qscan                   # quantakrypto/pqc-tools, npm @quantakrypto/qscan 0.12.0 (Apache-2.0)
     packaging: per algorithm    # one component per (asset type, algorithm, discriminator), its places as occurrences
     memory_gb: 4
-    approach: patterns (own TypeScript detectors); dependency manifests, keys, TLS and IaC configs
+    approach: patterns (own TypeScript detectors), also dependency manifests, keys, TLS and IaC configs
     vendor: QuantaKrypto
     url: "https://github.com/quantakrypto/pqc-tools"
     version: "0.12.0"

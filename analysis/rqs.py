@@ -63,16 +63,19 @@ RQS = (RQ1, RQ2, RQ3, RQ4, RQ5)
 
 BAR_EXAM = "Bar exam"
 BAR_EXAM_TABLES = ("micro-run{i}.csv", "micro-items-run{i}.csv")
+# the notes are sentences, one per line in the summary (analysis/summary.py `_text`)
 BAR_EXAM_NOTE = (
-    "Before the questions, a preparatory step selects the subject tools: the tool search (where and when the "
-    "candidates were looked for and which requirements each had to meet; `docs/tool-selection.md`) and the bar "
-    "exam, in a section of its own when the experiment includes the micro projects: every tool on the generated "
-    "micro projects (14 planted calls and 8 decoys per language, so with ground truth) gives recall, precision and "
-    "F1, the verdict (`bar passed` at 7 of 14 calls, leniently, in one language, else `bar failed`) and the "
-    "languages a tool is eligible in, which the later experiments name by hand; the one filter on the tools."
+    "Before the questions, a preparatory step selects the subject tools.",
+    "It has two parts: the tool search (where and when the candidates were looked for, and which requirements each "
+    "had to meet, in `docs/tool-selection.md`) and the bar exam.",
+    "The bar exam runs every tool on the generated micro projects (14 planted calls and 8 decoys per language, so "
+    "with ground truth), in a section of its own when the experiment includes them.",
+    "It gives recall, precision and F1, the verdict (`bar passed` at 7 of 14 calls, leniently, in one language, else "
+    "`bar failed`) and the languages a tool is eligible in, which the later experiments name by hand.",
+    "It is the one filter on the tools.",
 )
 STABILITY = "Run-to-run stability"
 STABILITY_NOTE = (
     "Run-to-run stability (an experiment with repeated runs) is a method check behind every agreement claim, not a "
-    "question of its own."
+    "question of its own.",
 )

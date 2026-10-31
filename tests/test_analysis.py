@@ -247,7 +247,7 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     k2plus = [int(r["k2"]) + int(r["k3"]) + int(r["k4plus"]) for r in exact]
     assert k2plus == sorted(k2plus)  # cumulative: agreement never drops at a higher level
     assert all(float(r["seconds"]) >= 0 for r in levels)  # each matcher's time per level
-    assert "**Matching time**" in (out / "_SUMMARY.md").read_text(encoding="utf-8")
+    assert "#### Matching time" in (out / "_SUMMARY.md").read_text(encoding="utf-8")
     if raqun.available():  # the `raqun` extra (CI, the runner image): matcher (c) at every level, next to exact
         assert [r["level"] for r in levels if r["matcher"] == "raqun"] == list(lv.LEVELS)
         matchers = _read_csv(out / "matchers-run1.csv")
@@ -265,6 +265,9 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert info["rows"]["items-run1.csv"] == len(algos) and info["vocabulary"]["algorithms"]
     summary = (out / "_SUMMARY.md").read_text(encoding="utf-8")
     assert summary.startswith("# Analysis Summary of Experiment `exp-tables`\n")
+    from analysis.summary import style_issues
+
+    assert style_issues(summary) == []  # one sentence per line, no semicolons, every collapsible captioned
     toc = summary[summary.index("## Contents") : summary.index("## Preamble")]
     links = re.findall(r"^ *- \[(.+)\]\(#(.+)\)$", toc, flags=re.M)  # every entry links to a heading below
     headings = re.findall(r"^#{2,3} (.+)$", summary[len(toc) :], flags=re.M)
@@ -287,14 +290,15 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert "| tool | packaging | CBOMs | algorithm assets | records | items |" in summary  # algorithm components
     assert "| packaging | one component is | signature in this table |" in summary
     # "Per language" counts the items of the matcher x level table
-    per_language = summary[summary.index("**Per language**") : summary.index("**exact vs raqun")]
+    start = summary.index("#### Per language", summary.index("### Agreement at L4"))
+    per_language = summary[start : summary.index("\n###", start + 1)]
     assert re.search(r"^\| all \| ([\d']+) \|", per_language, flags=re.M).group(1) == exact[-1]["items"]
     # the record carries the repository's size, so the Repositories table is flat (no commit in it: no /tree link)
     assert "| [bfcbom/micro-java](https://github.com/bfcbom/micro-java) | Java | 3 | 2 | 3.0 | 1.0 |" in summary
-    assert "Per repository (`units-repo-run<i>.csv`)" in summary
+    assert "<summary>🗂️ Units per repository (1)</summary>" in summary
     meaningful = summary.index("### Meaningful")
     assert meaningful < summary.index("#### Asset type `algorithm`", meaningful) < summary.index("### Where the info")
-    assert "**RQ4 Agreement**" in summary[summary.index("## Files") :]  # files by question
+    assert "#### RQ4 Agreement" in summary[summary.index("## Files") :]  # files by question
     sources = _read_csv(out / "sources-run1.csv")
     assert sources and {r["kind"] for r in sources} <= set(SOURCE_KINDS) and all(r["dimension"] for r in sources)
     registry = _read_csv(out / "registry-run1.csv")
@@ -326,7 +330,8 @@ def test_an_oom_killed_run_is_listed_but_its_cbom_is_not_read(tmp_path, monkeypa
     assert {u["tool"] for u in _read_csv(out / "units-run1.csv")} == {"cbomkit"}  # its CBOM was not normalised
     summary = (out / "_SUMMARY.md").read_text(encoding="utf-8")
     assert "| cipherradar |  |  |  | 1 |  |" in summary and runs["cipherradar"]["memory_failure"] == "oom kill"
-    assert "⛔ Runs that may have failed for memory (1;" in summary
+    assert "⛔ 1 run may have failed for memory." in summary
+    assert "<summary>🗂️ Runs that may have failed for memory (1)</summary>" in summary
     assert "`cipherradar` on `bfcbom/micro-java` (original, run 1): oom, oom kill, peak 4.0 of 4.0 GiB" in summary
 
 
@@ -431,8 +436,8 @@ def test_spellings_per_identity_count_distinct_raw_values_per_tool():
         row("b", "ecdsa", "algorithm=ECDSA;family=ECDSA", asset_type=""),  # no asset type: counts
     ]
     text = "\n".join(_spellings(rows))
-    assert "| a | 2 | 3 | 1.50 | SHA-256 (2: SHA-256, sha256) |" in text
-    assert "| b | 2 | 2 | 1.00 | SHA-256 (1: SHA256) |" in text  # `ecdsa` counted, the certificate's file name not
+    assert "| a | 2 | 3 | 1.50 | SHA-256 (2: `SHA-256`, `sha256`) |" in text  # as written: code
+    assert "| b | 2 | 2 | 1.00 | SHA-256 (1: `SHA256`) |" in text  # `ecdsa` counted, the certificate's file name not
     assert "`SHA-256` 3 spellings by 2 tools" in text and _spellings([]) == []
 
 
@@ -485,11 +490,13 @@ def test_summary_markdown_from_csv_rows():
         {**good, "language": "go", "verdict": "unsupported"},
     ]  # fmt: skip
     lines = sm._micro(rows, [])
+    assert sm.style_issues("\n".join(lines)) == []
     assert "| tool | java | go | bar exam |" in lines  # paper languages first, then the tool's verdict
     assert lines.index("| good | ✅ 11 | – | ✅ bar passed |") < lines.index("| weak | ⛔ 2 | error | ⛔ bar failed |")
-    verdicts = next(x for x in lines if x.startswith("**Verdicts**"))  # the hand-over into the later specs
-    assert verdicts.startswith("**Verdicts**: 1 of 2 tools pass the bar, 1 failed it (weak). Every passed tool ")
-    assert "no `tool_languages:` entry follows" in verdicts and "tools: [good]" in lines
+    verdicts = lines[lines.index("### Verdicts") :]  # the hand-over into the later specs
+    assert verdicts[2] == "1 of 2 tools pass the bar, 1 failed it (weak)."
+    assert verdicts[3].startswith("Every passed tool ") and "no `tool_languages:` entry follows" in verdicts[3]
+    assert "tools: [good]" in lines
     assert "tool_languages:" not in lines
     assert "| weak | 0 / 2 · 7 |  |" in lines
     assert "| weak | 0.18 / 0.50 / 0.27 |  |" in lines and "| good | 1.00 / 1.00 / 1.00 | – |" in lines
@@ -597,8 +604,8 @@ def test_summary_starts_with_when_how_long_and_how_much_ram(tmp_path, monkeypatc
     assert "| queue wait |" not in summary  # a batch enqueues everything at once: the wait is only the position
     # the workers' images and the runner were built from different commits: which is which, and the mark
     assert (
-        "| BF-CBOM commit | workers `abc123def456` (2 runs); runner `abc123def456-dirty` ⛔ the workers ran another "
-        "build than the runner (`make up-prod` rebuilds them; the board shows each) (`-dirty`: built from "
+        "| BF-CBOM commit | workers `abc123def456` (2 runs), runner `abc123def456-dirty` ⛔ the workers ran another "
+        "build than the runner (`make up-prod` rebuilds them, the board shows each) (`-dirty`: built from "
         "uncommitted changes) |" in summary
     )
     from analysis.summary import _commits
@@ -615,7 +622,7 @@ def test_summary_starts_with_when_how_long_and_how_much_ram(tmp_path, monkeypatc
         in limits
     )
     assert limits.index("| cbomkit | 4.0 | 2.9 | 0.73 | 2.9 |  | 0 | 0 |") < limits.index("| cipherradar |")
-    assert "(empty: the workers of this experiment did not record it yet)" in limits
+    assert "Empty: the workers of this experiment did not record it yet." in limits
     assert "✅ No run failed for memory." in limits
     runs = {r["tool"]: r for r in _read_csv(exp / "_ANALYSIS" / "runs.csv")}
     assert runs["cbomkit"]["queue_sec"] == "90.0" and runs["cbomkit"]["bfcbom_commit"] == "abc123def456"
@@ -779,12 +786,13 @@ def test_runtime_rows_report_peak_memory_and_cpu_per_repository_and_the_limits_a
     csv_runs = [{"repo": r["snapshot"], **{k: ("" if v is None else str(v)) for k, v in r.items()}} for r in runs]
     limits = "\n".join(_memory_limits(csv_runs, [csv_row]))
     assert "| t | 4.0 | 4.0 | 1.00 | 3.7 | 1 | 1 | 1 |" in limits  # at limit, OOM kills, failed for memory
-    assert "⛔ Runs that may have failed for memory (1;" in limits and "`t` on `c`" in limits and "`d`" not in limits
-    assert "reached their limit and still finished" not in limits  # c is listed as a failure, not twice
+    assert "⛔ 1 run may have failed for memory." in limits and "`t` on `c`" in limits and "`d`" not in limits
+    assert "reached the limit and still finished" not in limits  # c is listed as a failure, not twice
     # an ok run at the limit is listed apart: its peak is the limit's, not the tool's
     capped = {**csv_runs[2], "repo": "e", "limit_hits": "3", "peak_memory_mb": "4096.0"}
     ok = "\n".join(_memory_limits([*csv_runs[:3], capped], [csv_row]))
-    assert "Runs that reached their limit and still finished (1; their peak is capped by the limit):" in ok
+    assert "⚠️ 1 run reached the limit and still finished." in ok
+    assert "<summary>🗂️ Runs at the limit that finished (1)</summary>" in ok
     assert "- `t` on `e` (original, run 1): ok, peak 4.0 of 4.0 GiB, 3 limit hits" in ok
     assert ok.index("still finished") < ok.index("✅ No run failed for memory.")
 
@@ -798,9 +806,9 @@ def test_runs_without_a_result_are_listed_by_tool_then_repository():
 
     lines = _runs([row("zeta", "o/a"), row("alpha", "o/b"), row("alpha", "o/a", "timeout"), row("alpha", "o/c", "ok")])
     assert [x for x in lines if " on `o/" in x] == [
-        "- `alpha` on `o/a` (original, run 1): timeout: boom",
-        "- `alpha` on `o/b` (original, run 1): error: boom",
-        "- `zeta` on `o/a` (original, run 1): error: boom",
+        "- `alpha` on `o/a` (original, run 1): timeout, `boom`",
+        "- `alpha` on `o/b` (original, run 1): error, `boom`",
+        "- `zeta` on `o/a` (original, run 1): error, `boom`",
     ]
 
 
@@ -857,23 +865,25 @@ def test_repositories_section_counts_by_language_and_size_stratum():
         {"full_name": "golang-jwt/jwt", "language": "Go", "commit": "dd", "checkout_bytes": 5 * 1024**2, "stars": 120},
     ]
     lines = _size_strata(repos)
-    assert "the checkout at the pinned commit (`checkout_bytes`" in lines[0]
-    assert "--size-bins 300-3000,3000-30000,30000-" in lines[0]
-    assert "--star-bins 50-300,300-2000,2000-" in lines[0]
+    text = "\n".join(lines)  # the table first, the strata explained in its collapsed columns
+    assert lines[0].startswith("| language |") and "<summary>📋 Columns</summary>" in text
+    assert "the checkout at the pinned commit (`checkout_bytes`" in text
+    assert "--size-bins 300-3000,3000-30000,30000-" in text and "--star-bins 50-300,300-2000,2000-" in text
     # sizes, an empty column, then stars; the micro project has no star count
     assert ("| language | < 0.3 MB | 0.3-3 MB | 3-30 MB | >= 30 MB | all |  | < 50 stars | 50-300 stars "
             "| 300-2000 stars | >= 2000 stars | stars unknown |") in lines  # fmt: skip
     assert "| Java | 1 | 0 | 0 | 1 | 2 |  | 0 | 0 | 0 | 1 | 1 |" in lines
     assert "| Python | 0 | 1 | 0 | 0 | 1 |  | 0 | 0 | 1 | 0 | 0 |" in lines
     assert "| Go | 0 | 0 | 1 | 0 | 1 |  | 0 | 1 | 0 | 0 | 0 |" in lines
-    assert lines[-2] == "| all | 1 | 1 | 1 | 1 | 4 |  | 0 | 1 | 1 | 1 | 1 |"
+    assert next(x for x in lines if x.startswith("| all")) == "| all | 1 | 1 | 1 | 1 | 4 |  | 0 | 1 | 1 | 1 | 1 |"
     # GitHub's size when every repository has one (a corpus-built spec), else the checkout; an unknown size has a column
     github = _size_strata([{**r, "size_kb": 40_000} for r in repos])
-    assert "GitHub's repository size" in github[0] and "| all | 0 | 0 | 0 | 4 | 4 |  | 0 | 1 | 1 | 1 | 1 |" in github
+    assert "GitHub's repository size" in "\n".join(github)
+    assert "| all | 0 | 0 | 0 | 4 | 4 |  | 0 | 1 | 1 | 1 | 1 |" in github
     starred = _size_strata([{**r, "stars": 10} for r in repos])  # every star count known: no unknown column
     assert "| all | 1 | 1 | 1 | 1 | 4 |  | 4 | 0 | 0 | 0 |" in starred
     mixed = _size_strata([repos[0], {**repos[1], "checkout_bytes": None}])
-    assert "| language | < 0.3 MB | 0.3-3 MB | 3-30 MB | >= 30 MB | size unknown | all |  |" in mixed[2]
+    assert "| language | < 0.3 MB | 0.3-3 MB | 3-30 MB | >= 30 MB | size unknown | all |  |" in mixed[0]
     assert "| Java | 1 | 0 | 0 | 0 | 1 | 2 |  | 0 | 0 | 0 | 1 | 1 |" in mixed
     # the table sits between the intro and the detailed list; no size at all, no table
     section = _repositories({"repos": repos})
@@ -919,7 +929,7 @@ def test_tool_versions_section_lists_what_ran_and_flags_mixed_versions():
     tools = [{"tool": "xgrep", "version": "0.101.0", "version_url": "https://example.org/xgrep/0.101.0"},
              {"tool": "pqcheck", "version": "c0ccf5b", "version_url": ""}]  # fmt: skip
     lines = _versions(rows, tools)
-    assert lines[0] == "### Tool versions" and "30 October 2026" in lines[2]
+    assert lines[0] == "### Tool versions" and "30 October 2026" in "\n".join(lines)  # in its collapsed rule
     assert ("| xgrep | [0.101.0](https://example.org/xgrep/0.101.0) | `xgrep 0.101.0` | `bf-cbom/worker-xgrep:1.0.4` "
             "| `abc123` | 2 |") in lines  # fmt: skip
     assert not any(line.startswith("| cdxgen") for line in lines)
