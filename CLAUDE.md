@@ -44,10 +44,9 @@ example, voter groups, how family and group are argued),
   60.5 GiB (corpus-pilot-medium, 2026-10-23). Current limits are in `common/tools.yaml` and `docker-compose.yml`;
   since 2026-10-30 every worker reaches its peak comfortably, because the paper reports peaks and never limits
   (CBOMkit 20 GiB with `-Xmx16g`, the heap being its binding limit; CipherRadar 12; xgrep 8; the trials' highest
-  peaks were 12.8, 7.3 and 3.0). corpus-main is to run with `REPLICAS="cbomkit=2"`: with the services, the summed caps
-  are 115 of 121.5 GiB, so every job can reach its cap at once (decided 2026-10-30). With cdxgen (eligible in Go since
-  the bar of 2026-10-31, 24 GiB) they are 139: open whether its cap goes down to what its Go runs need (its Go peaks
-  from the next corpus run) or the plan accepts it.
+  peaks were 12.8, 7.3 and 3.0). corpus-main runs without replicas (decided 2026-10-31; `cbomkit=2` was the plan of
+  2026-10-30): its 11 tools, cdxgen's 24 GiB included, and the services (git server 16, runner 8, coordinator 2,
+  Redis 1; the idle misc-pyqun's 4 left out) sum to 119 of 121.5 GiB, so every job can reach its cap at once.
   The laptop is for code, configs and analysing copied exports.
 - **Results are disposable until the paper's runs.** One code path per feature, no compatibility with older result
   layouts; old experiments are rerun, not migrated.
@@ -165,7 +164,7 @@ example, voter groups, how family and group are argued),
   stack board shows one row per tool (`busy 2/3`, summed RAM). Run times measured with replicas include their CPU
   contention; the replica test (corpus-pilot-medium without and with cbomkit 3, cipherradar 3, scanoss 2, 2026-10-30;
   `docs/findings.md` "Replica test") found CBOMkit's times within the unreplicated tools' noise (median ratio 1.03),
-  so corpus-main runs with `cbomkit=2`. It also found the git server serving one clone at a time, so a CBOMkit full
+  so corpus-main was to run with `cbomkit=2` (since 2026-10-31 it runs without replicas). It also found the git server serving one clone at a time, so a CBOMkit full
   clone held up every other worker's clone, inside their run times (fixed: 16 fcgiwrap processes), and the corpus
   order starting the longest jobs late (fixed: largest first).
 - **Later: memory-gated scheduling** (noted 2026-10-19, not built; the user may move the stack to Kubernetes

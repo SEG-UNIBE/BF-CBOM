@@ -304,8 +304,8 @@ experiment.
   `memory_gb` in `common/tools.yaml` (a test keeps them equal; adjust both). Idle workers use little, large jobs can
   reach their caps, and the VM also needs memory for the coordinator, Redis and the git server (`GITSERVER_MEMORY`,
   16g, which leaves room for the concurrent full clones of CBOMkit replicas). On the VM the caps of every container
-  an experiment feeds, replicas included, plus those of the services stay within its RAM (corpus-main with
-  `REPLICAS="cbomkit=2"`: 115 of 121.5 GiB): every job can then reach its cap at the same time, a tool's reported
+  an experiment feeds, replicas included, plus those of the services stay within its RAM (corpus-main, without
+  replicas: 119 of 121.5 GiB): every job can then reach its cap at the same time, a tool's reported
   peak is its own and not our limit's, and the kernel never has to pick Redis or the git server for an OOM kill.
   CBOMkit's limit is set by its Java heap (`JAVA_OPTS` `-Xmx`, 4 GiB below the container's limit): a full heap
   ends the job as a failure, not an OOM kill, so the two rise together.

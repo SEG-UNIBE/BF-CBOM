@@ -1,11 +1,12 @@
 # The paper's corpus run (RQ1-RQ4): the stratified GitHub sample of 2026-10-30, 6 repos per (star bin x size bin)
-# cell, 54 each in Java, Python and Go, the eligible tools once. 1620 tool/repository pairs, 1242 of them supported
-# (Java 7 tools, Python 8, Go 8); the rest are recorded as unsupported without scanning.
-# Run on the VM once bar-micro has confirmed the tools on the pins of 2026-10-30, with a second CBOMkit container:
-#   make up-prod REPLICAS="cbomkit=2"
+# cell, 54 each in Java, Python and Go, the eligible tools once. 1782 tool/repository pairs, 1296 of them supported
+# (Java 7 tools, Python 8, Go 9); the rest are recorded as unsupported without scanning.
+# Run on the VM once bar-micro has confirmed the tools on the pins of 2026-10-30, without replicas (decided 2026-10-31):
+#   make up-prod
 #   make experiment EXP=experiments/corpus-main.yaml EXPERIMENT_MEMORY_BUDGET_GB=0 ARGS="--overwrite-old"
-# The caps of these tools (CBOMkit 2 x 20 GiB) and of the services (git server 16, runner 8, coordinator 2, Redis 1)
-# sum to 115 GiB of the VM's 121.5, so every job can reach its cap at once and the reported peaks are the tools' own.
+# The caps of these tools (92 GiB, cdxgen 24 and CBOMkit 20 among them) and of the services (git server 16, runner 8,
+# coordinator 2, Redis 1) sum to 119 GiB of the VM's 121.5, so every job can reach its cap at once and the reported
+# peaks are the tools' own.
 #   make experiment-export NAME=corpus-main BF_CBOM_JOBS=32 RUNNER_MEMORY=96g
 name: corpus-main
 description: stratified GitHub sample of 2026-10-30, 54 repos each in Java, Python and Go
