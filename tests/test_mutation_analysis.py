@@ -288,7 +288,7 @@ def test_not_judged_counts_the_planted_calls_by_status():
             for t, st in statuses]  # fmt: skip
     text = "\n".join(sr._mutation([mutant], rows, []))
     assert f"{sb.CAVEAT} Not judged: 3 planted call × tool, by the status of the run on the mutant" in text
-    assert "2 unsupported (the language is outside the tool’s), 1 original error." in text
+    assert "2 unsupported (a language the tool does not support), 1 original error." in text
 
 
 def test_changes_off_the_edit_are_counted_apart_from_detection_and_read_against_the_baseline():

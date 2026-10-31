@@ -773,7 +773,8 @@ def _packaging(n: NormalizedCbom) -> tuple[list[list[NormRecord]], set[str]]:
 
 def micro_verdict(status: str, score: TruthScore | None) -> str:
     """pass/fail (the bar: lenient call-site recall) for a scored run; otherwise why there is no grade:
-    unsupported (outside the tool's languages), missing (not run), error (failed, timed out, cancelled, unreadable)."""
+    unsupported (a language the tool does not support), missing (not run), error (failed, timed out, cancelled,
+    unreadable)."""
     if score is not None:
         return "pass" if score.passes_bar else "fail"
     return status if status in ("unsupported", "missing") else "error"

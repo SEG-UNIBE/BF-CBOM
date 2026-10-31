@@ -191,7 +191,9 @@ def _reading() -> list[str]:
     )
     lines += _bullets(
         [
-            ("–", "the repository's language is outside the tool's languages, so the tool was not run."),
+            ("–", "not run: the tool does not support the repository's language.",
+             "The supported languages are the ones the tool declares (`languages` in `common/tools.yaml`), narrowed "
+             "by a spec's `tool_languages`."),
             ("×", "the run failed or timed out."),
             ("1'234", "a number with ' between thousands, so 1234."),
             ("0.43", "a share as a fraction with two decimals, so 43 %, and `1.00` means all."),
@@ -624,7 +626,7 @@ def _runs(rows: list[dict]) -> list[str]:
         median = _num(statistics.median(durations)) if durations else ""
         versions = ", ".join(f"`{v}`" for v in sorted({r["tool_version"] for r in rs if r.get("tool_version")}))
         if not versions and c.get("unsupported") == len(rs):
-            versions = "not run: no repo in its languages"
+            versions = "not run: no repository in a language it supports"
         row = [tool] + [c.get(s, 0) or "" for s in statuses] + [other or "", median]
         others.append(other)
         table.append(row + [versions])
@@ -660,7 +662,7 @@ def _runs(rows: list[dict]) -> list[str]:
             ("oom", "the tool wrote output, but its container was OOM-killed meanwhile, so the CBOM may be partial.",
              "That is our memory cap, not the tool's result.",
              "Such a run is left out of every table below, and `experiment run --retry-failed` redoes it."),
-            ("unsupported", "the repository's language is outside the tool's languages, so the tool was not run."),
+            ("unsupported", "not run: the tool does not support the repository's language."),
             *([("other", "runs with any other status.")] if "other" in header else []),
             ("median s", "the median duration of the ok runs, in seconds."),
             ("tool version", "as the worker recorded it."),
@@ -863,7 +865,7 @@ def _micro(rows: list[dict], expected: list[dict]) -> list[str]:
             (" … ".join(langs) if len(langs) > 1 else langs[0],
              f"`{VERDICT_MARK['pass']} n` (pass) or `{VERDICT_MARK['fail']} n` (fail), with n the calls the tool "
              "found in their functions.",
-             "`–`: outside the tool's languages, `error`: the run failed or timed out."),
+             "`–`: not run, a language the tool does not support, `error`: the run failed or timed out."),
             ("bar exam", "the tool's verdict.",
              "`bar passed`: it clears the bar in at least one language.",
              "`bar failed`: it was scored and clears it nowhere, a candidate to leave out of the later specs.",
@@ -1082,8 +1084,7 @@ def _decoys(rows: list[dict], langs: list[str], tools: list[str]) -> list[str]:
     lines += _columns(
         [
             (" … ".join(langs) if len(langs) > 1 else langs[0], "`hit/decoys`: the decoys the tool reported crypto "
-             "on, out of the project's decoys.", "`–`: the language is outside the tool's languages, so it did not "
-             "run there."),
+             "on, out of the project's decoys.", "`–`: not run, a language the tool does not support."),
             ("decoys hit", "the kinds it reported crypto on, with the languages in brackets when not in every "
              "language it was scored on."),
         ]

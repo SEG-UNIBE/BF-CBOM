@@ -146,7 +146,8 @@ def _reported(rows: list[dict], run: int) -> list[str]:
     matrix.append(totals)
     body = _text(
         "`crypto assets` per repository (rows) and tool (columns), as written, from the ok runs.",
-        "`all` sums each column, `–` is an unsupported language and `×` a failed or timed-out run.",
+        "`all` sums each column, `–` is a language the tool does not support (not run) and `×` a failed or timed-out "
+        "run.",
         "`expect` is `expect_crypto` from the corpus: `low` marks a negative case where little crypto is expected, so "
         "reports there are a false-positive proxy."
         if expect
@@ -1695,7 +1696,7 @@ def _mutation(
     failed = Counter(r.get("status") or "missing" for r in rows if r.get("status") != "ok")
     if failed:
         why = ", ".join(
-            f"{_n(n)} {'unsupported (the language is outside the tool’s)' if st == 'unsupported' else st}"
+            f"{_n(n)} {'unsupported (a language the tool does not support)' if st == 'unsupported' else st}"
             for st, n in sorted(failed.items(), key=lambda kv: (-kv[1], kv[0]))
         )
         lines += _check(CAVEAT, f"Not judged: {_n(sum(failed.values()))} planted call × tool, by the status of the "
