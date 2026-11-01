@@ -1,0 +1,2634 @@
+selected_from: corpus-main
+rule: per language the 30 repositories with the smallest checkout (all files at the
+  pinned commit) among those where every supported tool's run on the original was
+  ok
+projection:
+  variants: 31
+  hours:
+    cbomkit:
+    - 220.5
+    - 8.6
+    cdxgen:
+    - 27.6
+    - 6.4
+    cipherradar:
+    - 68.0
+    - 9.3
+    ciphersift:
+    - 20.6
+    - 1.6
+    cryptobomforge:
+    - 29.7
+    - 7.2
+    cryptoscan:
+    - 42.5
+    - 1.8
+    pqcheck:
+    - 20.4
+    - 2.1
+    qdarpan:
+    - 19.1
+    - 1.0
+    scanoss:
+    - 32.1
+    - 1.6
+    securin-xbom:
+    - 29.1
+    - 6.3
+    xgrep:
+    - 40.7
+    - 4.7
+short: {}
+excluded:
+- full_name: yuchuangu85/Android_Framework_Source
+  language: Java
+  reason: a failed run in corpus-main
+  runs:
+  - cipherradar:error
+- full_name: OctoGramApp/OctoGram
+  language: Java
+  reason: a failed run in corpus-main
+  runs:
+  - cipherradar:timeout
+- full_name: Tencent/TencentKona-11
+  language: Java
+  reason: a failed run in corpus-main
+  runs:
+  - cipherradar:error
+- full_name: stanfordnlp/CoreNLP
+  language: Java
+  reason: a failed run in corpus-main
+  runs:
+  - cbomkit:timeout
+- full_name: google/j2objc
+  language: Java
+  reason: a failed run in corpus-main
+  runs:
+  - cipherradar:error
+- full_name: QingyangZhang/EMPO
+  language: Python
+  reason: a failed run in corpus-main
+  runs:
+  - cbomkit:error
+- full_name: ASPP/pelita
+  language: Python
+  reason: a failed run in corpus-main
+  runs:
+  - cbomkit:error
+- full_name: PancrePal-xiaoyibao/PancrePal-xiaoyibao
+  language: Python
+  reason: a failed run in corpus-main
+  runs:
+  - cbomkit:error
+- full_name: real-stanford/universal_manipulation_interface
+  language: Python
+  reason: a failed run in corpus-main
+  runs:
+  - cbomkit:error
+- full_name: Blizaine/Maestro
+  language: Python
+  reason: a failed run in corpus-main
+  runs:
+  - cbomkit:error
+- full_name: jeshraghian/snntorch
+  language: Python
+  reason: a failed run in corpus-main
+  runs:
+  - cbomkit:error
+- full_name: hashicorp/terraform-provider-azuread
+  language: Go
+  reason: a failed run in corpus-main
+  runs:
+  - cbomkit:timeout
+- full_name: Gaurav-Gosain/tuios
+  language: Go
+  reason: a failed run in corpus-main
+  runs:
+  - cbomkit:timeout
+repos:
+- full_name: nelenkov/android-backup-extractor
+  git_url: https://github.com/nelenkov/android-backup-extractor.git
+  branch: master
+  commit: 38fd634a50a1c5d8972a4eca83f5e5d47bfa8411
+  language: Java
+  stars: 2608
+  size_kb: 481
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - JCA
+  - BouncyCastle
+  files: 22
+  source_files: 2
+  checkout_bytes: 94308
+  source_bytes: 22821
+- full_name: MinecraftForge/Installer
+  git_url: https://github.com/MinecraftForge/Installer.git
+  branch: '2.0'
+  commit: 87803a77943a1b2d02d69e7c3108042b21f5382d
+  language: Java
+  stars: 72
+  size_kb: 4690
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - JCA
+  - JSSE
+  files: 46
+  source_files: 30
+  checkout_bytes: 259568
+  source_bytes: 158129
+- full_name: openscoring/openscoring
+  git_url: https://github.com/openscoring/openscoring.git
+  branch: master
+  commit: 017286a1a868a80f8c56862bd4bc29e049e6d7dc
+  language: Java
+  stars: 587
+  size_kb: 927
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - JCA
+  topics:
+  - apache-spark
+  - api
+  - lightgbm
+  - pmml
+  - r
+  - real-time
+  - scikit-learn
+  - xgboost
+  files: 77
+  source_files: 47
+  checkout_bytes: 317711
+  source_bytes: 150965
+- full_name: heroku/webapp-runner
+  git_url: https://github.com/heroku/webapp-runner.git
+  branch: main
+  commit: 59f44bbd7f3918140d18cfbad1ef2cd77f576463
+  language: Java
+  stars: 323
+  size_kb: 1313
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - JSSE
+  topics:
+  - heroku
+  - heroku-languages
+  - java
+  - tomcat
+  files: 49
+  source_files: 14
+  checkout_bytes: 322360
+  source_bytes: 70924
+- full_name: Trinea/android-common
+  git_url: https://github.com/Trinea/android-common.git
+  branch: master
+  commit: 56be038544ef00e02c86052ce16398dda1987a4d
+  language: Java
+  stars: 4995
+  size_kb: 1268
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - JCA
+  files: 95
+  source_files: 77
+  checkout_bytes: 497048
+  source_bytes: 471934
+- full_name: hhhzzzsss/SongPlayer
+  git_url: https://github.com/hhhzzzsss/SongPlayer.git
+  branch: master
+  commit: 36f9d1f3dda4cd7b5728e6e4fb54e0a95ff9c9d8
+  language: Java
+  stars: 63
+  size_kb: 1293
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - JCA
+  - JSSE
+  files: 48
+  source_files: 32
+  checkout_bytes: 524204
+  source_bytes: 227138
+- full_name: vert-x3/vertx-mongo-client
+  git_url: https://github.com/vert-x3/vertx-mongo-client.git
+  branch: master
+  commit: b2140d1751e3f627d70f1f84f302f8f075e7503f
+  language: Java
+  stars: 63
+  size_kb: 1869
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - JCA
+  - JSSE
+  topics:
+  - async
+  - java
+  - mongo
+  - non-blocking
+  - reactive
+  - vertx
+  files: 125
+  source_files: 110
+  checkout_bytes: 683521
+  source_bytes: 628011
+- full_name: google/volley
+  git_url: https://github.com/google/volley.git
+  branch: master
+  commit: a4627fcc795fcc661aa0033a6cc135ec9c66ee81
+  language: Java
+  stars: 3412
+  size_kb: 1425
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - JSSE
+  files: 132
+  source_files: 98
+  checkout_bytes: 767290
+  source_bytes: 610929
+- full_name: jakgor471/BSPEntSpy
+  git_url: https://github.com/jakgor471/BSPEntSpy.git
+  branch: main
+  commit: 13e2845d9ef050f4ed974b0abf7c63a05394dad0
+  language: Java
+  stars: 54
+  size_kb: 1042
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - JCA
+  topics:
+  - bsp
+  - garrysmod
+  - half-life-2
+  - hammer-editor
+  - source-engine
+  files: 94
+  source_files: 55
+  checkout_bytes: 787907
+  source_bytes: 392173
+- full_name: scribejava/scribejava
+  git_url: https://github.com/scribejava/scribejava.git
+  branch: master
+  commit: 8970e8eeb0aff840d0b223890e9c392ee19218f7
+  language: Java
+  stars: 5453
+  size_kb: 2625
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - JCA
+  - JSSE
+  topics:
+  - java
+  - oauth
+  - oauth2
+  - scribe
+  - scribe-java
+  - scribejava
+  - scribejava-httpclient
+  files: 340
+  source_files: 315
+  checkout_bytes: 890285
+  source_bytes: 801650
+- full_name: LeoChen-Tech/douyin-material-saver
+  git_url: https://github.com/LeoChen-Tech/douyin-material-saver.git
+  branch: main
+  commit: 3b0e2ead38e97ce6cd7ccacde25e63cf76db1ba9
+  language: Java
+  stars: 63
+  size_kb: 872
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - JCA
+  files: 62
+  source_files: 15
+  checkout_bytes: 1210451
+  source_bytes: 246684
+- full_name: mc1arke/sonarqube-community-branch-plugin
+  git_url: https://github.com/mc1arke/sonarqube-community-branch-plugin.git
+  branch: master
+  commit: e59bb80e563fe5224b361726889e0ea9b9bd7ee0
+  language: Java
+  stars: 2893
+  size_kb: 1906
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - BouncyCastle
+  topics:
+  - sonarqube
+  - sonarqube-analysis
+  - sonarqube-plugin
+  - sonarqube-scanner
+  - sonarqube-server
+  files: 367
+  source_files: 221
+  checkout_bytes: 1300337
+  source_bytes: 1012744
+- full_name: Rapsssito/react-native-tcp-socket
+  git_url: https://github.com/Rapsssito/react-native-tcp-socket.git
+  branch: master
+  commit: 8a3f47b33fd395092caa0241aa92327802abffad
+  language: Java
+  stars: 397
+  size_kb: 1598
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - JCA
+  - BouncyCastle
+  - JSSE
+  topics:
+  - android
+  - ios
+  - net
+  - network
+  - networking
+  - react-native
+  - react-native-library
+  - socket
+  - ssl
+  - tcp
+  - tcp-client
+  - tcp-server
+  - tcp-socket
+  - tls
+  files: 135
+  source_files: 12
+  checkout_bytes: 1323164
+  source_bytes: 70648
+- full_name: ohbus/retail-banking
+  git_url: https://github.com/ohbus/retail-banking.git
+  branch: master
+  commit: 648b784ffdbb7f2ef8f968a23640e35eac6cac88
+  language: Java
+  stars: 57
+  size_kb: 777
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - JCA
+  topics:
+  - banking
+  - banking-applications
+  - bootstrap
+  - case-study
+  - consumer
+  - hacktoberfest
+  - ilp
+  - j2ee
+  - java
+  - mvc
+  - mysql
+  - online-banking
+  - retail-banking
+  - spring-boot
+  - sprint
+  - tcs
+  - thymeleaf
+  - web
+  files: 109
+  source_files: 40
+  checkout_bytes: 1331859
+  source_bytes: 91824
+- full_name: FusionAuth/java-http
+  git_url: https://github.com/FusionAuth/java-http.git
+  branch: main
+  commit: 4bb098e34b27a7312e27e00b06b51fcad918974f
+  language: Java
+  stars: 365
+  size_kb: 1213
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - JCA
+  - JSSE
+  topics:
+  - http
+  - http-client
+  - http-server
+  - java
+  - java17
+  - no-dependencies
+  files: 149
+  source_files: 93
+  checkout_bytes: 1680558
+  source_bytes: 653543
+- full_name: ashishps1/awesome-system-design-resources
+  git_url: https://github.com/ashishps1/awesome-system-design-resources.git
+  branch: main
+  commit: 25724090f7dd7746129b7194b55504f9d06f86ed
+  language: Java
+  stars: 42966
+  size_kb: 2340
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - JCA
+  topics:
+  - awesome
+  - backend
+  - computer-science
+  - distributed-systems
+  - high-level-design
+  - hld
+  - interview
+  - interview-questions
+  - scalability
+  - system-design
+  files: 26
+  source_files: 11
+  checkout_bytes: 1724940
+  source_bytes: 16514
+- full_name: openanalytics/containerproxy
+  git_url: https://github.com/openanalytics/containerproxy.git
+  branch: master
+  commit: 8772fa34ffdf8868e988b7aabc17a224c0ab73cc
+  language: Java
+  stars: 56
+  size_kb: 2681
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - JCA
+  - BouncyCastle
+  files: 354
+  source_files: 277
+  checkout_bytes: 1972897
+  source_bytes: 1397746
+- full_name: tinystruct/tinystruct
+  git_url: https://github.com/tinystruct/tinystruct.git
+  branch: master
+  commit: 089ec19022f3bb5d87f1e83e30b2034b24f7e77f
+  language: Java
+  stars: 363
+  size_kb: 2838
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - JCA
+  - JSSE
+  topics:
+  - agent
+  - ai-agent
+  - ai-development
+  - java
+  - java-agent
+  - java-ai
+  - java-cli
+  - java-frameworks
+  - jepa
+  - jev
+  - lightweight-framework
+  - mcp
+  - mcp-server
+  - modular-design
+  - sse
+  - tinystruct
+  - typesafe
+  - typesafe-ai
+  - typesafe-jev
+  - web-frameworks
+  files: 353
+  source_files: 283
+  checkout_bytes: 1997104
+  source_bytes: 1610205
+- full_name: zalando/riptide
+  git_url: https://github.com/zalando/riptide.git
+  branch: main
+  commit: 4e9400ad4f4fe01512245d7f651de16b2ebf985c
+  language: Java
+  stars: 341
+  size_kb: 8895
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - JSSE
+  topics:
+  - async
+  - client-side
+  - http
+  - java
+  - json-stream
+  - microservices
+  - plugin-extension
+  - resilience
+  - routing
+  - spring
+  - spring-boot-starter
+  - web
+  files: 613
+  source_files: 470
+  checkout_bytes: 2895688
+  source_bytes: 1079853
+- full_name: QuiltMC/quilt-loader
+  git_url: https://github.com/QuiltMC/quilt-loader.git
+  branch: develop
+  commit: 35a644ed97fceb6cbda99cb980f120ad76f1e6c1
+  language: Java
+  stars: 520
+  size_kb: 4470
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - JCA
+  topics:
+  - mod
+  - quiltmc
+  files: 729
+  source_files: 510
+  checkout_bytes: 2992094
+  source_bytes: 2386668
+- full_name: RoastSlav/quickdrop
+  git_url: https://github.com/RoastSlav/quickdrop.git
+  branch: master
+  commit: 6d77ecba32cc5cf2ffd68a712ba0fca8f713f643
+  language: Java
+  stars: 432
+  size_kb: 2965
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - JCA
+  - BouncyCastle
+  - JSSE
+  topics:
+  - file-sharing
+  - secure-storage
+  - self-hosted
+  files: 346
+  source_files: 177
+  checkout_bytes: 3169493
+  source_bytes: 1305872
+- full_name: byronka/minum
+  git_url: https://github.com/byronka/minum.git
+  branch: master
+  commit: e76a764174a3d6b19434259a8c81500d08a37efa
+  language: Java
+  stars: 665
+  size_kb: 7280
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - JCA
+  - JSSE
+  topics:
+  - framework
+  - java
+  - minimalism
+  - minimalist
+  - tdd
+  - web
+  files: 332
+  source_files: 216
+  checkout_bytes: 3903983
+  source_bytes: 1419775
+- full_name: Milesight-IoT/beaver-iot
+  git_url: https://github.com/Milesight-IoT/beaver-iot.git
+  branch: main
+  commit: cc4edea766e1ffec3ead3741bba71c2eff4bf04c
+  language: Java
+  stars: 72
+  size_kb: 5101
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - JCA
+  topics:
+  - beaver-iot
+  - iot
+  - iot-platform
+  files: 1387
+  source_files: 1158
+  checkout_bytes: 4394572
+  source_bytes: 2753567
+- full_name: elastic/elasticsearch-hadoop
+  git_url: https://github.com/elastic/elasticsearch-hadoop.git
+  branch: main
+  commit: eec78d4f6d2649db6df60dae117c9d5abdee7552
+  language: Java
+  stars: 1967
+  size_kb: 11395
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - JCA
+  - JSSE
+  files: 1039
+  source_files: 615
+  checkout_bytes: 4895884
+  source_bytes: 3263910
+- full_name: Guardsquare/proguard
+  git_url: https://github.com/Guardsquare/proguard.git
+  branch: master
+  commit: 6c4f8a7dc09524c200316ecefb3730ccc4a8d060
+  language: Java
+  stars: 3687
+  size_kb: 7227
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - JCA
+  topics:
+  - android
+  - build-tool
+  - java
+  - obfuscator
+  - optimiser
+  - proguard
+  files: 665
+  source_files: 485
+  checkout_bytes: 5251354
+  source_bytes: 3960138
+- full_name: CszYihen/Yihen-Drama
+  git_url: https://github.com/CszYihen/Yihen-Drama.git
+  branch: main
+  commit: 2b79d9b6ef56085ecc58ec4f0a4bc0469c38518c
+  language: Java
+  stars: 221
+  size_kb: 3802
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - BouncyCastle
+  files: 310
+  source_files: 228
+  checkout_bytes: 5467968
+  source_bytes: 501975
+- full_name: CloudNetService/CloudNet
+  git_url: https://github.com/CloudNetService/CloudNet.git
+  branch: nightly
+  commit: cc2e3c32fdd865699c6b815b2de4848c557c158b
+  language: Java
+  stars: 447
+  size_kb: 108954
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 30000
+    - 1572864
+  crypto_apis:
+  - JCA
+  - JSSE
+  topics:
+  - bukkit
+  - bungeecord
+  - cloudnet
+  - fabric
+  - java
+  - minecraft
+  - minecraft-network
+  - minecraft-server
+  - minecraft-server-management
+  - minestom
+  - nukkit
+  - sponge
+  - velocity
+  - waterdogpe
+  files: 1294
+  source_files: 1147
+  checkout_bytes: 5940310
+  source_bytes: 5219306
+- full_name: singgel/SpringBoot-Templates
+  git_url: https://github.com/singgel/SpringBoot-Templates.git
+  branch: master
+  commit: 629aefd5663cecec0cffaeac713f2dc792b011b5
+  language: Java
+  stars: 184
+  size_kb: 3120
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - JCA
+  topics:
+  - dubbo
+  - elasticsearch
+  - hbase
+  - hive
+  - kafka
+  - logback
+  - lucene
+  - mongodb
+  - mybatis
+  - netty
+  - participle
+  - rabbitmq
+  - redis
+  - rocketmq
+  - solr
+  - spring-boot
+  - springboot
+  - starter
+  - swagger
+  - zookeeper
+  files: 550
+  source_files: 275
+  checkout_bytes: 6939609
+  source_bytes: 630335
+- full_name: jodconverter/jodconverter
+  git_url: https://github.com/jodconverter/jodconverter.git
+  branch: develop
+  commit: 8977022ab31d1a75010beac7f906f5bde714d10b
+  language: Java
+  stars: 1597
+  size_kb: 14906
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - JCA
+  - JSSE
+  topics:
+  - converter
+  - java
+  - libreoffice
+  - openoffice
+  files: 614
+  source_files: 363
+  checkout_bytes: 7038863
+  source_bytes: 2136955
+- full_name: google/copybara
+  git_url: https://github.com/google/copybara.git
+  branch: master
+  commit: 0ca346378a824b3894fb5ee20a64499453a37438
+  language: Java
+  stars: 3907
+  size_kb: 16272
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - JCA
+  files: 1159
+  source_files: 962
+  checkout_bytes: 8677859
+  source_bytes: 7636967
+- full_name: maxcountryman/flask-login
+  git_url: https://github.com/maxcountryman/flask-login.git
+  branch: main
+  commit: c8bba84b9ba6768e878317fc46c54bd13fa1ac07
+  language: Python
+  stars: 3676
+  size_kb: 861
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - hashlib
+  topics:
+  - authentication
+  - login-system
+  - session-management
+  files: 41
+  source_files: 10
+  checkout_bytes: 153971
+  source_bytes: 102373
+- full_name: novnc/websockify
+  git_url: https://github.com/novnc/websockify.git
+  branch: master
+  commit: 1e284ea2c825377ec09b40164b64f6e0778e31fc
+  language: Python
+  stars: 4486
+  size_kb: 4807
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - hashlib
+  - ssl
+  topics:
+  - bridge
+  - certificate
+  - javascript
+  - novnc
+  - proxy
+  - python
+  - ssl
+  - subprotocol
+  - traffic
+  - websocket-protocol
+  - websocket-proxy
+  - websockets
+  - websockify
+  - wss
+  files: 50
+  source_files: 20
+  checkout_bytes: 251797
+  source_bytes: 179365
+- full_name: jhj0517/Whisper-WebUI
+  git_url: https://github.com/jhj0517/Whisper-WebUI.git
+  branch: master
+  commit: c3bb3b18e959826b28b1192486a8d5b361b6a4e0
+  language: Python
+  stars: 2900
+  size_kb: 1570
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - hashlib
+  topics:
+  - ai
+  - gradio
+  - open-source
+  - python
+  - pytorch
+  - web-ui
+  - whisper
+  files: 111
+  source_files: 65
+  checkout_bytes: 325117
+  source_bytes: 237581
+- full_name: lilydjwg/winterpy
+  git_url: https://github.com/lilydjwg/winterpy.git
+  branch: master
+  commit: 033ce9547f0a0b97a87dc1595abaa102d0c512bd
+  language: Python
+  stars: 229
+  size_kb: 1266
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - hashlib
+  topics:
+  - misc
+  - python
+  files: 125
+  source_files: 82
+  checkout_bytes: 364444
+  source_bytes: 294377
+- full_name: thewhiteh4t/FinalRecon
+  git_url: https://github.com/thewhiteh4t/FinalRecon.git
+  branch: master
+  commit: b5db3a46921195bec643065c560e19741852957c
+  language: Python
+  stars: 3041
+  size_kb: 417
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - pyca
+  - ssl
+  topics:
+  - crawler
+  - directory-search
+  - dns-enumeration
+  - headers
+  - javascript-crawler
+  - pentest-tool
+  - pentesting
+  - pentesting-tools
+  - port-scanning
+  - python3
+  - reconnaissance
+  - ssl-certificate
+  - subdomain-enumeration
+  - traceroute
+  - web-penetration-testing
+  - web-reconnaissance
+  - webpentest
+  - whois
+  files: 51
+  source_files: 36
+  checkout_bytes: 391039
+  source_bytes: 103842
+- full_name: py-smart-gardena/hass-gardena-smart-system
+  git_url: https://github.com/py-smart-gardena/hass-gardena-smart-system.git
+  branch: master
+  commit: 316c8b88d13c52c85d9e30103fbd8f6c82b28c0a
+  language: Python
+  stars: 319
+  size_kb: 490
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - ssl
+  topics:
+  - gardena
+  - gardena-api
+  - gardena-smart-system
+  - home-assistant
+  - homeassistant
+  files: 70
+  source_files: 30
+  checkout_bytes: 659963
+  source_bytes: 311477
+- full_name: uziii2208/PwnRM
+  git_url: https://github.com/uziii2208/PwnRM.git
+  branch: master
+  commit: e3379fc033a6179229d6d6c74c2ddddd0dbb4e01
+  language: Python
+  stars: 94
+  size_kb: 3817
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - pyca
+  - hashlib
+  - ssl
+  - pycryptodome
+  topics:
+  - active-directory
+  - adtriage
+  - amsi-bypass
+  - ctf
+  - ethical-hacking
+  - impacket
+  - lateral-movement
+  - offensive-security
+  - penetration-testing
+  - post-exploitation
+  - powershell
+  - rce
+  - red-teaming
+  - windows
+  - windows-security
+  - winrm
+  files: 81
+  source_files: 58
+  checkout_bytes: 700573
+  source_bytes: 315599
+- full_name: lebrice/SimpleParsing
+  git_url: https://github.com/lebrice/SimpleParsing.git
+  branch: master
+  commit: 7a706bee8b258b548cb979c7321c1ba0cf8413e6
+  language: Python
+  stars: 550
+  size_kb: 1375
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - hashlib
+  topics:
+  - argparse
+  - argparse-alternative
+  - argument-parsing
+  - dataclasses
+  - python
+  files: 206
+  source_files: 151
+  checkout_bytes: 1043533
+  source_bytes: 815365
+- full_name: xaf/qolsysgw
+  git_url: https://github.com/xaf/qolsysgw.git
+  branch: main
+  commit: dc0c82852689c1ab2e4e5c86ccb7e1142bfa9efd
+  language: Python
+  stars: 218
+  size_kb: 733
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - ssl
+  topics:
+  - appdaemon
+  - automation
+  - hacs
+  - home-assistant
+  - home-automation
+  - qolsys
+  files: 104
+  source_files: 47
+  checkout_bytes: 1070272
+  source_bytes: 330833
+- full_name: cloudinary/pycloudinary
+  git_url: https://github.com/cloudinary/pycloudinary.git
+  branch: master
+  commit: 6ab5c2b239fe9685d77a96134971605d99d9ebdc
+  language: Python
+  stars: 262
+  size_kb: 1758
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - hashlib
+  topics:
+  - cloudinary
+  - cloudinary-api
+  - cloudinary-python-sdk
+  - cloudinary-sdk
+  - django
+  - image-manipulation
+  - image-processing
+  - python
+  - python-sdk
+  - sdk-python
+  - video-manipulation
+  - video-processing
+  files: 157
+  source_files: 96
+  checkout_bytes: 1087376
+  source_bytes: 773930
+- full_name: django-oscar/django-oscar-api
+  git_url: https://github.com/django-oscar/django-oscar-api.git
+  branch: main
+  commit: 0a8a36d7897e0a8a386671332bc292724e07414d
+  language: Python
+  stars: 377
+  size_kb: 1659
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - hashlib
+  topics:
+  - api
+  - django
+  - oscar
+  - rest
+  - restful
+  files: 146
+  source_files: 92
+  checkout_bytes: 1226117
+  source_bytes: 455326
+- full_name: heffneil/esphome-enhanced-dashboard
+  git_url: https://github.com/heffneil/esphome-enhanced-dashboard.git
+  branch: main
+  commit: 706d8eebe005fef93c4b3a997a4f4082f65a2ef6
+  language: Python
+  stars: 67
+  size_kb: 1042
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - hashlib
+  files: 20
+  source_files: 5
+  checkout_bytes: 1280079
+  source_bytes: 105127
+- full_name: MaxApiTeam/PyMax
+  git_url: https://github.com/MaxApiTeam/PyMax.git
+  branch: main
+  commit: c4cb917d354a1179be625925530d72c8aaa969ff
+  language: Python
+  stars: 286
+  size_kb: 1816
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - hashlib
+  - ssl
+  topics:
+  - api
+  - max
+  - max-api-selfbot
+  - max-api-userbot
+  - max-messenger
+  - maxapi-python
+  - pymax
+  - python
+  - selfbot
+  - userbot
+  - vk
+  - vkontakte
+  - websockets
+  files: 302
+  source_files: 212
+  checkout_bytes: 1521184
+  source_bytes: 723321
+- full_name: Rustam-Z/hamroh
+  git_url: https://github.com/Rustam-Z/hamroh.git
+  branch: main
+  commit: 0970d3a3dc8ff50970998515afe4ef79510f397e
+  language: Python
+  stars: 55
+  size_kb: 1710
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - hashlib
+  topics:
+  - ai-agent
+  - ai-assistant
+  - nanoclaw
+  - openclaw
+  files: 249
+  source_files: 199
+  checkout_bytes: 1802534
+  source_bytes: 1242712
+- full_name: sammchardy/python-binance
+  git_url: https://github.com/sammchardy/python-binance.git
+  branch: master
+  commit: 7d7b7fb029631db74852b2e84ed237911307495f
+  language: Python
+  stars: 7218
+  size_kb: 2226
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - hashlib
+  - pycryptodome
+  topics:
+  - api
+  - binance
+  - cryptocurrency
+  - python
+  - python2
+  - python3
+  - websockets
+  files: 116
+  source_files: 75
+  checkout_bytes: 1833938
+  source_bytes: 1478556
+- full_name: SmallPeaches/DanmakuRender
+  git_url: https://github.com/SmallPeaches/DanmakuRender.git
+  branch: v5
+  commit: ab8d3f398831390bf07e7fbeb8682e17079af643
+  language: Python
+  stars: 723
+  size_kb: 1110
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - hashlib
+  - ssl
+  - other
+  files: 177
+  source_files: 150
+  checkout_bytes: 1941465
+  source_bytes: 1181067
+- full_name: kyutai-labs/pocket-tts
+  git_url: https://github.com/kyutai-labs/pocket-tts.git
+  branch: main
+  commit: b20753acd269264fe62c8a4ca55c043b034709e3
+  language: Python
+  stars: 10132
+  size_kb: 2150
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - hashlib
+  files: 174
+  source_files: 92
+  checkout_bytes: 2058753
+  source_bytes: 590030
+- full_name: LuteOrg/lute-v3
+  git_url: https://github.com/LuteOrg/lute-v3.git
+  branch: develop
+  commit: 933d0840aede93b3999e6017ba7f5eba5e41206d
+  language: Python
+  stars: 1603
+  size_kb: 3665
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - hashlib
+  topics:
+  - language-learning
+  - lute
+  files: 634
+  source_files: 233
+  checkout_bytes: 3156472
+  source_bytes: 746984
+- full_name: MrGeDiao/shuorenhua
+  git_url: https://github.com/MrGeDiao/shuorenhua.git
+  branch: main
+  commit: e33d5eb6420ba3468043791a57d71c153b0a8691
+  language: Python
+  stars: 2377
+  size_kb: 4990
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - hashlib
+  topics:
+  - agent-skill
+  - ai-writing
+  - anti-slop
+  - chatgpt
+  - chinese
+  - claude-code
+  - codex
+  - cursor
+  - developer-tools
+  - openclaw
+  - prompt
+  - prompt-engineering
+  - rewriting
+  - skill
+  - text-quality
+  - writing
+  files: 107
+  source_files: 12
+  checkout_bytes: 3213494
+  source_bytes: 241528
+- full_name: QuinnDamerell/OctoPrint-OctoEverywhere
+  git_url: https://github.com/QuinnDamerell/OctoPrint-OctoEverywhere.git
+  branch: master
+  commit: 0f19f5dcca23a5047938cb3c2aeb30691ed4d238
+  language: Python
+  stars: 306
+  size_kb: 2916
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - hashlib
+  - ssl
+  - other
+  topics:
+  - 3d-printer
+  - 3d-printing
+  - ai
+  - android
+  - bambu-lab
+  - community
+  - fluidd
+  - fluiddpi
+  - image-classification
+  - ios
+  - klipper
+  - mainsail
+  - mainsail-os
+  - moonraker
+  - octopi
+  - octoprint
+  - webapp
+  - webcam-streaming
+  files: 313
+  source_files: 268
+  checkout_bytes: 3661527
+  source_bytes: 3341068
+- full_name: PeterGriffinJin/Search-R1
+  git_url: https://github.com/PeterGriffinJin/Search-R1.git
+  branch: main
+  commit: 598e61bd1d36895726d28a8d06b3a15bed19f5d3
+  language: Python
+  stars: 5553
+  size_kb: 3161
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - hashlib
+  files: 245
+  source_files: 191
+  checkout_bytes: 4691107
+  source_bytes: 1413221
+- full_name: secureagentics/Adrian
+  git_url: https://github.com/secureagentics/Adrian.git
+  branch: main
+  commit: 8ad3bdb4abb2184fd56c00718b82c4d8a497bc16
+  language: Python
+  stars: 587
+  size_kb: 1454
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - hashlib
+  - ssl
+  topics:
+  - aarm
+  - agent-security
+  - agentic-ai
+  - agentic-security
+  - agents
+  - ai
+  - ai-agents
+  - ai-governance
+  - ai-security
+  - langchain
+  - langgraph
+  - llm-security
+  - mcp
+  - mcp-security
+  - observability
+  - openai-agents
+  - prompt-injection
+  - runtime-security
+  - self-hosted
+  - threat-detection
+  files: 442
+  source_files: 182
+  checkout_bytes: 4803594
+  source_bytes: 2663033
+- full_name: ait-testbed/attackmate
+  git_url: https://github.com/ait-testbed/attackmate.git
+  branch: main
+  commit: d2edd8bfbb4d18bf4788f222022fe8c73d8fb58f
+  language: Python
+  stars: 51
+  size_kb: 75997
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 30000
+    - 1572864
+  crypto_apis:
+  - ssl
+  topics:
+  - api
+  - attack
+  - automation
+  - automation-framework
+  - cybersecurity
+  - exploit
+  - metasploit
+  - orchestration
+  - pentest
+  - python
+  - redteam
+  - rootkit
+  - security
+  - sliver
+  - testbed
+  - training
+  files: 238
+  source_files: 100
+  checkout_bytes: 5073981
+  source_bytes: 359475
+- full_name: honey720/chzzk-vod-downloader-v2
+  git_url: https://github.com/honey720/chzzk-vod-downloader-v2.git
+  branch: main
+  commit: 7860053b1e9410cf75143de784a0b2f9a79a014e
+  language: Python
+  stars: 71
+  size_kb: 14657
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - hashlib
+  - pycryptodome
+  topics:
+  - chzzk
+  files: 343
+  source_files: 294
+  checkout_bytes: 5289698
+  source_bytes: 4655739
+- full_name: pathintegral-institute/mcpm.sh
+  git_url: https://github.com/pathintegral-institute/mcpm.sh.git
+  branch: main
+  commit: 0119b7f8e7453a3941f290b31fa1d64dc0322ca5
+  language: Python
+  stars: 1018
+  size_kb: 4386
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - hashlib
+  topics:
+  - ai
+  - claude-desktop
+  - cli
+  - cline
+  - continue
+  - cursor
+  - goose
+  - homebrew
+  - llm
+  - mcp
+  - package-manager
+  - pip
+  - profile
+  - routing
+  - sse
+  - stdio
+  - tools
+  - windsurf
+  files: 576
+  source_files: 115
+  checkout_bytes: 6064025
+  source_bytes: 851392
+- full_name: chubin/cheat.sh
+  git_url: https://github.com/chubin/cheat.sh.git
+  branch: master
+  commit: 06af0000259bde1a347da368225c5962d7ffed3e
+  language: Python
+  stars: 41841
+  size_kb: 4715
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - hashlib
+  topics:
+  - cheatsheet
+  - cli
+  - command-line
+  - curl
+  - documentation
+  - examples
+  - hacktoberfest2021
+  - help
+  - terminal
+  - tldr
+  files: 126
+  source_files: 43
+  checkout_bytes: 6205954
+  source_bytes: 179230
+- full_name: pickles4evaaaa/mybibliotheca
+  git_url: https://github.com/pickles4evaaaa/mybibliotheca.git
+  branch: main
+  commit: 629b5c76a1a3d094d7f673643e93214111fc9c32
+  language: Python
+  stars: 595
+  size_kb: 73950
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 30000
+    - 1572864
+  crypto_apis:
+  - hashlib
+  - ssl
+  files: 395
+  source_files: 178
+  checkout_bytes: 7985607
+  source_bytes: 3898487
+- full_name: openstack/rally
+  git_url: https://github.com/openstack/rally.git
+  branch: master
+  commit: 8cc6edc4bac0c88c92a080182e5e5b28abd0e209
+  language: Python
+  stars: 345
+  size_kb: 26426
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - hashlib
+  files: 683
+  source_files: 370
+  checkout_bytes: 8001486
+  source_bytes: 2509423
+- full_name: blakeandersonw/core-oss
+  git_url: https://github.com/blakeandersonw/core-oss.git
+  branch: main
+  commit: a9707bb91fdc841091c61b72ef035b3311fa4f25
+  language: Python
+  stars: 434
+  size_kb: 3686
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - pyca
+  - hashlib
+  - other
+  files: 579
+  source_files: 269
+  checkout_bytes: 8469047
+  source_bytes: 2372785
+- full_name: huggingface/smollm
+  git_url: https://github.com/huggingface/smollm.git
+  branch: main
+  commit: 438be18dae658a638f3a6976fdf5190bb6d68619
+  language: Python
+  stars: 3940
+  size_kb: 1718
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - hashlib
+  - ssl
+  files: 712
+  source_files: 428
+  checkout_bytes: 8565864
+  source_bytes: 3543481
+- full_name: prometheus-community/avalanche
+  git_url: https://github.com/prometheus-community/avalanche.git
+  branch: main
+  commit: d27a421cfc94d219543c213d8ee665db35a9144e
+  language: Go
+  stars: 456
+  size_kb: 3903
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - stdlib
+  files: 38
+  source_files: 9
+  checkout_bytes: 301190
+  source_bytes: 152934
+- full_name: gothinkster/golang-gin-realworld-example-app
+  git_url: https://github.com/gothinkster/golang-gin-realworld-example-app.git
+  branch: main
+  commit: 626c372d259472148d93303f74aa9b9a1cdcef24
+  language: Go
+  stars: 2718
+  size_kb: 305
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - x/crypto
+  topics:
+  - api
+  - best
+  - best-practices
+  - boilerplate
+  - crud
+  - example
+  - gin
+  - gin-mvc
+  - go
+  - golang
+  - gorm
+  - jwt
+  - practice
+  - realworld
+  - rest
+  - restful
+  - sample
+  - starter
+  - todolist
+  - todomvc
+  files: 39
+  source_files: 19
+  checkout_bytes: 328482
+  source_bytes: 125843
+- full_name: TomDoesTech/GOTTH
+  git_url: https://github.com/TomDoesTech/GOTTH.git
+  branch: main
+  commit: 82f87cd086b12235b5293fb2fef3dcba173f4270
+  language: Go
+  stars: 685
+  size_kb: 19130
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - x/crypto
+  topics:
+  - go
+  - golang
+  - htmx
+  - tailwindcss
+  files: 53
+  source_files: 29
+  checkout_bytes: 386657
+  source_bytes: 48208
+- full_name: database64128/swgp-go
+  git_url: https://github.com/database64128/swgp-go.git
+  branch: main
+  commit: fe9047a44a4a3a3fc9541afa81b9622007384637
+  language: Go
+  stars: 364
+  size_kb: 795
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - stdlib
+  - x/crypto
+  topics:
+  - golang
+  - proxy
+  - wireguard
+  files: 111
+  source_files: 100
+  checkout_bytes: 409265
+  source_bytes: 359352
+- full_name: pushbits/server
+  git_url: https://github.com/pushbits/server.git
+  branch: main
+  commit: fdf5fbd85f0e45bb088660cf3606cd5609f0e13f
+  language: Go
+  stars: 371
+  size_kb: 807
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - stdlib
+  topics:
+  - cloud
+  - gotify
+  - matrix-org
+  - notifications
+  - privacy
+  - push-notifications
+  - pushbits
+  - pushnotification
+  - pushnotifications
+  - pushover
+  - self-hosted
+  - selfhosted
+  - selfhosting
+  files: 74
+  source_files: 52
+  checkout_bytes: 445901
+  source_bytes: 125308
+- full_name: anthdm/hollywood
+  git_url: https://github.com/anthdm/hollywood.git
+  branch: master
+  commit: b57d10b09004d546dc59310be8bb39e547b06846
+  language: Go
+  stars: 2347
+  size_kb: 353
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - stdlib
+  topics:
+  - actor-model
+  - distributed-systems
+  - fault-tolerance
+  - golang
+  - microservices
+  files: 109
+  source_files: 88
+  checkout_bytes: 468989
+  source_bytes: 410716
+- full_name: ibnaleem/gosearch
+  git_url: https://github.com/ibnaleem/gosearch.git
+  branch: main
+  commit: 158a938d8ba207d4cf26cbf505a2f797d2e18fee
+  language: Go
+  stars: 3835
+  size_kb: 2373
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - stdlib
+  topics:
+  - cti
+  - cybersecurity
+  - digital-footprint
+  - digital-footprint-lookup
+  - golang
+  - information-gathering
+  - osint
+  - osint-framework
+  - osint-reconnaissance
+  - osint-resources
+  - osint-tool
+  - pentesting
+  - redteam
+  - sherlock
+  - sherlock-alternatives
+  - social-media
+  - username-checker
+  - username-osint
+  - username-scanner
+  - username-search
+  files: 35
+  source_files: 17
+  checkout_bytes: 538326
+  source_bytes: 95532
+- full_name: reugn/go-streams
+  git_url: https://github.com/reugn/go-streams.git
+  branch: master
+  commit: 86444ed50ec3919596ef7bf9e97f69bc5a3fef3d
+  language: Go
+  stars: 2176
+  size_kb: 624
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - stdlib
+  topics:
+  - aerospike
+  - data-pipeline
+  - data-stream
+  - etl
+  - kafka
+  - kafka-streams
+  - low-code
+  - nats-streaming
+  - pipeline
+  - pulsar
+  - redis
+  - stream-processing
+  - stream-processor
+  - streaming-api
+  - streaming-data
+  - streams
+  - throttling
+  - websocket
+  - windowing
+  - workflow
+  files: 163
+  source_files: 112
+  checkout_bytes: 564969
+  source_bytes: 391658
+- full_name: luraproject/lura
+  git_url: https://github.com/luraproject/lura.git
+  branch: master
+  commit: 4c408dd8bab071a6a2c4d02ee06ca09122bbecf5
+  language: Go
+  stars: 6801
+  size_kb: 1833
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - stdlib
+  topics:
+  - api-gateway
+  - apis
+  - backend-services
+  - gateway
+  - gateway-api
+  - go
+  - golang
+  - krakend
+  - load-balancer
+  - microservice
+  - middleware
+  - proxies
+  - router
+  files: 142
+  source_files: 120
+  checkout_bytes: 670377
+  source_bytes: 597400
+- full_name: rykov/paperboy
+  git_url: https://github.com/rykov/paperboy.git
+  branch: main
+  commit: 74c8851098cb400fd26083d3c2b4ac91e6fba244
+  language: Go
+  stars: 504
+  size_kb: 1666
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - stdlib
+  topics:
+  - email
+  - email-campaigns
+  - email-marketing
+  - email-newsletter
+  - go
+  - html-emails
+  - paperboy
+  files: 122
+  source_files: 58
+  checkout_bytes: 862592
+  source_bytes: 248269
+- full_name: imulab/go-scim
+  git_url: https://github.com/imulab/go-scim.git
+  branch: master
+  commit: fec7838ed1c454d176f882e8c6cc73f094068697
+  language: Go
+  stars: 170
+  size_kb: 925
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - stdlib
+  - x/crypto
+  topics:
+  - cloud
+  - go
+  - golang
+  - identity
+  - identity-management
+  - identity-provider
+  - scim
+  - sso
+  files: 184
+  source_files: 159
+  checkout_bytes: 926899
+  source_bytes: 825863
+- full_name: chainreactors/gogo
+  git_url: https://github.com/chainreactors/gogo.git
+  branch: master
+  commit: a278b33d87447bb17e95b6b4e8a1fb7a9a450375
+  language: Go
+  stars: 2152
+  size_kb: 3899
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - stdlib
+  topics:
+  - recon
+  - redteam
+  - security
+  - security-tools
+  files: 93
+  source_files: 67
+  checkout_bytes: 951004
+  source_bytes: 729745
+- full_name: Vibra-Ingenn/Janus
+  git_url: https://github.com/Vibra-Ingenn/Janus.git
+  branch: main
+  commit: e5c3de4c6b85d355985d0d4ca5fc2ef629d62992
+  language: Go
+  stars: 137
+  size_kb: 726
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - stdlib
+  files: 51
+  source_files: 23
+  checkout_bytes: 977151
+  source_bytes: 115090
+- full_name: FNCache-project/FNCache
+  git_url: https://github.com/FNCache-project/FNCache.git
+  branch: master
+  commit: c78d571c5e294efbfbba64a20736abae5d0946dc
+  language: Go
+  stars: 58
+  size_kb: 644
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - stdlib
+  topics:
+  - c
+  - cni
+  - container
+  - ebpf
+  - ebpf-programs
+  - flannel
+  - golang
+  - k8s
+  - linux
+  files: 203
+  source_files: 161
+  checkout_bytes: 1045195
+  source_bytes: 897139
+- full_name: novitalabs/NovitaBox
+  git_url: https://github.com/novitalabs/NovitaBox.git
+  branch: main
+  commit: 9dacb2fb8b74163ab02c057c02d468f2c6a0bdac
+  language: Go
+  stars: 50
+  size_kb: 641
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - stdlib
+  topics:
+  - agents
+  - gpu
+  - gvisor
+  - microvm
+  - sandbox
+  files: 152
+  source_files: 84
+  checkout_bytes: 1243844
+  source_bytes: 905592
+- full_name: go-gorm/gen
+  git_url: https://github.com/go-gorm/gen.git
+  branch: master
+  commit: 52b585b1e8d82bed24a9152b07e49bae81b906b7
+  language: Go
+  stars: 2560
+  size_kb: 1565
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - stdlib
+  topics:
+  - generator
+  - golang
+  - gorm
+  files: 284
+  source_files: 254
+  checkout_bytes: 1544936
+  source_bytes: 1180404
+- full_name: zovocard/zovo_card_cdk_auto
+  git_url: https://github.com/zovocard/zovo_card_cdk_auto.git
+  branch: master
+  commit: ce8a9795b55df0e2b401d26110e582c27f2c9eb4
+  language: Go
+  stars: 92
+  size_kb: 870
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - stdlib
+  - x/crypto
+  files: 165
+  source_files: 50
+  checkout_bytes: 1624634
+  source_bytes: 367221
+- full_name: AlexStocks/getty
+  git_url: https://github.com/AlexStocks/getty.git
+  branch: master
+  commit: 69d92fef4392bac30b67e4ec8b440647d4528486
+  language: Go
+  stars: 952
+  size_kb: 16195
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - stdlib
+  topics:
+  - asynchronous-network
+  - codec
+  - getty
+  - go
+  - goroutine
+  - json
+  - json-api
+  - json-rpc
+  - micro
+  - microservice
+  - netty
+  - protobuf
+  - protobuf3
+  - protobuffer
+  - rpc
+  - rpc-framework
+  - rpc-service
+  - tcp
+  - websocket
+  - websockets
+  files: 283
+  source_files: 75
+  checkout_bytes: 1687618
+  source_bytes: 635721
+- full_name: duckbugio/flock
+  git_url: https://github.com/duckbugio/flock.git
+  branch: main
+  commit: ffd5c4715a3134bec5df024adcf95c3c5f4d83fe
+  language: Go
+  stars: 501
+  size_kb: 1518
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - stdlib
+  topics:
+  - ai-agent
+  - anthropic
+  - autonomous-agents
+  - chatbot
+  - claude
+  - claude-code
+  - code-review
+  - golang
+  - llm
+  - self-hosted
+  - telegram-bot
+  - vk-bot
+  files: 283
+  source_files: 196
+  checkout_bytes: 2162021
+  source_bytes: 1656019
+- full_name: turbot/steampipe
+  git_url: https://github.com/turbot/steampipe.git
+  branch: develop
+  commit: db7f0aa4046919d25562fb315c9c51e8833fcfbf
+  language: Go
+  stars: 7993
+  size_kb: 24822
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - stdlib
+  topics:
+  - aws
+  - azure
+  - cis
+  - cloud
+  - cnapp
+  - cspm
+  - devops
+  - devsecops
+  - etl
+  - gcp
+  - golang
+  - hacktoberfest
+  - kubernetes
+  - postgresql
+  - postgresql-fdw
+  - security
+  - sqlite
+  - steampipe
+  - terraform
+  - zero-etl
+  files: 733
+  source_files: 289
+  checkout_bytes: 2259933
+  source_bytes: 1263376
+- full_name: googleapis/gapic-showcase
+  git_url: https://github.com/googleapis/gapic-showcase.git
+  branch: main
+  commit: 771e1cb3dadb202e7712ed24cc0393b9a789ac5f
+  language: Go
+  stars: 183
+  size_kb: 5348
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - stdlib
+  files: 242
+  source_files: 200
+  checkout_bytes: 2451657
+  source_bytes: 2202985
+- full_name: melqtx/xeet
+  git_url: https://github.com/melqtx/xeet.git
+  branch: main
+  commit: bf957ce82e4a438a44ed790bb008db481395ce31
+  language: Go
+  stars: 72
+  size_kb: 2207
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - stdlib
+  topics:
+  - cli
+  - go
+  - terminal
+  - tui
+  - twitter
+  files: 154
+  source_files: 136
+  checkout_bytes: 2591635
+  source_bytes: 764156
+- full_name: slack-go/slack
+  git_url: https://github.com/slack-go/slack.git
+  branch: master
+  commit: 87465ce41c12245ce2de639ad9cfe5fd827bf6a6
+  language: Go
+  stars: 4972
+  size_kb: 3463
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - stdlib
+  topics:
+  - go
+  - golang
+  - slack
+  files: 377
+  source_files: 336
+  checkout_bytes: 2655699
+  source_bytes: 2292025
+- full_name: makew0rld/amfora
+  git_url: https://github.com/makew0rld/amfora.git
+  branch: master
+  commit: 0e9026b58a398bd5ef7c50b34c6117996a987925
+  language: Go
+  stars: 1360
+  size_kb: 2981
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - stdlib
+  topics:
+  - browser
+  - gemini
+  - gemini-protocol
+  - go
+  - golang
+  - terminal
+  - tui
+  files: 96
+  source_files: 49
+  checkout_bytes: 2949062
+  source_bytes: 273205
+- full_name: runfinch/finch
+  git_url: https://github.com/runfinch/finch.git
+  branch: main
+  commit: a7d1a28055983643f2c9f3362d02f3868274fe11
+  language: Go
+  stars: 4076
+  size_kb: 174691
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 30000
+    - 1572864
+  crypto_apis:
+  - stdlib
+  - x/crypto
+  topics:
+  - containerd
+  - containers
+  - lima-vm
+  - nerdctl
+  files: 407
+  source_files: 214
+  checkout_bytes: 3222291
+  source_bytes: 946089
+- full_name: prest/prest
+  git_url: https://github.com/prest/prest.git
+  branch: main
+  commit: 777b7176b2e7fc59a38c8468432ead29b9bbfb81
+  language: Go
+  stars: 4631
+  size_kb: 19060
+  stratum:
+    stars:
+    - 2000
+    - null
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - stdlib
+  - x/crypto
+  topics:
+  - api
+  - baas
+  - backend
+  - crud
+  - database
+  - docker
+  - golang
+  - instant-api
+  - jwt
+  - low-code
+  - mcp
+  - model-context-protocol
+  - mysql
+  - openapi
+  - postgres
+  - postgresql
+  - rest-api
+  - self-hosted
+  - sql
+  - timescaledb
+  files: 502
+  source_files: 299
+  checkout_bytes: 3284528
+  source_bytes: 2048934
+- full_name: marktolson/pooshit
+  git_url: https://github.com/marktolson/pooshit.git
+  branch: master
+  commit: 9aef25eba11d5c3509d14a6f7aec9c416c5f9b1c
+  language: Go
+  stars: 56
+  size_kb: 10245
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - x/crypto
+  files: 10
+  source_files: 1
+  checkout_bytes: 3530949
+  source_bytes: 28142
+- full_name: sigstore/scaffolding
+  git_url: https://github.com/sigstore/scaffolding.git
+  branch: main
+  commit: 90cbb802dfae4c2431b94f10077adf8495ce7808
+  language: Go
+  stars: 89
+  size_kb: 6185
+  stratum:
+    stars:
+    - 50
+    - 300
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - stdlib
+  files: 558
+  source_files: 167
+  checkout_bytes: 4028531
+  source_bytes: 1028184
+- full_name: openclaw/discrawl
+  git_url: https://github.com/openclaw/discrawl.git
+  branch: main
+  commit: ea2a46fba6a75b90275fc6600b0bb407e2f91f08
+  language: Go
+  stars: 859
+  size_kb: 2874
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 300
+    - 3000
+  crypto_apis:
+  - stdlib
+  files: 459
+  source_files: 332
+  checkout_bytes: 4215938
+  source_bytes: 3116198
+- full_name: stubbi/openclaw-operator
+  git_url: https://github.com/stubbi/openclaw-operator.git
+  branch: main
+  commit: 5fb14b429636a146e412a358f6a0e077ee66fc73
+  language: Go
+  stars: 403
+  size_kb: 5936
+  stratum:
+    stars:
+    - 300
+    - 2000
+    size_kb:
+    - 3000
+    - 30000
+  crypto_apis:
+  - stdlib
+  topics:
+  - agents
+  - ai
+  - golang
+  - helm
+  - kubernetes
+  - openclaw
+  - operator
+  files: 234
+  source_files: 114
+  checkout_bytes: 4572940
+  source_bytes: 1908890
