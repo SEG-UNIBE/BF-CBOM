@@ -99,7 +99,7 @@ def run_scanoss(repo_path: Path, out_file: Path, trace: Trace, *, timeout: float
 
 def _produce(instr: JobInstruction, trace: Trace) -> tuple[str, float]:
     start = time.monotonic()
-    with tempfile.TemporaryDirectory(prefix="scanoss-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="scanoss-", ignore_cleanup_errors=True) as tmp:
         work = Path(tmp)
         repo_dir = work / "repo"
         out_file = work / "cbom.json"

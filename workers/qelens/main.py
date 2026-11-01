@@ -57,7 +57,7 @@ def run_qelens(repo_path: Path, out_file: Path, trace: Trace, *, timeout: float)
 
 def _produce(instr: JobInstruction, trace: Trace) -> tuple[str, float]:
     start = time.monotonic()
-    with tempfile.TemporaryDirectory(prefix="qelens-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="qelens-", ignore_cleanup_errors=True) as tmp:
         repo_dir = Path(tmp) / "repo"
         out_file = Path(tmp) / "cbom.json"
         cloned = clone_repo(

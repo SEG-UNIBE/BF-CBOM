@@ -146,7 +146,7 @@ def run_cradar(repo_path: Path, out_file: Path, home: Path, trace: Trace, *, dea
 def _produce(instr: JobInstruction, trace: Trace) -> tuple[str, float]:
     start = time.monotonic()
     deadline = start + max(30.0, TIMEOUT_SEC - 20.0)
-    with tempfile.TemporaryDirectory(prefix="cradar-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="cradar-", ignore_cleanup_errors=True) as tmp:
         repo_dir = Path(tmp) / "repo"
         out_file = Path(tmp) / "cbom.json"
         home = Path(tmp) / "home"

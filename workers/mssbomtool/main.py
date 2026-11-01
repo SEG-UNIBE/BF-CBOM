@@ -63,7 +63,7 @@ class MsSbomToolClient:
         Clone target repo and run Microsoft sbom-tool against it.
         Returns a JSON string if found; otherwise '{}' string.
         """
-        with tempfile.TemporaryDirectory(prefix="mssbomtool_") as tmpdir:
+        with tempfile.TemporaryDirectory(prefix="mssbomtool_", ignore_cleanup_errors=True) as tmpdir:
             tmp = Path(tmpdir)
             repo_dir = tmp / "repo"
 

@@ -138,3 +138,19 @@ def test_worker_gives_up_on_redis_after_the_grace_period(monkeypatch):
     with pytest.raises(SystemExit) as exit_info:
         worker.redis_error(log, err, since, now=100.0 + worker.REDIS_GIVE_UP_SEC)
     assert exit_info.value.code == 1
+
+
+def test_no_worker_fails_a_scan_over_its_own_temp_dir_cleanup():
+    # corpus-main 2026-10-31: securin-xbom wrote its CBOM on Android_Framework_Source, and then deleting the clone
+    # raised "Directory not empty", which made the run an error; our cleanup is never the tool's result
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    sources = [*sorted((root / "workers").glob("*/main.py")), root / "common" / "llm_worker.py"]
+    bare = [
+        f"{p.relative_to(root)}:{n}"
+        for p in sources
+        for n, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1)
+        if "TemporaryDirectory(" in line and "ignore_cleanup_errors=True" not in line
+    ]
+    assert not bare, bare

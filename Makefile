@@ -87,8 +87,8 @@ up-dev: build-all
 	docker compose up
 
 # Prod: all workers except the dev-only ones, started in the background; then the live board (`make board`; Ctrl-C
-# closes it, the stack keeps running: `make logs` for the raw logs, `make down` stops it). Opt-in groups via
-# EXTRA_PROFILES, e.g.
+# closes it, the stack keeps running: `make logs` for the raw logs, `make down` stops it; NO_BOARD=1 skips it, so a
+# command can follow in one line). Opt-in groups via EXTRA_PROFILES, e.g.
 #   make up-prod EXTRA_PROFILES=llm   (chatgpt + claude workers; need API keys in docker/env/)
 # A service that is not up within the wait shows on the board (as down), so make goes on.
 up_detached = docker compose up -d --wait --wait-timeout 300 $(1) \
@@ -104,7 +104,7 @@ up-prod: export COMPOSE_PROFILES := prod$(if $(EXTRA_PROFILES),$(comma)$(EXTRA_P
 up-prod: export AVAILABLE_WORKERS := $(PROD_WORKERS)
 up-prod: build-all
 	$(call up_detached,$(SCALE))
-	@$(MAKE) --no-print-directory board
+	@$(if $(NO_BOARD),,$(MAKE) --no-print-directory board)
 
 # Prod from prebuilt GHCR images (no local build; see .github/workflows/images.yml)
 up-prod-pull: export COMPOSE_PROFILES := prod$(if $(EXTRA_PROFILES),$(comma)$(EXTRA_PROFILES),)
@@ -112,7 +112,7 @@ up-prod-pull: export AVAILABLE_WORKERS := $(PROD_WORKERS)
 up-prod-pull: ensure-env
 	docker compose pull
 	$(call up_detached,--no-build $(SCALE))
-	@$(MAKE) --no-print-directory board
+	@$(if $(NO_BOARD),,$(MAKE) --no-print-directory board)
 
 # All: exactly what's in AVAILABLE_WORKERS
 up-all: export COMPOSE_PROFILES := all

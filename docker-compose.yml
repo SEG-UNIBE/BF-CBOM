@@ -401,7 +401,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2g
+          # 2g until 2026-11-01 (peak at the limit, 14'051 hits, on ossf/malicious-packages, corpus-main)
+          memory: 4g
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     profiles: [prod, all]
@@ -518,8 +519,9 @@ services:
       resources:
         limits:
           # 4g killed it (rc=-9, no CBOM) on pycryptodome, bunkerweb and pyca/cryptography (corpus-pilot-medium, 2026-10-23);
-          # 8g until 2026-10-30 (highest trial peak 7.3 GiB, bunkerweb; the peak grows with source size)
-          memory: 12g
+          # 8g until 2026-10-30 (highest trial peak 7.3 GiB, bunkerweb; the peak grows with source size);
+          # 12g until 2026-11-01 (11.7 GiB and 1'794 limit hits on OctoGram, corpus-main, which timed out)
+          memory: 16g
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     profiles: [prod, all]

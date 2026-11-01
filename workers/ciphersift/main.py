@@ -90,7 +90,7 @@ def run_ciphersift(repo_path: Path, out_file: Path, trace: Trace, *, timeout: fl
 
 def _produce(instr: JobInstruction, trace: Trace) -> tuple[str, float]:
     start = time.monotonic()
-    with tempfile.TemporaryDirectory(prefix="ciphersift-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="ciphersift-", ignore_cleanup_errors=True) as tmp:
         work = Path(tmp)
         repo_dir = work / "repo"
         out_file = work / "cbom.json"

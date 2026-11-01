@@ -369,7 +369,7 @@ class CryptobomForgeClient:
         """
         trace = trace or Trace()
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             repo_path = clone_repo(git_url, branch=branch, target_dir=tmpdir, commit=commit)
             if not repo_path:
                 trace.add("git clone failed")

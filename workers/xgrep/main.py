@@ -37,7 +37,7 @@ def _env(home: Path) -> dict[str, str]:
 
 def xgrep_version() -> str | None:
     try:
-        with tempfile.TemporaryDirectory(prefix="xgrep-home-") as home:
+        with tempfile.TemporaryDirectory(prefix="xgrep-home-", ignore_cleanup_errors=True) as home:
             out = subprocess.run([BINARY, "version"], capture_output=True, text=True, timeout=60, env=_env(Path(home)))
         text = (out.stdout or "") + (out.stderr or "")
         m = re.search(r"\b(\d+\.\d+\.\d+)\b", text)
@@ -85,7 +85,7 @@ def limits(stderr: str, *, most: int = 5) -> list[str]:
 
 def _produce(instr: JobInstruction, trace: Trace) -> tuple[str, float]:
     start = time.monotonic()
-    with tempfile.TemporaryDirectory(prefix="xgrep-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="xgrep-", ignore_cleanup_errors=True) as tmp:
         repo_dir = Path(tmp) / "repo"
         out_file = Path(tmp) / "cbom.json"
         home = Path(tmp) / "home"

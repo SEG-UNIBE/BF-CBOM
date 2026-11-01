@@ -655,3 +655,28 @@ Two faults of our setup came with it, both fixed before the rerun:
   server in the same container, so the server could go on scanning beside the next job. The worker now restarts
   the server after a timeout, and the next job waits for it outside its measured time.
 CBOMkit is rerun on every repository (`--rerun cbomkit`); the other tools' runs stay.
+
+## corpus-main export review (2026-11-01: the first attempt plus CBOMkit's rerun)
+1'296 supported runs, 1'281 ok, 10 errors, 5 timeouts; CBOMkit's 162 runs from the rerun (build 2508728, 7 h 09 min
+alone), the other tools' from the first session (f331084, VM peak 42 of 121.5 GiB).
+- **Lanes** (summed job time): CBOMkit 7.1 h, CipherRadar 2.2, xgrep 1.2, CryptoScan 0.9, the rest below 0.9.
+- **Our fault, fixed:** securin-xbom on Android_Framework_Source wrote its CBOM, and deleting the worker's temporary
+  clone then raised "Directory not empty", which made the run an error. Every worker now ignores cleanup errors of
+  its own temporary directory (a test checks it).
+- **At the memory limit:** CipherRadar on OctoGram (11.7 of 12 GiB, 1'794 limit hits) timed out; CryptoScan on
+  ossf/malicious-packages peaked at its 2 GiB limit (14'051 hits); CipherSift on OctoGram (3.4 of 4), cdxgen on
+  AuditKit (21.4 of 24) and CBOMkit on malicious-packages (17.5 of 20) hit their limits and finished. The working set
+  includes active file cache, so a hit can be cache reclaim rather than the tool's own need. CipherRadar's limit is
+  16 GiB and CryptoScan's 4 since, for the full rerun.
+- **cdxgen finds no crypto in 5 Go repositories** where 7 or 8 other tools do, without any warning: two have no
+  `go.mod` at the root (ovn-kubernetes, sigstore/scaffolding), gardener and tuios ask for Go 1.26.8 and toolchain
+  1.27.3, go-scim for Go 1.13. Not yet checked in a debug run.
+- **One repository carries CryptoScan's records:** 295'158 of its 347'678 come from ossf/malicious-packages, a
+  repository of OSV data files (464 MB checkout, 0.3 MB of Go); its items there are 21.
+- **Expected:** CipherRadar's Java pass crashed (`java.resolveFirstArg`) on TencentKona-11, j2objc and
+  Android_Framework_Source, with no exclusion since 2026-10-31; CBOMkit failed to parse 6 Python repositories and
+  reached the hour on OctoGram, CoreNLP, terraform-provider-azuread and tuios; CipherRadar's 1'245 `unread` places lie
+  inside JAR files; CBOMkit finds nothing in 42 of its 48 Python runs (pyca only).
+- **For mutation-main:** 13 repositories have a failed run, leaving 52 Go, 49 Java and 48 Python clean ones. Ranked by
+  source size, ossf/malicious-packages is among the 30 smallest Go repositories, and over 31 variants it alone would
+  take 38.6 of the selection's scan hours (CBOMkit 10.6 of its 17.5).

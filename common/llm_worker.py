@@ -45,7 +45,7 @@ def run_llm_worker(
     def _produce(instr: JobInstruction, trace: Trace) -> str:
         start = time.monotonic()
         deadline = start + max(30.0, TIMEOUT_SEC - API_TIMEOUT_SEC - 15.0)  # headroom to assemble + push
-        with tempfile.TemporaryDirectory(prefix=f"{name}-") as tmp:
+        with tempfile.TemporaryDirectory(prefix=f"{name}-", ignore_cleanup_errors=True) as tmp:
             repo_path = clone_repo(
                 instr.repo_info.git_url, branch=instr.repo_info.branch, target_dir=tmp, commit=instr.repo_info.commit
             )

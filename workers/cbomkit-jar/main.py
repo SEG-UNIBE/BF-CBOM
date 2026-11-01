@@ -95,7 +95,7 @@ def run_action_jar(repo_path: Path, work: Path, languages: str, trace: Trace, *,
 
 def _produce(instr: JobInstruction, trace: Trace) -> tuple[str, float]:
     start = time.monotonic()
-    with tempfile.TemporaryDirectory(prefix="cbomkit-jar-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="cbomkit-jar-", ignore_cleanup_errors=True) as tmp:
         work = Path(tmp)
         repo_dir = work / "repo"
         cloned = clone_repo(

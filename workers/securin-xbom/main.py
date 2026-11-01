@@ -96,7 +96,7 @@ def run_xbom(repo_path: Path, out_dir: Path, home: Path, trace: Trace, *, timeou
 
 def _produce(instr: JobInstruction, trace: Trace) -> tuple[str, float]:
     start = time.monotonic()
-    with tempfile.TemporaryDirectory(prefix="xbom-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="xbom-", ignore_cleanup_errors=True) as tmp:
         repo_dir = Path(tmp) / "repo"
         out_dir = Path(tmp) / "out"
         home = Path(tmp) / "home"

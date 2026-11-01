@@ -142,7 +142,7 @@ tools:
   cryptoscan:
     engine: cryptoscan               # CSNP CryptoScan 1.5.0, regex pattern catalogue (90+ patterns)
     packaging: per family       # one component per category (RSA, ECC, ...), the matched text at each place carries the algorithm
-    memory_gb: 2
+    memory_gb: 4                    # 2 until 2026-11-01 (peak at the limit on ossf/malicious-packages, corpus-main)
     approach: "own engine: regex patterns (90+)"
     vendor: CSNP (CyberSecurity Non-Profit)
     url: "https://github.com/csnp/cryptoscan"
@@ -199,7 +199,7 @@ tools:
   cipherradar:
     engine: opengrep-rules          # github.com/nk-sentinel/cipherradar efa5d9de322c, opengrep 1.33.1 rules + tree-sitter + YARA
     packaging: per hit          # one component per finding, one occurrence
-    memory_gb: 12                   # 4 killed it (rc=-9) on pycryptodome, bunkerweb, pyca/cryptography (2026-10-23); 8 until 2026-10-30 (peak 7.3 on bunkerweb)
+    memory_gb: 16                   # 4 killed it (rc=-9) on pycryptodome, bunkerweb, pyca/cryptography (2026-10-23); 8 until 2026-10-30 (peak 7.3 on bunkerweb); 12 until 2026-11-01 (at the limit on OctoGram, corpus-main, and timed out)
     approach: "OpenGrep: pattern rules, plus tree-sitter and YARA-X passes"
     vendor: nk-sentinel (individual)
     url: "https://github.com/nk-sentinel/cipherradar"
