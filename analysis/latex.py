@@ -649,6 +649,12 @@ def offedit(scores: list[dict], names: dict[str, str]) -> Table | None:
 # ----- all of them -----
 
 
+def _spec(analysis_dir: Path) -> dict:
+    """The experiment's record next to the analysis folder (`_experiment.yaml`), empty without one."""
+    spec_file = spec_path(analysis_dir.parent)
+    return (yaml.safe_load(spec_file.read_text(encoding="utf-8")) if spec_file.exists() else None) or {}
+
+
 def build(analysis_dir: Path, *, run: int = 1) -> list[Table]:
     """Every table the folder's CSVs and its experiment's record have data for, in the paper's order."""
     analysis_dir = Path(analysis_dir)
@@ -656,13 +662,11 @@ def build(analysis_dir: Path, *, run: int = 1) -> list[Table]:
     def rows(name: str) -> list[dict]:
         return read_csv(analysis_dir / name.format(i=run))
 
-    spec_file = spec_path(analysis_dir.parent)
-    spec = (yaml.safe_load(spec_file.read_text(encoding="utf-8")) if spec_file.exists() else None) or {}
     names = _names(rows("tools.csv"))
     match, mscores = rows("matchlevels-run{i}.csv"), rows("mutation-scores.csv")
     tables = [
         bar(rows("micro-run{i}.csv"), names),
-        corpus(spec),
+        corpus(_spec(analysis_dir)),
         volume(rows("units-run{i}.csv"), rows("units-repo-run{i}.csv"), rows("traceability-run{i}.csv"), names),
         cost(rows("runtime.csv"), names),
         conformance(rows("schema-run{i}.csv"), names),
@@ -689,9 +693,7 @@ def write(analysis_dir: Path, *, run: int = 1) -> list[Table]:
     out.mkdir(exist_ok=True)
     for old in out.glob("tab_*.tex"):
         old.unlink()
-    spec_file = spec_path(analysis_dir.parent)
-    spec = (yaml.safe_load(spec_file.read_text(encoding="utf-8")) if spec_file.exists() else None) or {}
-    experiment = spec.get("name") or analysis_dir.parent.name
+    experiment = _spec(analysis_dir).get("name") or analysis_dir.parent.name
     tables = build(analysis_dir, run=run)
     for table in tables:
         (out / f"tab_{table.name}.tex").write_text(table.render(experiment), encoding="utf-8")
@@ -700,8 +702,8 @@ def write(analysis_dir: Path, *, run: int = 1) -> list[Table]:
 
 def too_wide(tables: list[Table]) -> list[str]:
     """A warning for each table whose estimated width is above the text width."""
-    return [f"tab_{t.name}.tex is about {t.width():.0f} pt wide, above the {TEXTWIDTH_PT:.0f} pt text width"
-            for t in tables if t.width() > TEXTWIDTH_PT]  # fmt: skip
+    return [f"tab_{t.name}.tex is about {w:.0f} pt wide, above the {TEXTWIDTH_PT:.0f} pt text width"
+            for t in tables if (w := t.width()) > TEXTWIDTH_PT]  # fmt: skip
 
 
 if __name__ == "__main__":  # rebuild from an exported folder: python -m analysis.latex <exp>/_ANALYSIS [run]
