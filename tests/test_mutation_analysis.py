@@ -278,6 +278,10 @@ def test_report_judges_mutants_and_keeps_them_out_of_the_agreement_tables(tmp_pa
     assert "## RQ5 Detection" in summary and "```diff" in summary and f"`{mid}`" in summary
     assert "### Recall, precision and F1 on the planted items" in summary and "the bridge to RQ4" in summary
     assert "### Changes off the edit" in summary
+    tex = {p.name for p in (out / "latex").iterdir()}
+    assert {"tab_rq5_detection.tex", "tab_rq5_styles.tex", "tab_rq5_offedit.tex"} <= tex
+    detection = (out / "latex" / "tab_rq5_detection.tex").read_text()
+    assert "& Java &" in detection and r"\begin{tabular*}{\textwidth}" in detection
 
 
 def test_not_judged_counts_the_planted_calls_by_status():

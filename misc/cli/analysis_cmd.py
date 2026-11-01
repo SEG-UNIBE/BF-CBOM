@@ -19,7 +19,16 @@ from pathlib import Path
 import typer
 import yaml
 
-from analysis import levels as lv, mutation as mu, schema as sch, score as sc, summary as sm, tables as tbl, tasks
+from analysis import (
+    latex as ltx,
+    levels as lv,
+    mutation as mu,
+    schema as sch,
+    score as sc,
+    summary as sm,
+    tables as tbl,
+    tasks,
+)
 from analysis.groundtruth import (
     BAR_FAILED,
     BAR_PASSED,
@@ -1044,7 +1053,12 @@ def run_report(
     }
     _write_info(out_dir, run, settings, counts, normalized, _voter_of(merge_llm))
     with progress.step(sm.SUMMARY_FILE):
-        return sm.write(out_dir, run=run)
+        path = sm.write(out_dir, run=run)
+    with progress.step(f"{ltx.LATEX_DIR}/"):
+        tables = ltx.write(out_dir, run=run)
+    for warning in ltx.too_wide(tables):
+        typer.secho(f"warning: {warning}", fg=typer.colors.YELLOW, err=True)
+    return path
 
 
 @analysis_app.command("report")

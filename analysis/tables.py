@@ -355,7 +355,7 @@ def run_rows(
 
 # ----- run time (RQ1: what a scan costs) -----
 
-TOOLS_COLUMNS = ["tool", "vendor", "url", "shipped", "approach", "version", "version_url"]
+TOOLS_COLUMNS = ["tool", "name", "vendor", "url", "shipped", "approach", "version", "version_url"]
 
 
 def tool_rows(tools: Iterable[str], registry: dict[str, dict] | None = None) -> list[dict]:

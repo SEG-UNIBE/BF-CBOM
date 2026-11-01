@@ -48,7 +48,7 @@ example, voter groups, how family and group are argued),
   7.3 and 3.0). corpus-main runs without replicas (decided 2026-10-31; `cbomkit=2` was the plan of 2026-10-30): its
   11 tools, cdxgen's 24 GiB included, and the services (git server 16, runner 8, coordinator 2, Redis 1; the idle
   misc-pyqun's 4 left out) sum to 125 of 121.5 GiB since that raise (119 before), while the first attempt peaked at
-  42 GiB.
+  42 GiB and the full run of 2026-11-01 at 47.6.
   The laptop is for code, configs and analysing copied exports.
 - **Results are disposable until the paper's runs.** One code path per feature, no compatibility with older result
   layouts; old experiments are rerun, not migrated.
@@ -155,7 +155,8 @@ example, voter groups, how family and group are argued),
   to the measured signature, never derived from it; `analysis/README.md` "Packaging per tool"), `version` and
   `version_url` (decided 2026-10-31: the version the paper reports, the tool's own, its release or 7 characters of
   the pinned commit without one, and the page that shows it, the paper's citation; a test checks the Dockerfile pins
-  it; the summary's "Tool versions" links it and checks every run recorded it). No verdict is
+  it; the summary's "Tool versions" links it and checks every run recorded it), `name` (the tool's name as the paper
+  writes it, CBOMkit, Q-DARPAN: the LaTeX tables' label, tools.csv; added 2026-11-01). No verdict is
   recorded there: the bar's record is the bar-micro export, and nothing in code reads a verdict.
 - **Memory budget (waves):** `EXPERIMENT_MEMORY_BUDGET_GB` (laptop default 14, 0 = unlimited) caps the summed
   `memory_gb` of the tools fed at once; the rest run in later waves. Runner and UI plan waves with
@@ -256,6 +257,15 @@ example, voter groups, how family and group are argued),
     of the repo's language (`in_scope`; fixtures, test vectors, configuration); the analyses count those places like
     any other (decided 2026-10-23: the tools are benchmarked on the repositories as they are, no scope filter), the
     share is for the discussion.
+  - **The paper's tables** (`latex.py`, 2026-11-01): `report` also writes `_ANALYSIS/latex/tab_<part>_<what>.tex`
+    (`design_bar`, `design_corpus`, `rq1_volume`, `rq1_cost`, `rq2_conformance`, `rq3_ladder`, `rq3_registry`,
+    `rq4_k`, `rq4_dimensions`, `rq4_rates_<dimension>`, `rq5_detection`, `rq5_styles`, `rq5_offedit`), each when its
+    data is there, rendered from the CSVs and the record only, like the summary (`python -m analysis.latex
+    <exp>/_ANALYSIS` on an export). Content only, as the paper's `assets/tab_*.tex`: booktabs, no vertical lines, a
+    `tabular*` or `tabularx` of exactly `\textwidth`; the table environment, caption and label stay in the paper.
+    Made for svjour3 `smallextended` (one column) at the paper's `\small`, 338 pt wide: `Table.width` sums glyph
+    widths measured in that class, a test keeps every layout inside it at worst-case values, `report` warns about a
+    wider table, nothing is ever scaled. Tools by `name`, alphabetical, in every table; the paper's languages only.
   - **Summary layout** (decided 2026-10-31): every subsection is its heading, one to three sentences, the table,
     its visible checks (✅ ⛔ a verdict, ⚠️ a caveat), then collapsibles below in this order: `📋 Columns` (one
     bullet per column, a homogeneous series such as `L0` … `L4` in one), `💡 Example`, `📖 <topic>` (background),
@@ -461,7 +471,7 @@ where they declare support, but no analysis, figure or tuning effort goes into t
   e0-llm-smoke, e0-phase2-smoke and the runs under the old spec names e0-micro, e0-stability, e1-pilot-corpus,
   e1-icpc-corpus, e1-pilot-60, e4-mutation-smoke; corpus-main sampled (2026-10-30: pc6, 162 repos,
   1242 supported scans; 7 of its 54 Python repos use pyca, 22 of its 54 Go repos x/crypto); bar-micro and
-  stability-pilot rerun on the pins of 2026-10-30 (every export so far ran on the old versions) -> the corpus-main run -> `make corpus-smallest` and mutation-main (once, no baseline) -> the rater
+  stability-pilot rerun on the pins of 2026-10-30 (every export so far ran on the old versions) -> the corpus-main run (done 2026-11-01, `docs/findings.md`) -> `make corpus-smallest` and mutation-main (once, no baseline) -> the rater
   study -> Phase 6.
 
 ## Phases 1-3 (done 2026-10-15 to 2026-10-18)

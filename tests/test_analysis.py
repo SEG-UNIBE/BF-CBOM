@@ -269,6 +269,9 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     from analysis.summary_blocks import style_issues
 
     assert style_issues(summary) == []  # one sentence per line, no semicolons, every collapsible captioned
+    tex = {p.name for p in (out / "latex").iterdir()}  # the paper's tables, from the same CSVs
+    assert {"tab_design_bar.tex", "tab_rq1_volume.tex", "tab_rq3_ladder.tex", "tab_rq4_k.tex"} <= tex
+    assert r"\toprule" in (out / "latex" / "tab_design_bar.tex").read_text(encoding="utf-8")
     toc = summary[summary.index("## Contents") : summary.index("## Preamble")]
     links = re.findall(r"^ *- \[(.+)\]\(#(.+)\)$", toc, flags=re.M)  # every entry links to a heading below
     headings = re.findall(r"^#{2,3} (.+)$", summary[len(toc) :], flags=re.M)
@@ -414,9 +417,9 @@ def test_repositories_section_links_pinned_commits_folds_by_language_or_lists_si
         {**repos[2], "files": 1200, "source_files": 980, "checkout_bytes": 7 * 1024**2, "source_bytes": 3 * 1024**2},
         {**repos[0], "size_kb": 2048},
     ]})  # fmt: skip
-    assert "| repository | language | files | source files | MiB | source MiB |" in counted
-    assert "| [jwtk/jjwt](https://github.com/jwtk/jjwt/tree/0df9) | Java | 1'200 | 980 | 7.0 | 3.0 |" in counted
-    assert f"| [jpadilla/pyjwt](https://github.com/jpadilla/pyjwt/tree/{sha}) | Python |  |  |  |  |" in counted
+    assert "| repository | language | files | source files | MiB | source MiB | source share |" in counted
+    assert "| [jwtk/jjwt](https://github.com/jwtk/jjwt/tree/0df9) | Java | 1'200 | 980 | 7.0 | 3.0 | 0.43 |" in counted
+    assert f"| [jpadilla/pyjwt](https://github.com/jpadilla/pyjwt/tree/{sha}) | Python |  |  |  |  |  |" in counted
     assert _repositories({}) == [] and _repositories({"repos": []}) == []
 
 
@@ -872,27 +875,36 @@ def test_repositories_section_counts_by_language_and_size_stratum():
     assert lines[0].startswith("| language |") and f"<summary>{COLUMNS} Columns</summary>" in text
     assert "the checkout at the pinned commit (`checkout_bytes`" in text
     assert "--size-bins 300-3000,3000-30000,30000-" in text and "--star-bins 50-300,300-2000,2000-" in text
-    # sizes, an empty column, then stars; the micro project has no star count
-    assert ("| language | < 0.3 MB | 0.3-3 MB | 3-30 MB | >= 30 MB | all |  | < 50 stars | 50-300 stars "
+    # the count, the sizes, then the stars; the micro project has no star count
+    assert ("| language | all | < 0.3 MB | 0.3-3 MB | 3-30 MB | >= 30 MB | < 50 stars | 50-300 stars "
             "| 300-2000 stars | >= 2000 stars | stars unknown |") in lines  # fmt: skip
-    assert "| Java | 1 | 0 | 0 | 1 | 2 |  | 0 | 0 | 0 | 1 | 1 |" in lines
-    assert "| Python | 0 | 1 | 0 | 0 | 1 |  | 0 | 0 | 1 | 0 | 0 |" in lines
-    assert "| Go | 0 | 0 | 1 | 0 | 1 |  | 0 | 1 | 0 | 0 | 0 |" in lines
-    assert next(x for x in lines if x.startswith("| all")) == "| all | 1 | 1 | 1 | 1 | 4 |  | 0 | 1 | 1 | 1 | 1 |"
+    assert "| Java | 2 | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 1 |" in lines
+    assert "| Python | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 |" in lines
+    assert "| Go | 1 | 0 | 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |" in lines
+    assert next(x for x in lines if x.startswith("| all")) == "| all | 4 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 |"
     # GitHub's size when every repository has one (a corpus-built spec), else the checkout; an unknown size has a column
     github = _size_strata([{**r, "size_kb": 40_000} for r in repos])
     assert "GitHub's repository size" in "\n".join(github)
-    assert "| all | 0 | 0 | 0 | 4 | 4 |  | 0 | 1 | 1 | 1 | 1 |" in github
+    assert "| all | 4 | 0 | 0 | 0 | 4 | 0 | 1 | 1 | 1 | 1 |" in github
     starred = _size_strata([{**r, "stars": 10} for r in repos])  # every star count known: no unknown column
-    assert "| all | 1 | 1 | 1 | 1 | 4 |  | 4 | 0 | 0 | 0 |" in starred
+    assert "| all | 4 | 1 | 1 | 1 | 1 | 4 | 0 | 0 | 0 |" in starred
     mixed = _size_strata([repos[0], {**repos[1], "checkout_bytes": None}])
-    assert "| language | < 0.3 MB | 0.3-3 MB | 3-30 MB | >= 30 MB | size unknown | all |  |" in mixed[0]
-    assert "| Java | 1 | 0 | 0 | 0 | 1 | 2 |  | 0 | 0 | 0 | 1 | 1 |" in mixed
+    assert "| language | all | < 0.3 MB | 0.3-3 MB | 3-30 MB | >= 30 MB | size unknown | < 50 stars |" in mixed[0]
+    assert "| Java | 2 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 1 |" in mixed
     # the table sits between the intro and the detailed list; no size at all, no table
     section = _repositories({"repos": repos})
-    assert section.index(next(x for x in section if x.startswith("| language | < 0.3 MB"))) < section.index(
-        "| repository | language | files | source files | MiB | source MiB |"
+    assert section.index(next(x for x in section if x.startswith("| language | all |"))) < section.index(
+        "| repository | language | files | source files | MiB | source MiB | source share |"
     )
+    # with the source sizes, a third group: the medians, the median source share and the repositories below 10 %
+    shares = {"apache/kafka": 0.05, "jpadilla/pyjwt": 0.5, "golang-jwt/jwt": 0.4}
+    measured = _size_strata([{**r, "source_bytes": round(r["checkout_bytes"] * shares.get(r["full_name"], 0.5))}
+                             for r in repos])  # fmt: skip
+    assert measured[0].endswith("| stars unknown | median MiB | median source MiB | median source share | below 10 % |")
+    assert "| Java | 2 | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 1 | 31.7 | 1.6 | 0.27 | 1 |" in measured
+    assert "| Go | 1 | 0 | 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 5.0 | 2.0 | 0.40 | 0 |" in measured
+    assert "| all | 4 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 3.8 | 1.6 | 0.45 | 1 |" in measured
+    assert "`median source share`" in "\n".join(measured)
     assert _size_strata([{"full_name": "a/b", "language": "Go", "commit": "ee"}]) == []
 
 

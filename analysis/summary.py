@@ -356,6 +356,17 @@ def _repo_cell(repo: dict) -> str:
     return f"[{name}]({url}/tree/{commit})" if commit else f"[{name}]({url})"
 
 
+# The source share below which a repository counts as mostly something else in the size table (data, documentation,
+# code in other languages): a description of the corpus, never a filter on it.
+SMALL_SOURCE_SHARE = 0.1
+
+
+def _source_share(repo: dict) -> float | None:
+    """The repository's source bytes over its checkout bytes at the pinned commit, None without both."""
+    checkout, source = _int(repo.get("checkout_bytes")), repo.get("source_bytes")
+    return _int(source) / checkout if checkout and source not in (None, "") else None
+
+
 def _repositories(spec: dict) -> list[str]:
     """The repositories the record names, each at its pinned commit: flat with their sizes when the runner counted
     them into the record (`files`, `source_files`, `checkout_bytes`, `source_bytes`), flat with GitHub's size when
@@ -392,11 +403,11 @@ def _repositories(spec: dict) -> list[str]:
 
         table = [
             [_repo_cell(r), r.get("language") or "", count(r.get("files")), count(r.get("source_files")),
-             mib(r.get("checkout_bytes")), mib(r.get("source_bytes"))]
+             mib(r.get("checkout_bytes")), mib(r.get("source_bytes")), _pct(_source_share(r))]
             for r in repos
         ]  # fmt: skip
-        header = ["repository", "language", "files", "source files", "MiB", "source MiB"]
-        body = _text(links) + md_table(header, table, "llrrrr") + [""]
+        header = ["repository", "language", "files", "source files", "MiB", "source MiB", "source share"]
+        body = _text(links) + md_table(header, table, "llrrrrr") + [""]
         body += _bullets(
             [
                 ("files", "the files at the pinned commit."),
@@ -404,6 +415,8 @@ def _repositories(spec: dict) -> list[str]:
                  "The run-time table scales by them."),
                 ("MiB", "the bytes of the checkout at that commit (the blobs, no history)."),
                 ("source MiB", "the bytes of its source files."),
+                ("source share", "source MiB over MiB: how much of the checkout is code in the repository's "
+                                 "language."),
             ]
         )  # fmt: skip
         return lines + _details(caption, body)
@@ -424,13 +437,14 @@ def _repositories(spec: dict) -> list[str]:
 
 
 def _size_strata(repos: list[dict]) -> list[str]:
-    """Repositories counted by language (rows) and stratum (columns): first the corpus builder's default size bins
-    (`CorpusParams.size_bins_kb`, `make corpus --size-bins`, GitHub's repository size in KB), then, after an empty
-    column, its default star bins (`CorpusParams.star_bins`, `--star-bins`), each with a column below the first bin's
+    """Repositories counted by language (rows) and stratum (columns): the count of the language first, then the corpus
+    builder's default size bins (`CorpusParams.size_bins_kb`, `make corpus --size-bins`, GitHub's repository size in
+    KB), then its default star bins (`CorpusParams.star_bins`, `--star-bins`), each with a column below the first bin's
     floor for the micro projects and other small repositories and an `unknown` column where a value is missing. The
     size is GitHub's `size_kb` when every repository has one (a corpus-built spec), else the checkout at the pinned
     commit (`checkout_bytes`), and the text says which; the stars are the corpus builder's `stars`, absent from a
-    hand-picked corpus."""
+    hand-picked corpus. When the record has the checkout and source sizes, a third group gives their medians, the
+    median source share and how many repositories fall below `SMALL_SOURCE_SHARE`."""
     params = CorpusParams()
     size_bins, star_bins = params.size_bins_kb, params.star_bins
     github = all(r.get("size_kb") for r in repos)
@@ -477,41 +491,69 @@ def _size_strata(repos: list[dict]) -> list[str]:
     order = {lang: i for i, lang in enumerate(PAPER_LANGUAGES)}
     by_size: dict[str, Counter] = defaultdict(Counter)
     by_stars: dict[str, Counter] = defaultdict(Counter)
+    by_repo: dict[str, list[dict]] = defaultdict(list)
     for (r, _, _), z, s in zip(sized, size_col, star_col, strict=True):
         lang = r.get("language") or "unknown"
         by_size[lang][z] += 1
         by_stars[lang][s] += 1
+        by_repo[lang].append(r)
     langs = sorted(by_size, key=lambda lang: (order.get(lang, len(order)), lang))
+    measured = any(_source_share(r) is not None for r in repos)
+    few = f"below {round(SMALL_SOURCE_SHARE * 100)} %"
 
-    def row(name: str, size: Counter, star: Counter, n: int) -> list:
-        return [name, *[size[i] for i in range(len(size_labels))], n, "", *[star[i] for i in range(len(star_labels))]]
+    def sizes(group: list[dict]) -> list:
+        """The median checkout and source MiB, the median source share and how many repositories are mostly
+        something else, over the repositories with both sizes."""
+        group = [r for r in group if _source_share(r) is not None]
+        if not group:
+            return ["", "", "", ""]
+        shares = [_source_share(r) for r in group]
 
-    table = [row(lang, by_size[lang], by_stars[lang], sum(by_size[lang].values())) for lang in langs]
-    table.append(row("all", sum(by_size.values(), Counter()), sum(by_stars.values(), Counter()), len(repos)))
+        def median_mib(key: str) -> str:
+            return f"{statistics.median(_int(r[key]) for r in group) / 1024**2:.1f}"
+
+        return [median_mib("checkout_bytes"), median_mib("source_bytes"), _pct(statistics.median(shares)),
+                sum(s < SMALL_SOURCE_SHARE for s in shares)]  # fmt: skip
+
+    def row(name: str, size: Counter, star: Counter, n: int, group: list[dict]) -> list:
+        return [name, n, *[size[i] for i in range(len(size_labels))], *[star[i] for i in range(len(star_labels))],
+                *(sizes(group) if measured else [])]  # fmt: skip
+
+    table = [row(lang, by_size[lang], by_stars[lang], sum(by_size[lang].values()), by_repo[lang]) for lang in langs]
+    table.append(row("all", sum(by_size.values(), Counter()), sum(by_stars.values(), Counter()), len(repos), repos))
     measure = (
         "GitHub's repository size as the corpus builder recorded it (`size_kb`)."
         if github
         else "the checkout at the pinned commit (`checkout_bytes`: the blobs, no history, so smaller than GitHub's "
         "size of the same repository)."
     )
-    header = ["language", *size_labels, "all", "", *star_labels]
+    header = ["language", "all", *size_labels, *star_labels,
+              *(["median MiB", "median source MiB", "median source share", few] if measured else [])]  # fmt: skip
     size_arg, star_arg = (",".join(bin_text(lo, hi) for lo, hi in bins) for bins in (size_bins, star_bins))
     lines = md_table(header, table, "l" + "r" * (len(header) - 1)) + [""]
     lines += _columns(
         [
             ("language", "one row per language, `all` the sum."),
+            ("all", "the repositories of the language."),
             (f"{size_labels[0]} … {size_labels[len(size_bins)]}",
              f"the corpus builder's default size strata (`make corpus`, `--size-bins {size_arg}` in KB), with a "
              "column below the sampling floor for the micro projects and other small repositories.",
              f"The size is {measure}"),
-            ("all", "the repositories of the language."),
+            *([("size unknown", "repositories without a recorded size.")] if "size unknown" in size_labels else []),
             (f"{star_labels[0]} … {star_labels[len(star_bins)]}",
-             f"after the empty column, the corpus builder's default star strata (`--star-bins {star_arg}`), with a "
+             f"the corpus builder's default star strata (`--star-bins {star_arg}`), with a "
              "column below the floor too.",
              "The stars are those the corpus builder recorded when it drew the repository (`stars`)."),
-            *([("size unknown", "repositories without a recorded size.")] if "size unknown" in size_labels else []),
             *([("stars unknown", "repositories without a recorded star count, such as a hand-picked corpus or the "
                                  "micro projects.")] if "stars unknown" in star_labels else []),
+            *([("median MiB, median source MiB",
+                "the medians of the repositories' checkouts and of their source "
+                "files at the pinned commits, as the list below gives them per repository."),
+               ("median source share", "the median of the repositories' source shares: their source bytes over their "
+                                "checkout bytes, how much of what every tool scans is code in the repository's "
+                                "language."),
+               (few, "the repositories whose source share is below that, mostly data, documentation or code in "
+                     "other languages.")] if measured else []),
         ]
     )  # fmt: skip
     return lines

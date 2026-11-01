@@ -685,3 +685,31 @@ alone), the other tools' from the first session (f331084, VM peak 42 of 121.5 Gi
   repositories the same; the largest checkout taken is 9 MB, the largest code 7.6 MB (2.1 MB by source size).
   Every tool's queue runs largest first by checkout size too, so that repository's long scans (CBOMkit 20 min)
   no longer start near the end of a lane.
+
+## corpus-main export review (2026-11-01, the full rerun: the paper's run)
+1'296 supported runs, 1'283 ok, 9 errors, 4 timeouts, every one by build 8fae7cb, in 7 h 08 min (VM peak 47.6 of
+121.5 GiB). The lanes: CBOMkit 7.1 h (the run's length), CipherRadar 2.2, CryptoScan 1.4, xgrep 1.3, SCANOSS 1.0, the
+rest less.
+- **The same results as the first attempt:** of the 1'281 runs ok in both, 1'277 have the same components,
+  algorithm assets and located assets; securin-xbom differs on 3 repositories (OctoGram, tomcat, industry4.0-mes, by
+  1 or 2 components) and xgrep on OctoGram (3 more). securin-xbom on Android_Framework_Source is ok now (the cleanup
+  fix). CBOMkit on OctoGram finished in 50 min, after reaching the hour in the first attempt, so it sits at the
+  limit; its three timeouts are CoreNLP, terraform-provider-azuread and tuios, and every job after a timeout gave
+  the first attempt's result (the backend restart).
+- **Failures, all the tools' own:** CBOMkit's 6 Python parse errors and CipherRadar's 3 Java crashes
+  (`java.resolveFirstArg`) as in the first attempt; CipherRadar reached the hour on OctoGram at 10.9 of 16 GiB, a
+  time limit now, not memory.
+- **Memory:** no OOM kill and no run failed for memory. Two runs reached the limit and finished: CBOMkit on
+  ossf/malicious-packages (18.9 of 20 GiB) and CipherSift on TencentKona-11 (3.2 of 4). CipherRadar peaked at 10.9 of
+  16, CryptoScan at 2.7 of 4.
+- **Contention at the start:** runs that started in the first 40 minutes took 2.1 h longer in total than in the first
+  attempt, later runs 0.1 h less. Those are the minutes when every tool's largest checkouts run together
+  (ossf/malicious-packages, 240'130 files, was cloned by 6 tools within 11 minutes), while the VM used 25 to 44 of its
+  64 cores, so the wait is the disk or the git server, and a run's time includes its clone. The largest effects keep
+  their CPU seconds: CryptoScan on malicious-packages 820 -> 2'516 s, SCANOSS 523 -> 1'497 s, CipherSift 306 -> 911 s.
+  Per tool the median ratio is 0.98 to 1.16 (Q-DARPAN 1.47, on 25 runs above 5 s), CBOMkit 1.04. For the paper: the
+  times were measured with all tools running at once on one host, so those of the largest repositories include that
+  competition.
+- **For mutation-main:** 13 repositories have a failed run (6 Python, 5 Java, 2 Go), leaving 48 Python, 49 Java and
+  52 Go clean ones. The 30 smallest checkouts per language project, over 31 variants, to a slowest lane of 9.3 h
+  (CipherRadar; CBOMkit 8.6) and 50.6 tool-hours; the whole corpus would take CBOMkit alone 220 h.
