@@ -1,9 +1,9 @@
 # The paper's mutation run (RQ5), decided 2026-10-31: per language the 30 repositories of corpus-main with the smallest
-# source size among those where every supported tool's run on the original was ok (one failure of any kind excludes a
-# repository for every tool), at corpus-main's pinned commits. The full mutation offering: every catalog snippet once,
-# five per style, and as many decoys, so 1 + 15 + 15 = 31 variants per repository. RQ5's numbers hold for smaller code;
-# the reason is the length of a mutation run over the whole corpus, which the selection step projects from
-# corpus-main's measured times.
+# checkout (all files at the pinned commit, which every tool scans; by source size until 2026-11-01) among those where
+# every supported tool's run on the original was ok (one failure of any kind excludes a repository for every tool), at
+# corpus-main's pinned commits. The full mutation offering: every catalog snippet once, five per style, and as many
+# decoys, so 1 + 15 + 15 = 31 variants per repository. RQ5's numbers hold for small repositories; the reason is the
+# length of a mutation run over the whole corpus, which the selection step projects from corpus-main's measured times.
 # After corpus-main, on the VM:
 #   make corpus-smallest ARGS="--from corpus-main --out /data/results/corpus/mutation-main.yaml"
 #   make corpus-export    # then commit experiments/results/mutation-main.yaml as experiments/corpus/mutation-main.yaml

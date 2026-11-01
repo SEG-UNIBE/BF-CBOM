@@ -1040,7 +1040,7 @@ def corpus_smallest(
     variants: int = SMALLEST_VARIANTS_OPT,
     out: Path = SMALLEST_OUT_OPT,
 ):
-    """The corpus of a mutation experiment: per language the smallest repositories (source size) of a corpus
+    """The corpus of a mutation experiment: per language the smallest repositories (checkout size) of a corpus
     experiment among those where every supported tool's run was ok, at their pinned commits, and the projected
     length of the mutation run over every repository and over the selection (mutation-main, decided 2026-10-31)."""
     exp_dir = experiment_dir(from_experiment)

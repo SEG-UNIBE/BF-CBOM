@@ -679,4 +679,9 @@ alone), the other tools' from the first session (f331084, VM peak 42 of 121.5 Gi
   inside JAR files; CBOMkit finds nothing in 42 of its 48 Python runs (pyca only).
 - **For mutation-main:** 13 repositories have a failed run, leaving 52 Go, 49 Java and 48 Python clean ones. Ranked by
   source size, ossf/malicious-packages is among the 30 smallest Go repositories, and over 31 variants it alone would
-  take 38.6 of the selection's scan hours (CBOMkit 10.6 of its 17.5).
+  take 38.6 of the selection's scan hours (CBOMkit 10.6 of its 17.5). The selection ranks by checkout size since
+  (decided 2026-11-01): every tool scans the whole checkout, and on this run's times the selection's slowest lane
+  drops from 17.5 h (CBOMkit) to 9.0 h (CipherRadar), all tools from 88 to 53 tool-hours, with 69 of the 90
+  repositories the same; the largest checkout taken is 9 MB, the largest code 7.6 MB (2.1 MB by source size).
+  Every tool's queue runs largest first by checkout size too, so that repository's long scans (CBOMkit 20 min)
+  no longer start near the end of a lane.

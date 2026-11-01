@@ -646,7 +646,7 @@ class Snapshot:
     language: str | None = None
     stars: int | None = None
     size_kb: int | None = None
-    source_bytes: int | None = None  # the record's size (snapshot_size): plan_jobs queues the largest first
+    checkout_bytes: int | None = None  # the record's size (snapshot_size): plan_jobs queues the largest first
 
     def repo_info(self) -> RepoInfo:
         return RepoInfo(
@@ -759,7 +759,7 @@ def resolve_snapshots(
                     language=repo.language,
                     stars=repo.stars,
                     size_kb=repo.size_kb,
-                    source_bytes=size.get("source_bytes"),
+                    checkout_bytes=size.get("checkout_bytes"),
                 )
             )
     write_spec_copy(exp_dir, replace(spec, repos=resolved))
@@ -824,12 +824,14 @@ def plan_jobs(
     """Jobs still to run. Resumable: a run whose meta file exists is skipped, unless `retry_failed` and its stored
     status is not "ok" (an `ok` run with OOM kills counts as not ok), or its tool is in `rerun` (every stored run of
     that tool is redone, unsupported pairs excepted). Redone runs have their stored files removed first.
-    The largest repositories come first (`source_bytes`), so the longest jobs do not start last and set the batch's
-    end; the sort is stable, so a repo's variants stay together and equal sizes keep the spec's order.
+    The largest repositories come first (`checkout_bytes`: every tool scans the whole checkout; by source size until
+    2026-11-01, which queued a data repository with little code but long scans near the end), so the longest jobs do
+    not start last and set the batch's end; the sort is stable, so a repo's variants stay together and equal sizes
+    keep the spec's order.
     Returns (jobs, skipped)."""
     jobs: list[PlannedJob] = []
     skipped = 0
-    for snap in sorted(snapshots, key=lambda s: -(s.source_bytes or 0)):
+    for snap in sorted(snapshots, key=lambda s: -(s.checkout_bytes or 0)):
         for tool in spec.tools:
             for i in range(1, spec.repetitions + 1):
                 cbom, meta = result_paths(exp_dir, snap.full_name, snap.commit, snap.variant, tool, i)
@@ -958,8 +960,10 @@ def _record_entry(repo: RepoSpec) -> dict:
 
 def smallest_clean_corpus(exp_dir: Path, *, per_language: int, variants: int, registry: dict | None = None) -> dict:
     """The corpus of a mutation experiment drawn from a corpus experiment's record (mutation-main from corpus-main,
-    decided 2026-10-31): per language the `per_language` repositories with the smallest source size (`source_bytes` at
-    the pinned commit) among those where every supported tool's first run on the original is stored `ok`. One error,
+    decided 2026-10-31): per language the `per_language` repositories with the smallest checkout (`checkout_bytes`: all
+    files at the pinned commit, which every tool scans, so what a run over the variants costs; ranked by source size
+    until 2026-11-01, which favoured repositories of mostly data, such as ossf/malicious-packages with 0.3 MB of Go in a
+    464 MB checkout) among those where every supported tool's first run on the original is stored `ok`. One error,
     timeout or OOM kill, or a missing run, excludes the repository for every tool (listed under `excluded`). The repos
     keep their pinned commits, so the mutants are made on the code the corpus run scanned. `projection`: per tool the
     summed hours of its runs times `variants` (the runs a repository gets in the mutation experiment), over every
@@ -983,14 +987,14 @@ def smallest_clean_corpus(exp_dir: Path, *, per_language: int, variants: int, re
     for repo in spec.repos:
         failed = [f"{t}:{status.get((repo.full_name, t)) or 'missing'}" for t in supported(repo)
                   if status.get((repo.full_name, t)) != "ok"]  # fmt: skip
-        if failed or repo.source_bytes is None:
-            reason = f"a failed run in {spec.name}" if failed else "no source size in the record"
+        if failed or repo.checkout_bytes is None:
+            reason = f"a failed run in {spec.name}" if failed else "no checkout size in the record"
             excluded.append({"full_name": repo.full_name, "language": repo.language, "reason": reason, "runs": failed})
         else:
             clean.append(repo)
     selected, short = [], {}
     for language in dict.fromkeys(r.language for r in spec.repos):
-        ranked = sorted((r for r in clean if r.language == language), key=lambda r: (r.source_bytes, r.full_name))
+        ranked = sorted((r for r in clean if r.language == language), key=lambda r: (r.checkout_bytes, r.full_name))
         selected += ranked[:per_language]
         if len(ranked) < per_language:
             short[language] = len(ranked)
@@ -1006,8 +1010,8 @@ def smallest_clean_corpus(exp_dir: Path, *, per_language: int, variants: int, re
     return {
         "selected_from": spec.name,
         "rule": (
-            f"per language the {per_language} repositories with the smallest source size among those where every "
-            "supported tool's run on the original was ok"
+            f"per language the {per_language} repositories with the smallest checkout (all files at the pinned commit) "
+            "among those where every supported tool's run on the original was ok"
         ),
         "projection": {"variants": variants, "hours": {t: [every[t], chosen[t]] for t in spec.tools}},
         "short": short,

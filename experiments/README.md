@@ -52,7 +52,7 @@ runs), `corpus-` (real repositories as they are), `mutation-` (real repositories
 | `corpus-icpc.yaml` | the 11 eligible tools (cdxgen in Go only) | 23 projects of the ICPC 2026 paper (`experiments/corpus/icpc-2026.yaml`, HEAD of 2026-10-18) | held-out counterpart of the pilot corpus: none of these repos was used to tune the vocabulary, the specs or CipherSift; six are marked `expect_crypto: low` (negative cases) |
 | `corpus-main.yaml` | the 11 eligible tools (cdxgen in Go only), once | the stratified GitHub sample of 2026-10-30 (`experiments/corpus/corpus-pc6.yaml`): 54 repos each in Java, Python and Go, 6 per cell | the paper's corpus run (RQ1-RQ4); 1620 tool/repository pairs, 1242 supported scans |
 | `mutation-smoke.yaml` | the 11 eligible tools (cdxgen in Go only) | pyjwt, jjwt, golang-jwt (pilot), 3 mutants each | the mutation harness end to end: the RSA-2048 keygen inserted in each style; CBOMkit and CryptoScan should find the direct one at its line (`mutation.csv`) |
-| `mutation-main.yaml` | the 11 eligible tools (cdxgen in Go only), once | per language the 30 repos of corpus-main with the smallest source size where every supported tool ran ok, at its pinned commits (`make corpus-smallest` after corpus-main) | RQ5: every snippet in every style and as many decoys (15 + 15 per repo, 31 variants) |
+| `mutation-main.yaml` | the 11 eligible tools (cdxgen in Go only), once | per language the 30 repos of corpus-main with the smallest checkout where every supported tool ran ok, at its pinned commits (`make corpus-smallest` after corpus-main) | RQ5: every snippet in every style and as many decoys (15 + 15 per repo, 31 variants) |
 | `mutation-pilot.yaml` | the 11 eligible tools (cdxgen in Go only), once | 9 pinned pilot-medium repos, 3 per language | mutation pilot: every catalog snippet once per repo (15 calls, 5 per style) and 15 decoys; 4185 planned results, currently 3348 supported scans |
 
 LLM providers are outside the current experiment scope; their implementation remains available for possible later use.
@@ -132,8 +132,8 @@ its runs on three small repos and their mutants, one repo per paper language; it
 `bar-micro.yaml` (3 jobs). The corpus run is `corpus-main.yaml` (the corpus `experiments/corpus/corpus-pc6.yaml`).
 The mutation run, `mutation-main.yaml`, takes its corpus from corpus-main's record: after corpus-main,
 `make corpus-smallest ARGS="--from corpus-main --out /data/results/corpus/mutation-main.yaml"` writes per language the
-30 repositories with the smallest source size (at the pinned commit) among those where every supported tool's run on
-the original was ok, with their commits, the excluded repositories and the projected length of the mutation run over
+30 repositories with the smallest checkout (all files at the pinned commit, which every tool scans, so what the run
+costs) among those where every supported tool's run on the original was ok, with their commits, the excluded repositories and the projected length of the mutation run over
 every repository and over the selection (31 runs per repository, one container per tool). A language with fewer than
 30 clean repositories keeps all of them, with a warning and its count under `short` in the file. `make corpus-export`
 copies it to `experiments/results/`, and it is committed as `experiments/corpus/mutation-main.yaml`.
@@ -302,8 +302,8 @@ experiment.
   workers that clone at once. Until 2026-10-30 one process served one request at a time, so a long full clone
   (CBOMkit) made every other worker's clone wait, and since a job's time includes its clone, that wait counted as
   the other tools' run time.
-- *Largest first.* Every tool's queue gets the repositories largest first (`source_bytes` at the pinned commit), so
-  the longest jobs do not start last and set the batch's end. Early on, the remaining-time forecast is therefore too
+- *Largest first.* Every tool's queue gets the repositories largest first (`checkout_bytes`, all files at the pinned
+  commit, which every tool scans), so the longest jobs do not start last and set the batch's end. Early on, the remaining-time forecast is therefore too
   high: its mean so far comes from the largest repositories.
 - *Memory limits are caps, not reservations.* Every worker has a memory limit in `docker-compose.yml`, mirrored by
   `memory_gb` in `common/tools.yaml` (a test keeps them equal; adjust both). Idle workers use little, large jobs can
