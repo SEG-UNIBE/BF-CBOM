@@ -1687,11 +1687,10 @@ def _mutation(
         masked = sum(_true(r.get("masked")) for r in ok)
         table.append(
             [lang, tool]
-            + [show(st, "found_site") for st in styles]
-            + [show("all", "found_span"), show("all", "found_repo"), masked, len(ok)]
+            + [show(st, "found_lines") for st in [*styles, "all"]]
+            + [show("all", "found_site"), show("all", "found_repo"), masked, len(ok)]
         )
-    header = ["language", "tool"] + [f"site, {st}" for st in styles]
-    header += ["span, all", "repository, all", "masked", "judged"]
+    header = ["language", "tool", *styles, "all", "call line ±2, all", "repository, all", "masked", "judged"]
     lines += md_table(header, table, "ll" + "r" * (len(header) - 2)) + [""]
     failed = Counter(r.get("status") or "missing" for r in rows if r.get("status") != "ok")
     if failed:
@@ -1702,11 +1701,16 @@ def _mutation(
         lines += _check(CAVEAT, f"Not judged: {_n(sum(failed.values()))} planted call × tool, by the status of the "
                                 f"run on the mutant: {why}.", "`original <status>` is the original's, and `status` "
                                 "in `mutation.csv` has each.")  # fmt: skip
+    series = f"{styles[0]} … {styles[-1]}" if len(styles) > 1 else styles[0] if styles else "style"
     lines += _columns(
         [
-            ("site, <style>", "mutants of that style where a new record of the expected algorithm appears at the "
-             "line naming it (±2 lines)."),
-            ("span, all", "the same anywhere on the inserted lines, imports included, all styles together."),
+            (series, "mutants of that style where a new record of the expected algorithm appears on one of the "
+             "inserted lines, imports excluded.", "That is the bar exam's rule: an item counts as found on its own "
+             "lines."),
+            ("all", "the same over all styles together, the recall of the scores below."),
+            ("call line ±2, all", "stricter: within two lines of the line naming the algorithm.",
+             "A snippet of several statements loses the tools that put the record on another one, such as Go's "
+             "`cipher.NewGCM` four lines below `aes.NewCipher`."),
             ("repository, all", "the algorithm appears in the tool's results for the mutant and was not in them for "
              "the original, wherever it is.", "Empty when every mutant is `masked`."),
             ("masked", "mutants whose original already has the algorithm, so the repository level cannot tell."),
@@ -1722,8 +1726,8 @@ def _mutation(
         row, st, c = eg
         detected, judged = c.split("(")[1].rstrip(")").split("/")
         lines += _example(
-            f"`{c}` under `site, {st}` for `{row[1]}` in {row[0]}: `{row[1]}` reported the inserted algorithm at the "
-            f"inserted call in {detected} of the {judged} judged {st} mutant(s)."
+            f"`{c}` under `{st}` for `{row[1]}` in {row[0]}: `{row[1]}` reported the inserted algorithm on the "
+            f"inserted lines in {detected} of the {judged} judged {st} mutant(s)."
         )
     lines += _mutation_scores(scores or [])
     lines += _offedit(scores or [])
@@ -1769,7 +1773,7 @@ def _mutation_scores(scores: list[dict]) -> list[str]:
                 s["language"],
                 s["tool"],
                 s["calls"],
-                ci(_float(s["recall_site"]), _float(s.get("recall_low")), _float(s.get("recall_high"))),
+                ci(_float(s["recall"]), _float(s.get("recall_low")), _float(s.get("recall_high"))),
                 _pct(s["recall_group"]),
                 s["decoys"],
                 s["decoys_hit"],
@@ -1777,7 +1781,7 @@ def _mutation_scores(scores: list[dict]) -> list[str]:
                 f1(s.get("f1"), s.get("f1_low"), s.get("f1_high")),
             ]
         )
-    header = ["language", "tool", "calls", "recall site [95 % CI]", "recall group", "decoys", "hit", "precision",
+    header = ["language", "tool", "calls", "recall [95 % CI]", "recall group", "decoys", "hit", "precision",
               "F1 [95 % CI]"]  # fmt: skip
     lines += md_table(header, table, "ll" + "r" * (len(header) - 2)) + [""]
     if no_decoys:
@@ -1788,14 +1792,15 @@ def _mutation_scores(scores: list[dict]) -> list[str]:
     lines += _columns(
         [
             ("calls", "judged planted calls, with an ok run on the mutant and on the original."),
-            ("recall site [95 % CI]", "the share of the calls with a new record of the expected algorithm at the "
-             "inserted call (±2 lines), all styles together, with the 95 % bootstrap interval over repositories.",
-             "An interval only where the support rule of the scores holds (3 repositories, 10 calls)."),
+            ("recall [95 % CI]", "the share of the calls with a new record of the expected algorithm on one of the "
+             "inserted lines, imports excluded, all styles together, with the 95 % bootstrap interval over "
+             "repositories.", "An interval only where the support rule of the scores holds (3 repositories, 10 "
+             "calls)."),
             ("recall group", "the same leniently: a record of the algorithm's group."),
             ("decoys", "judged planted decoys."),
-            ("hit", "decoys with any new crypto record on their inserted lines."),
+            ("hit", "decoys with any new crypto record on their inserted lines, imports excluded."),
             ("precision", "calls found / (calls found + decoys hit).", "Empty when no decoys were planted."),
-            ("F1 [95 % CI]", "the harmonic mean of recall site and precision, with its interval.",
+            ("F1 [95 % CI]", "the harmonic mean of recall and precision, with its interval.",
              "Empty when no decoys were planted."),
         ]
     )  # fmt: skip
@@ -1804,12 +1809,12 @@ def _mutation_scores(scores: list[dict]) -> list[str]:
         if eg[8]:
             lines += _example(
                 f"F1 `{eg[8]}` for `{eg[1]}` in {eg[0]}: it found {eg[3].split(' ')[0]} of its {eg[2]} planted calls "
-                f"at the call and reported {eg[6]} of the {eg[5]} planted decoys.",
+                f"on the inserted lines and reported {eg[6]} of the {eg[5]} planted decoys.",
                 f"So its precision over the planted items is {eg[7] or 'undefined'}.",
             )
         else:
-            lines += _example(f"`{eg[1]}` found {eg[3].split(' ')[0]} of its {eg[2]} planted calls in {eg[0]} at the "
-                              "inserted call.")  # fmt: skip
+            lines += _example(f"`{eg[1]}` found {eg[3].split(' ')[0]} of its {eg[2]} planted calls in {eg[0]} on the "
+                              "inserted lines.")  # fmt: skip
     return lines
 
 
@@ -1850,9 +1855,11 @@ def _offedit(scores: list[dict]) -> list[str]:
     lines += _columns(
         [
             ("mutants", "the judged mutants, calls and decoys."),
-            ("with changes", "mutants where the tool's report of the mutant has a new algorithm (`extra_units`, "
-             "besides the planted one and what it implies) or a new located finding outside the inserted lines "
-             "(`extra_sites`).", "The original's findings moved by the insertion are not new.",
+            ("with changes", "mutants where the tool's report of the mutant has something new outside the inserted "
+             "lines: an algorithm (`extra_units`, besides the planted one and what it implies) or a located finding "
+             "(`extra_sites`).", "An algorithm without a location counts too, since nothing places it on the edit.",
+             "What a tool reports on the inserted lines belongs to the planted code, and a decoy hit there counts "
+             "under precision instead.", "The original's findings moved by the insertion are not new.",
              "Lost findings are in `mutation.csv` (`lost_units`, `lost_sites`)."),
             ("share", "their share of the judged mutants."),
             ("extra units", "the median over the mutants with changes, so how much changes when something does.",

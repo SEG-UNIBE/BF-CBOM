@@ -596,14 +596,14 @@ def _by_tool_language(scores: list[dict], names: dict[str, str], cells) -> list:
 
 def detection(scores: list[dict], names: dict[str, str]) -> Table | None:
     """Recall, precision and F1 on the planted items (mutation-scores.csv, all styles), per tool and language: the
-    judged calls, recall at the call site and F1 with their bootstrap intervals over repositories, precision over the
-    planted calls and decoys."""
+    judged calls, recall on the inserted lines and F1 with their bootstrap intervals over repositories, precision over
+    the planted calls and decoys."""
     rows_in = [s for s in scores if s.get("style") == "all"]
     if not rows_in:
         return None
 
     def cells(s: dict) -> list:
-        return [_count(s.get("calls")), _interval(s.get("recall_site"), s.get("recall_low"), s.get("recall_high")),
+        return [_count(s.get("calls")), _interval(s.get("recall"), s.get("recall_low"), s.get("recall_high")),
                 _share(s.get("precision")), _interval(s.get("f1"), s.get("f1_low"), s.get("f1_high"))]  # fmt: skip
 
     header = ["Tool", "Language", "Calls", Tex(r"Recall [95\,\% CI]", "Recall [95 % CI]"), "Precision",
@@ -613,14 +613,15 @@ def detection(scores: list[dict], names: dict[str, str]) -> Table | None:
 
 
 def styles(scores: list[dict], names: dict[str, str]) -> Table | None:
-    """Recall at the call site per insertion style (mutation-scores.csv), per tool, the languages side by side."""
+    """Recall on the inserted lines per insertion style (mutation-scores.csv), per tool, the languages side by
+    side."""
     rows_in = [s for s in scores if s.get("style") in STYLES]
     if not rows_in:
         return None
     langs = _paper_languages(s["language"] for s in rows_in)
     shown = [st for st in STYLES if any(s["style"] == st for s in rows_in)]
     by = {(s["tool"], _language(s["language"]), s["style"]): s for s in rows_in}
-    rows = [[names.get(t, t), *(_share(by[(t, lang, st)].get("recall_site")) if (t, lang, st) in by else DASH
+    rows = [[names.get(t, t), *(_share(by[(t, lang, st)].get("recall")) if (t, lang, st) in by else DASH
                                 for lang in langs for st in shown)]
             for t in _order({s["tool"] for s in rows_in}, names)]  # fmt: skip
     header = ["Tool", *[STYLES[st] for _ in langs for st in shown]]

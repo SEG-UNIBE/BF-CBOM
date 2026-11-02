@@ -408,12 +408,17 @@ per asset type with that type's own field set.
 
 A mutant's CBOMs are normalised like every other, with the same specs and vocabulary; nothing in the normaliser knows
 about mutants. `analysis/mutation.py` compares each tool's records on a mutant with its records on the original and
-asks whether a new record of the snippet's expected unit (its L4 identity, as at the top of the ladder) appeared at the
-inserted call, on the inserted lines, in the file or in the repository. The expected units are written in the
+asks whether a new record of the snippet's expected unit (its L4 identity, as at the top of the ladder) appeared on
+the inserted lines (imports excluded, no window: the bar exam's rule, an item's own lines; the headline, decided
+2026-11-02), within two lines of the line naming the algorithm (stricter: a snippet of several statements, such as
+Go's `aes.NewCipher` and `cipher.NewGCM` with an `if err != nil` block between them, loses the tools that put the
+record on the other statement), in the file or in the repository. The expected units are written in the
 vocabulary (`tests/test_mutation.py` checks them), so detection rests on the same normalisation as the agreement
-numbers; a lenient column (`found_group`, the coarse group at the site) shows how much a stricter reading costs. A
+numbers; a lenient column (`found_group`, the coarse group on the inserted lines) shows how much a stricter reading
+costs. A
 planted decoy (a comment or a log message naming algorithms, a CRC32 checksum, a Base64 encoding, a variable named after
 an algorithm, a hex constant, a URL ending in `.sha256`, a certificate file path; what each one tests:
-`experiments/corpus/README.md`) is judged the other way round: any new crypto record on its inserted lines is a
+`experiments/corpus/README.md`) is judged the other way round: any new crypto record on its inserted lines (the same
+lines, imports excluded) is a
 `false_positive`, so `mutation-scores.csv` can give a precision and an F1 next to the recall. The
 agreement analyses never see the mutants (they read the original variants only).

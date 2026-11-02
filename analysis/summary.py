@@ -127,12 +127,12 @@ FILES = {
     "stability.csv": "per (tool, snapshot) with repeated runs: Jaccard across runs, record-count CV, flux (the share "
     "of items not in every run), consensus set",
     "mutants.csv": "one row per mutant (mutants.json): the planted call or decoy, its file, lines, host and patch",
-    "mutation.csv": "per (mutant, tool): found at the site / span / file / repo, by group, parameters, "
-    "`false_positive` on a decoy, extra and lost units and sites",
+    "mutation.csv": "per (mutant, tool): found on the inserted lines / at the call line / file / repo, by group, "
+    "parameters, `false_positive` on a decoy, extra and lost units and sites",
     "mutation-rates.csv": "per tool, language, style and dimension: detection rate (mean of per-repository rates, CI)",
-    "mutation-scores.csv": "per tool, language and style: recall on the planted calls (site, group), precision over "
-    "calls and decoys, F1, CIs over repositories, the changes off the edit (mutants with any, share, medians) and the "
-    "noise floor from --baseline",
+    "mutation-scores.csv": "per tool, language and style: recall on the planted calls (lines, call line, group), "
+    "precision over calls and decoys, F1, CIs over repositories, the changes off the edit (mutants with any, share, "
+    "medians) and the noise floor from --baseline",
     "bridge-run{i}.csv": "the bridge to RQ4: per language, each tool's confirmation rate at L4 against its F1, "
     "Spearman over the cells and Kendall tau between the rankings",
 }

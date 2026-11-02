@@ -8,8 +8,9 @@ file with the experiment folder, and the regenerated mutants are the same ones (
 version). A new repo gets `per_repo` insertion mutants: (snippet, style) pairs drawn round-robin over the styles from
 a seeded shuffle, each into a host from a file not used yet where possible, among the snippets whose library the
 project already declares (dependency files are never edited, decided 2026-10-20), then `decoys` decoy mutants (the
-catalog's known negatives, `direct` only, round-robin over the kinds; `equal`: as many as calls, decided 2026-10-22).
-Every mutant is one commit on the pinned commit: one file changed, whole lines inserted.
+catalog's known negatives, `direct` only, round-robin over the kinds; `equal`: as many as calls, decided 2026-10-22;
+a kind drawn again goes into another host, never the same mutant twice). Every mutant is one commit on the pinned
+commit: one file changed, whole lines inserted.
 """
 
 from __future__ import annotations
@@ -128,12 +129,18 @@ class RepoMutator:
                 return i
         return None
 
-    def try_pair(self, snippet_id: str, style: str, used_files: set[str], rng: random.Random) -> Mutation | None:
+    def try_pair(
+        self, snippet_id: str, style: str, used_files: set[str], rng: random.Random, made: frozenset = frozenset()
+    ) -> Mutation | None:
+        """A mutant of (snippet, style) in a host, or None; never one of `made` again (snippet, style, file, host line:
+        what the mutant id depends on)."""
         snippet = self.catalog.get(snippet_id)
         candidates = [h for h in self.hosts if self.form_for(snippet, h.path) is not None]
         rng.shuffle(candidates)
         candidates.sort(key=lambda h: h.path in used_files)  # stable: unused files first, shuffled within
         for host in candidates[:HOST_TRIES]:
+            if (snippet_id, style, host.path, host.line) in made:
+                continue
             form = self.form_for(snippet, host.path)
             try:
                 return mutate(
@@ -211,7 +218,9 @@ def generate(bare: Path, repo: RepoSpec, commit: str, params: MutationSpec, *, l
     kinds = [d.id for d in catalog.decoys]
     rng.shuffle(kinds)
     for i in range(wanted_decoys if kinds else 0):
-        made = mutator.try_pair(kinds[i % len(kinds)], "direct", used_files, rng)
+        # a kind comes round again once all are placed: into another host, or the mutant would be the same one twice
+        made_ids = frozenset((m["snippet"], m["style"], m["file"], m["host"]["line"]) for m in entry["mutants"])
+        made = mutator.try_pair(kinds[i % len(kinds)], "direct", used_files, rng, made_ids)
         if made is None:
             entry["notes"].append(f"{len(entry['mutants']) - calls} of {wanted_decoys} decoys: no host fits")
             break

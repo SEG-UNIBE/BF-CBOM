@@ -388,13 +388,16 @@ use a CBOM reports, counted as records and items, never as assets, which depend 
   finding with the same details (roles swapped 2026-10-23). k of n counts the eligible voters that ran on the repo
   (`items-`, `agreement-`, `score-`, `grouping-run<i>.csv`).
 - **RQ5, detection:** given cryptographic calls and decoys planted into real projects, how well does each generator
-  detect the calls and ignore the decoys? Recall at the site, precision on the decoys, F1 per tool, language and
-  style with CIs over repos, the micro F1 next to it, never pooled; the bridge to RQ4: Spearman between confirmation
-  rate and F1 over tool x language cells, Kendall tau between the two rankings. The tools ranked by F1 is one line
-  here. **Changes off the edit** are measured and reported as a finding, never folded into F1: the share of judged
-  mutants where the tool reports something new outside the inserted lines, with the medians of extra units and sites,
-  as measured, without a noise floor (every experiment of the paper runs once, below; `report --baseline <exp>` can
-  still join one from a stability experiment for our own reading). Caveats the
+  detect the calls and ignore the decoys? Recall on the inserted lines (imports excluded, the bar exam's rule: the
+  paper's "a planted call counts as detected when the tool reports its algorithm on one of the inserted lines";
+  decided 2026-11-02, the call line ±2 kept as a stricter column, which cost only Go's multi-statement snippets),
+  precision on the decoys, F1 per tool, language and style with CIs over repos, the micro F1 next to it, never
+  pooled; the bridge to RQ4: Spearman between confirmation rate and F1 over tool x language cells, Kendall tau
+  between the two rankings. The tools ranked by F1 is one line here. **Changes off the edit** are measured and
+  reported as a finding, never folded into F1: the share of judged mutants where the tool reports something new
+  outside the inserted lines (until 2026-11-02 a new unit on them, a decoy hit included, counted too), with the
+  medians of extra units and sites, as measured, without a noise floor (every experiment of the paper runs once,
+  below; `report --baseline <exp>` can still join one from a stability experiment for our own reading). Caveats the
   paper states: planted calls are plain uses of the catalog's APIs, precision covers the decoy kinds, insertions are
   easier than real findings (`mutation-`, `mutation-scores`, `bridge-run<i>.csv`).
 
@@ -615,21 +618,23 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
 - **Variants** (`mutants.py`): a spec's `mutation:` block (`per_repo`, `styles`, `snippets`, `seed`, `decoys`) gives
   every repo that many call mutants, (snippet, style) pairs drawn round-robin over the styles from a seeded shuffle,
   hosts from files not used yet, then as many decoy mutants (`decoys: equal`, the default; an int; 0 for none),
-  round-robin over the decoy kinds, `direct` only; each a commit on the pinned commit (fixed author and date: the SHA
-  depends only on the content), a branch `bfcbom/ins-<snippet>-<style>-<hash>` in the base mirror. `mutants.json`
+  round-robin over the decoy kinds, `direct` only, a kind drawn again into another host (never the same mutant twice;
+  until 2026-11-02 a small repository could get one twice, mutation-main once); each a commit on the pinned commit
+  (fixed author and date: the SHA depends only on the content), a branch `bfcbom/ins-<snippet>-<style>-<hash>` in the
+  base mirror. `mutants.json`
   records file, host, call line, spans, line shifts, the inserts (a missing branch is rebuilt from them with the same
   SHA), `decoy` and the patch (Phase 6's mutant patches). mutation-main: per language the 30 repositories of
   corpus-main with the smallest checkout, 15 calls and 15 decoys each (see "Research questions").
 - **Ground truth from mutation** (`analysis/mutation.py`; `mutation.csv`, `mutation-rates.csv`,
   `mutation-scores.csv`, `bridge-run<i>.csv`): per (mutant, tool) against the same tool on the original, counting
-  only new records (an original finding moved by the inserted lines is not new). A planted call: found at the site
-  (the line naming the algorithm ±2), on the inserted span, in the file, in the repo (`masked` when the original
-  already has the unit), leniently by group; parameters on the inserted lines. A planted decoy: `false_positive` when
-  any new record sits on its inserted lines. Both: extra and lost units and sites (the "no other change" check, read
-  next to the tool's run-to-run instability). With repeated runs a dimension counts when it holds in most of the
+  only new records (an original finding moved by the inserted lines is not new). A planted call: found on the
+  inserted lines (imports excluded, no window: the headline), at the call line ±2 (stricter), in the file, in the repo
+  (`masked` when the original already has the unit), leniently by group; parameters on the inserted lines. A planted
+  decoy: `false_positive` when any new record sits on its inserted lines (the same lines). Both: extra and lost units
+  and sites outside the edit (the "no other change" check, read next to the tool's run-to-run instability). With repeated runs a dimension counts when it holds in most of the
   mutant's runs, which also exposes LLM answers from memorised popular repos. Rates: the mean of per-repository rates
-  with bootstrap CIs over repos (`score.py`'s support). Scores per tool, language and style: recall at the site and by
-  group, precision = calls found / (calls found + decoys hit), F1, CIs over repos; the bridge to RQ4: Spearman between
+  with bootstrap CIs over repos (`score.py`'s support). Scores per tool, language and style: recall on the inserted
+  lines, at the call line and by group, precision = calls found / (calls found + decoys hit), F1, CIs over repos; the bridge to RQ4: Spearman between
   the exact matcher's L4 confirmation rate and F1 per language over tools, Kendall τ between the two rankings.
 - **Removal mutants:** not built and not needed for RQ5 (the decoys give the negatives); if ever built, insertion and
   removal results are reported apart, never pooled (refinement 7).

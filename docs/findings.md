@@ -713,3 +713,41 @@ rest less.
 - **For mutation-main:** 13 repositories have a failed run (6 Python, 5 Java, 2 Go), leaving 48 Python, 49 Java and
   52 Go clean ones. The 30 smallest checkouts per language project, over 31 variants, to a slowest lane of 9.3 h
   (CipherRadar; CBOMkit 8.6) and 50.6 tool-hours; the whole corpus would take CBOMkit alone 220 h.
+
+## mutation-main export review (2026-11-02, the paper's RQ5 run)
+2'700 mutants in 90 repositories (30 per language, the smallest clean checkouts of corpus-main): 1'350 planted calls
+and 1'350 planted decoys, 22'313 runs, every one ok, by build 9592fdf, in 9 h 30 min (projected 9.3 h) and 49.9
+tool-hours (projected 50.6). No OOM kill, VM peak 32.9 of 121.5 GiB; CBOMkit peaked at 18.0 of 20 GiB on
+runfinch/finch.
+- **The hit rule (decided 2026-11-02):** a planted call counts as detected when the tool reports its algorithm on one
+  of the inserted lines, imports excluded, the bar exam's rule (an item's own lines, no window); decoys are judged on
+  the same lines. The first scoring took the line naming the algorithm ±2, which in Go loses the tools that put the
+  record on another statement of the snippet (`cipher.NewGCM` four lines below `aes.NewCipher`, an `if err != nil`
+  block between them; ECDSA at `GenerateKey`): recall at that line against the inserted lines, xgrep 0.70 / 0.94,
+  CBOMkit 0.63 / 0.83, CipherRadar 0.63 / 0.72, pqcheck 0.65 / 0.72, every other Go tool within 0.02, Java and
+  Python identical. The ±2 reading stays a column (`found_site`, `recall_site`).
+- **F1 (the rule above):** CipherSift 0.96-1.00, xgrep 0.97-1.00, SCANOSS 0.99 (Go), CBOMkit 0.95 (Java), 0.91 (Go),
+  0.07 (Python). Precision is 1.00 everywhere but CipherRadar (0.75-0.80: algorithms named in comments and log
+  messages, 108 to 110 of the 110 to 112 such decoys per language) and CryptobomForge (0.99, one decoy, below). The bridge:
+  Spearman 0.4 (Go, Java), 0.5 (Python), 0.4 over the 24 cells.
+- **Changes off the edit, corrected:** until 2026-11-02 `extra_units` took every new algorithm of the mutant, those
+  on the inserted lines too, so a decoy hit counted a second time as a change elsewhere (CipherRadar 0.11-0.25, all
+  of it on the edit). Counted outside the edit, no tool shows noise: only xgrep (0.02-0.11), CipherSift (0.07-0.08)
+  and Q-DARPAN in Go (0.04) report anything new there. xgrep's and CipherSift's are the planted algorithm at the
+  host's callers, in its file and others (up to 114 and 136 sites in one mutant): their interprocedural analysis
+  follows the call. Q-DARPAN reports a Go import on the `import (` line, a few lines above the inserted one.
+- **Python's snippet mix:** 4 of the 30 Python repositories declare `cryptography`, so 418 of the 450 Python calls
+  are the seven standard-library snippets (hashlib, hmac, PBKDF2, ssl). CBOMkit's 0.04 follows from it: it covers
+  pyca only and found 16 of the 32 pyca calls.
+- **Intervals of width 0:** CipherRadar, CipherSift, CryptoScan and securin-xbom in Java find the same snippets in
+  every repository (securin-xbom misses 7 of the 15 everywhere), so the interval over repositories collapses. It
+  measures the host code's effect, which is none for them; the snippets are a fixed set, not a sample.
+- **Zeros to check:** cdxgen finds nothing in imulab/go-scim and sigstore/scaffolding (0 algorithm assets on the
+  originals too; a debug run in a throwaway container is open). CBOMkit finds 0 on google/copybara (Bazel), 0.07 on
+  BSPEntSpy and 0.33 on heroku/webapp-runner, in 3 to 30 s with 0 assets on the originals: its indexing needs a build
+  file and `src/` (as shipped).
+- **Ours:** one decoy mutant twice (ashishps1/awesome-system-design-resources, the identifier decoy in the same host:
+  a decoy kind drawn again could take a host it had; fixed in the generator, the run kept, no tool hit it, so Java
+  counts 450 decoys for 449 distinct). CryptobomForge's one decoy hit is its CodeQL context window (the finding ±2
+  lines) starting before the insertion point, so the moved finding was not recognised (the open "window centre"
+  item). One copybara mutant sits in `javatests/`, which the host filter does not know as a test folder.

@@ -8,12 +8,16 @@ the change (an LLM's memorised repository) is not credited.
 - `found_repo`: the expected unit (the L4 identity; a protocol for TLS) is among the mutant's units and not among the
   original's (majority over runs). `masked` when the original already has it: the repository level cannot decide,
   the row has no value there. Location-less tools are judged here only.
-- `found_file`, `found_span` (on an inserted line, imports included, ±`window`), `found_site` (the line naming the
-  algorithm ±`window`), `found_group` (lenient: a record of the expected group at the site, e.g. SHA-2 or EC).
+- `found_file`; `found_lines`, the headline (decided 2026-11-02): on one of the inserted lines, imports excluded,
+  the bar exam's rule (an item's own lines, no window; a record's line range counts at every line it spans);
+  `found_site`, stricter (the line naming the algorithm ±`window`: the first scoring, which cost Go's multi-statement
+  snippets, an `if err != nil` block apart, the second statement); `found_group` (lenient: a record of the expected
+  group on the inserted lines, e.g. SHA-2 or EC).
 - parameters (`key_size`, `mode`, `padding`, `curve`, `digest`, `iterations`, `protocol_version`): a new record of
   the expected unit on the inserted lines carries the expected value; empty where nothing is expected or no such
-  record exists.
-- "no other change": `extra_units` (new units besides the expected one, `also` and what they imply), `lost_units`,
+  record exists. A decoy is a `false_positive` when a new crypto record sits on its inserted lines (the same lines).
+- "no other change": `extra_units` (new units off the inserted lines, or without a location, besides the expected
+  one, `also` and what they imply; a unit only on the inserted lines is the planted code's), `lost_units`,
   `extra_sites`, `lost_sites` (located findings, the original's moved through `shifts`), majority sets on both
   sides; read next to the tool's run-to-run instability on the original (stability.csv).
 Rates (`mutation-rates.csv`): per tool, language, style and dimension the mean of the per-repository detection rates
@@ -34,7 +38,7 @@ from .levels import identity
 from .normalize.vocab import Vocabulary, load_vocabulary
 from .score import MIN_ITEMS, MIN_REPOS, supported
 
-DETECTIONS = ("found_repo", "found_file", "found_span", "found_site", "found_group")
+DETECTIONS = ("found_repo", "found_file", "found_lines", "found_site", "found_group")
 PARAMETERS = ("key_size", "mode", "padding", "curve", "digest", "iterations", "protocol_version")
 DIMENSIONS = DETECTIONS + PARAMETERS
 BOOTSTRAP_SEED = 20261020
@@ -51,8 +55,9 @@ MUTATION_COLUMNS = [
     "lost_units", "extra_sites", "lost_sites", "new_records",
 ]  # fmt: skip
 SCORE_COLUMNS = [
-    "tool", "voter_group", "language", "style", "repos", "calls", "found_site", "found_group", "decoys",
-    "decoys_hit", "recall_site", "recall_low", "recall_high", "recall_group", "precision", "f1", "f1_low", "f1_high",
+    "tool", "voter_group", "language", "style", "repos", "calls", "found_lines", "found_site", "found_group", "decoys",
+    "decoys_hit", "recall", "recall_low", "recall_high", "recall_site", "recall_group", "precision", "f1", "f1_low",
+    "f1_high",
     "supported", "offedit_mutants", "offedit_share", "extra_units_median", "extra_sites_median",
     "baseline_flux", "baseline_changed",
 ]  # fmt: skip
@@ -156,62 +161,63 @@ def evaluate(
     exp = mutant.get("expected") or {}
     group = vocab.group_of(exp.get("family")) if exp.get("family") else None
     path, call, shifts = mutant["file"], int(mutant["call_line"]), mutant.get("shifts") or []
-    spans = [(s["start"] - window, s["end"] + window) for s in mutant.get("spans") or []]
+    spans = mutant.get("spans") or []
+    # the planted code (the snippet, or the helper and its call), the bar exam's rule: its own lines, no window
+    code = [(s["start"], s["end"]) for s in spans if s["kind"] != "import"]
+    # the whole edit, imports included, widened by the window: what lies beyond it is a change off the edit
+    edit = [(s["start"] - window, s["end"] + window) for s in spans]
     original_places = {p for recs in original_runs.values() for r in recs if (p := _place(r, vocab, shifts, path))}
     original_units = _majority([{k for r in recs if (k := _key(r, vocab))} for recs in original_runs.values()])
+
+    def on(r, regions: list[tuple[int, int]]) -> bool:
+        return r.file == path and any(_near(r, lo, hi) for lo, hi in regions)
+
     per_run = []
-    mutant_unit_sets, mutant_site_sets = [], []
+    mutant_unit_sets, off_edit_unit_sets, mutant_site_sets = [], [], []
     new_total = 0
     for recs in mutant_runs.values():
         new = [r for r in recs if _place(r, vocab) not in original_places]  # the original's, moved, is not new
         new_total += len(new)
         mine = [r for r in new if _key(r, vocab) == want]
         in_file = [r for r in mine if r.file == path]
-        on_span = [r for r in in_file if any(_near(r, lo, hi) for lo, hi in spans)]
+        on_lines = [r for r in in_file if on(r, code)]
         at_site = [r for r in in_file if _near(r, call - window, call + window)]
-        grouped = [
-            r for r in new if r.file == path and _near(r, call - window, call + window) and group and r.group == group
-        ]
+        grouped = [r for r in new if on(r, code) and group and r.group == group]
         run = {
             "units": {want} & {k for r in recs if (k := _key(r, vocab))},
             "found_file": bool(in_file),
-            "found_span": bool(on_span),
+            "found_lines": bool(on_lines),
             "found_site": bool(at_site),
-            "found_group": bool(grouped) or bool(at_site),
+            "found_group": bool(grouped) or bool(on_lines),
         }
         for dim in PARAMETERS:
             if exp.get(dim) is None:
                 run[dim] = None
                 continue
-            values = {r.values.get(dim) for r in on_span if r.values.get(dim) is not None}
+            values = {r.values.get(dim) for r in on_lines if r.values.get(dim) is not None}
             run[dim] = (str(exp[dim]) in {str(v) for v in values}) if values else None
         if decoy:  # a known negative: any new crypto record on its inserted lines is a false positive
             run.update({k: None for k in (*DETECTIONS[1:], *PARAMETERS)})
-            run["false_positive"] = any(
-                r.file == path and r.values.get("asset_type") != "library" and any(_near(r, lo, hi) for lo, hi in spans)
-                for r in new
-            )
+            run["false_positive"] = any(r.values.get("asset_type") != "library" and on(r, code) for r in new)
         else:
             run["false_positive"] = None
         per_run.append(run)
         mutant_unit_sets.append({k for r in recs if (k := _key(r, vocab))})
+        off_edit_unit_sets.append({k for r in recs if (k := _key(r, vocab)) and not on(r, edit)})
         mutant_site_sets.append(_sites(recs, vocab))
     masked = bool(want and want in original_units)
     out = {"unit": want, "masked": masked, "new_records": round(new_total / max(len(per_run), 1), 1)}
     out["found_repo"] = None if masked or not want else _vote([bool(r["units"]) for r in per_run])
-    for dim in ("found_file", "found_span", "found_site", "found_group", "false_positive", *PARAMETERS):
+    for dim in (*DETECTIONS[1:], "false_positive", *PARAMETERS):
         out[dim] = _vote([r[dim] for r in per_run])
-    mutant_units = _majority(mutant_unit_sets)
     allowed = _allowed_units(mutant, vocab)
-    out["extra_units"] = sorted(mutant_units - original_units - allowed)
-    out["lost_units"] = sorted(original_units - mutant_units)
+    # a unit only on the inserted lines is the planted code's (a decoy hit is a false positive), not a change off it
+    out["extra_units"] = sorted(_majority(off_edit_unit_sets) - original_units - allowed)
+    out["lost_units"] = sorted(original_units - _majority(mutant_unit_sets))
     original_site_major = _majority([_sites(recs, vocab, shifts, path) for recs in original_runs.values()])
     mutant_sites = _majority(mutant_site_sets)
-    inserted = [(lo, hi) for lo, hi in spans]
     extra = {
-        s
-        for s in mutant_sites - original_site_major
-        if not (s[1] == path and any(lo <= s[2] <= hi for lo, hi in inserted))
+        s for s in mutant_sites - original_site_major if not (s[1] == path and any(lo <= s[2] <= hi for lo, hi in edit))
     }
     out["extra_sites"] = len(extra)
     out["lost_sites"] = len(original_site_major - mutant_sites)
@@ -421,10 +427,11 @@ def score_rows(
     seed: int = BOOTSTRAP_SEED,
     baseline: dict[str, dict[str, float]] | None = None,
 ) -> list[dict]:
-    """mutation-scores.csv: per (tool, language, style or `all`) the pooled recall on the planted calls (at the
-    site: strict; by group: lenient), the precision over the planted items (calls found / (calls found + decoys
-    hit); the decoys, style-less, count for every style) and F1, with bootstrap CIs over repositories. Precision and
-    F1 are empty without decoys. `supported` as in score.py (repositories and calls).
+    """mutation-scores.csv: per (tool, language, style or `all`) the pooled recall on the planted calls (`recall`:
+    on the inserted lines, the headline; `recall_site`: at the line naming the algorithm, strict; `recall_group`: by
+    group, lenient), the precision over the planted items (calls found / (calls found + decoys hit); the decoys,
+    style-less, count for every style) and F1, with bootstrap CIs over repositories. Precision and F1 are empty
+    without decoys. `supported` as in score.py (repositories and calls).
     Changes off the edit (RQ5's side finding, never folded into recall, precision or F1): over the judged mutants of
     the (tool, language), calls and decoys together and style-less like the decoys, `offedit_mutants` with any new
     unit or new located site outside the inserted lines, `offedit_share` of the judged mutants, and the medians of
@@ -432,6 +439,7 @@ def score_rows(
     `baseline_changed` are the tool's noise floor
     from a stability experiment (`stability.baseline_flux`, `report --baseline`), empty without one."""
     calls: dict[tuple, dict[str, list[bool]]] = defaultdict(lambda: defaultdict(list))
+    at_site: dict[tuple, dict[str, list[bool]]] = defaultdict(lambda: defaultdict(list))
     grouped: dict[tuple, dict[str, list[bool]]] = defaultdict(lambda: defaultdict(list))
     decoys: dict[tuple, dict[str, list[bool]]] = defaultdict(lambda: defaultdict(list))
     offedit: dict[tuple, list[tuple[int, int]]] = defaultdict(list)
@@ -445,15 +453,17 @@ def score_rows(
         if r.get("kind") == "decoy":
             if r.get("false_positive") is not None:
                 decoys[key][r["repo"]].append(bool(r["false_positive"]))
-        elif r.get("found_site") is not None:
+        elif r.get("found_lines") is not None:
             for style in (r["style"], "all"):
-                calls[(*key, style)][r["repo"]].append(bool(r["found_site"]))
+                calls[(*key, style)][r["repo"]].append(bool(r["found_lines"]))
+                at_site[(*key, style)][r["repo"]].append(bool(r["found_site"]))
                 grouped[(*key, style)][r["repo"]].append(bool(r["found_group"]))
     out = []
     for (tool, language, style), per_repo in sorted(calls.items(), key=lambda kv: tuple(str(x) for x in kv[0])):
         negatives = decoys.get((tool, language), {})
         n = sum(len(v) for v in per_repo.values())
         tp = sum(sum(v) for v in per_repo.values())
+        strict = sum(sum(v) for v in at_site[(tool, language, style)].values())
         by_group = sum(sum(v) for v in grouped[(tool, language, style)].values())
         m = sum(len(v) for v in negatives.values())
         fp = sum(sum(v) for v in negatives.values())
@@ -471,13 +481,15 @@ def score_rows(
                 "style": style,
                 "repos": len(per_repo),
                 "calls": n,
-                "found_site": tp,
+                "found_lines": tp,
+                "found_site": strict,
                 "found_group": by_group,
                 "decoys": m,
                 "decoys_hit": fp,
-                "recall_site": round(tp / n, 4),
+                "recall": round(tp / n, 4),
                 "recall_low": None if recall_ci[0] is None else round(recall_ci[0], 4),
                 "recall_high": None if recall_ci[1] is None else round(recall_ci[1], 4),
+                "recall_site": round(strict / n, 4),
                 "recall_group": round(by_group / n, 4),
                 "precision": precision,
                 "f1": _f1(tp, fp, n - tp) if m else None,

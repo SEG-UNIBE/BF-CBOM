@@ -45,12 +45,12 @@ ORIGINAL = [_rec("SHA-256", "a/App.java", 30), _rec("MD5", "b/B.java", 5)]
 def test_a_new_record_at_the_call_line_is_detected_and_a_moved_one_is_not():
     moved = _rec("SHA-256", "a/App.java", 37)  # the original's line 30, after the 7 inserted lines
     out = mu.evaluate(MUTANT, {1: [moved, _rec("SHA-256", "a/App.java", 20), ORIGINAL[1]]}, {1: ORIGINAL})
-    assert out["found_site"] and out["found_span"] and out["found_file"] and out["found_group"]
+    assert out["found_lines"] and out["found_site"] and out["found_file"] and out["found_group"]
     assert out["masked"] and out["found_repo"] is None  # the original has SHA-256 already: repo level undecided
     assert (out["extra_units"], out["lost_units"], out["extra_sites"], out["lost_sites"]) == ([], [], 0, 0)
     assert out["new_records"] == 1
     missed = mu.evaluate(MUTANT, {1: [moved, ORIGINAL[1]]}, {1: ORIGINAL})
-    assert missed["found_site"] is False and missed["found_span"] is False and missed["found_file"] is False
+    assert missed["found_lines"] is False and missed["found_site"] is False and missed["found_file"] is False
 
 
 def test_a_record_without_identity_is_matched_by_name_so_a_moved_marker_is_not_new():
@@ -67,11 +67,17 @@ def test_a_record_without_identity_is_matched_by_name_so_a_moved_marker_is_not_n
     assert appeared["new_records"] == 1 and appeared["found_site"] is False  # a new marker counts, finds nothing
 
 
-def test_span_site_and_group_are_told_apart():
-    on_span = mu.evaluate(MUTANT, {1: [_rec("SHA-256", "a/App.java", 24)]}, {1: [ORIGINAL[1]]})
-    assert on_span["found_span"] and not on_span["found_site"] and on_span["found_repo"]  # new to the repository
-    generic = mu.evaluate(MUTANT, {1: [_rec("SHA-2", "a/App.java", 21)]}, {1: [ORIGINAL[1]]})
-    assert not generic["found_site"] and generic["found_group"] and not generic["found_repo"]
+def test_lines_site_and_group_are_told_apart():
+    # the record on another statement of the snippet, four lines below the one naming the algorithm (Go's NewGCM)
+    on_lines = mu.evaluate(MUTANT, {1: [_rec("SHA-256", "a/App.java", 24)]}, {1: [ORIGINAL[1]]})
+    assert on_lines["found_lines"] and not on_lines["found_site"] and on_lines["found_repo"]  # new to the repository
+    beside = mu.evaluate(MUTANT, {1: [_rec("SHA-256", "a/App.java", 25)]}, {1: [ORIGINAL[1]]})
+    assert beside["found_file"] and not beside["found_lines"]  # the inserted lines exactly, the bar's rule: no window
+    imports = {**MUTANT, "spans": [{"kind": "import", "start": 3, "end": 3}, *MUTANT["spans"]]}
+    at_import = mu.evaluate(imports, {1: [_rec("SHA-256", "a/App.java", 3)]}, {1: [ORIGINAL[1]]})
+    assert at_import["found_file"] and not at_import["found_lines"]  # an import is not the call
+    generic = mu.evaluate(MUTANT, {1: [_rec("SHA-2", "a/App.java", 24)]}, {1: [ORIGINAL[1]]})
+    assert not generic["found_lines"] and generic["found_group"] and not generic["found_repo"]
     elsewhere = mu.evaluate(MUTANT, {1: [_rec("SHA-256", "c/C.java", 20)]}, {1: [ORIGINAL[1]]})
     assert elsewhere["found_repo"] and not elsewhere["found_file"]
     unlocated = mu.evaluate(MUTANT, {1: [_rec("SHA-256", None, None)]}, {1: [ORIGINAL[1]]})
@@ -98,12 +104,13 @@ def test_a_decoy_is_a_false_positive_only_when_a_new_crypto_record_lands_on_it()
     assert quiet["false_positive"] is False and quiet["found_site"] is None and quiet["unit"] is None
     assert quiet["found_repo"] is None and quiet["key_size"] is None and not quiet["masked"]
     hit = mu.evaluate(DECOY, {1: [_rec("MD5", "a/App.java", 21)]}, {1: []})
-    assert hit["false_positive"] is True and hit["extra_units"] == ["MD5"]
+    assert hit["false_positive"] is True and hit["extra_units"] == []  # on the edit: precision's, not a change off it
     assert (
         mu.evaluate(DECOY, {1: [_rec("MD5", "a/App.java", 21, asset_type="library")]}, {1: []})["false_positive"]
         is False
     )
     assert mu.evaluate(DECOY, {1: [_rec("MD5", "a/App.java", 40)]}, {1: []})["false_positive"] is False  # elsewhere
+    assert mu.evaluate(DECOY, {1: [_rec("MD5", "a/App.java", 23)]}, {1: []})["false_positive"] is False  # beside it
     assert mu.evaluate(MUTANT, {1: []}, {1: []})["false_positive"] is None  # a planted call is never one
 
 
@@ -117,16 +124,18 @@ def test_scores_pool_calls_and_decoys_and_the_bridge_correlates_them_with_confir
                               ("blind", (0, 0, 0, 0), (0, 0, 0, 0))):  # fmt: skip
         for i, f in enumerate(found):
             style = "direct" if i % 2 else "indirect"
-            rows.append(row(f"r{i}", "call", style, tool, found_site=bool(f), found_group=bool(f)))
+            strict = bool(f) and not (tool == "good" and i == 0)  # once on the lines, not at the named line
+            rows.append(row(f"r{i}", "call", style, tool, found_lines=bool(f), found_site=strict, found_group=bool(f)))
         for i, h in enumerate(hits):
             rows.append(row(f"r{i}", "decoy", "direct", tool, false_positive=bool(h)))
     scores = {(s["tool"], s["style"]): s for s in mu.score_rows(rows, samples=20)}
     good, noisy, blind = scores[("good", "all")], scores[("noisy", "all")], scores[("blind", "all")]
-    assert (good["calls"], good["found_site"], good["decoys"], good["decoys_hit"]) == (4, 4, 4, 0)
-    assert (good["recall_site"], good["precision"], good["f1"]) == (1.0, 1.0, 1.0)
-    assert (noisy["recall_site"], noisy["precision"]) == (0.75, 0.6)
+    assert (good["calls"], good["found_lines"], good["found_site"]) == (4, 4, 3)
+    assert (good["decoys"], good["decoys_hit"]) == (4, 0)
+    assert (good["recall"], good["recall_site"], good["precision"], good["f1"]) == (1.0, 0.75, 1.0, 1.0)  # the lines
+    assert (noisy["recall"], noisy["precision"]) == (0.75, 0.6)
     assert noisy["f1"] == pytest.approx(2 * 0.6 * 0.75 / 1.35, abs=1e-4)
-    assert blind["recall_site"] == 0.0 and blind["precision"] is None and blind["f1"] == 0.0
+    assert blind["recall"] == 0.0 and blind["precision"] is None and blind["f1"] == 0.0
     assert scores[("good", "direct")]["decoys"] == 4  # the decoys are style-less: they count for every style
     assert not good["supported"] and good["f1_low"] is None  # 4 repositories, 4 calls: below the support rule
     without = mu.score_rows([r for r in rows if r["kind"] == "call"], samples=20)
@@ -147,7 +156,7 @@ def test_scores_pool_calls_and_decoys_and_the_bridge_correlates_them_with_confir
 def test_parameters_are_judged_on_the_inserted_lines():
     mutant = {**MUTANT, "expected": {"unit": "AES", "family": "AES", "key_size": 256, "mode": "GCM"}}
     out = mu.evaluate(mutant, {1: [_rec("AES", "a/App.java", 22, key_size=128, mode="GCM")]}, {1: []})
-    assert out["found_site"] and out["key_size"] is False and out["mode"] is True and out["padding"] is None
+    assert out["found_lines"] and out["key_size"] is False and out["mode"] is True and out["padding"] is None
     bare = mu.evaluate(mutant, {1: [_rec("AES", "a/App.java", 22)]}, {1: []})
     assert bare["key_size"] is None  # no value reported: not judged
 
@@ -155,16 +164,28 @@ def test_parameters_are_judged_on_the_inserted_lines():
 def test_majority_over_runs_and_other_changes():
     hit = _rec("SHA-256", "a/App.java", 20)
     runs = {1: [hit], 2: [], 3: []}
-    assert mu.evaluate(MUTANT, runs, {1: []})["found_site"] is False  # 1 of 3 runs
+    assert mu.evaluate(MUTANT, runs, {1: []})["found_lines"] is False  # 1 of 3 runs
     runs = {1: [hit], 2: [hit], 3: [_rec("RC4", "d/D.java", 3)]}
     out = mu.evaluate(MUTANT, runs, {1: [ORIGINAL[1]], 2: [ORIGINAL[1]]})
-    assert out["found_site"] is True  # 2 of 3
+    assert out["found_lines"] is True  # 2 of 3
     assert out["lost_units"] == ["MD5"] and out["extra_units"] == []  # RC4 in one run of three is noise
     noisy = mu.evaluate(MUTANT, {1: [hit, _rec("RC4", "d/D.java", 3)]}, {1: [ORIGINAL[1]]})
     assert noisy["extra_units"] == ["RC4"] and noisy["extra_sites"] == 1 and noisy["lost_units"] == ["MD5"]
     hmac = {**MUTANT, "expected": {"unit": "HMAC", "family": "HMAC", "digest": "SHA-256"}}
     implied = mu.evaluate(hmac, {1: [_rec("HMAC", "a/App.java", 20), _rec("SHA-256", "a/App.java", 20)]}, {1: []})
     assert implied["extra_units"] == []  # HMAC-SHA256 implies SHA-256 (refinement 2)
+
+
+def test_only_what_appears_off_the_inserted_lines_is_a_change_off_the_edit():
+    hit = _rec("SHA-256", "a/App.java", 20)
+    on_edit = mu.evaluate(MUTANT, {1: [hit, _rec("RC4", "a/App.java", 22)]}, {1: []})
+    assert on_edit["extra_units"] == [] and on_edit["extra_sites"] == 0  # RC4 sits on the planted code
+    elsewhere = mu.evaluate(MUTANT, {1: [hit, _rec("RC4", "a/App.java", 22), _rec("RC4", "a/App.java", 60)]}, {1: []})
+    assert elsewhere["extra_units"] == ["RC4"] and elsewhere["extra_sites"] == 1  # once off the edit, it counts
+    unlocated = mu.evaluate(MUTANT, {1: [hit, _rec("RC4", None, None)]}, {1: []})
+    assert unlocated["extra_units"] == ["RC4"] and unlocated["extra_sites"] == 0  # nothing places it on the edit
+    callers = mu.evaluate(MUTANT, {1: [hit, _rec("SHA-256", "c/C.java", 9)]}, {1: []})
+    assert callers["extra_units"] == [] and callers["extra_sites"] == 1  # the planted unit elsewhere: a site only
 
 
 def test_rates_are_means_of_per_repository_rates():
@@ -251,15 +272,16 @@ def test_report_judges_mutants_and_keeps_them_out_of_the_agreement_tables(tmp_pa
             return list(csv.DictReader(fh))
 
     judged = {r["tool"]: r for r in rows("mutation.csv") if r["variant"] == mid}
-    assert judged["cbomkit"]["found_site"] == "true" and judged["cbomkit"]["found_repo"] == "true"
-    assert judged["cbomkit-jar"]["found_site"] == "false" and judged["cbomkit-jar"]["found_repo"] == "false"
+    assert judged["cbomkit"]["found_lines"] == "true" and judged["cbomkit"]["found_repo"] == "true"
+    assert judged["cbomkit-jar"]["found_lines"] == "false" and judged["cbomkit-jar"]["found_repo"] == "false"
     assert judged["cbomkit"]["extra_units"] == "" and judged["cbomkit"]["lost_sites"] == "0"
     assert judged["cbomkit"]["kind"] == "call" and judged["cbomkit"]["false_positive"] == ""
     decoy = {r["tool"]: r for r in rows("mutation.csv") if r["variant"] == did}
     assert decoy["cbomkit"]["kind"] == "decoy" and decoy["cbomkit"]["false_positive"] == "false"
-    assert decoy["cbomkit-jar"]["false_positive"] == "true" and decoy["cbomkit-jar"]["found_site"] == ""
+    assert decoy["cbomkit-jar"]["false_positive"] == "true" and decoy["cbomkit-jar"]["found_lines"] == ""
     scores = {r["tool"]: r for r in rows("mutation-scores.csv") if r["style"] == "all"}
-    assert (scores["cbomkit"]["calls"], scores["cbomkit"]["found_site"], scores["cbomkit"]["decoys"]) == ("1", "1", "1")
+    cbomkit = scores["cbomkit"]
+    assert (cbomkit["calls"], cbomkit["found_lines"], cbomkit["decoys"]) == ("1", "1", "1")
     assert (scores["cbomkit"]["precision"], scores["cbomkit"]["f1"]) == ("1.0", "1.0")
     assert (scores["cbomkit-jar"]["decoys_hit"], scores["cbomkit-jar"]["precision"], scores["cbomkit-jar"]["f1"]) == (
         "1",
@@ -305,12 +327,15 @@ def test_changes_off_the_edit_are_counted_apart_from_detection_and_read_against_
                 "extra_sites": extra_sites, **v}  # fmt: skip
 
     rows = [
-        row("r1", "call", "t", [], 0, found_site=True, found_group=True),
-        row("r2", "call", "t", ["RC4"], 2, found_site=True, found_group=True),
+        row("r1", "call", "t", [], 0, found_lines=True, found_site=True, found_group=True),
+        row("r2", "call", "t", ["RC4"], 2, found_lines=True, found_site=True, found_group=True),
         row("r1", "decoy", "t", [], 1, false_positive=False),
         row("r2", "decoy", "t", [], 0, false_positive=False),
-        row("r1", "call", "quiet", [], 0, found_site=False, found_group=False),
-        {**row("r2", "call", "quiet", [], 0, found_site=True, found_group=True), "status": "original error"},
+        row("r1", "call", "quiet", [], 0, found_lines=False, found_site=False, found_group=False),
+        {
+            **row("r2", "call", "quiet", [], 0, found_lines=True, found_site=True, found_group=True),
+            "status": "original error",
+        },
     ]
     baseline = {"t": {"flux": 0.1, "changed": 0.25}}
     scores = {(s["tool"], s["style"]): s for s in mu.score_rows(rows, samples=0, baseline=baseline)}
@@ -318,7 +343,7 @@ def test_changes_off_the_edit_are_counted_apart_from_detection_and_read_against_
     assert (t["offedit_mutants"], t["offedit_share"]) == (2, 0.5)  # 4 judged mutants, calls and decoys together
     assert (t["extra_units_median"], t["extra_sites_median"]) == (0.5, 1.5)  # over the 2 mutants with changes
     assert (t["baseline_flux"], t["baseline_changed"]) == (0.1, 0.25)
-    assert (t["recall_site"], t["precision"], t["f1"]) == (1.0, 1.0, 1.0)  # the off-edit changes do not touch them
+    assert (t["recall"], t["precision"], t["f1"]) == (1.0, 1.0, 1.0)  # the off-edit changes do not touch them
     assert (quiet["offedit_mutants"], quiet["offedit_share"], quiet["baseline_flux"]) == (0, 0.0, None)
     assert scores[("t", "direct")]["offedit_mutants"] == 2  # style-less, like the decoys
     text = "\n".join(sr._offedit(list(scores.values())))

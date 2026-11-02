@@ -104,6 +104,26 @@ def test_pyca_snippets_only_where_cryptography_is_declared(tmp_path):
     assert all(m["file"] == "pkg/core.py" for m in entry["mutants"])  # dependency files are never touched
 
 
+def test_a_decoy_kind_drawn_again_never_repeats_a_mutant(tmp_path):
+    src = tmp_path / "proj"
+    (src / "pkg").mkdir(parents=True)
+    (src / "pkg" / "core.py").write_text(
+        "import json\n\n\ndef load(path):\n    return json.loads(path)\n\n\ndef main():\n    return load('{}')\n"
+    )  # two hosts, `load` and `main`: room for each of the 8 decoy kinds twice
+    mirror = tmp_path / "mirror"
+    repo, commit = _publish(src, "acme/small", "Python", mirror)
+    manifest: dict = {}
+    ids = ensure_mutants(repo, commit, MutationSpec(per_repo=1, decoys=17), manifest, mirror_dir=mirror,
+                         log=lambda m: None)  # fmt: skip
+    entry = manifest["repos"]["acme/small"]
+    decoys = [m for m in entry["mutants"] if m["decoy"]]
+    assert len(ids) == len(set(ids)) == 17  # 1 call and 16 distinct decoys
+    assert {(m["snippet"], m["host"]["name"]) for m in decoys} == {
+        (d, h) for d in {m["snippet"] for m in decoys} for h in ("load", "main")
+    } and len(decoys) == 16
+    assert entry["notes"] == ["16 of 17 decoys: no host fits"]
+
+
 def test_repos_without_a_catalog_or_a_host_get_no_mutants(tmp_path):
     src = tmp_path / "proj"
     src.mkdir()

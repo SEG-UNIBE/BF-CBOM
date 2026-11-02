@@ -122,7 +122,7 @@ def test_every_layout_fits_the_text_width_at_its_worst():
                "ci_high": 0.75, "exclusivity": 0.5, "coverage": 0.5} for t in tools]  # fmt: skip
     for table in latex.rates(scores, names):
         _fits(table)
-    mscores = [{"tool": t, "language": lg, "style": st, "calls": 9_999, "decoys": 9_999, "recall_site": 0.5,
+    mscores = [{"tool": t, "language": lg, "style": st, "calls": 9_999, "decoys": 9_999, "recall": 0.5,
                 "recall_low": 0.25, "recall_high": 0.75, "precision": 0.5, "f1": 0.5, "f1_low": 0.25, "f1_high": 0.75,
                 "offedit_mutants": 9_999, "offedit_share": 0.5, "extra_units_median": 999.5,
                 "extra_sites_median": 999.5}
