@@ -238,3 +238,4 @@ ruff.toml
 .idea/
 exports/
 notes.md
+experiments/
