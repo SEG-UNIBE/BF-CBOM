@@ -743,7 +743,8 @@ runfinch/finch.
   every repository (securin-xbom misses 7 of the 15 everywhere), so the interval over repositories collapses. It
   measures the host code's effect, which is none for them; the snippets are a fixed set, not a sample.
 - **Zeros to check:** cdxgen finds nothing in imulab/go-scim and sigstore/scaffolding (0 algorithm assets on the
-  originals too; a debug run in a throwaway container is open). CBOMkit finds 0 on google/copybara (Bazel), 0.07 on
+  originals too): its Go analysis reads only the module at the scan root,
+  [below](#cdxgen-reads-one-go-module-debug-run-2026-11-04). CBOMkit finds 0 on google/copybara (Bazel), 0.07 on
   BSPEntSpy and 0.33 on heroku/webapp-runner, in 3 to 30 s with 0 assets on the originals: its indexing needs a build
   file and `src/` (as shipped).
 - **Ours:** one decoy mutant twice (ashishps1/awesome-system-design-resources, the identifier decoy in the same host:
@@ -751,3 +752,38 @@ runfinch/finch.
   counts 450 decoys for 449 distinct). CryptobomForge's one decoy hit is its CodeQL context window (the finding ±2
   lines) starting before the insertion point, so the moved finding was not recognised (the open "window centre"
   item). One copybara mutant sits in `javatests/`, which the host filter does not know as a test folder.
+
+## cdxgen reads one Go module (debug run 2026-11-04)
+A Go repository can hold several modules, each a folder with its own `go.mod`. cdxgen's dependency inventory covers
+all of them, its crypto inventory only the module at the scan root. Checked with the pinned upstream image (13.5.0),
+the worker's flags and Go environment, in a throwaway container on the laptop; the debug runs diagnose and replace no
+result.
+- **The mechanism:** cdxgen runs `go list -deps` in every module (`--recurse`, on by default, "suitable for
+  mono-repos"), then golem once, `golem analyze --dir <scan root>`. Go's `./...` stops at a module boundary.
+  - imulab/go-scim has a root module, whose `./...` is the 5 packages under `cmd/`, while its crypto sits in the
+    nested modules `pkg/v2` and `mongo/v2`: 0 crypto assets. The same cdxgen run on `pkg/v2` reports SHA-1 at
+    `pkg/v2/service/filter/meta.go:124`, where the other tools have it, 2 assets in all.
+  - sigstore/scaffolding has no root module, only a `go.work` naming 10 of its 11 modules. `go list ./...` fails
+    there ("directory prefix . does not contain modules listed in go.work"), golem's output is all but empty (24 KB,
+    go-scim's 7 MB), 0 crypto assets. The same cdxgen run on `tools/tuf` reports 17.
+- **As shipped:** no option of cdxgen 13.5.0 runs the crypto analysis per module, and we run every tool on the
+  repository root. Scanning each module apart would steer the tool, so the results stay and this is a finding about
+  cdxgen: a repository's module layout decides how much of its code cdxgen's CBOM covers.
+- **The effect in corpus-main** (module layout read from each repository's tree at its pinned commit, the `go.mod`
+  and `go.work` paths; an earlier count read it from cdxgen's own BOM, which omits the root `go.mod` in some
+  repositories): of the 54 Go repositories, 27 are one root module, 18 have a root module and nested ones, 9 have no
+  root module. cdxgen reports nothing in a nested module of any of the 18, where the other tools have 2'749 records in
+  Go files, in 10 of them (tuios 837, l33tdawg/sage 491, qiwentaidi/Slack 446, FerretDB 392, gardener 299,
+  kube-logging 123, ibnaleem/gosearch 69, go-scim 48, aws 28, reugn/go-streams 16). Of the 9 without a root module,
+  cdxgen does report code of a nested module in 7 (one to four modules; the module cdxgen reads there was not
+  checked one by one) and nothing in the two whose root is a `go.work` alone, scaffolding (12 modules) and
+  ovn-kubernetes (4).
+- **The effect in mutation-main** (450 planted calls in 30 Go repositories, 15 each): 20 calls sit in a nested
+  module of a repository with a root module (go-scim 14, reugn/go-streams 5, go-gorm/gen 1) and cdxgen finds none of
+  them, against 298 of the 385 in root modules. The 45 calls in the three repositories without a root module split
+  the same way: chainreactors/gogo 8 and zovocard/zovo_card_cdk_auto 11 of 15 (one nested module each), scaffolding
+  0 of 15 (`go.work`). The 35 calls cdxgen cannot see by construction cost it 6 points of recall on the inserted
+  lines: 317 of 450 (0.70, `mutation-scores.csv`) against 317 of 415 (0.76) without them.
+- **Another cause, not checked:** gardener and tuios give 0 in their root modules too, where the other tools have
+  4'885 and 1'362 records; both ask for toolchain 1.27.3, the image has Go 1.27.1. Both also have a `go.work` next to
+  the root `go.mod`, but so has kube-logging, where cdxgen reports the root module.
