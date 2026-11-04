@@ -10,6 +10,18 @@ Spec names in dated sections are the names at the time: on 2026-10-22 e0-micro b
 stability-pilot, e1-pilot-corpus corpus-pilot-small, e1-pilot-60 corpus-pilot-medium, e1-icpc-corpus corpus-icpc and
 e4-mutation-smoke mutation-smoke.
 
+**Where the paper's numbers are.** The paper reports three runs, each once, on the tool versions of 2026-10-30:
+- the bar exam: [Bar exam 2026-10-31](#bar-exam-2026-10-31-bar-micro-the-tool-versions-of-2026-10-30);
+- corpus-main (RQ1 to RQ4):
+  [the full rerun of 2026-11-01](#corpus-main-export-review-2026-11-01-the-full-rerun-the-papers-run);
+- mutation-main (RQ5): [the review of 2026-11-02](#mutation-main-export-review-2026-11-02-the-papers-rq5-run), with
+  [cdxgen's module finding of 2026-11-04](#cdxgen-reads-one-go-module-debug-run-2026-11-04).
+The rules those runs follow:
+[one time limit, no interventions](#corpus-and-mutation-runs-one-time-limit-no-interventions-decided-2026-10-31)
+and the [interventions](#interventions-in-how-the-tools-run-and-their-effects-e1-pilot-corpus-2026-10-20) they
+replaced. Every other section is development history on the pilot sets, earlier tool versions and earlier code,
+kept for its date and its lessons, and its numbers are not the paper's.
+
 ## Pilot of 2026-10-08
 A colleague's one-day pilot: 15 generators on 16 pinned projects plus the micro projects, an inclusion bar and
 location-aware cross-matching with hand-checked samples. Reports and the landscape survey: `docs/pilot-2026-10-08/`.
@@ -179,8 +191,8 @@ ground truth caused them, not the tools.
     / 13 / 14 (misses SHA3-256), no decoy hit, precision 1.00 for both.
 - **Scorer tests** on the pilot's CBOMs keep the frozen old ground truth (`tests/fixtures/pilot/ground_truth-2026-10-08.yaml`).
   There CBOMkit's micro-python goes from 5 to 6 of 11 with the keygen rule (its EC key record), the pilot's own 6/11.
-- **Not comparable:** the micro numbers up to 2026-10-21 (`micro_2026-10-17` in `common/tools.yaml`) are on the old
-  projects. e0-micro reruns.
+- **Not comparable:** the micro numbers up to 2026-10-21 (the `micro_2026-10-17` lines of `common/tools.yaml`,
+  removed 2026-10-30) are on the old projects. e0-micro reruns.
 
 **Decoys moved into the catalogs (2026-10-22, later the same day).** The four decoy kinds are now `decoys:` entries of `mutation/catalog/<language>.yaml`, the one source for the micro projects and for the mutation harness, which plants them next to the calls (`decoys: equal` in a spec's mutation block) as known negatives for RQ4's precision. Their bodies took placeholders for locals and lost the `return` statements (a decoy inserted before a host's first statement must not end the host); the Java and Go micro files are unchanged, the Python one and the ground truth were regenerated (ground truth 2026-10-22.2, catalogs 2026-10-22.1).
 
@@ -366,7 +378,7 @@ so they are a snapshot, not results.
   vs 9 % with a line): both are columns now. CipherRadar's traceability was dominated by 14,825 "Hardcoded secret"
   records (14,469 on bisq2, i18n keys): key material has its own rows now.
 - **Micro:** CryptoScan finds only EC and RSA of the 11 micro-c assets although C is in its languages (OpenSSL EVP
-  API): a check of its invocation and patterns is open.
+  API). Moot since 2026-10-22: the C micro project went with the ground truth v2, and C is no paper language.
 
 ## Interventions in how the tools run, and their effects (e1-pilot-corpus, 2026-10-20)
 BF-CBOM runs every tool as shipped, with its documented best invocation. One intervention is allowed:
@@ -530,10 +542,10 @@ stability-pilot and mutation-smoke were not part of this round.
   report); `s / 1k files` was computed over the micro projects (one file each) and read as start-up cost (now only
   with `ρ size`, 3 or more repositories whose sizes differ); the RQ4 "Not judged" line gives the count per status;
   `mutation-scores.csv` has a `tailored` column.
-- **Open:** the "Spellings per identity" table counts cdxgen's certificate file names as spellings (`CA_ecdsa.pem`,
-  `ca_ecdsa_256.pub`, ...: 118 of the 240 ECDSA spellings), because `vocab.csv` carries no asset type and the name
-  parser reads `ecdsa` in a file name. The records are right (a certificate asset whose name says ECDSA); the table
-  should count algorithm assets only, or show certificates apart.
+- **Fixed 2026-10-29:** the "Spellings per identity" table counted cdxgen's certificate file names as spellings
+  (`CA_ecdsa.pem`, `ca_ecdsa_256.pub`, ...: 118 of the 240 ECDSA spellings), because `vocab.csv` carried no asset
+  type and the name parser reads `ecdsa` in a file name. The records are right (a certificate asset whose name says
+  ECDSA); `vocab.csv` carries `asset_type` now and the table counts algorithm assets only.
 - **Decided 2026-10-29:** the observer role goes (the bar replaces it; `role: observer`, `--observers-vote`, the
   `role` columns and the `°` mark are a cleanup); the specs other than bar-micro get the 11 tools by hand.
 
@@ -599,8 +611,9 @@ mixed builds.
 - **Traceability read symlinks as their text.** 26 records of CipherRadar and CryptoScan (Aegis, certbot,
   gocryptfs) named lines past the end of their file. In Aegis those files are symlinks (its `androidTest` vectors
   link to the `test` ones), which the tools follow in the checkout and the snapshot reader returned as the link's
-  one line; certbot and gocryptfs are to be checked with the next report on the VM. Files are now read as a checkout
-  shows them. The other 7 `unread` records are CipherRadar's places inside JAR files (`x.jar!/...`).
+  one line. Files are now read as a checkout shows them, and the VM render of 2026-10-31 shows no record past its
+  file's end in Aegis, certbot or gocryptfs. The other 7 `unread` records are CipherRadar's places inside JAR files
+  (`x.jar!/...`).
 
 ## Bar exam 2026-10-31 (bar-micro, the tool versions of 2026-10-30)
 Every tool once on the three micro projects, every container built from one commit, CPU recorded for every run.
@@ -640,9 +653,9 @@ once (decided 2026-10-31); this is our own determinism check.
   planted call triggers it (the catalog's curve is the literal `"secp256r1"`), and bar-micro and stability-pilot
   recorded no exclusion. A rerun with debug output only diagnoses an empty or failed result and never replaces a
   recorded one; only an error in our setup leads to a new run of that tool on every repository, recorded as such.
-- **To count after corpus-main:** CipherRadar's Java failures with this crash, and every run at its memory limit or
-  OOM-killed (the summary's "Memory limits"), since the memory limits differ per tool (2 to 24 GiB) and an OOM kill
-  counts as the tool's failure.
+- **To count after corpus-main** (counted in the reviews of 2026-11-01 below): CipherRadar's Java failures with
+  this crash, and every run at its memory limit or OOM-killed (the summary's "Memory limits"), since the memory
+  limits differ per tool (2 to 24 GiB) and an OOM kill counts as the tool's failure.
 
 ## corpus-main, first attempt (2026-10-31, cancelled)
 Every tool but CBOMkit finished; CBOMkit had done 8 of its 162 jobs after 4.5 hours, when the run was cancelled. Its
@@ -656,52 +669,37 @@ Two faults of our setup came with it, both fixed before the rerun:
   the server after a timeout, and the next job waits for it outside its measured time.
 CBOMkit is rerun on every repository (`--rerun cbomkit`); the other tools' runs stay.
 
-## corpus-main export review (2026-11-01: the first attempt plus CBOMkit's rerun)
-1'296 supported runs, 1'281 ok, 10 errors, 5 timeouts; CBOMkit's 162 runs from the rerun (build 2508728, 7 h 09 min
-alone), the other tools' from the first session (f331084, VM peak 42 of 121.5 GiB).
-- **Lanes** (summed job time): CBOMkit 7.1 h, CipherRadar 2.2, xgrep 1.2, CryptoScan 0.9, the rest below 0.9.
-- **Our fault, fixed:** securin-xbom on Android_Framework_Source wrote its CBOM, and deleting the worker's temporary
-  clone then raised "Directory not empty", which made the run an error. Every worker now ignores cleanup errors of
-  its own temporary directory (a test checks it).
-- **At the memory limit:** CipherRadar on OctoGram (11.7 of 12 GiB, 1'794 limit hits) timed out; CryptoScan on
-  ossf/malicious-packages peaked at its 2 GiB limit (14'051 hits); CipherSift on OctoGram (3.4 of 4), cdxgen on
-  AuditKit (21.4 of 24) and CBOMkit on malicious-packages (17.5 of 20) hit their limits and finished. The working set
-  includes active file cache, so a hit can be cache reclaim rather than the tool's own need. CipherRadar's limit is
-  16 GiB and CryptoScan's 4 since, for the full rerun.
-- **cdxgen finds no crypto in 5 Go repositories** where 7 or 8 other tools do, without any warning: two have no
-  `go.mod` at the root (ovn-kubernetes, sigstore/scaffolding), gardener and tuios ask for Go 1.26.8 and toolchain
-  1.27.3, go-scim for Go 1.13. Not yet checked in a debug run.
-- **One repository carries CryptoScan's records:** 295'158 of its 347'678 come from ossf/malicious-packages, a
-  repository of OSV data files (464 MB checkout, 0.3 MB of Go); its items there are 21.
-- **Expected:** CipherRadar's Java pass crashed (`java.resolveFirstArg`) on TencentKona-11, j2objc and
-  Android_Framework_Source, with no exclusion since 2026-10-31; CBOMkit failed to parse 6 Python repositories and
-  reached the hour on OctoGram, CoreNLP, terraform-provider-azuread and tuios; CipherRadar's 1'245 `unread` places lie
-  inside JAR files; CBOMkit finds nothing in 42 of its 48 Python runs (pyca only).
-- **For mutation-main:** 13 repositories have a failed run, leaving 52 Go, 49 Java and 48 Python clean ones. Ranked by
-  source size, ossf/malicious-packages is among the 30 smallest Go repositories, and over 31 variants it alone would
-  take 38.6 of the selection's scan hours (CBOMkit 10.6 of its 17.5). The selection ranks by checkout size since
-  (decided 2026-11-01): every tool scans the whole checkout, and on this run's times the selection's slowest lane
-  drops from 17.5 h (CBOMkit) to 9.0 h (CipherRadar), all tools from 88 to 53 tool-hours, with 69 of the 90
-  repositories the same; the largest checkout taken is 9 MB, the largest code 7.6 MB (2.1 MB by source size).
-  Every tool's queue runs largest first by checkout size too, so that repository's long scans (CBOMkit 20 min)
-  no longer start near the end of a lane.
-
 ## corpus-main export review (2026-11-01, the full rerun: the paper's run)
 1'296 supported runs, 1'283 ok, 9 errors, 4 timeouts, every one by build 8fae7cb, in 7 h 08 min (VM peak 47.6 of
 121.5 GiB). The lanes: CBOMkit 7.1 h (the run's length), CipherRadar 2.2, CryptoScan 1.4, xgrep 1.3, SCANOSS 1.0, the
-rest less.
+rest less. The first attempt (its first session plus CBOMkit's rerun, reviewed earlier the same day) gave the same
+results, and what it found is merged in below.
 - **The same results as the first attempt:** of the 1'281 runs ok in both, 1'277 have the same components,
   algorithm assets and located assets; securin-xbom differs on 3 repositories (OctoGram, tomcat, industry4.0-mes, by
-  1 or 2 components) and xgrep on OctoGram (3 more). securin-xbom on Android_Framework_Source is ok now (the cleanup
-  fix). CBOMkit on OctoGram finished in 50 min, after reaching the hour in the first attempt, so it sits at the
-  limit; its three timeouts are CoreNLP, terraform-provider-azuread and tuios, and every job after a timeout gave
-  the first attempt's result (the backend restart).
+  1 or 2 components) and xgrep on OctoGram (3 more). CBOMkit on OctoGram finished in 50 min, after reaching the hour
+  in the first attempt, so it sits at the limit; its three timeouts are CoreNLP, terraform-provider-azuread and
+  tuios, and every job after a timeout gave the first attempt's result (the backend restart).
 - **Failures, all the tools' own:** CBOMkit's 6 Python parse errors and CipherRadar's 3 Java crashes
-  (`java.resolveFirstArg`) as in the first attempt; CipherRadar reached the hour on OctoGram at 10.9 of 16 GiB, a
-  time limit now, not memory.
+  (`java.resolveFirstArg`, on TencentKona-11, j2objc and Android_Framework_Source, with no exclusion since
+  2026-10-31); CipherRadar reached the hour on OctoGram at 10.9 of 16 GiB, a time limit now, not memory. Also as
+  shipped: CipherRadar's 1'245 `unread` places lie inside JAR files, and CBOMkit finds nothing in 42 of its 48
+  Python runs (pyca only).
+- **Our fault in the first attempt, fixed:** securin-xbom on Android_Framework_Source wrote its CBOM, and deleting
+  the worker's temporary clone then raised "Directory not empty", which made the run an error. Every worker now
+  ignores cleanup errors of its own temporary directory (a test checks it); the run is ok in the full rerun.
 - **Memory:** no OOM kill and no run failed for memory. Two runs reached the limit and finished: CBOMkit on
   ossf/malicious-packages (18.9 of 20 GiB) and CipherSift on TencentKona-11 (3.2 of 4). CipherRadar peaked at 10.9 of
-  16, CryptoScan at 2.7 of 4.
+  16, CryptoScan at 2.7 of 4. Those two limits were raised after the first attempt (CipherRadar 12 -> 16 GiB,
+  CryptoScan 2 -> 4), where CipherRadar on OctoGram (11.7 of 12, 1'794 limit hits) timed out and CryptoScan on
+  ossf/malicious-packages peaked at its limit (14'051 hits); CipherSift on OctoGram (3.4 of 4), cdxgen on AuditKit
+  (21.4 of 24) and CBOMkit on malicious-packages (17.5 of 20) hit their limits and finished. The working set
+  includes active file cache, so a hit can be cache reclaim rather than the tool's own need.
+- **cdxgen finds no crypto in 5 Go repositories** where 7 or 8 other tools do, without any warning: two have no
+  `go.mod` at the root (ovn-kubernetes, sigstore/scaffolding), gardener and tuios ask for Go 1.26.8 and toolchain
+  1.27.3, go-scim for Go 1.13. Checked 2026-11-04 ([below](#cdxgen-reads-one-go-module-debug-run-2026-11-04)): its
+  Go crypto analysis reads only the module at the scan root; gardener and tuios remain unexplained.
+- **One repository carries CryptoScan's records:** 295'158 of its 347'678 come from ossf/malicious-packages, a
+  repository of OSV data files (464 MB checkout, 0.3 MB of Go); its items there are 21.
 - **Contention at the start:** runs that started in the first 40 minutes took 2.1 h longer in total than in the first
   attempt, later runs 0.1 h less. Those are the minutes when every tool's largest checkouts run together
   (ossf/malicious-packages, 240'130 files, was cloned by 6 tools within 11 minutes), while the VM used 25 to 44 of its
@@ -711,8 +709,13 @@ rest less.
   times were measured with all tools running at once on one host, so those of the largest repositories include that
   competition.
 - **For mutation-main:** 13 repositories have a failed run (6 Python, 5 Java, 2 Go), leaving 48 Python, 49 Java and
-  52 Go clean ones. The 30 smallest checkouts per language project, over 31 variants, to a slowest lane of 9.3 h
-  (CipherRadar; CBOMkit 8.6) and 50.6 tool-hours; the whole corpus would take CBOMkit alone 220 h.
+  52 Go clean ones. The selection ranks by checkout size since the first attempt (decided 2026-11-01): ranked by
+  source size, ossf/malicious-packages was among the 30 smallest Go repositories and over 31 variants would alone
+  have taken 38.6 of the selection's scan hours (CBOMkit 10.6 of its 17.5); every tool scans the whole checkout, so
+  the checkout sets the cost, and 69 of the 90 repositories are the same either way. The 30 smallest checkouts per
+  language project, over 31 variants, to a slowest lane of 9.3 h (CipherRadar; CBOMkit 8.6) and 50.6 tool-hours;
+  the whole corpus would take CBOMkit alone 220 h. Every tool's queue runs largest first by checkout size too, so
+  that repository's long scans (CBOMkit 20 min) no longer start near the end of a lane.
 
 ## mutation-main export review (2026-11-02, the paper's RQ5 run)
 2'700 mutants in 90 repositories (30 per language, the smallest clean checkouts of corpus-main): 1'350 planted calls
