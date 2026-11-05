@@ -331,7 +331,7 @@ DECOY_ROWS = [
     ("identifier", "Variable name", "algorithm name in identifier", 'String sha256Tag = "checksum-" + n;'),
     ("url", "URL", "algorithm name as file suffix", '"https://x.org/app.tar.gz.sha256"'),
     ("crc32", "CRC32 checksum", "non-cryptographic hash API", "new CRC32().update(data)"),
-    ("base64", "Base64 encoding", "encoding taken for encryption", "Base64.getEncoder().encodeToStr(data)"),  # cut to fit
+    ("base64", "Base64 encoding", "encoding taken for encryption", "Base64.getEncoder().encodeToStr(data)"),  # cut
     ("hex-constant", "Hex constant", "key or digest value",
      Tex(r'"9f86d081884c7d65\ldots" (64 hex digits)', '"9f86d081884c7d65..." (64 hex digits)')),
     ("cert-path", "Certificate path", "key or certificate file", '"config/certs/ca_ecdsa.pem"'),
