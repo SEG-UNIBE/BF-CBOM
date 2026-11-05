@@ -1,7 +1,8 @@
 r"""LaTeX tables for the paper, rendered only from what `analysis report` writes (the CSV tables and the record), like
 `_SUMMARY.md`: `_ANALYSIS/latex/tab_<part>_<what>.tex`, one file per table, each written when its data is there. The
 part is where the paper uses it: the three tables of the subject selection carry the paper's own file names
-(`candidate_tools`, `decoy_types`, `bar_exam_results`), then `design_corpus` and `rq1` to `rq5`.
+(`candidate_tools`, `decoy_types`, `bar_exam_results`), then `design_corpus` and `rq1` to `rq5` (`rq1_assets`
+first: what the tools wrote, as written, from runs.csv).
 
 A file holds the table's content only, written as the paper's `assets/tab_*.tex` are, so it is copied there as it
 is: a `tabular*` (numbers) or `tabularx` (with a column of text) of exactly `\linewidth`, booktabs rules, no vertical
@@ -57,7 +58,7 @@ _GLYPH_PT = {
     4.0: "*0123456789bdghknopquvxy–", 4.45: "FPS", 4.51: "+<=>", 4.89: "ELTZ", 5.34: "BCR",
     5.78: "ADGHKNOQUVXYw", 6.22: "m", 6.66: "%", 7.11: "M", 7.37: "@", 7.55: "W",
 }  # fmt: skip
-GLYPH_MARGIN = 1.02  # the estimate rounds up: the 31 tables of four exports measured up to 1 % wider than summed
+GLYPH_MARGIN = 1.035  # the estimate rounds up: measured tables came out up to 3 % wider than summed (bold headers)
 _GLYPHS = {ch: pt for pt, chars in _GLYPH_PT.items() for ch in chars}
 
 
@@ -453,6 +454,30 @@ def corpus(spec: dict) -> Table | None:
 # ----- RQ1 volume -----
 
 
+def assets(runs: list[dict], names: dict[str, str], run: int = 1) -> Table | None:
+    """What each tool wrote, as written (runs.csv, the original variants of one repetition): the repositories with an
+    ok run, the ok runs with no cryptographic asset, the failed runs, and the cryptographic assets by the CycloneDX
+    asset type they declare. Asset counts follow each tool's packaging, so they compare output formats; the volume
+    table counts findings in records and items."""
+    rows = [r for r in runs if _int(r.get("run")) == run and (r.get("variant") or "original") == "original"]
+    if not any(r.get("status") == "ok" for r in rows):
+        return None
+    by_tool: dict[str, list[dict]] = defaultdict(list)
+    for r in rows:
+        if r.get("status") != "unsupported":
+            by_tool[r["tool"]].append(r)
+    kinds = ["crypto_assets", "algorithm_assets", "certificate_assets", "protocol_assets", "material_assets"]
+    table = []
+    for tool in _order(by_tool, names):
+        rs = by_tool[tool]
+        ok = [r for r in rs if r["status"] == "ok"]
+        table.append([_badge(names.get(tool, tool)), _count(len(ok)),
+                      _count(sum(_int(r.get("crypto_assets")) == 0 for r in ok)), _count(len(rs) - len(ok)),
+                      *(_count(sum(_int(r.get(k)) for r in ok)) for k in kinds)])  # fmt: skip
+    header = ["Tool", "ok", "empty", "failed", "all", "algorithm", "cert.", "proto.", "material"]
+    return Table("rq1_assets", ["runs.csv"], "lrrrrrrrr", header, table, [(2, 4, "Runs"), (5, 9, "Crypto assets")])
+
+
 def volume(units: list[dict], unit_repos: list[dict], trace: list[dict], names: dict[str, str]) -> Table | None:
     """What each tool reports (units-run<i>.csv, units-repo-run<i>.csv, traceability-run<i>.csv): its packaging, its
     algorithm records and items, the median items per repository with an ok run, the share of its algorithm records
@@ -515,7 +540,7 @@ def cost(runtime: list[dict], names: dict[str, str]) -> Table | None:
         rows.append([_badge(names.get(tool, tool)), *(col[i] for col in times), p90[i], _count(r.get("timeouts")),
                      *peaks, _number(r.get("cores_median"))])  # fmt: skip
     k = len(cols)
-    header = ["Tool", *cols, "p90 (s)", "Timeouts", "median", "max", "Cores"]
+    header = ["Tool", *cols, "p90 (s)", _head("Time-", "outs"), "median", "max", "Cores"]
     groups = [(2, 1 + k, "Median time (s)"), (4 + k, 5 + k, "Peak memory (GiB)")]
     return Table("rq1_cost", ["runtime.csv"], "l" + "r" * (len(header) - 1), header, rows, groups)
 
@@ -790,6 +815,7 @@ def build(analysis_dir: Path, *, run: int = 1) -> list[Table]:
         decoys(load_catalog("java").decoys),
         bar(rows("micro-run{i}.csv"), rows("traceability-run{i}.csv"), names),
         corpus(_spec(analysis_dir)),
+        assets(rows("runs.csv"), names, run),
         volume(rows("units-run{i}.csv"), rows("units-repo-run{i}.csv"), rows("traceability-run{i}.csv"), names),
         cost(rows("runtime.csv"), names),
         conformance(rows("schema-run{i}.csv"), names),

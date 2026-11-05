@@ -249,7 +249,7 @@ example, voter groups, how family and group are argued),
     share is for the discussion.
   - **The paper's tables** (`latex.py`, 2026-11-01): `report` also writes `_ANALYSIS/latex/tab_<part>_<what>.tex`
     (`candidate_tools`, `decoy_types` and `bar_exam_results`, the paper's own file names for the subject selection,
-    then `design_corpus`, `rq1_volume`, `rq1_cost`, `rq2_conformance`, `rq3_ladder`, `rq3_registry`,
+    then `design_corpus`, `rq1_assets`, `rq1_volume`, `rq1_cost`, `rq2_conformance`, `rq3_ladder`, `rq3_registry`,
     `rq4_k`, `rq4_dimensions`, `rq4_rates_<dimension>`, `rq5_detection`, `rq5_styles`, `rq5_offedit`), each when its
     data is there, rendered from the CSVs and the record only, like the summary (`python -m analysis.latex
     <exp>/_ANALYSIS` on an export). Content only, as the paper's `assets/tab_*.tex`: booktabs, no vertical lines, a
