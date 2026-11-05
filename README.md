@@ -60,7 +60,7 @@ A bar exam on generated micro projects decides which tools take part in the expe
 IBM Research's dedicated CBOM generator for Java, Python and Go, now maintained by the Post-Quantum Cryptography Alliance.
 Uses SonarQube's sonar-cryptography plugin for static analysis and supports compliance policy checks; shipped as a server with a REST API.
 
-- **`CBOMKit` GitHub Action** ([cbomkit-action](https://github.com/cbomkit/cbomkit-action)):
+- **[`CBOMkit-action`](https://github.com/cbomkit/cbomkit-action)** (worker `cbomkit-jar`):
 the same sonar-cryptography engine packaged as a GitHub Action (a jar), run without the server. Both distributions passed the bar exam with identical scores; the experiments after it run the server, which failed on one repository fewer.
 
 - **[`cdxgen`](https://github.com/cdxgen/cdxgen)**:

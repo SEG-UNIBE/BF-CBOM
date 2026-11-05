@@ -360,9 +360,11 @@ algorithm per repository, LLM token counts, the list of files). Its Preamble end
 names, each linked to GitHub at its pinned commit, folded into one column per language, or flat with the size when
 the corpus builder recorded one. The summary is rendered from the CSV files and the record, so
 it never shows anything they don't hold; `python -m analysis.summary <exp>/_ANALYSIS/` rebuilds it from an export.
-`report` also writes the paper's tables, `_ANALYSIS/latex/tab_<part>_<what>.tex` (`design_` for the bar exam and the
-corpus, then `rq1_` to `rq5_`), from the same files: the content of each table only, with booktabs rules, sized to the
-text width of the paper's single-column format; `python -m analysis.latex <exp>/_ANALYSIS/` rebuilds them.
+`report` also writes the paper's tables, `_ANALYSIS/latex/tab_*.tex` (`candidate_tools`, `decoy_types` and
+`bar_exam_results` under the paper's own file names, then `design_corpus` and `rq1_` to `rq5_`), from the same files
+and the registry: the content of each table only, as the paper's `assets/` hold it (booktabs rules, bold column titles,
+the paper's tool badges, sized to the text width of its single-column format), so a file is copied there as it is;
+`python -m analysis.latex <exp>/_ANALYSIS/` rebuilds them.
 Its numbers carry `'` between thousands (13'043); the CSVs keep plain numbers. Each report clears and rebuilds
 `_ANALYSIS/`. The standalone `micro` command also writes `micro-run<i>.json`; `report` writes its micro results
 as CSV tables instead.

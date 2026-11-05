@@ -1,6 +1,7 @@
 """The paper's LaTeX tables (analysis/latex.py): rendered from the CSVs only, booktabs, and every layout inside the
 single-column text width of svjour3 smallextended at \\small (338 pt), checked with the measured glyph widths."""
 
+import re
 from pathlib import Path
 
 import yaml
@@ -15,6 +16,11 @@ LONGEST = max((t.get("name") or k for k, t in load_tools().items()), key=latex._
 def _names(n: int = 11) -> dict[str, str]:
     """`n` tools, every one as wide as the widest registered name, so a layout is checked at its worst."""
     return {f"t{i:02d}": LONGEST for i in range(n)}
+
+
+def _rows(text: str) -> list[str]:
+    """The rendered lines without the paper's layout: the indent and the padding that aligns the columns."""
+    return [re.sub(r" +(&|\\\\)", r" \1", line.strip()) for line in text.splitlines()]
 
 
 def _fits(table: latex.Table) -> None:
@@ -38,17 +44,21 @@ def test_a_table_renders_booktabs_at_textwidth_with_groups_and_escapes():
         [(2, 3, "Both")],
     )
     text = table.render("exp")
-    lines = text.splitlines()
+    lines = _rows(text)
     assert lines[0].startswith("% tab_rq9_demo.tex from exp (demo-run1.csv)") and "do not edit" in lines[0]
-    assert lines[2] == r"\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}lrr@{}}" and lines[-1] == r"\end{tabular*}"
+    assert lines[2] == r"\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lrr@{}}" and lines[-1] == r"\end{tabular*}"
     assert lines[3] == r"\toprule" and lines[-2] == r"\bottomrule" and "|" not in lines[2]  # no vertical lines
-    assert r" & \multicolumn{2}{c}{Both} \\" in lines and r"\cmidrule(l){2-3}" in lines  # trimmed inside only
-    assert r"Tool & a\_b & 50\,\% \\" in lines and r"x\&y & 1{,}210 & -- \\" in lines
+    assert r"\textbf{Tool} & \textbf{a\_b} & \textbf{50\,\%} \\" in lines  # headers in bold
+    raw = text.splitlines()
+    assert raw[3] == "\t\\toprule" and raw[8].startswith("\tx\\&y          & 1{,}210")  # indented, aligned
+    assert r"\arraystretch" not in text  # no badge, no stretch
+    assert r"& \multicolumn{2}{c}{\textbf{Both}} \\" in lines and r"\cmidrule(l){2-3}" in lines  # trimmed inside only
+    assert r"x\&y & 1{,}210 & -- \\" in lines
     assert r"\multicolumn{3}{@{}l}{\emph{group}} \\" in lines and lines.count(r"\midrule") == 2
     too = latex.Table("x", [], "l", ["a"], [["w" * 99]])
     assert latex.too_wide([too]) and "WIDER THAN THE TEXT" in too.render("e")
     wide = latex.Table("x", [], "lX", ["a", "b"], [["1", "text " * 99]])
-    assert r"\begin{tabularx}{\textwidth}{@{}l>{\raggedright\arraybackslash}X@{}}" in wide.render("e")
+    assert r"\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}X@{}}" in wide.render("e")
     assert wide.width() < 100  # an X column wraps: it counts with its minimum
 
 
@@ -58,10 +68,10 @@ def test_a_group_label_wider_than_its_columns_widens_the_table():
     assert grouped.width() > narrow.width() + 50
 
 
-def test_the_bar_table_gives_the_verdicts_eligible_tools_first():
+def test_the_bar_table_gives_the_verdicts_passed_tools_first():
     def r(tool, lang, verdict, lenient=0, repo=0, decoys="", tailored=""):
         return {"tool": tool, "language": lang, "verdict": verdict, "lenient": lenient, "repo": repo,
-                "decoys_hit": decoys, "tailored": tailored}  # fmt: skip
+                "decoys_hit": decoys, "tailored": tailored, "n_items": 14, "bar_items": 7}  # fmt: skip
 
     micro = [
         r("cdxgen", "java", "fail", 0, 6), r("cdxgen", "go", "pass", 9, 13), r("cdxgen", "python", "unsupported"),
@@ -69,15 +79,24 @@ def test_the_bar_table_gives_the_verdicts_eligible_tools_first():
         r("ciphersift", "java", "pass", 14, 14, "comment;log-message", "True"),
     ]  # fmt: skip
     names = {"cdxgen": "cdxgen", "qscan": "qScan", "ciphersift": "CipherSift"}
-    table = latex.bar(micro, names)
-    lines = table.render("bar-micro").splitlines()
-    assert r"Tool & Java & Python & Go & Verdict & Decoys reported on \\" in lines  # the paper's languages in order
-    assert r"CipherSift$\ast$ & 14 (14) & -- & -- & eligible & comment, log message \\" in lines
-    assert r"cdxgen & 0 (6) & -- & 9 (13) & eligible in Go & none \\" in lines
-    assert r"qScan & 5 (5) & 5 (5) & 5 (5) & not eligible & none \\" in lines
+    trace = [{"tool": "cdxgen", "asset_type": "algorithm", "records": 10, "located_line": 10},
+             {"tool": "cdxgen", "asset_type": "algorithm", "records": 4, "located_line": 0},
+             {"tool": "cdxgen", "asset_type": "related-crypto-material", "records": 3, "located_line": 3},
+             {"tool": "qscan", "asset_type": "algorithm", "records": 24, "located_line": 24}]  # fmt: skip
+    table = latex.bar(micro, trace, names)
+    lines = _rows(table.render("bar-micro"))
+    assert (
+        r"\textbf{Tool} & \textbf{Java} & \textbf{Python} & \textbf{Go} & \textbf{All} & \textbf{Located} & "
+        r"\textbf{Bar exam verdict} \\" in lines
+    )
+    assert r"\tool{CipherSift}$\ast$ & 14 & -- & -- & 0 & -- & passed \\" in lines
+    assert r"\tool{cdxgen} & 0 & -- & 9 & 14 & 0.71 & passed in Go only \\" in lines  # algorithm records only
+    assert r"\tool{qScan} & 5 & 5 & 5 & 24 & 1.00 & failed \\" in lines
+    begin = lines.index(r"\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lrrrrrl@{}}")
+    assert lines[begin - 1] == r"\renewcommand{\arraystretch}{1.12}"  # badges in the rows: the paper's looser rows
     body = lines[lines.index(r"\midrule") + 1 :]
-    assert body.index(r"\midrule") == 2 and body[3].startswith("qScan")  # eligible first, then the others
-    assert latex.bar([], names) is None
+    assert body.index(r"\midrule") == 2 and body[3].startswith(r"\tool{qScan}")  # passed first, then the others
+    assert latex.bar([], trace, names) is None
 
 
 def test_every_layout_fits_the_text_width_at_its_worst():
@@ -87,18 +106,18 @@ def test_every_layout_fits_the_text_width_at_its_worst():
     names = _names()
     tools = list(names)
     langs = ["Java", "Python", "Go"]
-    micro = [{"tool": t, "language": lg.lower(), "verdict": "pass", "lenient": 14, "repo": 14,
-              "decoys_hit": "comment;log-message;crc32;base64", "tailored": "True"}
+    micro = [{"tool": t, "language": lg.lower(), "verdict": "pass", "lenient": 14, "repo": 14, "n_items": 14,
+              "bar_items": 7, "decoys_hit": "comment;log-message;crc32;base64", "tailored": "True"}
              for t in tools for lg in langs]  # fmt: skip
-    _fits(latex.bar(micro, names))
+    trace = [{"tool": t, "asset_type": "algorithm", "records": 3, "located_line": 1, "strong": 1, "source": "git"}
+             for t in tools]  # fmt: skip
+    _fits(latex.bar(micro, trace, names))
     repos = [{"full_name": f"o/r{i}", "language": lg, "stars": 250_000, "checkout_bytes": 1536 * 1024**2,
               "source_bytes": 999 * 1024**2} for i, lg in enumerate(langs * 99)]  # fmt: skip
     _fits(latex.corpus({"repos": repos}))
     units = [{"tool": t, "packaging": "per algorithm", "records": 999_999, "items": 99_999, "loc_line": 1,
               "loc_none": 0, "outside_code": 1} for t in tools]  # fmt: skip
     unit_repos = [{"tool": t, "items": 999} for t in tools]
-    trace = [{"tool": t, "asset_type": "algorithm", "records": 3, "located_line": 1, "strong": 1, "source": "git"}
-             for t in tools]  # fmt: skip
     _fits(latex.volume(units, unit_repos, trace, names))
     runtime = [{"tool": t, "language": lg, "median_sec": 999.0, "p90_sec": 3600.0, "timeouts": 162,
                 "peak_median_mb": 24 * 1024, "peak_max_mb": 99 * 1024, "cores_median": 64.0}
@@ -144,12 +163,15 @@ def test_write_names_each_table_by_its_part_and_replaces_old_ones(tmp_path: Path
     (out / "latex" / "tab_rq9_gone.tex").write_text("old")
     written = latex.write(out)
     folder = out / latex.LATEX_DIR
-    assert sorted(p.name for p in folder.iterdir()) == ["tab_design_corpus.tex", "tab_rq1_cost.tex"]
-    assert [t.name for t in written] == ["design_corpus", "rq1_cost"] and not latex.too_wide(written)
+    assert sorted(p.name for p in folder.iterdir()) == ["tab_candidate_tools.tex", "tab_decoy_types.tex",
+                                                        "tab_design_corpus.tex", "tab_rq1_cost.tex"]  # fmt: skip
+    assert [t.name for t in written] == ["candidate_tools", "decoy_types", "design_corpus", "rq1_cost"]
+    assert not latex.too_wide(written)
     cost = (folder / "tab_rq1_cost.tex").read_text()
-    assert "from corpus-x (runtime.csv)" in cost and r"CBOMkit & 12.5 & 20.0 & 0 & -- & -- & -- \\" in cost
+    assert "from corpus-x (runtime.csv)" in cost
+    assert r"\tool{CBOMkit} & 12.5 & 20.0 & 0 & -- & -- & -- \\" in _rows(cost)
     assert "pt wide, spread to the 338 pt text width." in cost
-    corpus = (folder / "tab_design_corpus.tex").read_text()
+    corpus = _rows((folder / "tab_design_corpus.tex").read_text())
     assert r"Go & 1 & 120 & 4.0 & 1.0 & 0.25 & 0 \\" in corpus and r"\cmidrule(lr){4-5}\cmidrule(l){6-7}" in corpus
 
 

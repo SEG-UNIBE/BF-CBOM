@@ -270,8 +270,8 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
 
     assert style_issues(summary) == []  # one sentence per line, no semicolons, every collapsible captioned
     tex = {p.name for p in (out / "latex").iterdir()}  # the paper's tables, from the same CSVs
-    assert {"tab_design_bar.tex", "tab_rq1_volume.tex", "tab_rq3_ladder.tex", "tab_rq4_k.tex"} <= tex
-    assert r"\toprule" in (out / "latex" / "tab_design_bar.tex").read_text(encoding="utf-8")
+    assert {"tab_bar_exam_results.tex", "tab_rq1_volume.tex", "tab_rq3_ladder.tex", "tab_rq4_k.tex"} <= tex
+    assert r"\toprule" in (out / "latex" / "tab_bar_exam_results.tex").read_text(encoding="utf-8")
     toc = summary[summary.index("## Contents") : summary.index("## Preamble")]
     links = re.findall(r"^ *- \[(.+)\]\(#(.+)\)$", toc, flags=re.M)  # every entry links to a heading below
     headings = re.findall(r"^#{2,3} (.+)$", summary[len(toc) :], flags=re.M)

@@ -1,20 +1,24 @@
 r"""LaTeX tables for the paper, rendered only from what `analysis report` writes (the CSV tables and the record), like
 `_SUMMARY.md`: `_ANALYSIS/latex/tab_<part>_<what>.tex`, one file per table, each written when its data is there. The
-part is where the paper uses it: `design` (the bar exam, the corpus), then `rq1` to `rq5`.
+part is where the paper uses it: the three tables of the subject selection carry the paper's own file names
+(`candidate_tools`, `decoy_types`, `bar_exam_results`), then `design_corpus` and `rq1` to `rq5`.
 
-A file holds the table's content only: a `tabular*` (numbers) or `tabularx` (with a column of text) of exactly
-`\textwidth`, booktabs rules, no vertical lines. The `table` environment, its caption and its label stay in the paper,
-as in its `assets/tab_*.tex`. The layouts are made for Springer's svjour3 in its single-column `smallextended` format
-at `\small`, which the paper's table environments set: 338 pt of text width. `Table.width` estimates a table's natural
-width from glyph widths measured in that class, and a test keeps every layout inside it; nothing is ever scaled.
-Tools appear under their names (`name` in tools.csv) in one order, alphabetical, the same in every table. The paper's
-preamble needs booktabs, tabularx and makecell.
+A file holds the table's content only, written as the paper's `assets/tab_*.tex` are, so it is copied there as it
+is: a `tabular*` (numbers) or `tabularx` (with a column of text) of exactly `\linewidth`, booktabs rules, no vertical
+lines, the rows indented by a tab with their columns aligned, every tool name in the paper's `\tool{}` badge (with the
+looser `\arraystretch` the badges need, scoped to the table). The `table` environment, its caption and its label stay
+in the paper. The layouts are made for Springer's svjour3 in its single-column `smallextended` format at `\small`,
+which the paper's table environments set: 338 pt of text width. `Table.width` estimates a table's natural width from
+glyph widths measured in that class, and a test keeps every layout inside it; nothing is ever scaled. Tools appear
+under their names (`name` in tools.csv) in one order, alphabetical, the same in every table. The paper's preamble
+needs booktabs, tabularx, makecell and the `\tool`, `\yes` and `\no` macros.
 
     python -m analysis.latex <exp>/_ANALYSIS [run]    # rebuild from an exported folder
 """
 
 from __future__ import annotations
 
+import re
 import statistics
 import sys
 from collections import defaultdict
@@ -24,6 +28,7 @@ from pathlib import Path
 import yaml
 
 from common.experiment import spec_path
+from mutation.catalog import load_catalog
 
 from .summary import PAPER_LANGUAGES, SMALL_SOURCE_SHARE, _source_share
 from .summary_blocks import LEVEL_ORDER, _float, _int, _true, read_csv
@@ -37,6 +42,9 @@ LATEX_DIR = "latex"
 TEXTWIDTH_PT = 338.0
 TABCOLSEP_PT = 6.0
 X_MIN_PT = 60.0
+BADGE_PT = 3.7  # what the paper's \tool{} badge adds around a name: inner xsep, line and outer sep, both sides
+STRETCH = "1.12"  # the paper's \arraystretch for rows of badges, so they do not touch
+CITE_PT = 18.0  # a numeric citation after a name, ` [12]`
 
 STYLES = {"direct": "dir.", "wrapper": "wrap.", "indirect": "ind."}  # RQ5's insertion styles, as column heads
 
@@ -96,6 +104,22 @@ def _width(cell) -> float:
     if isinstance(cell, Tex) and cell.pt is not None:
         return cell.pt
     return max(_glyphs(line) for line in _plain(cell).split("\n"))
+
+
+def _badge(name: str, mark: str = "") -> Tex:
+    """A tool's name in the paper's `\\tool{}` badge, `mark` set after it in math (`*`: tailored)."""
+    tex = r"\tool{" + _tex(name) + "}" + (r"$\ast$" if mark == "*" else "")
+    return Tex(tex, name + mark, _glyphs(name + mark) + BADGE_PT)
+
+
+YES = Tex(r"\yes", "✓", 7.0)  # the paper's macros: a green check, a red cross (pifont)
+NO = Tex(r"\no", "✗", 7.0)
+
+
+def _bold(cell) -> str:
+    """A header cell in bold, unless it is empty or sets its own font."""
+    tex = _tex(cell)
+    return tex if not tex or r"\textbf" in tex else r"\textbf{" + tex + "}"
 
 
 def _head(*lines: str) -> Tex:
@@ -160,6 +184,20 @@ def _paper_languages(values) -> list[str]:
     return [lang for lang in PAPER_LANGUAGES if lang in present]
 
 
+def _aligned(body: list) -> list[str]:
+    """The rows (lists of LaTeX cells) joined with `&` and ended with `\\\\`, every column padded to its widest cell,
+    as the paper's hand-kept tables are aligned; the strings between them stay as they are."""
+    rows = [row for row in body if isinstance(row, list)]
+    widths = [max(len(row[i]) for row in rows) for i in range(len(rows[0]))] if rows else []
+
+    def line(row) -> str:
+        if not isinstance(row, list):
+            return row
+        return " & ".join(c.ljust(w) for c, w in zip(row, widths, strict=True)) + r" \\"
+
+    return [line(row) for row in body]
+
+
 @dataclass
 class Table:
     """One table: its name (the file is `tab_<name>.tex`), the files it reads, one letter per column (`l`, `r`, `X`),
@@ -172,6 +210,7 @@ class Table:
     header: list
     rows: list
     groups: list[tuple[int, int, str]] = field(default_factory=list)
+    specs: dict[int, str] = field(default_factory=dict)  # a column's full spec where the letter is not enough (0-based)
 
     def width(self) -> float:
         """The natural width in pt: the widest cell of each column, `X_MIN_PT` for an X column (its text wraps), the
@@ -192,36 +231,43 @@ class Table:
     def render(self, experiment: str) -> str:
         n = len(self.columns)
         if "X" in self.columns:
-            spec = "".join(r">{\raggedright\arraybackslash}X" if c == "X" else c for c in self.columns)
-            lines = [r"\begin{tabularx}{\textwidth}{@{}" + spec + "@{}}"]
-            end = r"\end{tabularx}"
+            default = {"X": r">{\raggedright\arraybackslash}X"}
+            spec = "".join(self.specs.get(i, default.get(c, c)) for i, c in enumerate(self.columns))
+            begin, end = r"\begin{tabularx}{\linewidth}{@{}" + spec + "@{}}", r"\end{tabularx}"
         else:
-            lines = [r"\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}" + self.columns + "@{}}"]
+            begin = r"\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}" + self.columns + "@{}}"
             end = r"\end{tabular*}"
-        lines.append(r"\toprule")
+        body: list = [r"\toprule"]  # a list is a row of cells, aligned below; a string a line as it is
         if self.groups:
             starts = {g[0]: g for g in self.groups}
             cells, rules, i = [], [], 1
             while i <= n:
                 if i in starts:
                     first, last, label = starts[i]
-                    cells.append(rf"\multicolumn{{{last - first + 1}}}{{c}}{{{_tex(label)}}}")
+                    cells.append(rf"\multicolumn{{{last - first + 1}}}{{c}}{{{_bold(label)}}}")
                     trim = ("" if first == 1 else "l") + ("" if last == n else "r")
                     rules.append(rf"\cmidrule({trim}){{{first}-{last}}}")
                     i = last + 1
                 else:
                     cells.append("")
                     i += 1
-            lines += [" & ".join(cells) + r" \\", "".join(rules)]
-        lines += [" & ".join(_tex(c) for c in self.header) + r" \\", r"\midrule"]
+            body += [" & ".join(cells) + r" \\", "".join(rules)]
+        body += [[_bold(c) for c in self.header], r"\midrule"]
         for row in self.rows:
             if isinstance(row, Sub):
-                lines.append(rf"\multicolumn{{{n}}}{{@{{}}l}}{{\emph{{{_tex(row.text)}}}}} \\")
+                body.append(rf"\multicolumn{{{n}}}{{@{{}}l}}{{\emph{{{_tex(row.text)}}}}} \\")
             elif isinstance(row, Tex):
-                lines.append(str(row))
+                body.append(str(row))
             else:
-                lines.append(" & ".join(_tex(c) for c in row) + r" \\")
-        lines += [r"\bottomrule", end]
+                body.append([_tex(c) for c in row])
+        body.append(r"\bottomrule")
+        lines = [begin, *("\t" + line for line in _aligned(body)), end]
+        if any(r"\tool{" in line for line in lines):
+            lines = [
+                "% Rows a little looser than the default, so the tool badges do not touch (scoped to the table).",
+                r"\renewcommand{\arraystretch}{" + STRETCH + "}",
+                *lines,
+            ]
         width = self.width()
         if width > TEXTWIDTH_PT:
             fit = f"WIDER THAN THE TEXT: about {width:.0f} pt of {TEXTWIDTH_PT:.0f} pt."
@@ -247,18 +293,85 @@ def _order(tools, names: dict[str, str]) -> list[str]:
     return sorted(set(tools), key=lambda t: (names.get(t, t).casefold(), t))
 
 
-# ----- the study design: the bar exam, the corpus -----
+# ----- the subject selection: the candidates, the decoys, the bar exam; then the corpus -----
 
 
-def bar(micro: list[dict], names: dict[str, str]) -> Table | None:
-    """The bar exam (micro-run<i>.csv): per tool and language the calls found in their functions, leniently, with in
-    brackets the calls whose family is reported anywhere in the project; the verdict and the decoy kinds reported on.
-    The eligible tools first, then the others, each by name."""
+def candidates(tools: list[dict]) -> Table | None:
+    """The candidate tools (tools.csv, from the registry): each with its citation (`cite`, the paper's bibliography
+    key), how it ships, its version at the cutoff date (a bare commit prefixed `commit`) and whether it declares each
+    paper language (`languages`), as the paper's macros `\\yes` and `\\no`."""
+    named = [t for t in tools if t.get("name")]
+    if not named:
+        return None
+
+    def version(v: str):
+        if not v:
+            return DASH
+        return f"commit {v}" if re.fullmatch(r"[0-9a-f]{7,}", v) and not v.isdigit() else v
+
+    def row(t: dict) -> list:
+        name = _badge(t["name"])
+        if cite := t.get("cite"):
+            name = Tex(str(name) + rf" \citep{{{cite}}}", name.plain + " [0]", (name.pt or 0.0) + CITE_PT)
+        langs = {x.strip().lower() for x in (t.get("languages") or "").split(";") if x.strip()}
+        marks = [YES if lg.lower() in langs else NO for lg in PAPER_LANGUAGES]
+        return [name, t.get("shipped") or "", version(t.get("version") or ""), *marks]
+
+    rows = [row(t) for t in sorted(named, key=lambda t: (t["name"].casefold(), t["tool"]))]
+    header = ["Tool", "Shipped as", "Version", *PAPER_LANGUAGES]
+    return Table("candidate_tools", ["tools.csv"], "lXl" + "c" * len(PAPER_LANGUAGES), header, rows)
+
+
+# The decoy kinds as the paper presents them, in its order: the catalog id, the label, what the decoy mimics and the
+# Java example, the catalog's body shortened to its telling line. The catalog (`mutation/catalog/java.yaml`) stays the
+# one definition; a kind it has and this list lacks is rendered from the catalog's own words.
+DECOY_ROWS = [
+    ("comment", "Comment", "algorithm name in prose", "// replace MD5 and DES with SHA-256 and AES"),
+    ("log-message", "Log message", "algorithm name in a string", 'println("RSA and ECDSA keys are rotated nightly")'),
+    ("identifier", "Variable name", "algorithm name in identifier", 'String sha256Tag = "checksum-" + n;'),
+    ("url", "URL", "algorithm name as file suffix", '"https://x.org/app.tar.gz.sha256"'),
+    ("crc32", "CRC32 checksum", "non-cryptographic hash API", "new CRC32().update(data)"),
+    ("base64", "Base64 encoding", "encoding taken for encryption", "Base64.getEncoder().encodeToStr(data)"),  # cut to fit
+    ("hex-constant", "Hex constant", "key or digest value",
+     Tex(r'"9f86d081884c7d65\ldots" (64 hex digits)', '"9f86d081884c7d65..." (64 hex digits)')),
+    ("cert-path", "Certificate path", "key or certificate file", '"config/certs/ca_ecdsa.pem"'),
+]  # fmt: skip
+
+
+def decoys(catalog_decoys) -> Table | None:
+    """The decoy kinds of the micro projects and the mutants (the Java catalog): what each mimics and a Java example,
+    the example column in typewriter type. The rows follow `DECOY_ROWS`, limited to the kinds the catalog has."""
+    by_id = {d.id: d for d in catalog_decoys}
+    if not by_id:
+        return None
+    rows = [[label, mimics, example] for did, label, mimics, example in DECOY_ROWS if did in by_id]
+    for did, d in by_id.items():  # a kind the paper's list does not know yet: the catalog's own words
+        if did not in {r[0] for r in DECOY_ROWS}:
+            lines = [ln.strip().replace("$", "") for ln in d.forms[0].templates["direct"].splitlines() if ln.strip()]
+            rows.append([did, d.what, lines[0] if lines else ""])
+    header = ["Decoy", "Mimics", Tex(r"\multicolumn{1}{l@{}}{\textbf{Java example}}", "Java example")]
+    specs = {1: r">{\hsize=0.77\hsize\raggedright\arraybackslash}X",
+             2: r">{\hsize=1.23\hsize\ttfamily\raggedright\arraybackslash}X"}  # fmt: skip
+    return Table("decoy_types", ["mutation/catalog/java.yaml"], "lXX", header, rows, specs=specs)
+
+
+def bar(micro: list[dict], trace: list[dict], names: dict[str, str]) -> Table | None:
+    """The bar exam (micro-run<i>.csv, traceability-run<i>.csv): per tool and language the calls found in their
+    functions, leniently (the bar's count; the calls found anywhere in the project and the decoy hits stay in the
+    summary), then what the tool reported on the micro projects, its algorithm records and the share of them with a
+    file and a line (a tool without locations reports, but cannot pass), and, last, the bar exam's verdict (`passed`,
+    `failed`, `passed in Go only`). Two column groups name the calls out of how many with the bar (`n_items`,
+    `bar_items`) and the records. The tools that passed first, then the others, each by name."""
     if not micro:
         return None
     langs = _paper_languages(r["language"] for r in micro)
     cells = {(r["tool"], _language(r["language"])): r for r in micro}
     tailored = {r["tool"] for r in micro if _true(r.get("tailored"))}
+    records: dict[str, list[int]] = defaultdict(lambda: [0, 0])  # per tool: algorithm records, those with a line
+    for r in trace:
+        if (r.get("asset_type") or "") == "algorithm":
+            records[r["tool"]][0] += _int(r["records"])
+            records[r["tool"]][1] += _int(r["located_line"])
 
     def verdict(tool: str) -> str:
         done = [lg for lg in langs if (r := cells.get((tool, lg))) and r["verdict"] in ("pass", "fail")]
@@ -266,32 +379,33 @@ def bar(micro: list[dict], names: dict[str, str]) -> Table | None:
         if not done:
             return "not judged"
         if passed == done:
-            return "eligible"
-        return f"eligible in {', '.join(passed)}" if passed else "not eligible"
+            return "passed"
+        return f"passed in {', '.join(passed)} only" if passed else "failed"
 
     def cell(r: dict | None):
         if r is None or r["verdict"] == "unsupported":
             return DASH
         if r["verdict"] in ("pass", "fail"):
-            return f"{_int(r['lenient'])} ({_int(r['repo'])})"
+            return _count(r["lenient"])
         return "not run" if r["verdict"] == "missing" else r["verdict"]
 
-    def decoys(tool: str) -> str:
-        kinds = dict.fromkeys(k for lg in langs if (r := cells.get((tool, lg)))
-                              for k in (r.get("decoys_hit") or "").split(";") if k)  # fmt: skip
-        return ", ".join(k.replace("-", " ") for k in kinds) or "none"
-
     def row(tool: str) -> list:
-        label = names.get(tool, tool)
-        name = Tex(_tex(label) + r"$\ast$", label + "*") if tool in tailored else label
-        return [name, *[cell(cells.get((tool, lg))) for lg in langs], verdict(tool), decoys(tool)]
+        name = _badge(names.get(tool, tool), "*" if tool in tailored else "")
+        n, located = records.get(tool, [0, 0])
+        return [name, *[cell(cells.get((tool, lg))) for lg in langs], _count(n), _ratio(located, n), verdict(tool)]
 
     tools = _order({r["tool"] for r in micro}, names)
-    eligible = [t for t in tools if verdict(t).startswith("eligible")]
-    rest = [t for t in tools if t not in eligible]
-    rows = [row(t) for t in eligible] + ([MIDRULE] if eligible and rest else []) + [row(t) for t in rest]
-    header = ["Tool", *langs, "Verdict", "Decoys reported on"]
-    return Table("design_bar", ["micro-run<i>.csv"], "l" + "r" * len(langs) + "lX", header, rows)
+    passed = [t for t in tools if verdict(t).startswith("passed")]
+    rest = [t for t in tools if t not in passed]
+    rows = [row(t) for t in passed] + ([MIDRULE] if passed and rest else []) + [row(t) for t in rest]
+    header = ["Tool", *langs, "All", "Located", "Bar exam verdict"]
+    scored = [r for r in micro if r["verdict"] in ("pass", "fail")]
+    calls = max((_int(r["n_items"]) for r in scored), default=0)
+    bar_items = max((_int(r["bar_items"]) for r in scored), default=0)
+    groups = [(2, 1 + len(langs), f"Calls found of {calls}, bar {bar_items}"),
+              (2 + len(langs), 3 + len(langs), "Algorithm records")]  # fmt: skip
+    return Table("bar_exam_results", ["micro-run<i>.csv", "traceability-run<i>.csv"], "l" + "r" * len(langs) + "rrl",
+                 header, rows, groups)  # fmt: skip
 
 
 def corpus(spec: dict) -> Table | None:
@@ -355,7 +469,7 @@ def volume(units: list[dict], unit_repos: list[dict], trace: list[dict], names: 
         checked = [r for r in rs if r.get("source")]
         rows.append(
             [
-                names.get(tool, tool),
+                _badge(names.get(tool, tool)),
                 u.get("packaging") or "unknown",
                 _count(u["records"]),
                 _count(u["items"]),
@@ -365,7 +479,7 @@ def volume(units: list[dict], unit_repos: list[dict], trace: list[dict], names: 
                 _ratio(u.get("outside_code"), located) if "outside_code" in u else DASH,
             ]
         )
-    header = ["Tool", "Packaging", "Records", "Items", _head("Items", "per repo"), "file+line", "strong",
+    header = ["Tool", "Packaging", "Records", "Items", _head("Items", "per repo"), _head("file", "+line"), "strong",
               _head("Outside", "code")]  # fmt: skip
     return Table("rq1_volume", ["units-run<i>.csv", "units-repo-run<i>.csv", "traceability-run<i>.csv"], "llrrrrrr",
                  header, rows, [(6, 7, "Located")])  # fmt: skip
@@ -392,8 +506,8 @@ def cost(runtime: list[dict], names: dict[str, str]) -> Table | None:
     for i, tool in enumerate(tools):
         r = every[tool]
         peaks = [gib(r.get("peak_median_mb")), gib(r.get("peak_max_mb"))]
-        rows.append([names.get(tool, tool), *(col[i] for col in times), p90[i], _count(r.get("timeouts")), *peaks,
-                     _number(r.get("cores_median"))])  # fmt: skip
+        rows.append([_badge(names.get(tool, tool)), *(col[i] for col in times), p90[i], _count(r.get("timeouts")),
+                     *peaks, _number(r.get("cores_median"))])  # fmt: skip
     k = len(cols)
     header = ["Tool", *cols, "p90 (s)", "Timeouts", "median", "max", "Cores"]
     groups = [(2, 1 + k, "Median time (s)"), (4 + k, 5 + k, "Peak memory (GiB)")]
@@ -457,7 +571,7 @@ def conformance(schema: list[dict], names: dict[str, str]) -> Table | None:
             parts = [_error_kind(k, n) for k, n in top]
             errors = Tex(", ".join(parts), ", ".join(p.plain for p in parts))
         versions = ", ".join(sorted({f"{r.get('bom_format')} {r.get('spec_version')}" for r in rs}))
-        rows.append([names.get(tool, tool), versions, _count(len(rs)),
+        rows.append([_badge(names.get(tool, tool)), versions, _count(len(rs)),
                      _ratio(sum(_true(r["valid"]) for r in checked), len(checked)), errors])  # fmt: skip
     header = ["Tool", "Format", "CBOMs", "Valid", "Most frequent schema errors"]
     return Table("rq2_conformance", ["schema-run<i>.csv"], "llrrX", header, rows)
@@ -476,13 +590,13 @@ def ladder(levels: list[dict], names: dict[str, str]) -> Table | None:
     lvls = sorted({r["level"] for r in rows_in}, key=lambda lv: (order.get(lv, len(order)), lv))
     by = {(r["tool"], r["level"]): r for r in rows_in}
 
-    def row(label: str, tool: str) -> list:
+    def row(label, tool: str) -> list:
         shares = [_float(by.get((tool, lv), {}).get("share")) for lv in lvls]
         gain = f"{shares[-1] - shares[0]:+.2f}" if shares[0] is not None and shares[-1] is not None else DASH
         return [label, _count(by.get((tool, lvls[0]), {}).get("items")), *(_share(s) for s in shares), gain]
 
     tools = _order({r["tool"] for r in rows_in if r["tool"] != "all"}, names)
-    rows = [row(names.get(t, t), t) for t in tools]
+    rows = [row(_badge(names.get(t, t)), t) for t in tools]
     if any(r["tool"] == "all" for r in rows_in):
         rows += [MIDRULE, row("all tools", "all")]
     gain = Tex(rf"{lvls[0]}$\to${lvls[-1]}", pt=_glyphs(lvls[0] + lvls[-1]) + 8.0)  # the arrow is 8 pt
@@ -567,7 +681,7 @@ def rates(scores: list[dict], names: dict[str, str]) -> list[Table]:
     tables = []
     for dim in dict.fromkeys(r["dimension"] for r in scores):
         by = {r["tool"]: r for r in scores if r["dimension"] == dim}
-        rows = [[names.get(t, t), _count(by[t].get("repos")), _count(by[t]["items"]),
+        rows = [[_badge(names.get(t, t)), _count(by[t].get("repos")), _count(by[t]["items"]),
                  _interval(by[t].get("rate"), by[t].get("ci_low"), by[t].get("ci_high")),
                  _share(by[t].get("exclusivity")), _share(by[t].get("coverage"))]
                 for t in _order(by, names)]  # fmt: skip
@@ -589,7 +703,7 @@ def _by_tool_language(scores: list[dict], names: dict[str, str], cells) -> list:
         mine = [lang for lang in langs if (tool, lang) in by]
         if rows and mine:
             rows.append(SPACE)
-        rows += [[names.get(tool, tool) if i == 0 else "", lang, *cells(by[(tool, lang)])] for i, lang in
+        rows += [[_badge(names.get(tool, tool)) if i == 0 else "", lang, *cells(by[(tool, lang)])] for i, lang in
                  enumerate(mine)]  # fmt: skip
     return rows
 
@@ -621,7 +735,7 @@ def styles(scores: list[dict], names: dict[str, str]) -> Table | None:
     langs = _paper_languages(s["language"] for s in rows_in)
     shown = [st for st in STYLES if any(s["style"] == st for s in rows_in)]
     by = {(s["tool"], _language(s["language"]), s["style"]): s for s in rows_in}
-    rows = [[names.get(t, t), *(_share(by[(t, lang, st)].get("recall")) if (t, lang, st) in by else DASH
+    rows = [[_badge(names.get(t, t)), *(_share(by[(t, lang, st)].get("recall")) if (t, lang, st) in by else DASH
                                 for lang in langs for st in shown)]
             for t in _order({s["tool"] for s in rows_in}, names)]  # fmt: skip
     header = ["Tool", *[STYLES[st] for _ in langs for st in shown]]
@@ -666,7 +780,9 @@ def build(analysis_dir: Path, *, run: int = 1) -> list[Table]:
     names = _names(rows("tools.csv"))
     match, mscores = rows("matchlevels-run{i}.csv"), rows("mutation-scores.csv")
     tables = [
-        bar(rows("micro-run{i}.csv"), names),
+        candidates(rows("tools.csv")),
+        decoys(load_catalog("java").decoys),
+        bar(rows("micro-run{i}.csv"), rows("traceability-run{i}.csv"), names),
         corpus(_spec(analysis_dir)),
         volume(rows("units-run{i}.csv"), rows("units-repo-run{i}.csv"), rows("traceability-run{i}.csv"), names),
         cost(rows("runtime.csv"), names),

@@ -13,7 +13,7 @@ rerunning bar-micro.
 | Tool | Version or commit | Published | How it is pinned | Source |
 |---|---|---|---|---|
 | CBOMkit | 2.3.0 (sonar-cryptography 1.7.0, bundled) | 2026-09-09 | image digest | `ghcr.io/cbomkit/cbomkit` |
-| cbomkit-jar | cbomkit-action v2.3.0 (sonar-cryptography 1.7.0, bundled) | 2026-09-07 | image digest | `ghcr.io/cbomkit/cbomkit-action` |
+| CBOMkit-action (`cbomkit-jar`) | v2.3.0 (sonar-cryptography 1.7.0, bundled) | 2026-09-07 | image digest | `ghcr.io/cbomkit/cbomkit-action` |
 | cdxgen | 13.5.0 | 2026-10-23 | image digest | `ghcr.io/cdxgen/cdxgen` (GitHub's latest release; npm's `latest` tag still names 12.9.0) |
 | CipherRadar | default branch `efa5d9de322c9120b15acc2e958dc6c1c4e609e1` (only pre-releases exist) | 2026-09-07 | full SHA, built from source | github.com/nk-sentinel/cipherradar |
 | CipherRadar's engine | OpenGrep 1.33.1 (CipherRadar pins none) | 2026-10-29 | sha256 per arch | github.com/opengrep/opengrep |

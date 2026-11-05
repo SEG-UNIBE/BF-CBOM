@@ -355,7 +355,7 @@ def run_rows(
 
 # ----- run time (RQ1: what a scan costs) -----
 
-TOOLS_COLUMNS = ["tool", "name", "vendor", "url", "shipped", "approach", "version", "version_url"]
+TOOLS_COLUMNS = ["tool", "name", "vendor", "url", "shipped", "approach", "version", "version_url", "languages", "cite"]
 
 
 def tool_rows(tools: Iterable[str], registry: dict[str, dict] | None = None) -> list[dict]:
@@ -363,8 +363,12 @@ def tool_rows(tools: Iterable[str], registry: dict[str, dict] | None = None) -> 
     version the paper reports with the page that shows it, as `common/tools.yaml` records them (empty for a tool
     outside the registry)."""
     registry = registry if registry is not None else load_tools()
-    return [{"tool": t, **{c: (registry.get(t) or {}).get(c) or "" for c in TOOLS_COLUMNS[1:]}}
-            for t in sorted(set(tools))]  # fmt: skip
+
+    def cell(t: str, c: str) -> str:
+        v = (registry.get(t) or {}).get(c) or ""
+        return ";".join(str(x) for x in v) if isinstance(v, list) else str(v)
+
+    return [{"tool": t, **{c: cell(t, c) for c in TOOLS_COLUMNS[1:]}} for t in sorted(set(tools))]
 
 
 RUNTIME_COLUMNS = [

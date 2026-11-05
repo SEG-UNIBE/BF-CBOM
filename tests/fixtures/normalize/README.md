@@ -9,7 +9,7 @@ project each. Each file names its source snapshots in
 | File | Tool (version) | What it exercises |
 |---|---|---|
 | `cryptoscan.json` | CryptoScan 1.4.0 | per-occurrence `symbol` (`KeySize = 2048`, `iterations = 5`, `TLSv1.2`, `ed25519`), a multi-algorithm category name, a certificate check |
-| `cbomkit-jar.json` | cbomkit-action v2.3.0 | `dependencies`: RSA-OAEP -> SHA-256 (digest), salt -> HKDF (key family), salt sizes |
+| `cbomkit-jar.json` | CBOMkit-action v2.3.0 | `dependencies`: RSA-OAEP -> SHA-256 (digest), salt -> HKDF (key family), salt sizes |
 | `cipherradar.json` | CipherRadar efa5d9d | `algorithmFamily` contradicting the name (SHA-1 labelled SHA-2), `algorithmRef` / `signatureAlgorithmRef`, a crypto library import |
 | `qdarpan.json` | qdarpan 0.1.0 | `qdarpan:family`, crypto library components (`jca`, `crypto/rsa`) |
 | `securin-xbom.json` | xbom 0.1.0 | out-of-spec primitive `pk`, related material of type `prng` |

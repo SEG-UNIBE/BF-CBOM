@@ -11,7 +11,7 @@ example, voter groups, how family and group are argued),
 
 ## Rules
 - **Current scope and wording (2026-10-22, bar 2026-10-31, CBOMkit 2026-10-30):** describe BF-CBOM publicly as
-  integrating **14 CBOM generator tools**, CBOMkit in both of its official distributions (server and GitHub Action,
+  integrating **14 CBOM generator tools**, CBOMkit in both of its official distributions (server and CBOMkit-action,
   15 workers), of which **11 are eligible** after the bar exam (the specs name them by hand; cdxgen in Go only,
   `tool_languages`). Eligibility is per tool and language: a tool below the bar in a language is "not eligible" there,
   never "disqualified". Both CBOMkit distributions passed with identical scores; the later specs run the server
@@ -148,7 +148,8 @@ example, voter groups, how family and group are argued),
   `version_url` (decided 2026-10-31: the version the paper reports, the tool's own, its release or 7 characters of
   the pinned commit without one, and the page that shows it, the paper's citation; a test checks the Dockerfile pins
   it; the summary's "Tool versions" links it and checks every run recorded it), `name` (the tool's name as the paper
-  writes it, CBOMkit, Q-DARPAN: the LaTeX tables' label, tools.csv; added 2026-11-01). No verdict is
+  writes it, CBOMkit, Q-DARPAN: the LaTeX tables' label, tools.csv; added 2026-11-01), `cite` (the paper's
+  bibliography key, the candidates table; 2026-11-05). No verdict is
   recorded there: the bar's record is the bar-micro export, and nothing in code reads a verdict.
 - **Memory budget (waves):** `EXPERIMENT_MEMORY_BUDGET_GB` (laptop default 14, 0 = unlimited) caps the summed
   `memory_gb` of the tools fed at once; the rest run in later waves. Runner and UI plan waves with
@@ -247,11 +248,15 @@ example, voter groups, how family and group are argued),
     any other (decided 2026-10-23: the tools are benchmarked on the repositories as they are, no scope filter), the
     share is for the discussion.
   - **The paper's tables** (`latex.py`, 2026-11-01): `report` also writes `_ANALYSIS/latex/tab_<part>_<what>.tex`
-    (`design_bar`, `design_corpus`, `rq1_volume`, `rq1_cost`, `rq2_conformance`, `rq3_ladder`, `rq3_registry`,
+    (`candidate_tools`, `decoy_types` and `bar_exam_results`, the paper's own file names for the subject selection,
+    then `design_corpus`, `rq1_volume`, `rq1_cost`, `rq2_conformance`, `rq3_ladder`, `rq3_registry`,
     `rq4_k`, `rq4_dimensions`, `rq4_rates_<dimension>`, `rq5_detection`, `rq5_styles`, `rq5_offedit`), each when its
     data is there, rendered from the CSVs and the record only, like the summary (`python -m analysis.latex
     <exp>/_ANALYSIS` on an export). Content only, as the paper's `assets/tab_*.tex`: booktabs, no vertical lines, a
-    `tabular*` or `tabularx` of exactly `\textwidth`; the table environment, caption and label stay in the paper.
+    `tabular*` or `tabularx` of exactly `\linewidth`, tool names in the paper's `\tool{}` badges (with the looser
+    `\arraystretch` they need), the rows tab-indented with aligned columns, so a file is copied into the paper's
+    `assets/` as it is; the table environment, caption and label stay in the paper. The candidates table reads
+    `cite`, `shipped`, `version` and `languages` from tools.csv, the decoys table the Java catalog.
     Made for svjour3 `smallextended` (one column) at the paper's `\small`, 338 pt wide: `Table.width` sums glyph
     widths measured in that class, a test keeps every layout inside it at worst-case values, `report` warns about a
     wider table, nothing is ever scaled. Tools by `name`, alphabetical, in every table; the paper's languages only.
@@ -304,7 +309,7 @@ algorithms carry no location); cryptarium, qelens and qscan failed it (bar of 20
 | Worker | Voter group | Languages | Invocation and caveats |
 |---|---|---|---|
 | `cbomkit` | cbomkit | Java, Python, Go | CBOMkit server image, cloned through the git server over TLS; Python covers pyca only; modules need a build file and `src/`; large repos need ~45 min and a 16 GB heap; a scan that reaches the limit restarts the backend (`stop_backend`), since the job's timeout kills only the worker's process group and the server's scan would run on beside the next job (2026-10-31) |
-| `cbomkit-jar` | cbomkit | Java, Python, Go | cbomkit-action, source only, the same engine; runs on bar-micro only since 2026-10-30 (the server's results were the same, with one failed run fewer); the indexing risk (build file without `src/`) is noted, `CBOMKIT_ENSURE_SRC=1` stays off |
+| `cbomkit-jar` | cbomkit | Java, Python, Go | CBOMkit-action, source only, the same engine; runs on bar-micro only since 2026-10-30 (the server's results were the same, with one failed run fewer); the indexing risk (build file without `src/`) is noted, `CBOMKIT_ENSURE_SRC=1` stays off |
 | `cdxgen` | cdxgen | Java, JS, Go | the languages its README claims crypto for (Java keystores and certificates, JS/TS, Go through golem), no Python; eligible in Go only (bar of 2026-10-31: 9 of 14; Java 0 at the call sites, its Java algorithms carry no location); `--include-crypto --evidence` with `-t java` / `-t go` (13.x picks the language from the packages the BOM lists and skips its code analysis without `-t` when none is listed; the `cbom` command finds nothing in Go); algorithms carry locations only for JS/TS (occurrences) and Go (property `cdx:golem:crypto:sourceLocation`, one per asset); its Go crypto analysis reads only the module at the scan root (golem once; nested modules unseen, a `go.work` root without a `go.mod` gives nothing; the dependency inventory covers every module; as shipped, `docs/findings.md` "cdxgen reads one Go module"); Go analysis type-checks, so a module's imports resolve only with its `go.sum`, network and a writable module cache (a GOPATH per job, `go_env`); lines saying its code analysis was skipped or failed are recorded as `tool warning:` notes (`analysis_warnings`); 24 GiB. History (12.x, the setup errors of 2026-10-22 and 2026-10-31, atom's Python crash): `docs/findings.md` "Micro projects" |
 | `cryptobomforge` | cryptobomforge | Python, C | CodeQL's crypto inventory queries, C with `--build-mode none`; writes IBM's draft `1.4-cbom-1.0`, not CycloneDX, also when CodeQL finds nothing (every stored CBOM is the tool's; the worker's placeholder for that case went 2026-10-20) |
 | `deepseek`, `chatgpt`, `claude` | one each, `merge_group: llm` | all five | `common/llm_cbom.py` (below), CycloneDX 1.7 assembled by us; `chatgpt` / `claude` need `make up-prod EXTRA_PROFILES=llm` and a key in `docker/env/worker-<provider>.env`; a request that fails after the provider's retries fails the job (no partial CBOMs), `LLM_MAX_CHUNKS` 1000, `LLM_CONCURRENCY` 4 |
@@ -497,9 +502,10 @@ Pure Python and unit-tested; runs in the runner image or on the host for a copie
   - `record_id` = `<tool>:<component>:<occurrence>`, `site_id` = `<tool>:<file>:<line>`.
 - **RQ2, and RQ1's traceability** (`schema.py`): whole-document validation against the vendored schemas (`jsonschema`
   with an offline `referencing` registry), split by `cbom_by` (refinement 3); the tools' CycloneDX versions stay as
-  shipped (1.6: CBOMkit, cbomkit-jar, CryptoScan, pqcheck, securin-xbom, xgrep, qelens, Cryptarium and qScan; 1.7: cdxgen,
-  CipherRadar, CipherSift, Q-DARPAN, SCANOSS; CryptobomForge IBM's draft, its own empty draft document when CodeQL
-  finds nothing; what BF-CBOM writes itself, the LLM assembly, is 1.7); "meaningful" shares per CycloneDX asset type
+  shipped (1.6: CBOMkit, CBOMkit-action, CryptoScan, pqcheck, securin-xbom, xgrep, qelens, Cryptarium and qScan;
+  1.7: cdxgen, CipherRadar, CipherSift, Q-DARPAN, SCANOSS; CryptobomForge IBM's draft, its own empty draft document
+  when CodeQL finds nothing; what BF-CBOM writes itself, the LLM assembly, is 1.7); "meaningful" shares per
+  CycloneDX asset type
   with the standard's own fields for that type (standard fields vs any source; no tautological assetType column);
   traceability (RQ1) per asset type, with `located_file` (names a file) and `located_line` (file and line) apart,
   weak and strong on the records with a line (refinement 4); key material gets its own rows so secrets in

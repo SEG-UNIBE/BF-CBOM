@@ -84,12 +84,12 @@ Each tool carries a hand label `packaging` in `common/tools.yaml` (decided 2026-
 read a new tool's output), one of five terms on one axis, the granularity of a component, finest to coarsest: **per
 hit** (one component per place: CipherRadar, pqcheck, securin-xbom, qelens, the LLM assembly), **per rule** (one
 component per rule match on one API with its places, so several components name one algorithm: CipherSift), **per
-algorithm** (one component per algorithm as the tool spells it, parameters included, with all its places: CBOMkit,
-xgrep, SCANOSS, Q-DARPAN, CryptobomForge, cdxgen, qScan), **per family** (one component per coarse family, the
-specific algorithm only at the place: CryptoScan), **no places** (no evidence at all: Cryptarium). The label is read
-from the CBOMs, never derived from the numbers; the numbers of `units-run<i>.csv` are its signature (per hit: records
-= assets; per family: assets per item below 1; per algorithm: 1.2-2 assets per item with places aggregated), and the
-summary's "Units per tool" prints both side by side.
+algorithm** (one component per algorithm as the tool spells it, parameters included, with all its places: CBOMkit and
+CBOMkit-action (`cbomkit-jar`), xgrep, SCANOSS, Q-DARPAN, CryptobomForge, cdxgen, qScan), **per family** (one
+component per coarse family, the specific algorithm only at the place: CryptoScan), **no places** (no evidence at all:
+Cryptarium). The label is read from the CBOMs, never derived from the numbers; the numbers of `units-run<i>.csv` are
+its signature (per hit: records = assets; per family: assets per item below 1; per algorithm: 1.2-2 assets per item
+with places aggregated), and the summary's "Units per tool" prints both side by side.
 
 | Tool | Packaging | One component is | Its places |
 |---|---|---|---|
@@ -273,7 +273,7 @@ independently is not: the rules decide what is found, the engine only runs them.
 
 | Voter group | Tools | Shared detection logic | Evidence |
 |---|---|---|---|
-| cbomkit | CBOMkit, cbomkit-jar | the same sonar-cryptography engine, as a server image and as the action jar | the engine versions recorded in `tools.yaml` and the runs |
+| cbomkit | CBOMkit, CBOMkit-action | the same sonar-cryptography engine, as a server image and as the GitHub Action's jar | the engine versions recorded in `tools.yaml` and the runs |
 | one each | securin-xbom, CipherRadar, SCANOSS | only a pattern engine (semgrep; opengrep, its fork); the rules are their own | the rule-overlap check below |
 | one each | DeepSeek, ChatGPT, Claude | our prompts and file selection, not the model | `--merge-llm` merges them (sensitivity) |
 | one each | every other tool | none | its own engine |
@@ -297,7 +297,7 @@ the shared engine; the check showed that it rested on the engine alone, so they 
 
 **Sensitivity.** Every report ranks the tools again under other groupings (`grouping-run<i>.csv`, the summary's
 "Other voter groupings", Kendall's tau against the declared ranking): `per-tool` (every tool its own voter, so
-CBOMkit and cbomkit-jar confirm each other), `llm-merged` (the LLM workers as one voter) and `engine-merged` (the
+CBOMkit and CBOMkit-action confirm each other), `llm-merged` (the LLM workers as one voter) and `engine-merged` (the
 tools of one pattern engine family as one voter: `engine_family` in `tools.yaml`, the former `grep-rules`); next to
 it leave-one-voter-out. **Planned with the mutation run (RQ5):** whether two tools miss the same inserted items more often than chance
 (conditional dependence given the truth, the assumption behind independent voters and Dawid-Skene); tools with

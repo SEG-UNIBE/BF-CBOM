@@ -44,8 +44,9 @@ location-aware cross-matching with hand-checked samples. Reports and the landsca
 ### 2026-10-15 (superseded)
 Strict recall out of 11 (Java / Python / Go / JS / C): CBOMkit 11 / 5 / 0 / 0 / 0; DeepSeek rewrite 11 / 8 / 11 / 11 /
 11; Q-DARPAN 10 / – / 9 / – / 7; CipherRadar 11 / 8 / 9 / 9 / 4; pqcheck – / 8 / 8 / – / –; securin-xbom 6 / 7 / 4 /
-4 / 2; xgrep 11 / 8 / 10 / 9 / –; cbomkit-jar 11 / 5 / 8 / – / –; CryptoScan 0 / 0 / 5 / 6 / 0; cdxgen and
-CryptobomForge 0 everywhere. Precision 100 % except CryptoScan (7/11 Go) and CipherRadar (12/13 Go, 3/5 C).
+4 / 2; xgrep 11 / 8 / 10 / 9 / –; CBOMkit-action (`cbomkit-jar`) 11 / 5 / 8 / – / –; CryptoScan 0 / 0 / 5 / 6 / 0;
+cdxgen and CryptobomForge 0 everywhere. Precision 100 % except CryptoScan (7/11 Go) and CipherRadar (12/13 Go,
+3/5 C).
 The CryptoScan, CryptobomForge and CBOMkit-server (Go) numbers were **our setup errors**, not the tools: CryptoScan
 without `--include-quantum-safe` and on a `demo/` folder it skips, CryptobomForge on CodeQL's security suite instead
 of the crypto queries, a CBOMkit image without Go (all fixed 2026-10-17). An example for the paper of why
@@ -59,7 +60,7 @@ Lenient call-site recall out of 11; all runs ok.
 | CipherSift (benchmark-informed) | 11 | 11 | 11 | – | – |
 | DeepSeek | 11 | 11 | 11 | 11 | 9 |
 | xgrep | 11 | 10 | 10 | 9 | – |
-| CBOMkit, cbomkit-jar | 11 | 5 | 8 | – | – |
+| CBOMkit, CBOMkit-action | 11 | 5 | 8 | – | – |
 | CipherRadar | 11 | 8 | 9 | 9 | – |
 | Q-DARPAN | 11 | – | 9 | – | 7 |
 | CryptoScan | 9 | 10 | 10 | 10 | 1 |
@@ -222,9 +223,9 @@ was over parsed algorithms, at L0 over raw names) and was not monotone; the fixe
 below.
 - **2026-10-16, first ladder:** pooled 48 % at L0, 53 % L1, 60 % L2, 75 % L3, 75 % L4: the tool-specific part (L4) adds
   nothing overall; the gain comes from standard spellings and parsing composite names. Per tool L0 -> L4: DeepSeek 28
-  -> 64 %, cbomkit-jar 57 -> 93 %, CipherRadar 53 -> 85 %, xgrep 67 -> 92 %, CryptoScan 37 -> 53 %, securin-xbom 87 ->
-  96 %. Shares are not strictly monotone: at a given level one tool's value may already be canonical while another's
-  is still a raw name.
+  -> 64 %, CBOMkit-action 57 -> 93 %, CipherRadar 53 -> 85 %, xgrep 67 -> 92 %, CryptoScan 37 -> 53 %, securin-xbom
+  87 -> 96 %. Shares are not strictly monotone: at a given level one tool's value may already be canonical while
+  another's is still a raw name.
 - **2026-10-18, after moving tool idioms into the tool specs (WP2):** only those tools move, and only below L4:
   CipherRadar L2 73 -> 69 %, L3 87 -> 85 %; pqcheck L2 89 -> 86 %, L3 90 -> 88 %; DeepSeek L2 43 -> 42 % (`rand`
   unmapped); pooled L3 75 -> 74 %, L4 75 % unchanged. L4lit equals L4 for every tool: the interpretive entries set
@@ -236,8 +237,8 @@ below.
   of 3,026), CryptobomForge 7 %, the rest ≤ 1 %. The frozen vocabulary is not edited for these.
 
 ## RQ1 on e1-pilot-corpus (2026-10-18)
-- **Whole-document validity:** every CBOM of cbomkit-jar, cdxgen, CipherRadar, CryptoScan, pqcheck, Q-DARPAN and xgrep
-  validates. CBOMkit server 3 of 6 (`uniqueItems` in `dependencies`), DeepSeek 2 of 15 (the assembly before
+- **Whole-document validity:** every CBOM of CBOMkit-action, cdxgen, CipherRadar, CryptoScan, pqcheck, Q-DARPAN and
+  xgrep validates. CBOMkit server 3 of 6 (`uniqueItems` in `dependencies`), DeepSeek 2 of 15 (the assembly before
   2026-10-16), securin-xbom 2 of 8 (`relatedCryptoMaterialProperties.type`, `primitive` enums), CryptobomForge 4 of 6
   in IBM's draft (no schema); the two 1.6 ones were valid, but they were the worker's own empty placeholder for a
   CodeQL run without results, not the tool's output (removed 2026-10-20; cryptobom-forge writes its own empty draft
@@ -262,14 +263,15 @@ below.
 
 ## Scores on e1-pilot-corpus (2026-10-18)
 Algorithm dimension at L3, confirmation rate with 95 % CI over repos (items): securin-xbom 96 % [81, 100] (23),
-cbomkit-jar 93 % [88, 100] (68), xgrep 90 % [83, 96] (134), pqcheck 88 %, Q-DARPAN 87 %, CipherRadar 85 % (124), CBOMkit
-server 67 % [23, 100] (15), DeepSeek 59 % [46, 69] (198), CryptoScan 52 % [43, 60] (176), CryptobomForge 43 % (7);
+CBOMkit-action 93 % [88, 100] (68), xgrep 90 % [83, 96] (134), pqcheck 88 %, Q-DARPAN 87 %, CipherRadar 85 % (124),
+CBOMkit server 67 % [23, 100] (15), DeepSeek 59 % [46, 69] (198), CryptoScan 52 % [43, 60] (176), CryptobomForge
+43 % (7);
 cdxgen had no algorithm records in those CBOMs (runs before `-t`). Dawid-Skene agrees on the tails (Q-DARPAN support
 83 %, securin-xbom 81 %; CryptoScan 28 %, DeepSeek 31 %) but reorders the middle. The careful-tools-alone effect is
 visible (CBOMkit server: few items, wide CI); E4 decides what exclusivity means.
 With the fixed-unit matcher of the evening (scoring items are the clusters at L3, `score.item_id`) the ranking is
 the same except that xgrep (91 %) and pqcheck (90 %) swap places with nothing, and every rate moves by a few points:
-securin-xbom 96, cbomkit-jar 93, xgrep 91, pqcheck 90, CipherRadar 88, Q-DARPAN 88, CBOMkit server 71, DeepSeek 64,
+securin-xbom 96, CBOMkit-action 93, xgrep 91, pqcheck 90, CipherRadar 88, Q-DARPAN 88, CBOMkit server 71, DeepSeek 64,
 CryptoScan 52, CryptobomForge 50 %.
 
 ## Ladder and matching on the fixed unit (2026-10-18, evening)
@@ -277,7 +279,7 @@ The ladder now keeps the unit fixed (an algorithm = its L4 identity) and varies 
 cumulative (`analysis/README.md` "How much agreement does normalisation create?"). Every tool's share is
 non-decreasing by construction. Pilot corpus, confirmed share of a tool's algorithms at L0 / L1 / L2 / L3 / L4lit /
 L4 (number of algorithms): pooled 56 / 60 / 67 / 73 / 77 / 77 % (937); CBOMkit server 27 / 60 / 60 / 67 / 67 / 67
-(15), cbomkit-jar 68 / 74 / 84 / 93 / 94 / 94 (68), CipherRadar 70 / 74 / 81 / 87 / 89 / 89 (115), CryptoScan 32 /
+(15), CBOMkit-action 68 / 74 / 84 / 93 / 94 / 94 (68), CipherRadar 70 / 74 / 81 / 87 / 89 / 89 (115), CryptoScan 32 /
 33 / 43 / 50 / 60 / 60 (225), DeepSeek 46 / 48 / 56 / 60 / 64 / 64 (198), pqcheck 71 / 81 / 87 / 88 / 90 / 90 (90),
 Q-DARPAN 79 / 81 / 81 / 87 / 89 / 89 (62), securin-xbom 87 / 87 / 91 / 96 / 96 / 96 (23), xgrep 74 / 77 / 81 / 90 /
 92 / 92 (134), CryptobomForge 29 / 43 / 43 / 43 / 43 / 43 (7). Reading: the L0 column is the share of a tool's
@@ -308,7 +310,7 @@ so they are a snapshot, not results.
   outage; each failed run fired 300 requests because API errors took the split-and-retry path. cdxgen was OOM-killed
   at its 8 GiB limit on Chat2DB, bisq, bisq2 and kafka with the runs stored `ok` (peaks at the limit). CBOMkit's two
   pilot errors (keycloak, ansible) were "Git clone from http://gitserver/... failed" in under a minute while
-  cbomkit-jar scanned both: the git server's 256 MiB limit against a full JGit clone. All three are fixed in the
+  CBOMkit-action scanned both: the git server's 256 MiB limit against a full JGit clone. All three are fixed in the
   setup.
 - **CBOMkit's two packagings agree exactly** wherever both ran: 130 of 130 (repo, tool) cells on ICPC and all 9 E0
   repos give identical algorithm sets; the server variant takes ~4.9 GB resident and is slower.
@@ -348,7 +350,7 @@ so they are a snapshot, not results.
   hierarchy.
 - **Ladder after the change** (confirmed share of a tool's algorithms, L0 / L1 / L2 / L3 / L4, algorithms; the former
   L4lit level is gone with the last judgement entry; tailored pairs excluded, so CipherSift is absent on the pilot).
-  Pilot, pooled 61 / 70 / 83 / 90 / 90 % (914): CBOMkit 70 -> 100 (50), cbomkit-jar 66 -> 96 (67), cdxgen 0 -> 100
+  Pilot, pooled 61 / 70 / 83 / 90 / 90 % (914): CBOMkit 70 -> 100 (50), CBOMkit-action 66 -> 96 (67), cdxgen 0 -> 100
   (10), CipherRadar 69 -> 90 (134), CryptobomForge 39 -> 100 (28), CryptoScan 35 -> 72 (229), pqcheck 79 -> 99 (86),
   Q-DARPAN 86 -> 100 (55), SCANOSS 67 -> 96 (100), securin-xbom 83 -> 96 (23), xgrep 72 -> 98 (132); confirmed
   through members alone 61 / 70 / 73 / 80 / 87 %; clusters spanning several identities 65 / 68 / 75 / 63 / 63. ICPC
@@ -362,7 +364,7 @@ so they are a snapshot, not results.
   needs ≥ 3 repos and ≥ 10 items). ICPC: CipherSift 100 [100, 100], CryptobomForge 100, pqcheck 100, Q-DARPAN 100,
   xgrep 100, securin-xbom 100, CBOMkit 98 [96, 100] (pooled 97), DeepSeek 98 [96, 100] (95), CipherRadar 86 [71,
   96] (90), CryptoScan 82 [64, 92] (86); cdxgen 100 % unranked (3 repos, 6 items). Pilot: CBOMkit 100, cdxgen 100 (5
-  repos, 10 items), CryptobomForge 100, Q-DARPAN 100, pqcheck 99 [96, 100], cbomkit-jar 98 [94, 100], xgrep 98 [92,
+  repos, 10 items), CryptobomForge 100, Q-DARPAN 100, pqcheck 99 [96, 100], CBOMkit-action 98 [94, 100], xgrep 98 [92,
   100], securin-xbom 96 [88, 100], SCANOSS 96 [91, 100], CipherRadar 89 [82, 94], CryptoScan 78 [63, 88] (pooled
   72). Location (ICPC): Q-DARPAN 100,
   xgrep 100, CryptobomForge 100, pqcheck 93, securin-xbom 93 (pooled 82), CBOMkit 90 (78), DeepSeek 84 (47),
@@ -406,8 +408,8 @@ L4 identities per repository, CipherSift and observers left out).
   tool's input.
 - **CBOMkit module indexing (left as the tool does it).** Not a crash: CBOMkit indexes a directory as a module only
   when it has a build file and a `src/` directory, so on Kafka-like layouts it scans a handful of files (the pilot:
-  7 of 2,900 on Kafka). The pilot added an empty `src/` at the repo root; cbomkit-jar keeps that as the opt-in
-  `CBOMKIT_ENSURE_SRC=1`, off in every run. Effect: CBOMkit and cbomkit-jar report nothing on kafka, where the
+  7 of 2,900 on Kafka). The pilot added an empty `src/` at the repo root; CBOMkit-action keeps that as the opt-in
+  `CBOMKIT_ENSURE_SRC=1`, off in every run. Effect: CBOMkit and CBOMkit-action report nothing on kafka, where the
   other voters report 15 algorithms; keycloak carries the same risk note but is partly indexed (65 assets). Kept
   off: the empty directory is a file added to the scanned repo, it repairs the tool's indexing rather than letting
   it run, and the jar would differ from the server image by our hand.
@@ -467,7 +469,7 @@ is `unread`: the mirror is on the VM); the runs are redone on the VM with the ca
   files.
 - **Tool findings to keep as they are.** CryptoScan 1.4.0 panics on 9 of 60 repos (`slice bounds out of range`;
   ayza, mina-sshd, ballcat, simple-java-mail, MaxKey, surpass, pyca/cryptography, scapy, xipki); CBOMkit's Python
-  parser fails on OctoBot and bandit (both packagings); cbomkit-jar on refinery (protobuf); cryptarium names 631 of
+  parser fails on OctoBot and bandit (both packagings); CBOMkit-action on refinery (protobuf); cryptarium names 631 of
   its 804 records `UNKNOWN`; CipherSift puts curve Ed25519 on Ed448; CBOMkit's two packagings agree on every repo
   both ran. Peak VM RAM 40.3 GiB; wall time 2 h 26 min, queue wait median 532 s (cdxgen's and CBOMkit's serial
   queues).
@@ -478,7 +480,7 @@ golang-jwt (18 mutants, 21 variants, 252 runs, 18 min). Every run ok; hosts 57 (
 (jjwt); every mutant placed, none skipped. The criterion held: CBOMkit (both packagings) and CryptoScan report the
 inserted call at its line (±2) in every language and style, and hit no decoy; `mutation-scores.csv` has its F1
 columns. Read with the vocabulary of 2026-10-23.2:
-- **At the site in every language and style:** cbomkit, cbomkit-jar, CipherSift, CryptoScan, xgrep, qScan (Java's
+- **At the site in every language and style:** cbomkit, CBOMkit-action, CipherSift, CryptoScan, xgrep, qScan (Java's
   indirect insertion aside), securin-xbom (Java, Python), pqcheck (Python, Go), SCANOSS (Go), CryptobomForge (Python),
   Q-DARPAN (Go; Java direct and wrapper, not indirect), cdxgen (Go only: its Java and Python CBOMs name no algorithm,
   as in the pilots). Q-DARPAN's and qScan's miss of the Java *indirect* style (the algorithm name passed through a
@@ -552,7 +554,7 @@ stability-pilot and mutation-smoke were not part of this round.
 ## Replica test 2026-10-30 (corpus-pilot-medium with and without replicas)
 corpus-pilot-medium (60 repos, 10 tools) was run with replicas (`REPLICAS="cbomkit=3,cipherradar=3,scanoss=2"`, on
 2026-10-30, with the tool versions of 2026-10-30 and the earlier caps: CBOMkit 16, CipherRadar 8 GiB) and compared
-with the run without replicas of 2026-10-29. That baseline ran the older tool versions (also cbomkit-jar, and a 6 GB
+with the run without replicas of 2026-10-29. That baseline ran the older tool versions (also CBOMkit-action, and a 6 GB
 git server), so among the replicated tools only CBOMkit compares cleanly, and among the controls CipherSift, Q-DARPAN
 and pqcheck.
 - **Wall time 1 h 46 min → 56 min.** CBOMkit's three containers ended at minute 56 with 109 busy minutes between

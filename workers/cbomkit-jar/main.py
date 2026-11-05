@@ -1,5 +1,5 @@
-"""CBOMkit action-jar worker: the same sonar-cryptography engine as `workers/cbomkit`, packaged as the
-standalone `CBOMkit-action.jar` (cbomkit-action v2.3.0 -> cbomkit-lib 1.3.0 -> sonar-cryptography 1.7.0),
+"""CBOMkit-action worker (`cbomkit-jar`): the same sonar-cryptography engine as `workers/cbomkit`, packaged as
+the GitHub Action's standalone `CBOMkit-action.jar` (v2.3.0 -> cbomkit-lib 1.3.0 -> sonar-cryptography 1.7.0),
 run as a plain CLI without the server, database or git clone of the service.
 
 Why a second CBOMkit worker: the pilot of 2026-10-08 graded this packaging, the server image is what

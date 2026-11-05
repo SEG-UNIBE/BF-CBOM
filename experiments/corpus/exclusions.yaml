@@ -7,7 +7,7 @@ repos:
   - full_name: IBM/cbomkit
     reason: generator (CBOMkit server)
   - full_name: IBM/cbomkit-action
-    reason: generator (CBOMkit action jar)
+    reason: generator (CBOMkit-action, the GitHub Action)
   - full_name: IBM/sonar-cryptography
     reason: generator engine (CBOMkit's rules) and its test suite
   - full_name: PQCA/sonar-cryptography
