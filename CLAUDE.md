@@ -255,8 +255,10 @@ example, voter groups, how family and group are argued),
     <exp>/_ANALYSIS` on an export). Content only, as the paper's `assets/tab_*.tex`: booktabs, no vertical lines, a
     `tabular*` or `tabularx` of exactly `\linewidth`, tool names in the paper's `\tool{}` badges (with the looser
     `\arraystretch` they need), the rows tab-indented with aligned columns, so a file is copied into the paper's
-    `assets/` as it is; the table environment, caption and label stay in the paper. The candidates table reads
-    `cite`, `shipped`, `version` and `languages` from tools.csv, the decoys table the Java catalog.
+    `assets/` as it is (numbers of four digits or more in siunitx's `\num{}`, so the paper's preamble sets the
+    thousands separator once; 2026-11-05); the table environment, caption and label stay in the paper. The
+    candidates table reads `cite`, `shipped`, `version` and `languages` from tools.csv, the decoys table the Java
+    catalog.
     Made for svjour3 `smallextended` (one column) at the paper's `\small`, 338 pt wide: `Table.width` sums glyph
     widths measured in that class, a test keeps every layout inside it at worst-case values, `report` warns about a
     wider table, nothing is ever scaled. Tools by `name`, alphabetical, in every table; the paper's languages only.

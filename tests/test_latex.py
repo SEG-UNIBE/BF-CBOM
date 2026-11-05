@@ -50,10 +50,10 @@ def test_a_table_renders_booktabs_at_textwidth_with_groups_and_escapes():
     assert lines[3] == r"\toprule" and lines[-2] == r"\bottomrule" and "|" not in lines[2]  # no vertical lines
     assert r"\textbf{Tool} & \textbf{a\_b} & \textbf{50\,\%} \\" in lines  # headers in bold
     raw = text.splitlines()
-    assert raw[3] == "\t\\toprule" and raw[8].startswith("\tx\\&y          & 1{,}210")  # indented, aligned
+    assert raw[3] == "\t\\toprule" and raw[8].startswith("\tx\\&y          & \\num{1210}")  # indented, aligned
     assert r"\arraystretch" not in text  # no badge, no stretch
     assert r"& \multicolumn{2}{c}{\textbf{Both}} \\" in lines and r"\cmidrule(l){2-3}" in lines  # trimmed inside only
-    assert r"x\&y & 1{,}210 & -- \\" in lines
+    assert r"x\&y & \num{1210} & -- \\" in lines
     assert r"\multicolumn{3}{@{}l}{\emph{group}} \\" in lines and lines.count(r"\midrule") == 2
     too = latex.Table("x", [], "l", ["a"], [["w" * 99]])
     assert latex.too_wide([too]) and "WIDER THAN THE TEXT" in too.render("e")

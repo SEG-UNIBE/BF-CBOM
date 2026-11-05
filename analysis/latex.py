@@ -11,7 +11,8 @@ in the paper. The layouts are made for Springer's svjour3 in its single-column `
 which the paper's table environments set: 338 pt of text width. `Table.width` estimates a table's natural width from
 glyph widths measured in that class, and a test keeps every layout inside it; nothing is ever scaled. Tools appear
 under their names (`name` in tools.csv) in one order, alphabetical, the same in every table. The paper's preamble
-needs booktabs, tabularx, makecell and the `\tool`, `\yes` and `\no` macros.
+needs booktabs, tabularx, makecell, siunitx (`\num{}` for every number of four digits or more, so the thousands
+separator is set once there) and the `\tool`, `\yes` and `\no` macros.
 
     python -m analysis.latex <exp>/_ANALYSIS [run]    # rebuild from an exported folder
 """
@@ -127,22 +128,27 @@ def _head(*lines: str) -> Tex:
     return Tex(r"\makecell[b]{" + r"\\".join(_tex(x) for x in lines) + "}", "\n".join(lines))
 
 
+def _num(text: str) -> Tex:
+    """A number as the paper writes it: four digits or more in siunitx's `\\num{}`, which sets the thousands
+    separator once in the preamble (`\\num{1210}` prints 1,210), fewer digits as they are."""
+    sign, digits = ("-", text[1:]) if text.startswith("-") else ("", text)
+    whole, _, fraction = digits.partition(".")
+    plain = sign + f"{int(whole):,}" + ("." + fraction if fraction else "")
+    return Tex(r"\num{" + text + "}" if len(whole) >= 4 else text, plain)
+
+
 def _count(v) -> Tex:
-    """A whole number with the paper's thousands separator, 1{,}210."""
-    text = f"{_int(v):,}"
-    return Tex(text.replace(",", "{,}"), text)
+    """A whole number, `\\num{1210}` from four digits (prints 1,210)."""
+    return _num(str(_int(v)))
 
 
 def _number(v, digits: int = 1) -> Tex:
     f = _float(v)
-    if f is None:
-        return DASH
-    text = f"{f:,.{digits}f}"
-    return Tex(text.replace(",", "{,}"), text)
+    return DASH if f is None else _num(f"{f:.{digits}f}")
 
 
 def _seconds(column: list) -> list[Tex]:
-    """A column of seconds with one decimal while every value stays below 100, else whole (106, 3{,}600), the same
+    """A column of seconds with one decimal while every value stays below 100, else whole (106, \\num{3600}), the same
     decimals down the column so it lines up: a tenth says nothing about a long scan."""
     largest = max((f for v in column if (f := _float(v)) is not None), default=0.0)
     return [_number(v, 1 if largest < 100 else 0) for v in column]
