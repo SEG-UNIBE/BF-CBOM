@@ -1,0 +1,196 @@
+{
+ "bomFormat": "CycloneDX",
+ "specVersion": "1.6",
+ "metadata": {
+  "tools": {
+   "services": [
+    {
+     "name": "CBOMkit",
+     "provider": {
+      "name": "PQCA"
+     }
+    }
+   ]
+  },
+  "properties": [
+   {
+    "name": "bf-cbom:fixture-origin",
+    "value": "e1-pilot-corpus 2026-10-16: FiloSottile__age@b74dce4cdbe3"
+   }
+  ]
+ },
+ "components": [
+  {
+   "bom-ref": "7308247e-715d-496c-b645-de8ce67a45c0",
+   "cryptoProperties": {
+    "assetType": "related-crypto-material",
+    "relatedCryptoMaterialProperties": {
+     "size": 24,
+     "type": "salt"
+    }
+   },
+   "evidence": {
+    "occurrences": [
+     {
+      "additionalContext": "New",
+      "line": 53,
+      "location": "primitives.go",
+      "offset": 6
+     }
+    ]
+   },
+   "name": "salt@7308247e-715d-496c-b645-de8ce67a45c0",
+   "type": "cryptographic-asset"
+  },
+  {
+   "bom-ref": "0a1de990-8d77-4368-b473-f96c13d32c65",
+   "cryptoProperties": {
+    "assetType": "related-crypto-material",
+    "relatedCryptoMaterialProperties": {
+     "size": 56,
+     "type": "salt"
+    }
+   },
+   "evidence": {
+    "occurrences": [
+     {
+      "additionalContext": "New",
+      "line": 223,
+      "location": "agessh/agessh.go",
+      "offset": 7
+     }
+    ]
+   },
+   "name": "salt@0a1de990-8d77-4368-b473-f96c13d32c65",
+   "type": "cryptographic-asset"
+  },
+  {
+   "bom-ref": "f9e3e7d5-3b60-4c00-8c8d-7216f44e995a",
+   "cryptoProperties": {
+    "algorithmProperties": {
+     "padding": "oaep",
+     "primitive": "pke"
+    },
+    "assetType": "algorithm",
+    "oid": "1.2.840.113549.1.1.7"
+   },
+   "evidence": {
+    "occurrences": [
+     {
+      "additionalContext": "EncryptOAEP",
+      "line": 81,
+      "location": "agessh/agessh.go",
+      "offset": 20
+     },
+     {
+      "additionalContext": "DecryptOAEP",
+      "line": 132,
+      "location": "agessh/agessh.go",
+      "offset": 17
+     }
+    ]
+   },
+   "name": "RSA-OAEP",
+   "type": "cryptographic-asset"
+  },
+  {
+   "bom-ref": "2e8b5302-370b-4d3f-ba25-dea23da17073",
+   "cryptoProperties": {
+    "algorithmProperties": {
+     "parameterSetIdentifier": "24",
+     "primitive": "kdf"
+    },
+    "assetType": "algorithm"
+   },
+   "evidence": {
+    "occurrences": [
+     {
+      "additionalContext": "New",
+      "line": 223,
+      "location": "agessh/agessh.go",
+      "offset": 7
+     },
+     {
+      "additionalContext": "New",
+      "line": 335,
+      "location": "agessh/agessh.go",
+      "offset": 7
+     }
+    ]
+   },
+   "name": "HKDF-SHA-256",
+   "type": "cryptographic-asset"
+  },
+  {
+   "bom-ref": "e5cddc64-4726-477d-b1bb-0468c15f3efd",
+   "cryptoProperties": {
+    "algorithmProperties": {
+     "cryptoFunctions": [
+      "digest"
+     ],
+     "parameterSetIdentifier": "256",
+     "primitive": "hash"
+    },
+    "assetType": "algorithm",
+    "oid": "2.16.840.1.101.3.4.2.1"
+   },
+   "evidence": {
+    "occurrences": [
+     {
+      "additionalContext": "Sum256",
+      "line": 36,
+      "location": "agessh/agessh.go",
+      "offset": 6
+     },
+     {
+      "additionalContext": "New",
+      "line": 81,
+      "location": "agessh/agessh.go",
+      "offset": 36
+     }
+    ]
+   },
+   "name": "SHA-256",
+   "type": "cryptographic-asset"
+  },
+  {
+   "bom-ref": "c84c6ac9-ea26-4449-a06a-d0417f8dd183",
+   "cryptoProperties": {
+    "assetType": "related-crypto-material",
+    "relatedCryptoMaterialProperties": {
+     "size": 56,
+     "type": "salt"
+    }
+   },
+   "evidence": {
+    "occurrences": [
+     {
+      "additionalContext": "New",
+      "line": 335,
+      "location": "agessh/agessh.go",
+      "offset": 7
+     }
+    ]
+   },
+   "name": "salt@c84c6ac9-ea26-4449-a06a-d0417f8dd183",
+   "type": "cryptographic-asset"
+  }
+ ],
+ "dependencies": [
+  {
+   "dependsOn": [
+    "e5cddc64-4726-477d-b1bb-0468c15f3efd"
+   ],
+   "ref": "f9e3e7d5-3b60-4c00-8c8d-7216f44e995a"
+  },
+  {
+   "dependsOn": [
+    "e5cddc64-4726-477d-b1bb-0468c15f3efd",
+    "0a1de990-8d77-4368-b473-f96c13d32c65",
+    "c84c6ac9-ea26-4449-a06a-d0417f8dd183",
+    "7308247e-715d-496c-b645-de8ce67a45c0"
+   ],
+   "ref": "2e8b5302-370b-4d3f-ba25-dea23da17073"
+  }
+ ]
+}

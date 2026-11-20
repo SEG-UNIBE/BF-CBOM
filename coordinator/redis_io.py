@@ -10,9 +10,11 @@ import streamlit as st
 from common.cbom_analysis import (
     create_component_match_instruction,
 )
-from common.config import GITHUB_CACHE_TTL_SEC, GITHUB_TOKEN
+from common.config import EXPERIMENT_MEMORY_BUDGET_GB, GITHUB_CACHE_TTL_SEC, GITHUB_TOKEN
+from common.jobs import EXPERIMENT_ROUTE_PREFIX, JOB_ROUTING_KEY, tool_supports  # noqa: F401  re-exported
 from common.models import ComponentMatchJobInstruction, Inspection
-from common.utils import repo_dict_to_info
+from common.tools_registry import load_tools, plan_waves, tool_memory_gb
+from common.utils import repo_dict_to_info, resolve_remote_commit
 from coordinator.logger_config import logger
 
 
@@ -93,34 +95,6 @@ def enqueue_component_match_instruction(
     r.rpush(queue_name, instruction.to_json())
 
 
-def build_component_match_jobs(
-    r: redis.Redis,
-    insp_id: str,
-    exclude_types: bool = True,
-) -> tuple[list[ComponentMatchJobInstruction], dict[str, str]]:
-    """Return component match instructions + repo mapping for an inspection."""
-
-    repos = get_insp_repos(r, insp_id)
-
-    instructions: list[ComponentMatchJobInstruction] = []
-    repo_map: dict[str, str] = {}
-
-    for repo in repos:
-        instruction = prepare_component_match_instruction(
-            r,
-            insp_id,
-            repo,
-            exclude_types=exclude_types,
-        )
-        if not instruction:
-            continue
-
-        instructions.append(instruction)
-        repo_map[instruction.job_id] = instruction.repo_info.full_name or (repo.get("full_name") or "")
-
-    return instructions, repo_map
-
-
 # ----- GitHub enrichment helpers (module-level, cache-aware) -----
 
 
@@ -145,8 +119,6 @@ def fetch_repo_meta(r: redis.Redis, fullname: str, token: str | None) -> dict | 
                 return json.loads(cached)
             except Exception:
                 pass
-        if not token:
-            return None
         url = f"https://api.github.com/repos/{fullname}"
         resp = requests.get(url, headers=_github_headers(token), timeout=10)
         if resp.status_code == 200:
@@ -180,8 +152,6 @@ def fetch_top_language(r: redis.Redis, fullname: str, token: str | None) -> str 
                     return max(data.items(), key=lambda kv: kv[1])[0]
             except Exception:
                 pass
-        if not token:
-            return None
         url = f"https://api.github.com/repos/{fullname}/languages"
         resp = requests.get(url, headers=_github_headers(token), timeout=10)
         if resp.status_code == 200:
@@ -217,6 +187,38 @@ def get_redis() -> redis.Redis:
         st.error(f"Cannot connect to Redis at {host}:{port}: {e}")
         st.stop()
     return r
+
+
+# ----- Worker liveness -----
+
+
+def get_worker_liveness(r: redis.Redis, workers: list[str]) -> dict[str, dict | None]:
+    """Return worker -> heartbeat payload ({state, job_id, ts}) or None when the worker is down.
+
+    Workers refresh `worker:<name>:alive` (see common.worker.publish_heartbeat); the key
+    expires on its own, so a missing key means no live process is consuming that queue.
+    """
+    names = list(workers or [])
+    if not names:
+        return {}
+    pipe = r.pipeline()
+    for name in names:
+        pipe.get(f"worker:{name}:alive")
+    out: dict[str, dict | None] = {}
+    for name, raw in zip(names, pipe.execute(), strict=True):
+        payload = None
+        if raw:
+            try:
+                payload = json.loads(raw)
+            except Exception:
+                payload = {"state": "unknown"}
+        out[name] = payload
+    return out
+
+
+def dead_workers(r: redis.Redis, workers: list[str]) -> list[str]:
+    """Names from `workers` that currently have no live process."""
+    return [name for name, payload in get_worker_liveness(r, workers).items() if payload is None]
 
 
 # ----- Inspection schema helpers -----
@@ -276,6 +278,213 @@ def pair_key(repo_full_name: str, worker: str) -> str:
     return f"{repo_full_name}|{worker}"
 
 
+# Global hash job_id -> insp_id, so any poller can route any worker result.
+# JOB_ROUTING_KEY / EXPERIMENT_ROUTE_PREFIX live in common/jobs.py (workers use them to mark jobs running).
+# Routing targets with the experiment prefix are batch experiments (misc/cli experiment), not inspections:
+# their results are forwarded untouched to `results:exp:<name>` for the runner to persist.
+# Statuses that count a job as done for progress purposes.
+TERMINAL_JOB_STATUSES = ("completed", "failed", "cancelled", "unsupported")
+UNSUPPORTED_STATUS = "unsupported"
+# Flat job-hash fields that are enough to render status/duration/size without the CBOM body.
+JOB_SUMMARY_FIELDS = ("status", "worker_status", "duration_sec", "size_bytes", "started_at")
+
+
+def job_fields_from_result(job_dict: dict) -> dict[str, str]:
+    """Flatten the cheap-to-read parts of a worker JobResult into hash fields.
+
+    Readers use these instead of re-parsing `result_json` (which embeds the whole CBOM).
+    """
+    worker_status = str(job_dict.get("status") or "error")
+    fields = {
+        "worker_status": worker_status,  # ok | timeout | error
+        "received_at": now_iso(),
+        "result_json": json.dumps(job_dict, ensure_ascii=False),
+    }
+    dur = job_dict.get("duration_sec")
+    if isinstance(dur, int | float):
+        fields["duration_sec"] = f"{float(dur):.3f}"
+    size = job_dict.get("size_bytes")
+    if size is None:
+        size = len((job_dict.get("json") or "").encode("utf-8"))
+    fields["size_bytes"] = str(int(size))
+    return fields
+
+
+def job_status_key(meta: dict) -> str:
+    """Map a job hash to a canonical UI status key (see common.utils._STATUS_META).
+
+    Hash values: held | fired (= queued) | running | completed | failed | cancelled | unsupported.
+    """
+    stt = (meta.get("status") or "").lower()
+    if stt in ("completed", "cancelled", "unsupported", "running", "held"):
+        return stt
+    if stt == "failed":
+        ws = (meta.get("worker_status") or "").lower()
+        if not ws and meta.get("result_json"):
+            # Legacy hashes written before worker_status existed
+            try:
+                ws = str(json.loads(meta["result_json"]).get("status") or "").lower()
+            except Exception:
+                ws = ""
+        return "timeout" if ws == "timeout" else "failed"
+    return "queued"
+
+
+def enrich_repo(r: redis.Redis, repo: dict, gh_token: str | None) -> dict:
+    """Return a copy of a repo snapshot with branch, commit, language, stars and size filled in.
+
+    The branch is the explicit one if given, else the GitHub default branch. The commit is
+    resolved once (git ls-remote) and then kept, so re-runs and retries scan the same snapshot.
+    GitHub metadata is best-effort and cached; it is never required for a job to run.
+    """
+    repo = dict(repo)
+    fullname = repo.get("full_name")
+    branch = repo.get("branch") or repo.get("default_branch")
+    if not branch:
+        resolved = fetch_default_branch(r, fullname, gh_token)
+        branch = resolved or "main"
+        if resolved:
+            repo["default_branch"] = resolved
+    repo["branch"] = branch
+    git_url = repo.get("clone_url") or repo.get("git_url") or (f"https://github.com/{fullname}.git" if fullname else "")
+    if not repo.get("commit") and git_url:
+        sha = resolve_remote_commit(git_url, branch)
+        if sha:
+            repo["commit"] = sha
+        else:
+            logger.warning("Could not resolve commit for %s@%s; jobs will scan the branch head", fullname, branch)
+    if not repo.get("language"):
+        top = fetch_top_language(r, fullname, gh_token)
+        if top:
+            repo["language"] = top
+    if repo.get("stargazers_count") in (None, "") or repo.get("size") in (None, ""):
+        meta = fetch_repo_meta(r, fullname, gh_token)
+        if isinstance(meta, dict):
+            if repo.get("stargazers_count") in (None, "") and "stargazers_count" in meta:
+                repo["stargazers_count"] = meta.get("stargazers_count")
+            if repo.get("size") in (None, "") and "size" in meta:  # GitHub "size" is in KB
+                repo["size"] = meta.get("size")
+    return repo
+
+
+# ----- Memory budget: waves of workers -----
+# Every worker runs one job at a time, so an inspection needs at most the sum of the compose memory limits
+# of the workers that have jobs queued. `EXPERIMENT_MEMORY_BUDGET_GB` caps that sum: workers outside the
+# current wave get their jobs created as `held` (instruction kept in the job hash, nothing queued) and are
+# released by `release_due_waves` once every job of the current wave is terminal. Same planner as the runner.
+
+HELD_STATUS = "held"
+
+
+def inspection_waves(workers: list[str], budget_gb: float | None = None) -> list[list[str]]:
+    """Wave plan for an inspection's workers under the memory budget (one wave when the budget is 0)."""
+    budget = EXPERIMENT_MEMORY_BUDGET_GB if budget_gb is None else budget_gb
+    registry = load_tools()
+    memory = {w: tool_memory_gb(w, registry) for w in workers}
+    return plan_waves(list(workers), budget_gb=budget, memory_gb=memory)
+
+
+def wave_fields(waves: list[list[str]], current: int) -> dict[str, str]:
+    """Inspection hash fields describing the wave plan and the wave being fed (1-based)."""
+    return {
+        "waves_json": json.dumps(waves),
+        "wave": str(current),
+        "memory_budget_gb": f"{EXPERIMENT_MEMORY_BUDGET_GB:g}",
+    }
+
+
+def get_insp_waves(meta: dict) -> tuple[list[list[str]], int]:
+    """(waves, current wave index 1-based) from an inspection hash; ([], 0) for inspections without a plan."""
+    try:
+        waves = json.loads(meta.get("waves_json") or "[]")
+        current = int(meta.get("wave") or 0)
+    except (ValueError, TypeError):
+        return [], 0
+    return (waves if isinstance(waves, list) else []), current
+
+
+def wave_complete(rows: list[tuple[str, str]], wave: list[str]) -> bool:
+    """True when every job (worker, status) of the wave's workers is terminal or the wave has no jobs."""
+    wave_set = set(wave)
+    return all(status in TERMINAL_JOB_STATUSES for worker, status in rows if worker in wave_set)
+
+
+def _issue_job(
+    pipe: redis.client.Pipeline,
+    insp_id: str,
+    repo: dict,
+    worker: str,
+    job_id: str,
+    *,
+    hold: bool,
+    supported: bool = True,
+) -> None:
+    """Create the job record and queue it, hold it for a later wave, or close it as unsupported."""
+    fields = {"worker": worker, "repo_full_name": repo.get("full_name"), "sent_at": now_iso()}
+    if not supported:
+        fields.update(
+            {
+                "status": UNSUPPORTED_STATUS,
+                "worker_status": "unsupported",
+                "notes": f"{worker} does not list {repo.get('language') or '?'} in common/tools.yaml; not run",
+            }
+        )
+        pipe.rpush(f"insp:{insp_id}:jobs", job_id)
+        pipe.hset(f"insp:{insp_id}:job_index", mapping={pair_key(repo.get("full_name"), worker): job_id})
+        pipe.hset(f"insp:{insp_id}:job:{job_id}", mapping=fields)
+        return
+    instr_json = create_job_instruction(repo, worker, job_id).to_json()
+    if hold:
+        fields.update({"status": HELD_STATUS, "instruction_json": instr_json})
+    else:
+        pipe.rpush(f"jobs:{worker}", instr_json)
+        fields["status"] = "fired"
+    pipe.rpush(f"insp:{insp_id}:jobs", job_id)
+    pipe.hset(f"insp:{insp_id}:job_index", mapping={pair_key(repo.get("full_name"), worker): job_id})
+    pipe.hset(JOB_ROUTING_KEY, job_id, insp_id)
+    pipe.hset(f"insp:{insp_id}:job:{job_id}", mapping=fields)
+
+
+def release_due_waves(r: redis.Redis, insp_id: str) -> int:
+    """Queue the held jobs of the next wave(s) whose predecessor wave has finished; returns jobs released."""
+    meta = get_insp_meta(r, insp_id)
+    if meta.get("status") != "running":
+        return 0
+    waves, current = get_insp_waves(meta)
+    if not waves or current <= 0 or current >= len(waves):
+        return 0
+    jobs = r.lrange(f"insp:{insp_id}:jobs", 0, -1) or []
+    if not jobs:
+        return 0
+    pipe = r.pipeline()
+    for job_id in jobs:
+        pipe.hmget(f"insp:{insp_id}:job:{job_id}", "worker", "status")
+    rows = [(w or "", (stt or "").lower()) for w, stt in pipe.execute()]
+    released = 0
+    while current < len(waves) and wave_complete(rows, waves[current - 1]):
+        current += 1
+        next_workers = set(waves[current - 1])
+        pipe = r.pipeline()
+        for job_id, (worker, status) in zip(jobs, rows, strict=True):
+            if worker not in next_workers or status != HELD_STATUS:
+                continue
+            instr_json = r.hget(f"insp:{insp_id}:job:{job_id}", "instruction_json")
+            if not instr_json:
+                logger.warning("Held job %s of %s has no instruction; marking failed", job_id, insp_id)
+                pipe.hset(f"insp:{insp_id}:job:{job_id}", mapping={"status": "failed", "worker_status": "error"})
+                continue
+            pipe.rpush(f"jobs:{worker}", instr_json)
+            pipe.hset(f"insp:{insp_id}:job:{job_id}", mapping={"status": "fired", "sent_at": now_iso()})
+            pipe.hdel(f"insp:{insp_id}:job:{job_id}", "instruction_json")
+            released += 1
+        pipe.hset(f"insp:{insp_id}", mapping={"wave": str(current), "wave_released_at": now_iso()})
+        pipe.execute()
+        logger.info("Inspection %s: wave %d/%d released (%s)", insp_id, current, len(waves), ", ".join(next_workers))
+        # the released jobs are now fired, i.e. the new current wave is not complete unless it had no jobs
+        rows = [(w, "fired" if (w in next_workers and stt == HELD_STATUS) else stt) for w, stt in rows]
+    return released
+
+
 def create_inspection(r: redis.Redis, name: str, params: dict, repos: list[dict], workers: list[str]) -> str:
     """Create an inspection record with a snapshot of repos and selected workers."""
     insp_id = str(uuid.uuid4())
@@ -325,116 +534,114 @@ def start_inspection(r: redis.Redis, insp_id: str) -> int:
     repos = get_insp_repos(r, insp_id)
     workers = get_insp_workers(r, insp_id)
     repos_key = f"insp:{insp_id}:repos"
+    waves = inspection_waves(workers)
+    first_wave = set(waves[0]) if waves else set(workers)
 
     issued = 0
     pipe = r.pipeline()
     # Optional token for higher rate limits when resolving default branches
     gh_token = GITHUB_TOKEN
 
+    registry = load_tools()
     for idx, repo in enumerate(repos):
-        repo = dict(repo)
-        fullname = repo.get("full_name")
-        branch = repo.get("default_branch") or repo.get("branch")
-        if not branch:
-            resolved = fetch_default_branch(r, fullname, gh_token)
-            branch = resolved or "main"
-            if resolved:
-                repo["default_branch"] = resolved
-        # Ensure branch is set for job instruction
-        repo["branch"] = branch
-        # Ensure a language is set to aid language-specific workers
-        if not repo.get("language"):
-            top = fetch_top_language(r, fullname, gh_token)
-            if top:
-                repo["language"] = top
-        # Best-effort fill stars and size if missing (helps UI summaries)
-        if repo.get("stargazers_count") in (None, "") or repo.get("size") in (None, ""):
-            meta = fetch_repo_meta(r, fullname, gh_token)
-            if isinstance(meta, dict):
-                if repo.get("stargazers_count") in (None, "") and "stargazers_count" in meta:
-                    repo["stargazers_count"] = meta.get("stargazers_count")
-                # GitHub "size" is in KB
-                if repo.get("size") in (None, "") and "size" in meta:
-                    repo["size"] = meta.get("size")
-
+        repo = enrich_repo(r, repo, gh_token)
         pipe.lset(repos_key, idx, json.dumps(repo))
-
         for worker in workers:
-            job_id = str(uuid.uuid4())
-            instr_obj = create_job_instruction(repo, worker, job_id)
-            pipe.rpush(f"jobs:{worker}", instr_obj.to_json())
-            pipe.rpush(f"insp:{insp_id}:jobs", job_id)
-            pipe.hset(
-                f"insp:{insp_id}:job_index",
-                mapping={pair_key(fullname, worker): job_id},
-            )
-            pipe.hset(
-                f"insp:{insp_id}:job:{job_id}",
-                mapping={
-                    "worker": worker,
-                    "repo_full_name": fullname,
-                    "status": "fired",
-                    "sent_at": now_iso(),
-                },
+            supported = tool_supports(worker, repo.get("language"), registry)
+            _issue_job(
+                pipe, insp_id, repo, worker, str(uuid.uuid4()), hold=worker not in first_wave, supported=supported
             )
             issued += 1
     pipe.hset(
         f"insp:{insp_id}",
-        mapping={
-            "status": "running",
-            "started_at": now_iso(),
-            "issued_jobs": str(issued),
-        },
+        mapping={"status": "running", "started_at": now_iso(), "issued_jobs": str(issued), **wave_fields(waves, 1)},
     )
     pipe.execute()
+    if len(waves) > 1:
+        logger.info("Inspection %s: %d waves under %g GiB: %s", insp_id, len(waves), EXPERIMENT_MEMORY_BUDGET_GB, waves)
     return issued
+
+
+def _route_result(r: redis.Redis, polling_insp_id: str, job_id: str) -> str | None:
+    """Return the inspection a job belongs to, or None if unknown."""
+    insp = r.hget(JOB_ROUTING_KEY, job_id)
+    if insp:
+        return insp
+    # Jobs issued before the routing index existed: accept if the poller owns it.
+    if r.exists(f"insp:{polling_insp_id}:job:{job_id}"):
+        return polling_insp_id
+    return None
+
+
+def ingest_worker_results(r: redis.Redis, polling_insp_id: str, workers: list[str]) -> int:
+    """Drain `results:<worker>` lists and file each result under its inspection.
+
+    Every popped entry is consumed exactly once: routed to its inspection, stored as a
+    late result if that job was already cancelled, or dropped (and logged) if it belongs
+    to no known job. Nothing is left behind to be rescanned on the next poll.
+    """
+    ingested = 0
+    for worker in workers:
+        results_key = f"results:{worker}"
+        while True:
+            raw = r.lpop(results_key)
+            if raw is None:
+                break
+            try:
+                job_dict = json.loads(raw)
+            except Exception:
+                logger.warning("Dropping unparsable result from %s: %.200s", results_key, raw)
+                continue
+            job_id = job_dict.get("job_id")
+            insp_id = _route_result(r, polling_insp_id, job_id) if job_id else None
+            if not insp_id:
+                logger.warning("Dropping result for unknown job %s from %s", job_id, results_key)
+                continue
+            if insp_id.startswith(EXPERIMENT_ROUTE_PREFIX):
+                pipe = r.pipeline()
+                pipe.rpush(f"results:{insp_id}", raw)
+                pipe.hdel(JOB_ROUTING_KEY, job_id)
+                pipe.execute()
+                ingested += 1
+                continue
+            job_key = f"insp:{insp_id}:job:{job_id}"
+            current = r.hget(job_key, "status") or ""
+            fields = job_fields_from_result(job_dict)
+            if current == "cancelled":
+                # Worker finished after the user cancelled: keep the data, keep the status.
+                fields["late_received_at"] = fields.pop("received_at")
+            elif current in ("completed", "failed"):
+                logger.warning("Duplicate result for job %s (status=%s); keeping the first", job_id, current)
+                continue
+            else:
+                fields["status"] = "completed" if fields["worker_status"] == "ok" else "failed"
+            pipe = r.pipeline()
+            pipe.hset(job_key, mapping=fields)
+            pipe.hdel(JOB_ROUTING_KEY, job_id)
+            pipe.execute()
+            ingested += 1
+    return ingested
+
+
+def count_done_jobs(r: redis.Redis, insp_id: str) -> tuple[int, int]:
+    """Return (done, total) for an inspection using one pipelined round-trip."""
+    jobs = r.lrange(f"insp:{insp_id}:jobs", 0, -1) or []
+    if not jobs:
+        return 0, 0
+    pipe = r.pipeline()
+    for job_id in jobs:
+        pipe.hget(f"insp:{insp_id}:job:{job_id}", "status")
+    statuses = pipe.execute()
+    done = sum(1 for stt in statuses if (stt or "") in TERMINAL_JOB_STATUSES)
+    return done, len(jobs)
 
 
 def collect_results_once(r: redis.Redis, insp_id: str) -> tuple[int, int]:
     """Ingest available worker results once; return (done_count, total_jobs)."""
-    jobs = r.lrange(f"insp:{insp_id}:jobs", 0, -1) or []
     workers = get_insp_workers(r, insp_id)
-
-    # Build set of pending job_ids
-    pending = set()
-    for job_id in jobs:
-        stt = r.hget(f"insp:{insp_id}:job:{job_id}", "status") or ""
-        if stt not in ("completed", "failed", "cancelled"):
-            pending.add(job_id)
-
-    ingested = 0
-    for worker in workers:
-        raw_list = r.lrange(f"results:{worker}", 0, -1) or []
-        for raw in raw_list:
-            try:
-                job_dict = json.loads(raw)
-            except Exception:
-                continue
-            job_id = job_dict.get("job_id")
-            if not job_id or job_id not in pending:
-                continue
-            # Remove from worker results and store under inspection
-            r.lrem(f"results:{worker}", 1, raw)
-            status = job_dict.get("status", "error")
-            final = "completed" if status == "ok" else "failed"
-            r.hset(
-                f"insp:{insp_id}:job:{job_id}",
-                mapping={
-                    "status": final,
-                    "received_at": now_iso(),
-                    "result_json": json.dumps(job_dict, ensure_ascii=False),
-                },
-            )
-            ingested += 1
-
-    # Return counts: completed/failed and total
-    done = 0
-    for job_id in jobs:
-        stt = r.hget(f"insp:{insp_id}:job:{job_id}", "status") or ""
-        if stt in ("completed", "failed", "cancelled"):
-            done += 1
-    total = len(jobs)
-    return done, total
+    ingest_worker_results(r, insp_id, workers)
+    release_due_waves(r, insp_id)
+    return count_done_jobs(r, insp_id)
 
 
 def cancel_inspection(r: redis.Redis, insp_id: str) -> int:
@@ -452,19 +659,7 @@ def cancel_inspection(r: redis.Redis, insp_id: str) -> int:
         if stt not in ("completed", "failed", "cancelled"):
             pending.append(job_id)
 
-    # Remove queued messages for pending jobs from worker queues
-    pending_set = set(pending)
-    for w in workers:
-        queue = f"jobs:{w}"
-        raw_list = r.lrange(queue, 0, -1) or []
-        for raw in raw_list:
-            try:
-                obj = json.loads(raw)
-            except Exception:
-                continue
-            jid = obj.get("job_id")
-            if jid and jid in pending_set:
-                r.lrem(queue, 1, raw)
+    _unqueue(r, workers, set(pending))
 
     # Mark pending jobs as cancelled
     pipe = r.pipeline()
@@ -473,9 +668,23 @@ def cancel_inspection(r: redis.Redis, insp_id: str) -> int:
             f"insp:{insp_id}:job:{job_id}",
             mapping={"status": "cancelled", "cancelled_at": now_iso()},
         )
+        pipe.hdel(f"insp:{insp_id}:job:{job_id}", "instruction_json")  # held jobs: never queued
     pipe.hset(f"insp:{insp_id}", mapping={"status": "cancelled", "cancelled_at": now_iso()})
     pipe.execute()
     return len(pending)
+
+
+def _unqueue(r: redis.Redis, workers: list[str], job_ids: set[str]) -> None:
+    """Remove the queued instructions of `job_ids` from the workers' queues."""
+    for w in workers:
+        queue = f"jobs:{w}"
+        for raw in r.lrange(queue, 0, -1) or []:
+            try:
+                jid = json.loads(raw).get("job_id")
+            except Exception:
+                continue
+            if jid in job_ids:
+                r.lrem(queue, 1, raw)
 
 
 def reset_inspection_jobs(r: redis.Redis, insp_id: str) -> int:
@@ -488,11 +697,13 @@ def reset_inspection_jobs(r: redis.Redis, insp_id: str) -> int:
     pipe = r.pipeline()
     for job_id in jobs:
         pipe.delete(f"insp:{insp_id}:job:{job_id}")
+        pipe.hdel(JOB_ROUTING_KEY, job_id)
     # Clear job list and index
     pipe.delete(f"insp:{insp_id}:jobs")
     pipe.delete(f"insp:{insp_id}:job_index")
     # Reset meta status back to created (keep name/repos/workers)
     pipe.hset(f"insp:{insp_id}", mapping={"status": "created", "reset_at": now_iso()})
+    pipe.hdel(f"insp:{insp_id}", "waves_json", "wave", "wave_released_at")
     pipe.execute()
     return len(jobs)
 
@@ -514,70 +725,32 @@ def retry_non_completed_inspection(r: redis.Redis, insp_id: str) -> int:
     repos_key = f"insp:{insp_id}:repos"
     gh_token = GITHUB_TOKEN
 
-    issued = 0
-    pipe = r.pipeline()
     job_index_key = f"insp:{insp_id}:job_index"
+    todo: list[tuple[dict, str]] = []
+    pipe = r.pipeline()
     for idx, repo in enumerate(repos):
-        repo = dict(repo)
-        fullname = repo.get("full_name")
-        branch = repo.get("default_branch") or repo.get("branch")
-        if not branch:
-            resolved = fetch_default_branch(r, fullname, gh_token)
-            branch = resolved or "main"
-            if resolved:
-                repo["default_branch"] = resolved
-        repo["branch"] = branch
-        if not repo.get("language"):
-            top = fetch_top_language(r, fullname, gh_token)
-            if top:
-                repo["language"] = top
-        if repo.get("stargazers_count") in (None, "") or repo.get("size") in (None, ""):
-            meta = fetch_repo_meta(r, fullname, gh_token)
-            if isinstance(meta, dict):
-                if repo.get("stargazers_count") in (None, "") and "stargazers_count" in meta:
-                    repo["stargazers_count"] = meta.get("stargazers_count")
-                if repo.get("size") in (None, "") and "size" in meta:
-                    repo["size"] = meta.get("size")
-
+        repo = enrich_repo(r, repo, gh_token)
         pipe.lset(repos_key, idx, json.dumps(repo))
-
         for worker in workers:
-            pk = pair_key(fullname, worker)
-            prior_id = r.hget(job_index_key, pk)
-            completed = False
-            if prior_id:
-                stt = r.hget(f"insp:{insp_id}:job:{prior_id}", "status") or ""
-                completed = stt == "completed"
-            if completed:
+            prior_id = r.hget(job_index_key, pair_key(repo.get("full_name"), worker))
+            prior = (r.hget(f"insp:{insp_id}:job:{prior_id}", "status") or "") if prior_id else ""
+            if prior in ("completed", UNSUPPORTED_STATUS):
                 continue
+            todo.append((repo, worker))
 
-            job_id = str(uuid.uuid4())
-            instr_obj = create_job_instruction(repo, worker, job_id)
-            # Queue the job
-            pipe.rpush(f"jobs:{worker}", instr_obj.to_json())
-            # Append new job id and update index mapping
-            pipe.rpush(f"insp:{insp_id}:jobs", job_id)
-            pipe.hset(job_index_key, mapping={pk: job_id})
-            # Create job hash
-            pipe.hset(
-                f"insp:{insp_id}:job:{job_id}",
-                mapping={
-                    "worker": worker,
-                    "repo_full_name": fullname,
-                    "status": "fired",
-                    "sent_at": now_iso(),
-                },
-            )
-            issued += 1
+    registry = load_tools()
+    runnable = [(repo, w) for repo, w in todo if tool_supports(w, repo.get("language"), registry)]
+    waves = inspection_waves(sorted({w for _, w in runnable}, key=workers.index))
+    first_wave = set(waves[0]) if waves else set()
+    for repo, worker in todo:
+        supported = tool_supports(worker, repo.get("language"), registry)
+        _issue_job(pipe, insp_id, repo, worker, str(uuid.uuid4()), hold=worker not in first_wave, supported=supported)
+    issued = len(todo)
 
     if issued:
         pipe.hset(
             f"insp:{insp_id}",
-            mapping={
-                "status": "running",
-                "started_at": now_iso(),
-                "issued_jobs": str(issued),
-            },
+            mapping={"status": "running", "started_at": now_iso(), "issued_jobs": str(issued), **wave_fields(waves, 1)},
         )
     pipe.execute()
     return issued
@@ -591,23 +764,27 @@ def delete_inspection(r: redis.Redis, insp_id: str) -> int:
     - `insp:{id}:repos` list
     - `insp:{id}:jobs` list
     - `insp:{id}:job_index` hash
-    - `insp:{id}:job:{job_id}` hashes for all jobs
+    - `insp:{id}:job:{job_id}` hashes for all jobs and their `jobs:routing` entries
+    - its jobs still waiting in the worker queues (a job a worker already took finishes; its result is dropped)
     - membership in `inspects` set
 
     Returns count of deleted per-job hashes (for reference).
     """
     # Gather job ids
     jobs = r.lrange(f"insp:{insp_id}:jobs", 0, -1) or []
+    _unqueue(r, get_insp_workers(r, insp_id), set(jobs))
     deleted_jobs = 0
     pipe = r.pipeline()
     # Delete per-job hashes
     for job_id in jobs:
         pipe.delete(f"insp:{insp_id}:job:{job_id}")
+        pipe.hdel(JOB_ROUTING_KEY, job_id)
         deleted_jobs += 1
     # Delete containers
     pipe.delete(f"insp:{insp_id}:jobs")
     pipe.delete(f"insp:{insp_id}:job_index")
     pipe.delete(f"insp:{insp_id}:repos")
+    pipe.delete(f"insp:{insp_id}:match_results")
     pipe.delete(f"insp:{insp_id}")
     pipe.srem("inspects", insp_id)
     pipe.execute()
@@ -616,10 +793,12 @@ def delete_inspection(r: redis.Redis, insp_id: str) -> int:
     return deleted_jobs
 
 
+# Matcher workers that consume ComponentMatchJobInstruction payloads.
+COMPONENT_MATCH_WORKERS = ("pyqun", "treesimilartiy")
+
+
 def _purge_component_match_data(r: redis.Redis, insp_id: str) -> None:
-    worker = "treesimilartiy"
-    queue_key = f"jobs:{worker}"
-    results_key = f"results:{worker}"
+    """Remove queued/finished component-match payloads that belong to an inspection."""
 
     def _filter_list(key: str):
         items = r.lrange(key, 0, -1) or []
@@ -641,5 +820,6 @@ def _purge_component_match_data(r: redis.Redis, insp_id: str) -> None:
                 pipe.rpush(key, *filtered)
             pipe.execute()
 
-    _filter_list(queue_key)
-    _filter_list(results_key)
+    for worker in COMPONENT_MATCH_WORKERS:
+        _filter_list(f"jobs:{worker}")
+        _filter_list(f"results:{worker}")

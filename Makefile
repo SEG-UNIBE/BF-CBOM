@@ -1,10 +1,35 @@
 # ====== Project Configuration (edit only here) ======
 VERSION := $(shell cat VERSION 2>/dev/null || echo "0.0.0")
 BASE_IMAGE := bf-cbom/base
+# Git commit of this checkout, stamped into every image (ENV BF_CBOM_COMMIT, last layer) and every JobResult;
+# `-dirty` means the images were built from uncommitted changes
+BF_CBOM_COMMIT := $(shell git describe --always --dirty --abbrev=12 2>/dev/null || echo unknown)
 # Comma-separated list of all workers available in the repo
-AVAILABLE_WORKERS := skeleton,testing,mssbomtool,cbomkit,cdxgen,cryptobomforge,deepseek
+AVAILABLE_WORKERS := skeleton,testing,cbomkit,cdxgen,cryptobomforge,deepseek,cryptoscan,chatgpt,claude,pqcheck,qdarpan,securin-xbom,cipherradar,xgrep,cbomkit-jar,ciphersift,scanoss,qelens,cryptarium,qscan
 # Comma-separated list of dev-only workers
-DEV_WORKERS := skeleton,testing,mssbomtool
+DEV_WORKERS := skeleton,testing
+# Comma-separated list of parked workers: kept in the repo, in the prod stack only with EXTRA_PROFILES=parked
+PARKED_WORKERS := ciphersift
+# Batch runs (make experiment): memory budget in GiB = sum of the compose memory limits of the workers
+# fed at the same time (common/tools.yaml memory_gb). Tools beyond the budget run in later waves.
+# Laptop default 14 (Docker Desktop VM ~20 GiB); on a big VM set 0 (no limit) or e.g. 64.
+# Override per call: make experiment EXP=... EXPERIMENT_MEMORY_BUDGET_GB=0
+EXPERIMENT_MEMORY_BUDGET_GB ?= 14
+# Memory cap of the git server (compose limit). A full clone runs git pack-objects inside this cgroup; 256m killed it
+# on keycloak and ansible (CBOMkit's JGit clone, 2026-10-19). 16g (6g until 2026-10-30) leaves room for the concurrent
+# full clones of CBOMkit replicas; a limit is a cap, not a reservation.
+GITSERVER_MEMORY ?= 16g
+# Largest packed repo size `make corpus` samples; empty: 1536 MB (common/corpus.py DEFAULT_MAX_REPO_SIZE_MB, a quarter
+# of the git server's memory when the paper's corpus was built).
+CORPUS_MAX_REPO_SIZE_MB ?=
+# Memory cap of the runner (compose limit). `analysis report` holds every normalized CBOM of an experiment and runs
+# up to 8 worker processes (--jobs, misc/cli/parallel.py), each with one parsed CBOM or one repository's records
+# plus numpy and scikit-learn; 2g was killed on corpus-pilot-medium (exit 137, 2026-10-23).
+RUNNER_MEMORY ?= 8g
+# Worker processes of `analysis report` (--jobs; 0 = auto: min(CPUs, 8) for a step with 16+ items). On the VM (64 CPUs,
+# 122 GiB), with no experiment running: make experiment-export-all BF_CBOM_JOBS=32 RUNNER_MEMORY=96g
+# (or export both in the VM's shell profile: `?=` lets the environment win)
+BF_CBOM_JOBS ?= 0
 # Export everything defined above to downstream commands for cross-shell support
 .EXPORT_ALL_VARIABLES:
 # ====================================================
@@ -26,20 +51,37 @@ to_comma_list = $(subst $(space),$(comma),$(strip $1))
 
 AVAILABLE_WORKERS_LIST := $(call to_space_list,$(AVAILABLE_WORKERS))
 DEV_WORKERS_LIST       := $(call to_space_list,$(DEV_WORKERS))
-PROD_WORKERS_LIST      := $(filter-out $(DEV_WORKERS_LIST),$(AVAILABLE_WORKERS_LIST))
+PARKED_WORKERS_LIST    := $(if $(findstring parked,$(EXTRA_PROFILES)),,$(call to_space_list,$(PARKED_WORKERS)))
+PROD_WORKERS_LIST      := $(filter-out $(DEV_WORKERS_LIST) $(PARKED_WORKERS_LIST),$(AVAILABLE_WORKERS_LIST))
 PROD_WORKERS           := $(call to_comma_list,$(PROD_WORKERS_LIST))
 
+# NO_CACHE=1 rebuilds every layer from the Dockerfiles (e.g. `make up-prod NO_CACHE=1`)
+NO_CACHE ?= 0
+NO_CACHE_FLAG := $(if $(filter 1,$(NO_CACHE)),--no-cache,)
+
 build-base:
-	docker build -f docker/Dockerfile.base \
+	docker build $(NO_CACHE_FLAG) -f docker/Dockerfile.base \
 		-t $(BASE_IMAGE):$(VERSION) .
 
 release:
 	bash ./scripts/bump_version.sh $(VERSION)
 
-# Helper to build all services with the correct base tag
+# Helper to build all services (of the active profile) with the correct base tag.
+# SERIAL_BUILD=1 (default) builds one service at a time to avoid OOM in the Docker VM;
+# use SERIAL_BUILD=0 for a faster parallel build on machines with plenty of RAM.
+# The profiles built: the target's (COMPOSE_PROFILES, e.g. prod) plus the runner's (tools) and the LLM workers'. Given
+# as --profile flags they would replace COMPOSE_PROFILES: the parallel build then left out every prod worker, and
+# `make up-prod` recreated the workers from their old images (fixed 2026-10-31; `make board` shows each build).
+SERIAL_BUILD ?= 1
+BUILD_PROFILES = $(if $(COMPOSE_PROFILES),$(COMPOSE_PROFILES)$(comma))tools,llm
 build-all: ensure-env build-base
-	docker compose build
-	docker image prune -f
+ifeq ($(SERIAL_BUILD),1)
+	@for svc in $$(COMPOSE_PROFILES=$(BUILD_PROFILES) docker compose config --services); do \
+		echo ">>> building $$svc"; COMPOSE_PROFILES=$(BUILD_PROFILES) docker compose build $(NO_CACHE_FLAG) $$svc || exit 1; \
+	done
+else
+	COMPOSE_PROFILES=$(BUILD_PROFILES) docker compose build $(NO_CACHE_FLAG)
+endif
 
 # Dev: only the explicitly listed dev workers
 up-dev: export COMPOSE_PROFILES := dev
@@ -47,19 +89,138 @@ up-dev: export AVAILABLE_WORKERS := $(DEV_WORKERS)
 up-dev: build-all
 	docker compose up
 
-# Prod: all workers except the dev-only ones
-up-prod: export COMPOSE_PROFILES := prod
+# Prod: all workers except the dev-only ones, started in the background; then the live board (`make board`; Ctrl-C
+# closes it, the stack keeps running: `make logs` for the raw logs, `make down` stops it; NO_BOARD=1 skips it, so a
+# command can follow in one line). Opt-in groups via EXTRA_PROFILES, e.g.
+#   make up-prod EXTRA_PROFILES=llm      (chatgpt + claude workers; need API keys in docker/env/)
+#   make up-prod EXTRA_PROFILES=parked   (the parked workers, PARKED_WORKERS)
+# A service that is not up within the wait shows on the board (as down), so make goes on.
+up_detached = docker compose up -d --wait --wait-timeout 300 $(1) \
+	|| echo "some services are not up yet; the board shows which"
+EXTRA_PROFILES ?=
+# REPLICAS="cbomkit=3,cipherradar=3,scanoss=2": that many containers of those workers (`--scale worker-<tool>=N`), all
+# taking jobs from the tool's one queue; every experiment counts them from their heartbeats, so `make experiment` needs
+# nothing more. A later `make up-prod` without REPLICAS scales back to one each: on the VM, export it in the shell
+# profile to keep it (experiments/README.md "Parallelism and memory").
+REPLICAS ?=
+SCALE = $(foreach r,$(subst $(comma), ,$(REPLICAS)),--scale worker-$(r))
+up-prod: export COMPOSE_PROFILES := prod$(if $(EXTRA_PROFILES),$(comma)$(EXTRA_PROFILES),)
 up-prod: export AVAILABLE_WORKERS := $(PROD_WORKERS)
 up-prod: build-all
-	docker compose up
+	$(call up_detached,$(SCALE))
+	@$(if $(NO_BOARD),,$(MAKE) --no-print-directory board)
+
+# Prod from prebuilt GHCR images (no local build; see .github/workflows/images.yml)
+up-prod-pull: export COMPOSE_PROFILES := prod$(if $(EXTRA_PROFILES),$(comma)$(EXTRA_PROFILES),)
+up-prod-pull: export AVAILABLE_WORKERS := $(PROD_WORKERS)
+up-prod-pull: ensure-env
+	docker compose pull
+	$(call up_detached,--no-build $(SCALE))
+	@$(if $(NO_BOARD),,$(MAKE) --no-print-directory board)
 
 # All: exactly what's in AVAILABLE_WORKERS
 up-all: export COMPOSE_PROFILES := all
 up-all: build-all
 	docker compose up
 
+# every profile, so no container of another profile stays behind on the old network (it could not reach the
+# recreated redis and would show as `down` on the board)
+down: export COMPOSE_PROFILES := all
 down:
-	docker compose down
+	docker compose down --remove-orphans
+
+# `service=commit,...` for every running container of the stack, read from the container's own BF_CBOM_COMMIT (the
+# commit its image was built from), so it says what really runs: the board shows it, `make experiment` refuses to
+# run on workers or a git server built from another commit than the runner
+CONTAINER_BUILDS = $$(ids=$$(docker ps -q --filter label=com.docker.compose.project=bf-cbom); test -z "$$ids" || docker inspect --format '{{index .Config.Labels "com.docker.compose.service"}} {{join .Config.Env " "}}' $$ids | sed -n 's/^\([^ ]*\) .*BF_CBOM_COMMIT=\([^ ]*\).*/\1=\2/p' | sort -u | paste -sd, -)
+
+# The live board of the running stack (misc/cli/stack_cmd.py): experiments, workers, queues; ARGS="--once" prints one
+# snapshot. BOARD_SERVICES: every container of the stack, running or exited, so a crashed worker shows as down.
+# BOARD_CHECKOUT: this checkout's commit, what `make up-prod` builds; BOARD_BUILDS: CONTAINER_BUILDS.
+board: ensure-env
+	docker compose run --rm -e TERM -e COLORTERM -e BF_CBOM_VERSION=$(VERSION) -e BOARD_CHECKOUT=$(BF_CBOM_COMMIT) \
+		-e BOARD_SERVICES="$$(docker ps -a --filter label=com.docker.compose.project=bf-cbom --format '{{.Label "com.docker.compose.service"}}' | sort -u | paste -sd, -)" \
+		-e BOARD_BUILDS="$(CONTAINER_BUILDS)" \
+		runner stack board $(ARGS)
+
+# ---- Batch experiments (results stay in the results-data volume; see experiments/README.md) ----
+# make experiment EXP=experiments/mutation-smoke.yaml
+# EXPERIMENT_IMAGE_IDS: the images on this host by content (recorded per session in <exp>/_run-log.json);
+# EXPERIMENT_BUILDS: CONTAINER_BUILDS, recorded too, and the run refuses to start when a worker of the spec or
+# the git server was built from another commit than the runner (`make up-prod` rebuilds them).
+# Replicas come from `make up-prod REPLICAS=...`; the run counts them and the memory budget counts each one.
+experiment: ensure-env
+	EXPERIMENT_IMAGE_IDS="$$(docker images --no-trunc --format '{{.Repository}}:{{.Tag}}={{.ID}}' --filter 'reference=bf-cbom/*:$(VERSION)' | paste -sd ',' -)" \
+	EXPERIMENT_BUILDS="$(CONTAINER_BUILDS)" \
+	docker compose run --rm -e EXPERIMENT_IMAGE_IDS -e EXPERIMENT_BUILDS runner experiment run /app/$(EXP) $(ARGS)
+
+# make experiment-attach  -> join the terminal of the `experiment run` of this stack from another shell: its progress
+# board and the result lines from now on. Detach with Ctrl-P Ctrl-Q; Ctrl-C interrupts the run as in its own terminal.
+experiment-attach:
+	@id=$$(docker ps --no-trunc --filter label=com.docker.compose.project=bf-cbom \
+		--filter label=com.docker.compose.service=runner --format '{{.ID}} {{.Command}}' \
+		| grep -F 'experiment run' | cut -d' ' -f1 | head -1); \
+	test -n "$$id" || { echo "no experiment run is running in this stack (make experiment EXP=...)"; exit 1; }; \
+	docker attach --detach-keys='ctrl-p,ctrl-q' $$id
+
+# make experiment-status NAME=mutation-smoke   /   make experiment-list
+experiment-status:
+	docker compose run --rm runner experiment status $(NAME)
+
+experiment-list:
+	docker compose run --rm runner experiment list
+
+# make experiment-collect NAME=mutation-smoke  -> collect results of jobs already queued (after `ARGS=--no-wait`)
+experiment-collect:
+	docker compose run --rm runner experiment collect $(NAME) $(ARGS)
+
+# make experiment-cancel NAME=mutation-smoke  -> remove its queued jobs from the worker queues
+experiment-cancel:
+	docker compose run --rm runner experiment cancel $(NAME)
+
+# make experiment-delete NAME=mutation-smoke  -> removes <name> from the results-data volume (asks first; ARGS=--yes skips)
+experiment-delete:
+	docker compose run --rm runner experiment delete $(NAME) $(ARGS)
+
+# make experiment-export NAME=mutation-smoke  -> experiments/results/<name>.zip;
+# runs `analysis report` first (ARGS=--no-report skips it, ARGS=--raqun adds RaQuN's cross-check, in files of its own)
+experiment-export:
+	mkdir -p experiments/results
+	docker compose run --rm -v "$(CURDIR)/experiments/results:/export" runner experiment export $(NAME) --dest /export $(ARGS)
+
+# make experiment-export-all  -> one ZIP per complete experiment (no run missing), overwriting the ZIPs there;
+# each runs `analysis report` first, as experiment-export does (ARGS=--no-report skips it, ARGS=--raqun adds RaQuN)
+experiment-export-all:
+	mkdir -p experiments/results
+	docker compose run --rm -v "$(CURDIR)/experiments/results:/export" runner experiment export --all --dest /export $(ARGS)
+
+# make corpus ARGS="--per-cell 2"  -> results volume: corpus/corpus.yaml (export with corpus-export); 3 star bins x
+# 3 size bins x 2 repos = 18 per language by default (--star-bins, --size-bins, --per-cell; common/corpus.py)
+# plus corpus/corpus-frame.yaml (every cell's population, the crypto checks); ARGS="--frame /data/results/corpus/
+# corpus-frame.yaml --per-cell 2 --out /data/results/corpus/corpus-pc2.yaml" redraws from it without searching
+# (without --out the redraw replaces corpus.yaml); with --as-of <the first draw's moment> the redraw repeats that
+# draw exactly: recorded commits stand, and only what the exclusions changed since is replaced
+corpus: ensure-env
+	docker compose run --rm runner experiment corpus build $(ARGS)
+
+# make corpus-prune ARGS="--in /data/results/corpus/corpus.yaml --from stability-pilot"  -> drops repos a tool timed out on
+corpus-prune:
+	docker compose run --rm runner experiment corpus prune $(ARGS)
+
+# make corpus-smallest ARGS="--from corpus-main --out /data/results/corpus/mutation-main.yaml"  -> per language the 30
+# smallest repos (source size) where every supported tool's run was ok, at their pinned commits, and the projected
+# length of the mutation run (then `make corpus-export`, and the file goes to experiments/corpus/)
+corpus-smallest:
+	docker compose run --rm runner experiment corpus smallest $(ARGS)
+
+corpus-export:
+	mkdir -p experiments/results
+	docker compose run --rm --no-deps --entrypoint sh -v "$(CURDIR)/experiments/results:/export" runner \
+		-c 'cp -v /data/results/corpus/*.yaml /export/'
+
+# make analysis ARGS="report stability-pilot"  /  ARGS="micro bar-micro"  -> results volume: <exp>/_ANALYSIS/
+analysis:
+	docker compose run --rm --no-deps runner analysis $(ARGS)
 
 logs:
 	docker compose logs -f
@@ -78,12 +239,19 @@ ensure-env: $(ENV_FILES)
 $(ENV_DIR)/%.env: $(ENV_DIR)/%.env.template
 	@$(ENSURE_ENV_SCRIPT) $< $@
 
-.PHONY: prune prune-build clean-docker build-base build-all release up-dev up-prod up-all down logs ps show-workers
+.PHONY: clean-docker build-base build-all release up-dev up-prod up-prod-pull up-all down board logs ps show-workers \
+	experiment experiment-attach experiment-status experiment-list experiment-collect experiment-cancel \
+	experiment-delete experiment-export experiment-export-all corpus corpus-prune corpus-export analysis clean-cache
 
-prune:
-	docker system prune -af
+# Frees Docker's build cache and dangling images (safe: volumes and tagged images are kept).
+# Repeated rebuilds of the large worker images fill the Docker VM disk ("No space left on device").
+clean-cache:
+	docker builder prune -f
+	docker image prune -f
 
-prune-build:
-	docker builder prune -af
-
-clean-docker: prune prune-build
+# Removes BF-CBOM's containers (all profiles) and images only; other Docker projects are untouched.
+# The volumes (stored inspections, experiment results, git mirrors) are kept; `docker compose down -v` drops them.
+clean-docker:
+	docker compose --profile '*' down --remove-orphans
+	@ids=$$(docker images -q --filter 'reference=bf-cbom/*' --filter 'reference=ghcr.io/seg-unibe/bf-cbom-*' | sort -u); \
+	if [ -n "$$ids" ]; then docker rmi -f $$ids; else echo "no BF-CBOM images to remove"; fi

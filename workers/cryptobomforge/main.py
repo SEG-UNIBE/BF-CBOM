@@ -51,6 +51,56 @@ CODEQL_LANGUAGE_MAP = {
 }
 
 
+# The crypto queries cryptobom-forge is built for (its README: "the CodeQL cryptography experimental
+# queries"). Without a query argument `codeql database analyze` runs the default security suite, which
+# finds no crypto (micro-python: empty CBOM; paramiko: security alerts turned into fake assets).
+# Upstream has these for Python and C/C++ only; Java's crypto InventorySlices are
+# `@kind table`, which `analyze` cannot write as SARIF, so Java has no query and is not supported.
+# CRYPTOBOMFORGE_QUERIES_<LANG> (e.g. _JAVA) overrides or adds a query/suite spec for one language.
+CRYPTO_QUERIES = {
+    "python": "codeql/python-queries:experimental/cryptography/inventory/new_models",
+    "cpp": "codeql/cpp-queries:experimental/cryptography/inventory/new_models",
+}
+
+
+def crypto_query_for(lang: str) -> str | None:
+    return os.getenv(f"CRYPTOBOMFORGE_QUERIES_{lang.upper()}") or CRYPTO_QUERIES.get(lang)
+
+
+# Compiled languages that CodeQL 2.23 can extract without building (Python/JS/Ruby need no build). Without it,
+# C/C++ falls back to autobuild, which fails on sources without a build system (micro-c, 2026-10-17).
+_BUILD_MODE_NONE_LANGUAGES = {"java", "csharp", "cpp"}
+
+# File extensions per CodeQL language, used when repo metadata carries no language.
+_LANGUAGE_EXTENSIONS = {
+    "python": (".py",),
+    "java": (".java",),
+    "javascript": (".js", ".jsx", ".ts", ".tsx"),
+    "cpp": (".c", ".cc", ".cpp", ".cxx", ".h", ".hpp"),
+    "csharp": (".cs",),
+    "go": (".go",),
+    "ruby": (".rb",),
+    "swift": (".swift",),
+    "kotlin": (".kt", ".kts"),
+}
+_SKIP_DIRS = {".git", "node_modules", "vendor", "build", "dist", "target", "__pycache__"}
+
+
+def _detect_language(repo_path: str) -> str | None:
+    """Return the CodeQL language with the most source files under repo_path, or None."""
+    counts: dict[str, int] = dict.fromkeys(_LANGUAGE_EXTENSIONS, 0)
+    for _root, dirs, files in os.walk(repo_path):
+        dirs[:] = [d for d in dirs if d not in _SKIP_DIRS]
+        for f in files:
+            ext = os.path.splitext(f)[1].lower()
+            for lang, exts in _LANGUAGE_EXTENSIONS.items():
+                if ext in exts:
+                    counts[lang] += 1
+                    break
+    best = max(counts.items(), key=lambda kv: kv[1])
+    return best[0] if best[1] > 0 else None
+
+
 class CryptobomForgeClient:
     def __init__(self, *, timeout_sec: int = TIMEOUT_SEC):
         self.timeout_sec = timeout_sec
@@ -141,12 +191,12 @@ class CryptobomForgeClient:
 
     def _normalize_language(self, language: str | None) -> str | None:
         """Normalize and validate language for CodeQL compatibility.
-        
+
         Returns the CodeQL language identifier or None if unsupported.
         """
         if not language:
             return None
-        
+
         lang_lower = language.lower().strip()
         return CODEQL_LANGUAGE_MAP.get(lang_lower)
 
@@ -161,7 +211,7 @@ class CryptobomForgeClient:
     # New modular entry (preferred inside this class)
     def _run_codeql_scan(self, repo_path: str, language: str | None, trace: Trace) -> bool:
         logger.info("CodeQL scan requested: repo_path=%r, language=%r", repo_path, language)
-        
+
         if not language:
             trace.add("codeql: no language specified for repository")
             logger.warning("CodeQL scan skipped: no language specified")
@@ -170,18 +220,20 @@ class CryptobomForgeClient:
         # Normalize language to CodeQL identifier
         codeql_lang = self._normalize_language(language)
         if not codeql_lang:
-            trace.add(f"codeql: unsupported language '{language}' (supported: {', '.join(sorted(CODEQL_SUPPORTED_LANGUAGES))})")
+            supported = ", ".join(sorted(CODEQL_SUPPORTED_LANGUAGES))
+            trace.add(f"codeql: unsupported language '{language}' (supported: {supported})")
             logger.warning("CodeQL scan skipped: unsupported language '%s'", language)
             return False
+
+        if not crypto_query_for(codeql_lang):
+            trace.add(f"codeql: no crypto query for '{codeql_lang}' (upstream has Python and C/C++ only)")
+            raise RuntimeError(f"unsupported_language: no crypto query for {codeql_lang}")
 
         db_path = os.path.join(repo_path, f"codeql-db-{codeql_lang}")
         if not self._codeql_create_db(repo_path, db_path, codeql_lang, trace):
             return False
 
-        if codeql_lang in ["java", "cpp", "csharp", "go"] and os.path.exists(db_path):
-            if not self._codeql_finalize_db(db_path, codeql_lang, trace):
-                trace.add(f"codeql: finalize failed for {codeql_lang}; aborting analyze")
-                return False
+        # `database create` finalizes the database itself; a second explicit finalize fails.
 
         ram_flags = self._resolve_ram_flags(trace)
         return self._codeql_analyze_db(repo_path, db_path, codeql_lang, ram_flags, trace)
@@ -198,6 +250,10 @@ class CryptobomForgeClient:
             "--source-root",
             repo_path,
         ]
+        if lang in _BUILD_MODE_NONE_LANGUAGES:
+            # Extract from source without running the project's build (Maven/Gradle/make). Faster,
+            # works for repos whose build fails or needs network, and never executes repo code.
+            cmd += ["--build-mode", "none"]
         logger.info("Running CodeQL create for %s: %s", lang, " ".join(cmd))
         try:
             cp = subprocess.run(
@@ -274,6 +330,7 @@ class CryptobomForgeClient:
             "database",
             "analyze",
             db_path,
+            crypto_query_for(lang),
             "--format",
             "sarifv2.1.0",
             "--sarif-add-snippets",
@@ -304,28 +361,29 @@ class CryptobomForgeClient:
         branch: str = "main",
         main_language: str | None = None,
         trace: Trace | None = None,
+        commit: str | None = None,
     ) -> str:
         """Clone -> CodeQL -> cryptobom with progressive error trace accumulation.
 
         Returns raw CBOM JSON text on success; raises on failure so the caller/wrapper can classify.
         """
         trace = trace or Trace()
-        
-        # Validate language early before cloning
-        if not main_language:
-            trace.add("no language specified for repository; cryptobomforge requires a supported language")
-            raise RuntimeError("missing_language")
-        
-        codeql_lang = self._normalize_language(main_language)
-        if not codeql_lang:
-            trace.add(f"unsupported language '{main_language}'; cryptobomforge supports: {', '.join(sorted(CODEQL_SUPPORTED_LANGUAGES))}")
-            raise RuntimeError("unsupported_language")
-        
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo_path = clone_repo(git_url, branch=branch, target_dir=tmpdir)
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+            repo_path = clone_repo(git_url, branch=branch, target_dir=tmpdir, commit=commit)
             if not repo_path:
                 trace.add("git clone failed")
                 raise RuntimeError("git_clone_failed")
+
+            # Prefer the language from repo metadata; otherwise detect it from the checkout,
+            # so jobs without GitHub enrichment (e.g. CLI runs) still get scanned.
+            if not main_language or not self._normalize_language(main_language):
+                detected = _detect_language(repo_path)
+                trace.add(f"language metadata={main_language!r}; detected from files={detected!r}")
+                main_language = detected
+            if not main_language:
+                trace.add("no supported language found in repository")
+                raise RuntimeError("unsupported_language")
 
             ok = self._run_codeql_scan(repo_path, main_language, trace)
             if not ok:
@@ -338,10 +396,11 @@ class CryptobomForgeClient:
                 raise RuntimeError("no_sarif_found")
             logger.info("SARIF files found: %s", sarif_files)
 
+            # The count goes into the run notes so that a 0 can be checked. An empty result is not
+            # short-circuited: cryptobom-forge writes its own empty draft document for it (the worker's CycloneDX
+            # placeholder for that case went on 2026-10-20; every stored CBOM is the tool's).
             results_count = self._sarif_results_count(sarif_files[0], trace)
-            if results_count == 0:
-                trace.add("empty SARIF: no CodeQL results found")
-                raise RuntimeError("empty_sarif_no_results")
+            trace.add(f"codeql results: {results_count if results_count is not None else 'unreadable'}")
 
             # Normalize SARIF to avoid downstream KeyError on 'contextRegion'
             self._normalize_sarif_files(sarif_files, trace)
@@ -420,6 +479,7 @@ def _produce(instr: JobInstruction, trace: Trace) -> str:
         branch=instr.repo_info.branch,
         main_language=instr.repo_info.main_language,
         trace=trace,
+        commit=instr.repo_info.commit,
     )
 
 

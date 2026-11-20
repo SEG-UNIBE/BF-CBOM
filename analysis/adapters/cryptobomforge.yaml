@@ -1,0 +1,11 @@
+spec: cryptobomforge
+inherits: _ibm-cbom-draft
+version: 2
+declared: [{bomFormat: CBOM, specVersion: 1.4-cbom-1.0}]
+checked_on: "corpus-pilot-small 2026-10-16 (CodeQL 2.23.0 + cyclonedx-python-lib 4.2.2, 6 CBOMs); cryptobom-forge 1.1.0 on a SARIF with zero results 2026-10-20 (tests/fixtures/normalize/cryptobomforge-empty.json)"
+notes: >
+  Writes IBM's draft 1.4-cbom-1.0, also when CodeQL finds nothing: then a document without a components key (until
+  2026-10-20 the worker replaced that case by an empty CycloneDX CBOM of its own, bf-cbom:empty-reason; gone, every
+  stored CBOM is the tool's). Most components are named UNKNOWN with variant UNKNOWN and primitive/padding `unknown`;
+  locations only in detectionContext (5-9-line windows, often on unrelated code such as pom.xml or print statements),
+  read as line and line_end by _ibm-cbom-draft.

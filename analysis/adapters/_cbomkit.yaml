@@ -1,0 +1,14 @@
+# Shared base of the two CBOMkit packagings (same sonar-cryptography engine, one voter group).
+spec: _cbomkit
+inherits: _cyclonedx
+version: 1
+declared: [{bomFormat: CycloneDX, specVersion: "1.6"}]
+notes: >
+  One component per algorithm with all its occurrences. Names follow the registry (RSA-PKCS1-1.5-SHA-256,
+  ECDSA-secp521r1, HKDF-SHA-256, AES-128-GCM) or JCA spellings (DESede, NATIVEPRNG, HMACSHA2); MGF1 and RAW appear
+  as separate algorithm components. Key material is a component named `<type>@<uuid>` (secret-key@..., salt@...,
+  iv@...) linked to its algorithm only through `dependencies` (key -> algorithm; HMAC-SHA-256 -> SHA-256), which the
+  generic dependency source reads. parameterSetIdentifier is the key length for ciphers and RSA and the digest
+  length for hashes; DESede reports 64 (block size), kept as reported. additionalContext holds the API call
+  (javax.crypto.Mac#getInstance(...), Go `New`/`Sum256`, Python `generate_key`). Pilot finding: invented key sizes
+  (AES-GCM reported as 128 where the code uses 256).

@@ -1,0 +1,20 @@
+spec: ciphersift
+inherits: _cyclonedx
+version: 1
+declared: [{bomFormat: CycloneDX, specVersion: "1.7"}]
+checked_on: "micro java/python/go 2026-10-17 (CipherSift v1.1.1)"
+findings:
+  libraries: all            # only crypto libraries by its written list policy (Maven/Gradle, PyPI, Go modules)
+sources:
+  - fields: standard
+  - property: {ciphersift:family: family}
+  - {parse: name, when: {asset_type: [algorithm, protocol, certificate]}, quiet: true}   # names are often API calls
+  - api: occurrence:symbol
+context: [occurrence:symbol, occurrence:additionalContext]
+notes: >
+  One component per (rule, name, parameter, OID), named after the matched algorithm string (AES/GCM/NoPadding) or the
+  API (GCMParameterSpec, crypto/aes.NewCipher, hashlib.new). algorithmFamily uses registry names and is absent where
+  the rule does not determine it (plain RSA or EC key generation); ciphersift:family is the rule's own family (EC,
+  RSA, SHA2) and fills that gap. The occurrence symbol is the API (javax.crypto.Cipher.getInstance);
+  additionalContext is compact JSON {ruleId, snippet, param, test, via, origin}. Non-crypto PRNGs only with
+  --weakness-indicators (not used by the worker).

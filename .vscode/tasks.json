@@ -4,17 +4,17 @@
     {
       "label": "docker-compose-up-redis",
       "type": "shell",
-      "command": "docker-compose up -d redis"
+      "command": "docker compose up -d redis"
     },
     {
       "label": "docker-compose-down",
       "type": "shell",
-      "command": "docker-compose rm -sf redis"
+      "command": "docker compose rm -sf redis"
     },
     {
       "label": "run-streamlit-coordinator",
       "type": "shell",
-      "command": "streamlit run coordinator/Start.py",
+      "command": "streamlit run coordinator/0_Start.py",
       "isBackground": true,
       "problemMatcher": [],
       "group": "build"

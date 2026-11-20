@@ -1,0 +1,117 @@
+"""Memory measurement (common/memory.py), the worker's per-job resources and the runner's session log."""
+
+import json
+
+from common import memory
+from common.models import JobInstruction, JobResult, RepoInfo
+from common.worker import run_job_with_timeout
+
+MIB = 1024 * 1024
+
+
+def _cgroup(d, *, current, inactive=0, limit="max", oom=0, hits=0, cpu_usec=0):
+    d.mkdir(exist_ok=True)
+    (d / "cpu.stat").write_text(f"usage_usec {cpu_usec}\nuser_usec 0\nsystem_usec 0\n")
+    (d / "memory.current").write_text(f"{current}\n")
+    (d / "memory.stat").write_text(f"anon 1\nactive_file 2\ninactive_file {inactive}\n")
+    (d / "memory.max").write_text(f"{limit}\n")
+    (d / "memory.events").write_text(f"low 0\nhigh 0\nmax {hits}\noom 1\noom_kill {oom}\n")
+    return d
+
+
+def test_working_set_is_current_minus_inactive_file_like_docker_stats(tmp_path):
+    cg = _cgroup(tmp_path / "cg", current=900 * MIB, inactive=100 * MIB, limit=4096 * MIB, oom=2)
+    assert memory.working_set_bytes(cg) == 800 * MIB
+    assert memory.limit_bytes(cg) == 4096 * MIB and memory.oom_kills(cg) == 2
+    assert memory.limit_bytes(_cgroup(tmp_path / "unlimited", current=1)) is None
+
+
+def test_job_sampler_keeps_the_peak_and_counts_limit_hits_oom_kills_and_cpu_time_during_the_job(tmp_path, monkeypatch):
+    clock = iter([100.0, 140.0])  # the job's wall time: 40 s
+    monkeypatch.setattr(memory.time, "monotonic", lambda: next(clock))
+    cg = _cgroup(tmp_path / "cg", current=200 * MIB, limit=1024 * MIB, oom=1, hits=5, cpu_usec=7_000_000)
+    sampler = memory.JobSampler(cg)
+    _cgroup(cg, current=700 * MIB, limit=1024 * MIB, oom=1, hits=5, cpu_usec=9_000_000)
+    sampler.sample()
+    _cgroup(cg, current=300 * MIB, limit=1024 * MIB, oom=2, hits=9, cpu_usec=97_000_000)
+    assert sampler.result() == {
+        "peak_memory_mb": 700.0,
+        "memory_limit_mb": 1024.0,
+        "limit_hits": 4,
+        "oom_kills": 1,
+        "cpu_seconds": 90.0,
+        "cpu_cores": 2.25,
+    }
+
+
+def test_without_cgroup_files_everything_is_none(tmp_path):
+    assert memory.JobSampler(tmp_path / "missing").result() == {
+        "peak_memory_mb": None,
+        "memory_limit_mb": None,
+        "limit_hits": None,
+        "oom_kills": None,
+        "cpu_seconds": None,
+        "cpu_cores": None,
+    }
+    assert memory.host_memory(tmp_path / "meminfo") == {}
+
+
+def test_host_sampler_reads_meminfo(tmp_path):
+    meminfo = tmp_path / "meminfo"
+    meminfo.write_text("MemTotal:       20480000 kB\nMemFree:  1 kB\nMemAvailable:   10240000 kB\n")
+    host = memory.HostSampler(meminfo)
+    assert (host.total_mb, host.peak_used_mb) == (20000.0, 10000.0)
+    meminfo.write_text("MemTotal:       20480000 kB\nMemAvailable:    2048000 kB\n")
+    host.sample()
+    meminfo.write_text("MemTotal:       20480000 kB\nMemAvailable:   15360000 kB\n")
+    host.sample()
+    assert host.peak_used_mb == 18000.0
+
+
+def _ok(instr: JobInstruction) -> JobResult:
+    return JobResult(job_id=instr.job_id, status="ok", repo_info=instr.repo_info, json="{}", worker="t")
+
+
+def test_every_job_result_carries_the_containers_resources(tmp_path, monkeypatch):
+    monkeypatch.setattr(memory, "CGROUP_DIR", _cgroup(tmp_path / "cg", current=64 * MIB, limit=512 * MIB))
+    instr = JobInstruction(
+        job_id="j1", tool="t", repo_info=RepoInfo(full_name="o/r", git_url="u", branch="main", size_kb=1)
+    )
+    res = run_job_with_timeout(_ok, instr, 5, worker_name="t")
+    assert (res.peak_memory_mb, res.memory_limit_mb, res.limit_hits, res.oom_kills) == (64.0, 512.0, 0, 0)
+    assert res.cpu_seconds == 0.0  # the fake cgroup's counter does not move
+    assert json.loads(res.to_json())["peak_memory_mb"] == 64.0
+
+
+def test_runner_session_is_written_to_the_run_log(tmp_path, monkeypatch):
+    from common.experiment import load_run_log
+    from misc.cli import experiment_cmd
+
+    meminfo = tmp_path / "meminfo"
+    meminfo.write_text("MemTotal: 2048000 kB\nMemAvailable: 1024000 kB\n")
+    monkeypatch.setattr(memory, "MEMINFO", meminfo)
+    session = experiment_cmd._Session(tmp_path, "run", memory_budget_gb=14.0, waves=[["a"], ["b"]])
+    meminfo.write_text("MemTotal: 2048000 kB\nMemAvailable: 512000 kB\n")
+    session.tick()
+    session.finish("completed", results_stored=3)
+    (entry,) = load_run_log(tmp_path)
+    assert entry["status"] == "completed" and entry["results_stored"] == 3 and entry["finished_at"]
+    assert entry["host"]["ram_total_mb"] == 2000.0 and entry["ram_peak_used_mb"] == 1500.0
+    assert entry["memory_budget_gb"] == 14.0 and entry["waves"] == [["a"], ["b"]]
+    experiment_cmd._Session(tmp_path, "collect").finish("completed")
+    assert [e["command"] for e in load_run_log(tmp_path)] == ["run", "collect"]
+
+
+def test_session_records_the_runner_commit_and_the_worker_image_ids(tmp_path, monkeypatch):
+    from common.experiment import load_run_log
+    from misc.cli import experiment_cmd
+
+    monkeypatch.setenv("BF_CBOM_COMMIT", "abc123def456-dirty")
+    ids = "bf-cbom/worker-cdxgen:1.0.3=sha256:" + "a" * 64 + ",bf-cbom/worker-cbomkit:1.0.3=sha256:" + "b" * 64
+    ids += ",bf-cbom/coordinator:1.0.3=sha256:" + "c" * 64 + ",<none>:<none>="
+    monkeypatch.setenv("EXPERIMENT_IMAGE_IDS", ids)
+    assert experiment_cmd.worker_image_ids(["cdxgen", "xgrep"]) == {"cdxgen": "sha256:" + "a" * 64}
+    experiment_cmd._Session(tmp_path, "run", tools=["cbomkit", "cdxgen"]).finish("completed")
+    (entry,) = load_run_log(tmp_path)
+    assert entry["runner_commit"] == "abc123def456-dirty"
+    assert entry["images"] == {"cbomkit": "sha256:" + "b" * 64, "cdxgen": "sha256:" + "a" * 64}

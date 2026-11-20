@@ -3,13 +3,17 @@ from pathlib import Path
 
 import streamlit as st
 
-from common.utils import get_status_emoji
+from common.utils import get_status_emoji, get_status_help, get_status_keys_order, status_text
 from coordinator.logger_config import logger
 from coordinator.redis_io import (
+    JOB_SUMMARY_FIELDS,
     cancel_inspection,
     collect_results_once,
+    count_done_jobs,
+    dead_workers,
     get_insp_meta,
     get_insp_repos,
+    get_insp_waves,
     get_insp_workers,
     get_redis,
     list_inspections,
@@ -19,6 +23,7 @@ from coordinator.redis_io import (
     retry_non_completed_inspection,
     start_inspection,
 )
+from coordinator.scheduler import ensure_scheduler
 from coordinator.utils import (
     format_inspection_header,
     get_favicon_path,
@@ -37,6 +42,7 @@ st.set_page_config(
 )
 
 r = get_redis()
+ensure_scheduler()
 st.title("Execution")
 
 # Resolve insp selection
@@ -81,6 +87,23 @@ with left:
         unsafe_allow_html=True,
     )
     st.caption(f"Workers: {', '.join(workers) if workers else '(none)'} · Status: {status}")
+    waves, wave_no = get_insp_waves(meta)
+    if len(waves) > 1 and status in ("running", "completed", "cancelled"):
+        budget = meta.get("memory_budget_gb") or "?"
+        plan = " → ".join(
+            ("**" if i == wave_no else "") + ", ".join(w) + ("**" if i == wave_no else "")
+            for i, w in enumerate(waves, 1)
+        )
+        st.caption(
+            f"Memory budget {budget} GiB: wave {wave_no}/{len(waves)} · {plan} · "
+            "⏸️ jobs of later waves are held until the current wave has finished"
+        )
+    down = dead_workers(r, workers)
+    if down and status in ("created", "running"):
+        st.warning(
+            "No live worker for: " + ", ".join(f"`{w}`" for w in down) + ". "
+            "Their jobs will stay queued until the container is up (`make ps`, `make logs`)."
+        )
 
     # Action controls
     if status == "running":
@@ -114,14 +137,7 @@ with mid:
 
 with right:
     st.subheader("Notes")
-    em = get_status_emoji
-    notes = [
-        f"{em('pending')} Pending: job queued or running.",
-        f"{em('completed')} Completed: worker returned a CBOM successfully.",
-        f"{em('failed')} Failed: worker errored while processing the repo.",
-        f"{em('timeout')} Timeout: worker exceeded its time budget.",
-        f"{em('cancelled')} Cancelled: job was cancelled before completion.",
-    ]
+    notes = [f"{get_status_emoji(k)} {status_text(k, 'label')}: {get_status_help(k)}." for k in get_status_keys_order()]
     st.markdown("\n".join(f"- {line}" for line in notes))
 # Auto-refresh is always on while running; no toggle needed
 
@@ -147,15 +163,18 @@ if not df.empty:
     # Initialize worker columns
     for w in workers:
         df[w] = ""
-    # Fill worker result cells
+    # Fill worker result cells (one pipelined round-trip; never loads the CBOM bodies)
+    cells: list[tuple[int, str, str]] = []
+    pipe = r.pipeline()
     for i, repo in enumerate(repos):
         full = repo.get("full_name")
         for w in workers:
             j_id = job_idx.get(pair_key(full, w))
             if j_id:
-                stt = r.hget(f"insp:{insp_id}:job:{j_id}", "status") or ""
-                raw = r.hget(f"insp:{insp_id}:job:{j_id}", "result_json")
-                df.at[i, w] = summarize_result_cell(stt, raw)
+                cells.append((i, w, j_id))
+                pipe.hmget(f"insp:{insp_id}:job:{j_id}", JOB_SUMMARY_FIELDS)
+    for (i, w, _), values in zip(cells, pipe.execute(), strict=True):
+        df.at[i, w] = summarize_result_cell(dict(zip(JOB_SUMMARY_FIELDS, values, strict=True)))
 
     show_cols = ["repo", "info", "url"] + workers
     view_df = df.loc[:, show_cols].copy()
@@ -169,13 +188,7 @@ if not df.empty:
     )
 
     # Progress (full width)
-    jobs = r.lrange(f"insp:{insp_id}:jobs", 0, -1) or []
-    done = 0
-    for job_id in jobs:
-        stt = r.hget(f"insp:{insp_id}:job:{job_id}", "status") or ""
-        if stt in ("completed", "failed", "cancelled"):
-            done += 1
-    total = len(jobs)
+    done, total = count_done_jobs(r, insp_id)
     if total > 0:
         st.progress(done / total, text=f"Completed {done}/{total}")
         st.caption(f"Expected jobs: {expected}")
@@ -198,7 +211,7 @@ with col_b:
     cancel_disabled = status != "running"
     if st.button("Cancel", type="primary", disabled=cancel_disabled):
         cancelled = cancel_inspection(r, insp_id)
-        st.toast(f"Cancelled {cancelled} pending jobs")
+        st.toast(f"Cancelled {cancelled} queued, held or running jobs")
         set_query_insp_id(insp_id)
         st.rerun()
 

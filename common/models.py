@@ -14,6 +14,8 @@ class Trace:
 
     def __init__(self) -> None:
         self._items: list[str] = []
+        # Structured facts the producer wants in the JobResult (an LLM run's `usage`); kept when the job fails.
+        self.fields: dict = {}
 
     def add(self, msg: str) -> None:
         if not msg:
@@ -46,6 +48,9 @@ class RepoInfo(DataClassJsonMixin):
     size_kb: int
     main_language: str | None = None
     stars: int | None = None
+    # Exact snapshot that was (or must be) scanned. Resolved at inspection start; workers
+    # that clone check out this SHA, so repeated runs and mutants scan identical bytes.
+    commit: str | None = None
 
 
 @dataclass
@@ -58,6 +63,32 @@ class JobResult(DataClassJsonMixin):
     size_bytes: int | None = None
     worker: str | None = None
     error: str | None = None
+    # Provenance (filled by common.worker.run_worker): generator version string, the image
+    # the worker ran in, and which repetition of the same (repo, tool) pair this was.
+    tool_version: str | None = None
+    image_ref: str | None = None
+    run_index: int | None = None
+    # The BF-CBOM git commit the worker image was built from (env BF_CBOM_COMMIT, stamped by the build;
+    # `-dirty` = built from uncommitted changes).
+    bfcbom_commit: str | None = None
+    # UTC ISO timestamps of the job subprocess (common.worker.run_job_with_timeout).
+    started_at: str | None = None
+    finished_at: str | None = None
+    # Non-fatal remarks from the worker (e.g. a fallback that was taken) for successful jobs.
+    notes: str | None = None
+    # Resources of the worker's container while the job ran (common/memory.py, filled by run_job_with_timeout):
+    # peak working set sampled once per second, the container's memory limit, how often usage reached the limit
+    # (0: the limit never constrained the job), OOM kills during the job, the container's CPU time during the job and
+    # that divided by the job's wall time (the mean number of cores busy).
+    peak_memory_mb: float | None = None
+    memory_limit_mb: float | None = None
+    limit_hits: int | None = None
+    oom_kills: int | None = None
+    cpu_seconds: float | None = None
+    cpu_cores: float | None = None
+    # Structured usage of an LLM run (common/llm_cbom.py:GenerationStats.usage): requests, tokens per kind, the
+    # model ids the provider answered with. Present on failed runs too (Trace.fields).
+    usage: dict | None = None
 
 
 @dataclass
@@ -65,6 +96,7 @@ class JobInstruction(DataClassJsonMixin):
     job_id: str
     tool: str
     repo_info: RepoInfo
+    run_index: int | None = None
 
 
 @dataclass
@@ -121,6 +153,7 @@ class RepoRef(DataClassJsonMixin):
     full_name: str
     git_url: str
     branch: str | None = None
+    commit: str | None = None
 
 
 @dataclass

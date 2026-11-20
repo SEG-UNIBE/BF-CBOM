@@ -1,0 +1,13 @@
+# Second pilot: 60 pinned projects (20 Java, 20 Python, 20 Go), the 10 eligible tools (cdxgen in Go only), once.
+# 660 tool/repository pairs; unsupported language combinations are recorded without scanning.
+# Run on the 64 GB VM after make up-prod:
+#   make experiment EXP=experiments/corpus-pilot-medium.yaml EXPERIMENT_MEMORY_BUDGET_GB=0
+#   make analysis ARGS="report corpus-pilot-medium"
+#   make experiment-export NAME=corpus-pilot-medium
+name: corpus-pilot-medium
+description: second pilot with 60 manually selected projects, 20 each in Java, Python and Go
+tools: [cbomkit, cdxgen, cipherradar, cryptobomforge, cryptoscan, pqcheck, qdarpan, scanoss, securin-xbom, xgrep]  # the bar exam (bar-micro export) passed 11 workers, of which CBOMkit-action (`cbomkit-jar`) is left out (CBOMkit runs as its server distribution, decided 2026-10-30); cryptarium, qelens, qscan failed the bar
+tool_languages:  # cdxgen is eligible in Go only (9 of 14); in Java it is below the bar (0: its Java algorithms carry no location), Python is not one of its languages
+  cdxgen: [go]
+repetitions: 1
+corpus: corpus/pilot-2026-10-22.yaml

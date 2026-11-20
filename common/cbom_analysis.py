@@ -129,11 +129,6 @@ def create_component_match_instruction(
     )
 
 
-def get_crypto_asset_types() -> list[str]:
-    """Return a copy of common crypto asset types."""
-    return list(COMMON_CRYPTO_ASSET_TYPES)
-
-
 def _safe_json_loads(text: str) -> Any | None:
     try:
         return json.loads(text)

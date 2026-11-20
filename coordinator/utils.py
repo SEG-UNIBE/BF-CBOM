@@ -14,21 +14,6 @@ from coordinator.redis_io import get_insp_repos, get_insp_workers, pair_key
 
 # ----- Query param helpers -----
 
-def hide_streamlit_status() -> None:
-    """Hide Streamlit's top-right run status widget to prevent flicker.
-
-    This targets the status widget via its test id. Safe no-op if the DOM changes.
-    """
-    st.markdown(
-        """
-        <style>
-        /* Hide the top-right status/stop indicator */
-        [data-testid="stStatusWidget"] { display: none !important; }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
 
 def get_favicon_path() -> str:
     """Return absolute path to the SVG favicon bundled with the coordinator image.
@@ -255,10 +240,10 @@ def human_duration(seconds: int | float | None) -> str:
 def derive_status_key_from_payload(payload: dict | None) -> str:
     """Map a worker payload status to our canonical keys.
 
-    Returns one of: 'completed', 'timeout', 'failed', 'cancelled', 'pending'
+    Returns one of: 'completed', 'timeout', 'failed', 'cancelled', 'unsupported', 'queued'
     """
     if not isinstance(payload, dict):
-        return "pending"
+        return "queued"
     stt = str(payload.get("status") or "").lower()
     if stt == "ok":
         return "completed"
@@ -266,9 +251,11 @@ def derive_status_key_from_payload(payload: dict | None) -> str:
         return "timeout"
     if stt == "cancelled":
         return "cancelled"
+    if stt == "unsupported":
+        return "unsupported"
     if stt:
         return "failed"
-    return "pending"
+    return "queued"
 
 
 # ----- Table/data helpers for pages -----
@@ -338,6 +325,17 @@ def estimate_similarity_runtime(component_counts: dict[str, int]) -> float:
     return float(max(0.0, estimate))
 
 
+def safe_float(value, default: float | None = None) -> float | None:
+    """Return float(value) if possible, otherwise default."""
+
+    try:
+        if value is None or value == "":
+            return default
+        return float(value)
+    except Exception:
+        return default
+
+
 def safe_int(value, default: int = 0) -> int:
     """Return int(value) if possible, otherwise default."""
 
@@ -366,45 +364,43 @@ def format_inspection_header(name: str, insp_id: str, created: str, expected: st
     )
 
 
-def summarize_result_cell(stt: str, raw_payload_json: str | None) -> str:
-    """Return compact cell text for a job in grids.
+def summarize_result_cell(meta: dict) -> str:
+    """Return compact cell text for a job in grids from its (flat) job hash.
 
-    - fired -> pending emoji
+    - fired/queued -> queued emoji only; running -> emoji + elapsed time
+    - held / unsupported -> emoji + label
     - completed -> ✅ + duration/size
     - cancelled -> 🚫 Cancelled
     - failed/timeout -> appropriate emoji + label
     """
     from common.utils import get_status_emoji, status_text
+    from coordinator.redis_io import job_status_key
 
-    stt = (stt or "").lower().strip()
-    payload = None
-    if raw_payload_json:
-        try:
-            payload = json.loads(raw_payload_json)
-        except Exception:
-            payload = None
-
-    if stt == "fired":
-        return get_status_emoji("pending") or ""
-    if stt == "completed":
-        dur = None
-        size_b = None
-        if isinstance(payload, dict):
-            dur = payload.get("duration_sec")
-            size_b = payload.get("size_bytes")
-            if size_b is None:
-                try:
-                    size_b = len((payload.get("json") or "").encode("utf-8"))
-                except Exception:
-                    size_b = None
-        meta_txt = format_duration_and_size(dur, size_b)
+    key = job_status_key(meta or {})
+    if key == "completed":
+        dur = safe_float(meta.get("duration_sec"))
+        size_b = safe_int(meta.get("size_bytes"), default=-1)
+        meta_txt = format_duration_and_size(dur, size_b if size_b >= 0 else None)
         return f"{get_status_emoji('completed')} {meta_txt}".strip()
-    if stt == "cancelled":
-        return f"{get_status_emoji('cancelled')} {status_text('cancelled', 'label')}"
-
-    # Default: determine via payload
-    key = derive_status_key_from_payload(payload)
+    if key == "running":
+        elapsed = elapsed_since(meta.get("started_at"))
+        return f"{get_status_emoji('running')} {human_duration(elapsed)}" if elapsed is not None else "⚙️"
+    if key == "queued":
+        return get_status_emoji("queued") or ""
     return f"{get_status_emoji(key)} {status_text(key, 'label')}"
+
+
+def elapsed_since(iso_ts: str | None) -> int | None:
+    """Whole seconds since an ISO-8601 UTC timestamp ('...Z'); None when missing or unparsable."""
+    if not iso_ts:
+        return None
+    try:
+        started = dt.datetime.fromisoformat(str(iso_ts).replace("Z", "+00:00"))
+        if started.tzinfo is None:
+            started = started.replace(tzinfo=dt.UTC)
+        return max(0, int((dt.datetime.now(dt.UTC) - started).total_seconds()))
+    except (ValueError, TypeError):
+        return None
 
 
 # ----- GitHub enrichment for manual repo lists -----
@@ -423,7 +419,7 @@ def _fetch_repo(full_name: str, token: str | None, timeout: int = 10) -> dict | 
         resp = requests.get(url, headers=_github_headers(token), timeout=timeout)
         if resp.status_code == 200:
             return resp.json()
-        
+
         # Log non-200 responses
         if resp.status_code == 401:
             logger.warning(

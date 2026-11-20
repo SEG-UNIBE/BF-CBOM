@@ -1,0 +1,635 @@
+"""Corpus builder: stratified GitHub sampling, crypto pre-filter and commit pinning.
+
+Produces the `repos:` list consumed by `common.experiment.load_spec` via `corpus: <file>`.
+Runs inside the `runner` container; needs network access to GitHub (a token raises the
+search rate limit from 10 to 30 requests per minute).
+
+Sampling design (2026-10-29): the cells are language x star bin x size bin, every cell gets the same quota
+(`per_cell`), so the sample covers the design space evenly (a comparison of tools across strata, not an estimate of
+the GitHub population). Every cell's population is enumerated completely before the draw: the search is paginated
+to the API's limit of 1000 results, and a cell above it is split by creation date until every part fits, so the draw
+(`random.Random(seed)` over the full, name-sorted population) is uniform over the cell. The frame is recorded in the
+corpus `params` (search date, bins, every cell with its population and quota), each sampled repo keeps its `stratum`,
+the populations themselves (every enumerated repository) and the crypto checks by commit go into the frame file
+(`<corpus>-frame.yaml`, reusable with `--frame`), and two covariates are recorded but never selected on:
+`crypto_apis` (the API families the pre-filter matched) and `topics` (the repository's GitHub topics). No topic
+targeting: the crypto-use pre-filter is the one content criterion.
+
+Exclusions: name patterns (CBOM tooling, benchmarks), the reviewed list
+`experiments/corpus/exclusions.yaml` (the generators' own repos and test suites, with a reason each, and the pilot
+sets: every repository scanned in a pilot run before the corpus was drawn, so the corpus is held out from what the
+instrument was developed on; since 2026-11-18), and the repos a tool was tuned on (`tailored_on` in
+common/tools.yaml). The crypto pre-filter greps first-party source only (no test, vendor, example or
+documentation paths). Every exclusion is recorded with its reason.
+`prune_corpus` drops repos where a tool timed out in an earlier experiment (the stability run), with the reason.
+
+Frozen redraw (`as_of`, 2026-11-18): a rebuild from a frame normally pins every drawn repo at its current commit.
+With `as_of`, the moment of the first draw, the frame is the record instead: a candidate with a recorded check
+keeps that commit and that result, with nothing resolved or cloned, and a candidate the first draw never reached
+is pinned at the last commit of its default branch at or before `as_of` and checked there. So a draw is repeated
+exactly from frame, seed and exclusions, and a changed exclusion list changes only what it excludes: the next
+candidate of the cell moves up.
+
+Repo size cap: the corpus never samples repos above CORPUS_MAX_REPO_SIZE_MB (default DEFAULT_MAX_REPO_SIZE_MB, below;
+GitHub's `size` is the packed repository size in KB). The cap is recorded in the corpus `params` and the search cells
+are clamped to it; a candidate above it is listed as excluded with the reason.
+"""
+
+from __future__ import annotations
+
+import functools
+import json
+import logging
+import os
+import random
+import re
+import subprocess
+import tempfile
+import time
+import zipfile
+from dataclasses import dataclass, field
+from datetime import date, timedelta
+from pathlib import Path
+
+import requests
+import yaml
+
+from .tools_registry import REPO_ROOT, tailored_map
+from .utils import clone_repo, commit_as_of, resolve_remote_commit
+
+EXCLUSIONS_FILE = REPO_ROOT / "experiments" / "corpus" / "exclusions.yaml"
+# Paths the crypto pre-filter ignores: the scope is first-party source (some tools skip tests too)
+NON_FIRST_PARTY = (
+    "test", "tests", "testing", "spec", "vendor", "third_party", "thirdparty", "node_modules", "example", "examples",
+    "sample", "samples", "demo", "docs", "doc", "benchmark", "benchmarks",
+)  # fmt: skip
+
+logger = logging.getLogger(__name__)
+
+# libyaml when PyYAML has it, else the pure-Python classes; the same YAML either way. A frame of ~78k repos (22 MB)
+# reads in 6 s instead of 26 and writes in 4 s instead of 14.
+_FRAME_LOADER = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+_FRAME_DUMPER = getattr(yaml, "CSafeDumper", yaml.SafeDumper)
+
+
+def read_frame(path: Path) -> dict:
+    """A frame file (`<corpus>-frame.yaml`) as `write_frame` wrote it, or that one file zipped (as the repository
+    keeps the paper's: `experiments/corpus/corpus-pc6-frame.yaml.zip`)."""
+    if path.suffix == ".zip":
+        with zipfile.ZipFile(path) as z, z.open(z.namelist()[0]) as f:
+            return yaml.load(f, Loader=_FRAME_LOADER) or {}
+    with path.open(encoding="utf-8") as f:
+        return yaml.load(f, Loader=_FRAME_LOADER) or {}
+
+
+def write_frame(frame: dict, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as f:
+        yaml.dump(frame, f, Dumper=_FRAME_DUMPER, sort_keys=False)
+
+
+# Import/usage patterns that make a repo interesting for CBOM generation (grep on a shallow clone), per API family:
+# the families a repo matches are recorded as the covariate `crypto_apis` (never selected on).
+CRYPTO_APIS: dict[str, dict[str, str]] = {
+    "java": {
+        "JCA": r"javax\.crypto|java\.security\.(MessageDigest|KeyPairGenerator|Signature|SecureRandom|KeyFactory"
+        r"|KeyStore)",
+        "BouncyCastle": r"org\.bouncycastle",
+        "JSSE": r"javax\.net\.ssl",
+    },
+    "python": {
+        "pyca": r"^\s*(from|import)\s+cryptography\b",
+        "hashlib": r"^\s*(from|import)\s+(hashlib|hmac)\b",
+        "ssl": r"^\s*(from|import)\s+ssl\b",
+        "pycryptodome": r"^\s*(from|import)\s+(Crypto|Cryptodome)\b",
+        "nacl": r"^\s*(from|import)\s+nacl\b",
+        "pyOpenSSL": r"^\s*(from|import)\s+OpenSSL\b",
+        "other": r"^\s*(from|import)\s+(ecdsa|rsa|bcrypt|passlib|jwt)\b",
+    },
+    "go": {
+        # an import path in quotes (single or grouped imports); crypto/rand alone is not enough (IDs, nonces)
+        "stdlib": r'"crypto/(aes|cipher|des|ecdh|ecdsa|ed25519|elliptic|hkdf|hmac|md5|mlkem|pbkdf2|rc4|rsa|sha1|sha256'
+        r'|sha3|sha512|tls|x509)"',
+        "x/crypto": r'"golang\.org/x/crypto/',
+    },
+}
+CRYPTO_PATTERNS: dict[str, str] = {lang: "|".join(fams.values()) for lang, fams in CRYPTO_APIS.items()}
+SOURCE_EXTENSIONS = {"java": "java", "python": "py", "go": "go"}
+# per language, first-party exclusions beyond NON_FIRST_PARTY directories (Go keeps tests next to the code)
+EXTRA_EXCLUDES = {"go": ["**/*_test.go", "**/testdata/**"]}
+# Repos that are themselves CBOM tooling or benchmarks would bias the comparison.
+DEFAULT_EXCLUDE_PATTERNS = [r"cbom", r"benchmark", r"sonar-cryptography", r"cryptobom", r"crypto-finder", r"cryptoscan"]
+# The largest packed repo size the corpus samples: a quarter of the git server's memory (6 GB) when the paper's corpus
+# was built on 2026-10-30, so that a full clone through it always fit (CBOMkit's JGit clone; pack-objects holds the
+# object list plus bounded delta windows, Dockerfile.gitserver). The git server has 16 GB since, for the concurrent
+# clones of CBOMkit replicas; the cap stays, so every corpus has the same definition.
+DEFAULT_MAX_REPO_SIZE_MB = 1536
+
+
+def repo_size_cap_mb(env: dict | None = None) -> int | None:
+    """The corpus size cap in MB: CORPUS_MAX_REPO_SIZE_MB when set (0: none), else DEFAULT_MAX_REPO_SIZE_MB."""
+    env = os.environ if env is None else env
+    explicit = (env.get("CORPUS_MAX_REPO_SIZE_MB") or "").strip()
+    return (int(float(explicit)) or None) if explicit else DEFAULT_MAX_REPO_SIZE_MB
+
+
+Bin = tuple[int, int | None]  # [lo, hi): hi None = open (up to the size cap for sizes)
+
+
+def parse_bins(text: str) -> list[Bin]:
+    """`"50-300,300-2000,2000-"` -> [(50, 300), (300, 2000), (2000, None)]: bins are [lo, hi), the last may be open."""
+    bins: list[Bin] = []
+    for part in (p.strip() for p in text.split(",") if p.strip()):
+        lo, dash, hi = part.partition("-")
+        if not dash or not lo.strip().isdigit() or (hi.strip() and not hi.strip().isdigit()):
+            raise ValueError(f"a bin is `lo-hi` or `lo-`: {part!r}")
+        bins.append((int(lo), int(hi) if hi.strip() else None))
+    if not bins:
+        raise ValueError("no bins")
+    for (_, hi), (lo, _) in zip(bins, bins[1:], strict=False):
+        if hi is None or lo != hi:
+            raise ValueError(f"bins must be adjacent: {text!r}")
+    return bins
+
+
+def clamp_size_bins(bins: list[Bin], cap_mb: int | None) -> list[Bin]:
+    """The size cells (KB) cut at the cap: cells above it disappear, the cell containing it (or the open last one)
+    ends at the cap."""
+    if not cap_mb:
+        return list(bins)
+    cap_kb = cap_mb * 1024
+    return [(lo, cap_kb if hi is None else min(hi, cap_kb)) for lo, hi in bins if lo < cap_kb]
+
+
+def bin_query(lo: int, hi: int | None) -> str:
+    """The GitHub range qualifier of a [lo, hi) bin: `lo..hi-1`, or `>=lo` when open."""
+    return f">={lo}" if hi is None else f"{lo}..{hi - 1}"
+
+
+def bin_text(lo: int, hi: int | None) -> str:
+    return f"{lo}-" if hi is None else f"{lo}-{hi}"
+
+
+@dataclass
+class CorpusParams:
+    languages: list[str] = field(default_factory=lambda: ["Java", "Python", "Go"])  # the paper's (2026-10-20)
+    per_cell: int = 2  # repos drawn per (language, stars, size) cell; 3 x 3 cells x 2 = 18 per language
+    star_bins: list[Bin] = field(default_factory=lambda: [(50, 300), (300, 2000), (2000, None)])
+    size_bins_kb: list[Bin] = field(default_factory=lambda: [(300, 3000), (3000, 30000), (30000, None)])
+    pushed_within_days: int = 365
+    crypto_filter: bool = True
+    exclude_patterns: list[str] = field(default_factory=lambda: list(DEFAULT_EXCLUDE_PATTERNS))
+    seed: int = 20261015
+    max_repo_size_mb: int | None = field(default_factory=repo_size_cap_mb)  # see the module docstring
+
+    @property
+    def cells_per_language(self) -> int:
+        return len(self.star_bins) * len(clamp_size_bins(self.size_bins_kb, self.max_repo_size_mb))
+
+    @property
+    def per_language(self) -> int:
+        return self.cells_per_language * self.per_cell
+
+
+def _headers(token: str | None) -> dict:
+    h = {"Accept": "application/vnd.github+json", "User-Agent": "bf-cbom-corpus"}
+    if token:
+        h["Authorization"] = f"Bearer {token}"
+    return h
+
+
+SEARCH_URL = "https://api.github.com/search/repositories"
+SEARCH_LIMIT = 1000  # GitHub returns at most 1000 results per query
+GITHUB_EPOCH = date(2008, 1, 1)
+
+
+RATE_LIMIT_URL = "https://api.github.com/rate_limit"  # does not count against the quota
+
+
+def github_check(token: str | None) -> str:
+    """One request before the search: is the API reachable, is the token accepted, and how much search quota is
+    left. Returns a one-line summary; raises RuntimeError naming the cause otherwise (never the token)."""
+    try:
+        resp = requests.get(RATE_LIMIT_URL, headers=_headers(token), timeout=30)
+    except requests.RequestException as e:
+        raise RuntimeError(f"GitHub API unreachable: {type(e).__name__}") from None
+    if resp.status_code == 401:
+        raise RuntimeError("GitHub rejected the token (401 Bad credentials): check GITHUB_TOKEN")
+    if resp.status_code != 200:
+        raise RuntimeError(f"GitHub API check failed ({resp.status_code}): {resp.text[:200]}")
+    res = resp.json().get("resources") or {}
+    search, core = res.get("search") or {}, res.get("core") or {}
+    return (
+        f"GitHub API ok ({'authenticated' if token else 'unauthenticated'}): search {search.get('remaining')} of "
+        f"{search.get('limit')} per minute left, core {core.get('remaining')} of {core.get('limit')} per hour"
+    )
+
+
+def _repo(it: dict) -> dict:
+    return {
+        "full_name": it["full_name"],
+        "git_url": it["clone_url"],
+        "branch": it.get("default_branch") or "main",
+        "language": it.get("language"),
+        "stars": it.get("stargazers_count"),
+        "size_kb": it.get("size"),
+        "pushed_at": it.get("pushed_at"),
+        "created_at": it.get("created_at"),
+        "topics": sorted(it.get("topics") or []),  # a covariate, never a selection criterion
+    }
+
+
+def _search(q: str, token: str | None, *, page: int = 1, per_page: int = 100) -> tuple[list[dict], int]:
+    """One search request: the page's items and the query's total count; retries on rate limiting."""
+    for attempt in range(6):
+        resp = requests.get(
+            SEARCH_URL, params={"q": q, "per_page": per_page, "page": page}, headers=_headers(token), timeout=30
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            return data.get("items", []), int(data.get("total_count") or 0)
+        if resp.status_code in (403, 429):
+            wait = int(resp.headers.get("Retry-After") or 0) or max(
+                5, int(resp.headers.get("X-RateLimit-Reset", "0") or 0) - int(time.time())
+            )
+            wait = min(max(wait, 5), 120)
+            logger.warning("GitHub search rate limited; sleeping %ss (attempt %d)", wait, attempt + 1)
+            time.sleep(wait)
+            continue
+        raise RuntimeError(f"GitHub search failed ({resp.status_code}): {resp.text[:200]}")
+    raise RuntimeError("GitHub search: giving up after repeated rate limiting")
+
+
+def cell_query(language: str, stars: Bin, size_kb: Bin, pushed_since: str) -> str:
+    return (
+        f"language:{language} stars:{bin_query(*stars)} size:{bin_query(*size_kb)} "
+        f"pushed:>={pushed_since} archived:false fork:false"
+    )
+
+
+def _enumerate(q: str, token: str | None, created: tuple[date, date], *, per_page: int, pause: float,
+               log=lambda m: None) -> tuple[list[dict], int]:  # fmt: skip
+    """Every repository matching `q` created within `created` (inclusive): paginated up to the API's limit; above it
+    the date range is halved and both halves enumerated, so the population is complete. Returns the repos and the
+    number of requests."""
+    lo, hi = created
+    query = f"{q} created:{lo.isoformat()}..{hi.isoformat()}"
+    items, total = _search(query, token, page=1, per_page=per_page)
+    requests_made = 1
+    if total > SEARCH_LIMIT and lo < hi:
+        mid = lo + (hi - lo) // 2
+        time.sleep(pause)
+        left, n1 = _enumerate(q, token, (lo, mid), per_page=per_page, pause=pause, log=log)
+        time.sleep(pause)
+        right, n2 = _enumerate(q, token, (mid + timedelta(days=1), hi), per_page=per_page, pause=pause, log=log)
+        return left + right, requests_made + n1 + n2
+    if total > SEARCH_LIMIT:
+        log(f"  ! {total} repos created on {lo}: the API returns {SEARCH_LIMIT} at most, the population is truncated")
+    repos = [_repo(it) for it in items]
+    page = 1
+    while len(repos) < min(total, SEARCH_LIMIT) and page * per_page < SEARCH_LIMIT:
+        page += 1
+        time.sleep(pause)
+        items, _ = _search(query, token, page=page, per_page=per_page)
+        requests_made += 1
+        if not items:
+            break
+        repos += [_repo(it) for it in items]
+    return repos, requests_made
+
+
+def search_cell(
+    language: str,
+    stars: Bin,
+    size_kb: Bin,
+    pushed_since: str,
+    token: str | None,
+    *,
+    per_page: int = 100,
+    pause: float = 2.1,
+    log=lambda m: None,
+) -> tuple[list[dict], int, int]:
+    """The complete population of a (language, stars, size) cell: every matching repository (deduplicated by full
+    name), the cell's total count as the API states it, and the requests it took. `pause` is the wait between
+    requests (30 per minute with a token)."""
+    q = cell_query(language, stars, size_kb, pushed_since)
+    _, total = _search(q, token, page=1, per_page=1)  # the cell's own count, next to the enumeration
+    pages = -(-total // per_page)  # at least one request per page; splits above the API's 1000 add a few
+    log(f"  {language}, {bin_text(*stars)} stars, {bin_text(*size_kb)} KB: {total} repos, >= {pages} requests, "
+        f"about {pages * pause / 60:.0f} min at the search API's rate")  # fmt: skip
+    repos, requests_made = _enumerate(q, token, (GITHUB_EPOCH, date.today()), per_page=per_page, pause=pause, log=log)
+    seen: dict[str, dict] = {}
+    for r in repos:
+        seen.setdefault(r["full_name"], r)
+    return list(seen.values()), total, requests_made + 1
+
+
+@functools.cache
+def grep_reads_patterns() -> bool:
+    """Whether this git's `grep -E` reads `\\s` and `\\b`, which the Python patterns of CRYPTO_APIS use. They are GNU
+    extensions of POSIX ERE: git on Linux (the runner) knows them, Apple's git matches nothing with them, so on a
+    Mac host every Python repository would look free of cryptography and the draw would go wrong without a word."""
+    with tempfile.TemporaryDirectory(prefix="corpus-") as tmp:
+        Path(tmp, "probe.py").write_text("import hashlib\n", encoding="utf-8")
+        grep = subprocess.run(
+            ["git", "grep", "--no-index", "-q", "-E", r"^\s*import\s+hashlib\b", "--", "probe.py"],
+            cwd=tmp,
+            capture_output=True,
+            check=False,
+        )
+    return grep.returncode == 0
+
+
+def has_crypto_usage(
+    git_url: str, branch: str, language: str, *, commit: str | None = None, timeout: float = 300
+) -> list[str] | None:
+    """Shallow-clone and grep first-party source for the crypto API families of `language` (CRYPTO_APIS). Returns the
+    families matched (empty: no first-party crypto usage, the repo is not sampled; the list is the covariate
+    `crypto_apis`), or None when the clone fails. A language without patterns matches `["unchecked"]`. With `commit`
+    the check reads exactly that commit instead of the branch's head (the frozen redraw)."""
+    families = CRYPTO_APIS.get(language.lower())
+    if not families:
+        return ["unchecked"]
+    if not grep_reads_patterns():
+        raise RuntimeError("this git's grep does not read the crypto patterns (`\\s`, `\\b`: Apple's git): run the "
+                           "corpus builder in the runner, `make corpus`")  # fmt: skip
+    with tempfile.TemporaryDirectory(prefix="corpus-") as top:
+        tmp = os.path.join(top, "repo")
+        if commit:
+            if clone_repo(git_url, branch, tmp, commit=commit) is None:
+                return None
+        else:
+            clone = subprocess.run(
+                ["git", "clone", "--quiet", "--depth", "1", "-b", branch, git_url, tmp],
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                env={"GIT_TERMINAL_PROMPT": "0", "PATH": "/usr/bin:/bin:/usr/local/bin"},
+                check=False,
+            )
+            if clone.returncode != 0:
+                return None
+        matched = []
+        for family, pattern in families.items():
+            grep = subprocess.run(
+                ["git", "-C", tmp, "grep", "-l", "-I", "-E", pattern, "--", *grep_pathspecs(language)],
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                check=False,
+            )
+            if grep.returncode == 0 and grep.stdout.strip():
+                matched.append(family)
+        return matched
+
+
+def _excluded(full_name: str, patterns: list[str]) -> bool:
+    return any(re.search(p, full_name, flags=re.IGNORECASE) for p in patterns)
+
+
+def load_exclusions(path: Path = EXCLUSIONS_FILE) -> dict:
+    """{"repos": {full name (lower): reason}, "patterns": [(regex, reason)]} from experiments/corpus/exclusions.yaml.
+    Its `pilot_sets` name corpus files next to it: every repository of such a file is excluded as `pilot set
+    (<file>)`, so the files stay the one list of what the pilot runs scanned; a reviewed entry keeps its own reason."""
+    path = Path(path)
+    if not path.exists():
+        return {"repos": {}, "patterns": []}
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    repos = {str(r["full_name"]).lower(): str(r.get("reason") or "excluded") for r in data.get("repos") or []}
+    for name in data.get("pilot_sets") or []:
+        pilot = yaml.safe_load((path.parent / str(name)).read_text(encoding="utf-8")) or {}
+        for r in pilot.get("repos") or []:
+            repos.setdefault(str(r["full_name"]).lower(), f"pilot set ({name})")
+    return {
+        "repos": repos,
+        "patterns": [(str(p["regex"]), str(p.get("reason") or "excluded")) for p in data.get("patterns") or []],
+    }
+
+
+def exclusion_reason(
+    full_name: str,
+    *,
+    patterns: list[str],
+    exclusions: dict | None = None,
+    tailored: dict[str, frozenset[str]] | None = None,
+) -> str | None:
+    """Why a repo may not enter the corpus, or None: a tool was tuned on it, the reviewed list, a
+    reviewed pattern, or the builder's default name patterns."""
+    for tool, repos in (tailored or {}).items():
+        if full_name in repos:
+            return f"tailored_on of {tool} (tools.yaml)"
+    exclusions = exclusions or {"repos": {}, "patterns": []}
+    if full_name.lower() in exclusions["repos"]:
+        return exclusions["repos"][full_name.lower()]
+    for regex, reason in exclusions["patterns"]:
+        if re.search(regex, full_name, flags=re.IGNORECASE):
+            return f"{reason} ({regex})"
+    if _excluded(full_name, patterns):
+        return "name pattern"
+    return None
+
+
+def grep_pathspecs(language: str) -> list[str]:
+    """`git grep` pathspecs for first-party source of `language`: its extensions, minus NON_FIRST_PARTY directories
+    (and Go's test files and testdata)."""
+    ext = SOURCE_EXTENSIONS[language.lower()]
+    excludes = [f"**/{d}/**" for d in NON_FIRST_PARTY] + EXTRA_EXCLUDES.get(language.lower(), [])
+    return [f"*.{ext}", *(f":(exclude,glob){x}" for x in excludes)]
+
+
+def build_corpus(
+    params: CorpusParams,
+    token: str | None,
+    *,
+    log=print,
+    status=lambda language, picked, now: None,
+    exclusions: dict | None = None,
+    tailored: dict[str, frozenset[str]] | None = None,
+    frame: dict | None = None,
+    as_of: str | None = None,
+) -> dict:
+    """Stratified sample per language over stars x size cells, `per_cell` repos each, filtered and pinned to
+    commits. Every cell's population is enumerated and recorded, the draw is a seeded shuffle of the name-sorted
+    population, and the first `per_cell` candidates that pass the exclusions, the size cap and the crypto pre-filter
+    are taken (so the sample is uniform over the eligible repos of the cell). Exclusions default to
+    experiments/corpus/exclusions.yaml and the registry's `tailored_on`; every excluded candidate is listed
+    with its reason.
+    `status(language, picked, now)` follows the search (the CLI's progress line): `now` is the cell searched or the
+    repo checked, None once the language is done.
+    `frame` (filled in place; the CLI keeps it as `<corpus>-frame.yaml`): every cell's enumerated population with
+    its query and the search date, plus the crypto checks by commit. A frame with cells is reused instead of
+    searching (same languages, bins and cap; its search date stands), so another `per_cell` or `seed` draws from the
+    same population and can be verified offline; a check whose repo still has the same default-branch commit is
+    reused instead of cloning.
+    `as_of` (an ISO timestamp, with a frame only), the frozen redraw of the module docstring: recorded checks stand
+    as they are, and a candidate without one is pinned and checked as of that moment."""
+    exclusions = load_exclusions() if exclusions is None else exclusions
+    tailored = tailored_map() if tailored is None else tailored
+    rng = random.Random(params.seed)
+    frame = {} if frame is None else frame
+    reuse = bool(frame.get("cells"))
+    if as_of and not reuse:
+        raise RuntimeError("as_of redraws from a frame: without one there is no draw to repeat")
+    today = time.strftime("%Y-%m-%d", time.gmtime())
+    if not reuse:
+        frame.update(
+            search_date=today,
+            pushed_since=time.strftime("%Y-%m-%d", time.gmtime(time.time() - params.pushed_within_days * 86400)),
+            cells=[],
+        )
+    checks: dict[str, dict] = frame.setdefault("crypto_checks", {})
+    pushed_since, search_date = frame["pushed_since"], frame["search_date"]
+    stored = {(c["language"], tuple(c["stars"]), tuple(c["size_kb"])): c for c in frame["cells"]}
+    cap_mb = params.max_repo_size_mb
+    size_bins = clamp_size_bins(params.size_bins_kb, cap_mb)
+    if cap_mb:
+        log(f"repo size cap {cap_mb} MB; size cells (KB): {size_bins}")
+    cells = [(s, z) for s in params.star_bins for z in size_bins]
+    quota = params.per_cell
+    if reuse:
+        log(f"frame of {search_date} reused: {len(stored)} cells without search requests")
+    log(
+        f"{len(params.star_bins)} star bins x {len(size_bins)} size bins = {len(cells)} cells x {quota} repos = "
+        f"{len(cells) * quota} per language, {len(cells) * quota * len(params.languages)} in all"
+    )
+    pause = 2.1 if token else 6.5  # 30 (10) search requests per minute
+    chosen: list[dict] = []
+    excluded: list[dict] = []
+    cell_rows: list[dict] = []
+    stats = {"searched": 0, "requests": 0, "excluded": 0, "no_crypto": 0, "clone_failed": 0, "unresolved": 0}
+    for language in params.languages:
+        picked_for_lang: list[dict] = []
+        for stars, size in cells:
+            label = f"{bin_text(*stars)} stars, {bin_text(*size)} KB"
+            key = (language, tuple(stars), tuple(size))
+            if key in stored:
+                cell = stored[key]
+                candidates, population, n_requests = [dict(r) for r in cell["repos"]], cell["population"], 0
+            elif search_date != today:  # one frame, one search date
+                raise RuntimeError(f"the frame of {search_date} has no cell {language}, {label} (other bins, "
+                                   "languages or cap)")  # fmt: skip
+            else:  # a new frame, or one an interrupted build of today left
+                status(language, len(picked_for_lang), f"enumerating {label}")
+                candidates, population, n_requests = search_cell(
+                    language, stars, size, pushed_since, token, pause=pause, log=log
+                )
+                listed = [dict(c) for c in sorted(candidates, key=lambda c: c["full_name"])]
+                frame["cells"].append({"language": language, "stars": list(stars), "size_kb": list(size),
+                                       "query": cell_query(language, stars, size, pushed_since),
+                                       "population": population, "repos": listed})  # fmt: skip
+            stats["searched"] += len(candidates)
+            stats["requests"] += n_requests
+            candidates.sort(key=lambda c: c["full_name"])  # the API's order varies; the seed decides the draw
+            rng.shuffle(candidates)
+            taken = tried = 0
+            for cand in candidates:
+                if taken >= quota:
+                    break
+                tried += 1
+                reason = exclusion_reason(
+                    cand["full_name"], patterns=params.exclude_patterns, exclusions=exclusions, tailored=tailored
+                )
+                if reason:
+                    stats["excluded"] += 1
+                    excluded.append({"full_name": cand["full_name"], "reason": reason})
+                    continue
+                if cap_mb and (cand.get("size_kb") or 0) > cap_mb * 1024:
+                    stats["excluded"] += 1
+                    excluded.append(
+                        {
+                            "full_name": cand["full_name"],
+                            "reason": f"repo size {cand['size_kb'] // 1024} MB > cap {cap_mb} MB",
+                        }
+                    )
+                    continue
+                cached = checks.get(cand["full_name"])
+                if as_of:  # the frame is the record: its commit stands, a new candidate is pinned as of then
+                    commit = cached["commit"] if cached else commit_as_of(cand["git_url"], cand["branch"], as_of)
+                else:
+                    commit = resolve_remote_commit(cand["git_url"], cand["branch"])
+                if not commit:
+                    stats["unresolved"] += 1
+                    continue
+                if params.crypto_filter:
+                    if cached and cached.get("commit") == commit:
+                        apis = cached["apis"]
+                    else:
+                        status(language, len(picked_for_lang), f"{cand['full_name']}: cloning for the crypto check")
+                        apis = has_crypto_usage(
+                            cand["git_url"], cand["branch"], language, commit=commit if as_of else None
+                        )
+                        if apis is not None:  # a failed clone may be transient: never cached
+                            checks[cand["full_name"]] = {"commit": commit, "apis": apis}
+                    if apis is None:
+                        stats["clone_failed"] += 1
+                        excluded.append({"full_name": cand["full_name"], "reason": "clone failed"})
+                        continue
+                    if not apis:
+                        stats["no_crypto"] += 1
+                        excluded.append({"full_name": cand["full_name"], "reason": "no first-party crypto usage"})
+                        continue
+                    cand["crypto_apis"] = apis
+                cand["commit"] = commit
+                cand["stratum"] = {"stars": list(stars), "size_kb": list(size)}
+                picked_for_lang.append(cand)
+                taken += 1
+                log(f"  + {cand['full_name']} ({language}, {cand['stars']}★, {cand['size_kb']} KB) {commit[:12]}")
+            cell_rows.append(
+                {
+                    "language": language,
+                    "stars": list(stars),
+                    "size_kb": list(size),
+                    "population": population,
+                    "enumerated": len(candidates),
+                    "tried": tried,
+                    "sampled": taken,
+                    "quota": quota,
+                }
+            )
+            if taken < quota:
+                log(f"  ! {language} {label}: {taken} of {quota} (population {population}, {tried} tried)")
+            if n_requests:
+                time.sleep(pause)
+        status(language, len(picked_for_lang), None)
+        log(f"{language}: {len(picked_for_lang)} repos")
+        chosen.extend(picked_for_lang)
+    return {
+        "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "params": {
+            "languages": params.languages,
+            "per_cell": quota,
+            "per_language": len(cells) * quota,
+            "star_bins": [list(b) for b in params.star_bins],
+            "size_bins_kb": [list(b) for b in size_bins],
+            "max_repo_size_mb": cap_mb,
+            "pushed_since": pushed_since,
+            "search_date": search_date,
+            "crypto_filter": params.crypto_filter,
+            "exclude_patterns": params.exclude_patterns,
+            "seed": params.seed,
+            **({"as_of": as_of} if as_of else {}),
+        },
+        "cells": cell_rows,
+        "stats": stats,
+        "excluded": excluded,
+        "repos": chosen,
+    }
+
+
+def prune_corpus(corpus: dict, exp_dir: Path, *, statuses: tuple[str, ...] = ("timeout",)) -> dict:
+    """The corpus without the repos where some tool's run in `exp_dir` ended in one of `statuses` (the stability
+    run's timeouts); the dropped repos are listed under `pruned` with the tools and statuses."""
+    hits: dict[str, set[str]] = {}
+    for meta_path in sorted(Path(exp_dir).glob("*/*/*/run*.meta.json")):
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        if meta.get("status") in statuses:
+            repo = meta_path.parents[2].name.split("@", 1)[0].replace("__", "/", 1)
+            hits.setdefault(repo, set()).add(f"{meta.get('worker') or meta_path.parent.name}:{meta.get('status')}")
+    kept = [r for r in corpus.get("repos") or [] if r.get("full_name") not in hits]
+    reason = f"timed out in {Path(exp_dir).name}"
+    pruned = [
+        {"full_name": r["full_name"], "reason": reason, "runs": sorted(hits[r["full_name"]])}
+        for r in corpus.get("repos") or []
+        if r.get("full_name") in hits
+    ]
+    return {**corpus, "pruned_from": Path(exp_dir).name, "pruned": pruned, "repos": kept}

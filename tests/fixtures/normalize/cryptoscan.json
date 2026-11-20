@@ -1,0 +1,226 @@
+{
+ "bomFormat": "CycloneDX",
+ "specVersion": "1.6",
+ "metadata": {
+  "tools": [
+   {
+    "name": "CryptoScan",
+    "vendor": "CSNP",
+    "version": "1.4.0"
+   }
+  ],
+  "properties": [
+   {
+    "name": "bf-cbom:fixture-origin",
+    "value": "e1-pilot-corpus 2026-10-16: FiloSottile__age@b74dce4cdbe3, ansible__ansible@a26c0f7b504b, apache__kafka@771b9576b00e, hashicorp__vault@76fdd6587523"
+   }
+  ]
+ },
+ "components": [
+  {
+   "bom-ref": "crypto-rsa-0",
+   "cryptoProperties": {
+    "algorithmProperties": {
+     "primitive": "pke"
+    },
+    "assetType": "algorithm",
+    "oid": "1.2.840.113549.1.1.1"
+   },
+   "description": "RSA algorithm detected. RSA is vulnerable to Shor's algorithm and will be broken by cryptographically relevant quantum computers.",
+   "evidence": {
+    "occurrences": [
+     {
+      "line": 131,
+      "location": "cmd/age/age_test.go",
+      "symbol": "RSA"
+     },
+     {
+      "line": 136,
+      "location": "cmd/age/age_test.go",
+      "symbol": "RSA"
+     },
+     {
+      "line": 98,
+      "location": "agessh/agessh.go",
+      "symbol": "rsa"
+     }
+    ]
+   },
+   "name": "RSA",
+   "type": "cryptographic-asset"
+  },
+  {
+   "bom-ref": "crypto-ecc-1",
+   "cryptoProperties": {
+    "algorithmProperties": {
+     "primitive": "other"
+    },
+    "assetType": "algorithm"
+   },
+   "description": "Elliptic curve cryptography detected. ECC is vulnerable to Shor's algorithm on quantum computers.",
+   "evidence": {
+    "occurrences": [
+     {
+      "line": 183,
+      "location": "agessh/agessh.go",
+      "symbol": "ed25519"
+     },
+     {
+      "line": 195,
+      "location": "agessh/agessh.go",
+      "symbol": "ed25519"
+     },
+     {
+      "line": 260,
+      "location": "agessh/agessh.go",
+      "symbol": "ed25519"
+     }
+    ]
+   },
+   "name": "ECC",
+   "type": "cryptographic-asset"
+  },
+  {
+   "bom-ref": "crypto-tls-6",
+   "cryptoProperties": {
+    "algorithmProperties": {
+     "primitive": "other"
+    },
+    "assetType": "algorithm"
+   },
+   "description": "Deprecated TLS/SSL version detected. TLS 1.0, 1.1, and SSL 2/3 have known vulnerabilities.",
+   "evidence": {
+    "occurrences": [
+     {
+      "line": 220,
+      "location": "lib/ansible/plugins/connection/psrp.py",
+      "symbol": "TLSv1.2"
+     },
+     {
+      "line": 222,
+      "location": "lib/ansible/plugins/connection/psrp.py",
+      "symbol": "TLSv1.2"
+     },
+     {
+      "line": 201,
+      "location": "lib/ansible/module_utils/powershell/Ansible.ModuleUtils.WebRequest.psm1",
+      "symbol": "Tls11"
+     }
+    ]
+   },
+   "name": "TLS",
+   "type": "cryptographic-asset"
+  },
+  {
+   "bom-ref": "crypto-certificate-expiration-check-22",
+   "cryptoProperties": {
+    "assetType": "certificate"
+   },
+   "description": "Certificate validity period handling detected. Important for certificate lifecycle management.",
+   "evidence": {
+    "occurrences": [
+     {
+      "line": 369,
+      "location": "lib/ansible/galaxy/api.py",
+      "symbol": "expires"
+     },
+     {
+      "line": 370,
+      "location": "lib/ansible/galaxy/api.py",
+      "symbol": "expires"
+     },
+     {
+      "line": 371,
+      "location": "lib/ansible/galaxy/api.py",
+      "symbol": "expires"
+     }
+    ]
+   },
+   "name": "Certificate Expiration Check",
+   "type": "cryptographic-asset"
+  },
+  {
+   "bom-ref": "crypto-weak-pbkdf-usage-10",
+   "cryptoProperties": {
+    "assetType": "algorithm"
+   },
+   "description": "Weak password-based key derivation detected. Low iteration counts or weak hashes reduce security.",
+   "evidence": {
+    "occurrences": [
+     {
+      "line": 74,
+      "location": "jmh-benchmarks/src/main/java/org/apache/kafka/jmh/acl/AuthorizerBenchmark.java",
+      "symbol": "iterations = 5"
+     },
+     {
+      "line": 55,
+      "location": "jmh-benchmarks/src/main/java/org/apache/kafka/jmh/assignor/ClientSideAssignorBenchmark.java",
+      "symbol": "iterations = 5"
+     },
+     {
+      "line": 56,
+      "location": "jmh-benchmarks/src/main/java/org/apache/kafka/jmh/assignor/ClientSideAssignorBenchmark.java",
+      "symbol": "iterations = 5"
+     }
+    ]
+   },
+   "name": "Weak PBKDF Usage",
+   "type": "cryptographic-asset"
+  },
+  {
+   "bom-ref": "crypto-rsa,-ecdsa,-eddsa-15",
+   "cryptoProperties": {
+    "algorithmProperties": {
+     "primitive": "other"
+    },
+    "assetType": "algorithm"
+   },
+   "description": "Go implementation of JOSE standards (Algorithms: RSA, ECDSA, EdDSA)",
+   "evidence": {
+    "occurrences": [
+     {
+      "line": 1,
+      "location": "api/auth/approle/go.mod",
+      "symbol": "github.com/go-jose/go-jose"
+     },
+     {
+      "line": 1,
+      "location": "api/auth/aws/go.mod",
+      "symbol": "github.com/go-jose/go-jose"
+     },
+     {
+      "line": 1,
+      "location": "api/auth/azure/go.mod",
+      "symbol": "github.com/go-jose/go-jose"
+     }
+    ]
+   },
+   "name": "RSA, ECDSA, EdDSA",
+   "type": "cryptographic-asset"
+  },
+  {
+   "bom-ref": "crypto-hardcoded-key-size-43",
+   "cryptoProperties": {
+    "assetType": "algorithm"
+   },
+   "description": "Hardcoded key size detected. Review to ensure adequate security level.",
+   "evidence": {
+    "occurrences": [
+     {
+      "line": 41,
+      "location": "sdk/helper/certutil/helpers.go",
+      "symbol": "KeySize = 2048"
+     },
+     {
+      "line": 57,
+      "location": "sdk/helper/keysutil/policy.go",
+      "symbol": "KeySize = 4096"
+     }
+    ]
+   },
+   "name": "Hardcoded Key Size",
+   "type": "cryptographic-asset"
+  }
+ ],
+ "dependencies": []
+}

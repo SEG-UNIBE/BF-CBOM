@@ -1,0 +1,243 @@
+{
+ "bomFormat": "CycloneDX",
+ "specVersion": "1.7",
+ "metadata": {
+  "tools": [
+   {
+    "name": "CipherRadar",
+    "vendor": "nk-sentinel",
+    "version": "efa5d9d"
+   }
+  ],
+  "properties": [
+   {
+    "name": "bf-cbom:fixture-origin",
+    "value": "e1-pilot-corpus 2026-10-16: ansible__ansible@a26c0f7b504b"
+   }
+  ]
+ },
+ "components": [
+  {
+   "bom-ref": "FIND-1793/subjectPublicKey",
+   "cryptoProperties": {
+    "assetType": "related-crypto-material",
+    "relatedCryptoMaterialProperties": {
+     "algorithmRef": "crypto/alg/ecdsa-256",
+     "size": 256,
+     "type": "public-key"
+    }
+   },
+   "name": "ECDSA public key",
+   "type": "cryptographic-asset"
+  },
+  {
+   "bom-ref": "crypto/alg/ecdsa-256",
+   "cryptoProperties": {
+    "algorithmProperties": {
+     "algorithmFamily": "ECDSA",
+     "classicalSecurityLevel": 256,
+     "parameterSetIdentifier": "256",
+     "primitive": "signature"
+    },
+    "assetType": "algorithm"
+   },
+   "name": "ECDSA",
+   "properties": [
+    {
+     "name": "quantumStatus",
+     "value": "quantum-vulnerable"
+    },
+    {
+     "name": "cradar:quantum:priority",
+     "value": "high"
+    },
+    {
+     "name": "cradar:quantum:recommendation",
+     "value": "Migrate to ML-DSA"
+    },
+    {
+     "name": "cradar:quantum:migrationTarget",
+     "value": "ML-DSA (FIPS 204) or SLH-DSA (FIPS 205)"
+    }
+   ],
+   "type": "cryptographic-asset"
+  },
+  {
+   "bom-ref": "FIND-1793",
+   "cryptoProperties": {
+    "assetType": "certificate",
+    "certificateProperties": {
+     "certificateExtension": "KeyUsage=digitalSignature,keyEncipherment; ExtendedKeyUsage=clientAuth,serverAuth; SubjectAltName=DNS:SERVER2016",
+     "certificateFormat": "X.509",
+     "issuerName": "CN=SERVER2016",
+     "notValidAfter": "2018-05-30T08:23:17Z",
+     "notValidBefore": "2017-05-30T08:03:17Z",
+     "signatureAlgorithmRef": "crypto/alg/ecdsa-sha256",
+     "subjectName": "CN=SERVER2016",
+     "subjectPublicKeyRef": "FIND-1793/subjectPublicKey"
+    }
+   },
+   "description": "X.509 certificate for \"SERVER2016\" signed with ECDSA-SHA256 (expires 2018-05-30)",
+   "evidence": {
+    "occurrences": [
+     {
+      "line": 1,
+      "location": "test/units/module_utils/urls/fixtures/cbt/ecdsa_sha256.pem"
+     }
+    ]
+   },
+   "name": "X.509 Certificate (SERVER2016)",
+   "properties": [
+    {
+     "name": "severity",
+     "value": "high"
+    },
+    {
+     "name": "confidence",
+     "value": "high"
+    },
+    {
+     "name": "ruleId",
+     "value": "cbom-regex-pem-certificate-parsed"
+    },
+    {
+     "name": "fingerprint",
+     "value": "392d4f3863818b9a117f25740c02f936082d2706a4ca0a5952245bc8ae4c75fb"
+    },
+    {
+     "name": "detectionPass",
+     "value": "1"
+    },
+    {
+     "name": "cradar:cert:serialNumber",
+     "value": "78:d4:13:c6:43:20:ab:80:45:f6:d2:a8:80:81:97:51"
+    },
+    {
+     "name": "cradar:cert:sha256Fingerprint",
+     "value": "fe:cf:1b:25:85:44:99:90:d9:e3:b2:c9:2d:3f:59:7e:c8:35:4e:12:4e:da:75:1d:94:83:7c:2c:89:a2:c1:55"
+    },
+    {
+     "name": "cradar:cert:subjectKeyIdentifier",
+     "value": "9c:50:c4:f3:cd:b8:4d:80:22:05:e5:f8:7e:08:44:12:0d:f7:52:06"
+    },
+    {
+     "name": "cradar:cert:publicKeyCurve",
+     "value": "P-256"
+    },
+    {
+     "name": "cradar:cert:signatureHash",
+     "value": "SHA-256"
+    },
+    {
+     "name": "cradar:cert:selfSigned",
+     "value": "true"
+    },
+    {
+     "name": "cradar:cert:version",
+     "value": "3"
+    },
+    {
+     "name": "cradar:cert:validityDays",
+     "value": "365"
+    }
+   ],
+   "type": "cryptographic-asset"
+  },
+  {
+   "description": "Cryptographic library import detected. Part of the project's cryptographic supply chain inventory.\n",
+   "evidence": {
+    "occurrences": [
+     {
+      "line": 79,
+      "location": "/tmp/cradar-0p5xs2bd/repo/lib/ansible/module_utils/urls.py"
+     }
+    ]
+   },
+   "name": "pyca-cryptography-or-hashlib-or-pycryptodome-or-pynacl-or-passlib-or-pyjwt-or-python-jose-or-authlib-or-bcrypt-py-or-argon2-cffi",
+   "properties": [
+    {
+     "name": "severity",
+     "value": "info"
+    },
+    {
+     "name": "confidence",
+     "value": "high"
+    },
+    {
+     "name": "ruleId",
+     "value": "cbom-python-crypto-library-import"
+    },
+    {
+     "name": "library",
+     "value": "pyca-cryptography-or-hashlib-or-pycryptodome-or-pynacl-or-passlib-or-pyjwt-or-python-jose-or-authlib-or-bcrypt-py-or-argon2-cffi"
+    },
+    {
+     "name": "fingerprint",
+     "value": "f02a77477a07cb8f7d225ac0cc08d0edb2d859f7d367b012452110a904f5e309"
+    },
+    {
+     "name": "detectionPass",
+     "value": "2"
+    }
+   ],
+   "purl": "pkg:pypi/cryptography",
+   "type": "library"
+  },
+  {
+   "bom-ref": "FIND-103",
+   "cryptoProperties": {
+    "algorithmProperties": {
+     "algorithmFamily": "SHA-2",
+     "primitive": "hash"
+    },
+    "assetType": "algorithm"
+   },
+   "description": "Algorithm reference \"SHA-1\" detected via regex",
+   "evidence": {
+    "occurrences": [
+     {
+      "line": 116,
+      "location": "lib/ansible/modules/copy.py"
+     }
+    ]
+   },
+   "name": "SHA-1",
+   "properties": [
+    {
+     "name": "severity",
+     "value": "medium"
+    },
+    {
+     "name": "confidence",
+     "value": "low"
+    },
+    {
+     "name": "ruleId",
+     "value": "cbom-regex-algo-sha-1"
+    },
+    {
+     "name": "quantumStatus",
+     "value": "quantum-vulnerable"
+    },
+    {
+     "name": "cradar:quantum:priority",
+     "value": "medium"
+    },
+    {
+     "name": "cradar:quantum:recommendation",
+     "value": "Algorithm not recognized — review manually"
+    },
+    {
+     "name": "fingerprint",
+     "value": "ddea2746406e431510f731dbcc5dee415882c880aa5a9b7676c0db15c20acf65"
+    },
+    {
+     "name": "detectionPass",
+     "value": "1"
+    }
+   ],
+   "type": "cryptographic-asset"
+  }
+ ],
+ "dependencies": []
+}

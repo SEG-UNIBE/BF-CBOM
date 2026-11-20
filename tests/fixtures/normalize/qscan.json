@@ -1,0 +1,185 @@
+{
+ "bomFormat": "CycloneDX",
+ "specVersion": "1.6",
+ "serialNumber": "urn:uuid:35f5d898-44a0-4d81-8542-340d537b2e5b",
+ "version": 1,
+ "metadata": {
+  "timestamp": "2026-10-19T21:54:23.515Z",
+  "tools": {
+   "components": [
+    {
+     "type": "application",
+     "name": "qScan",
+     "version": "0.12.0"
+    }
+   ]
+  },
+  "component": {
+   "type": "application",
+   "bom-ref": "root",
+   "name": "/src"
+  },
+  "properties": [
+   {
+    "name": "bf-cbom:fixture-origin",
+    "value": "qScan 0.12.0 on corpus/micro/python, 2026-10-19; complete CBOM"
+   }
+  ]
+ },
+ "components": [
+  {
+   "type": "cryptographic-asset",
+   "bom-ref": "crypto:2c7075c63fd2effd",
+   "name": "ECDH (key-agree)",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {
+     "primitive": "key-agree",
+     "parameterSetIdentifier": "ECDH",
+     "executionEnvironment": "software-plain-ram",
+     "classicalSecurityLevel": 128,
+     "nistQuantumSecurityLevel": 0,
+     "cryptoFunctions": [
+      "other"
+     ]
+    }
+   },
+   "properties": [
+    {
+     "name": "quantakrypto:quantumVulnerable",
+     "value": "true"
+    },
+    {
+     "name": "quantakrypto:harvestNowDecryptLater",
+     "value": "true"
+    }
+   ],
+   "evidence": {
+    "occurrences": [
+     {
+      "location": "app/crypto_demo.py:16",
+      "additionalContext": "CWE-327"
+     }
+    ]
+   }
+  },
+  {
+   "type": "cryptographic-asset",
+   "bom-ref": "crypto:15a9432774a9072b",
+   "name": "ECDSA (signature)",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {
+     "primitive": "signature",
+     "parameterSetIdentifier": "ECDSA",
+     "executionEnvironment": "software-plain-ram",
+     "classicalSecurityLevel": 128,
+     "nistQuantumSecurityLevel": 0,
+     "cryptoFunctions": [
+      "sign",
+      "verify"
+     ]
+    }
+   },
+   "properties": [
+    {
+     "name": "quantakrypto:quantumVulnerable",
+     "value": "true"
+    },
+    {
+     "name": "quantakrypto:harvestNowDecryptLater",
+     "value": "false"
+    }
+   ],
+   "evidence": {
+    "occurrences": [
+     {
+      "location": "app/crypto_demo.py:28",
+      "additionalContext": "CWE-327"
+     }
+    ]
+   }
+  },
+  {
+   "type": "cryptographic-asset",
+   "bom-ref": "crypto:4fc7ba9e2300b48d",
+   "name": "RSA (kem)",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {
+     "primitive": "kem",
+     "parameterSetIdentifier": "RSA",
+     "executionEnvironment": "software-plain-ram",
+     "classicalSecurityLevel": 112,
+     "nistQuantumSecurityLevel": 0,
+     "cryptoFunctions": [
+      "encapsulate",
+      "decapsulate"
+     ]
+    }
+   },
+   "properties": [
+    {
+     "name": "quantakrypto:quantumVulnerable",
+     "value": "true"
+    },
+    {
+     "name": "quantakrypto:harvestNowDecryptLater",
+     "value": "true"
+    }
+   ],
+   "evidence": {
+    "occurrences": [
+     {
+      "location": "app/crypto_demo.py:15",
+      "additionalContext": "CWE-327"
+     },
+     {
+      "location": "app/crypto_demo.py:32",
+      "additionalContext": "CWE-327"
+     }
+    ]
+   }
+  },
+  {
+   "type": "cryptographic-asset",
+   "bom-ref": "crypto:8869b5d736e5762a",
+   "name": "RSA (other)",
+   "cryptoProperties": {
+    "assetType": "algorithm",
+    "algorithmProperties": {
+     "primitive": "other",
+     "parameterSetIdentifier": "RSA",
+     "executionEnvironment": "software-plain-ram",
+     "classicalSecurityLevel": 112,
+     "nistQuantumSecurityLevel": 0,
+     "cryptoFunctions": [
+      "other"
+     ]
+    }
+   },
+   "properties": [
+    {
+     "name": "quantakrypto:quantumVulnerable",
+     "value": "true"
+    },
+    {
+     "name": "quantakrypto:harvestNowDecryptLater",
+     "value": "true"
+    }
+   ],
+   "evidence": {
+    "occurrences": [
+     {
+      "location": "pyproject.toml:4",
+      "additionalContext": "CWE-327"
+     },
+     {
+      "location": "requirements.txt:1",
+      "additionalContext": "CWE-327"
+     }
+    ]
+   }
+  }
+ ]
+}

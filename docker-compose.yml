@@ -2,18 +2,97 @@ name: bf-cbom
 services:
 
   redis:
-    image: redis:7
+    image: redis:7.4@sha256:4fa24486b8bcca8eec45ee0eb166edc674795e53a2b53d1a9ef263eecebaac85
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"  # loopback only: Redis has no auth
     volumes:
       - redis-data:/data
     restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 1g
     healthcheck:
         test: ["CMD", "redis-cli", "ping"]
         interval: 2s
         timeout: 2s
         retries: 5
         start_period: 1s
+
+  # Local read-only git server (smart HTTP) on the compose network only. The runner mirrors every
+  # repo here at its pinned commit and pushes mutant branches; workers clone from
+  # http://gitserver/<owner>/<repo>.git so all tools scan identical bytes.
+  gitserver:
+    image: bf-cbom/gitserver:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.gitserver
+      args:
+        BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
+    volumes:
+      - git-data:/srv/git
+      - git-certs:/certs
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          # GITSERVER_MEMORY (Makefile): git pack-objects for a full clone of a large repo runs in this cgroup;
+          # 256m was OOM-killed on keycloak and ansible (CBOMkit's JGit clone, 2026-10-19); 16g for CBOMkit replicas
+          memory: ${GITSERVER_MEMORY:-16g}
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETUID, SETGID, NET_BIND_SERVICE, DAC_OVERRIDE]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/healthz"]
+      interval: 5s
+      timeout: 2s
+      retries: 5
+      start_period: 2s
+
+  # Batch experiment runner (on demand): `docker compose run --rm runner experiment run /app/experiments/<x>.yaml`
+  runner:
+    image: bf-cbom/runner:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.runner
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+        BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
+    depends_on:
+      redis:
+        condition: service_healthy
+      gitserver:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - BF_CBOM_IMAGE=bf-cbom/runner:${VERSION:-latest}  # recorded per session (_run-log.json runner_image)
+      - RESULTS_DIR=/data/results
+      - GIT_MIRROR_DIR=/srv/git
+      - GITSERVER_URL=http://gitserver
+      # Sum of worker memory limits (tools.yaml memory_gb) a batch run feeds at once; tools beyond it run in
+      # later waves. Set per machine in the Makefile / environment; 0 = no limit (one wave).
+      - EXPERIMENT_MEMORY_BUDGET_GB=${EXPERIMENT_MEMORY_BUDGET_GB:-14}
+      - BF_CBOM_JOBS=${BF_CBOM_JOBS:-0}  # worker processes of `analysis report` (--jobs; Makefile)
+      # The git server's memory cap (recorded per session); CORPUS_MAX_REPO_SIZE_MB overrides the corpus size cap
+      # (common/corpus.py, default 1536 MB)
+      - GITSERVER_MEMORY=${GITSERVER_MEMORY:-16g}
+      - CORPUS_MAX_REPO_SIZE_MB=${CORPUS_MAX_REPO_SIZE_MB:-}
+    env_file: docker/env/coordinator.env  # GITHUB_TOKEN for the corpus builder
+    volumes:
+      - results-data:/data/results
+      - git-data:/srv/git
+      - ./experiments:/app/experiments:ro
+    restart: "no"
+    deploy:
+      resources:
+        limits:
+          # RUNNER_MEMORY (Makefile): the analysis report's normalized CBOMs plus its worker processes (--jobs)
+          memory: ${RUNNER_MEMORY:-8g}
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    profiles: [tools]
 
   coordinator:
     image: bf-cbom/coordinator:${VERSION:-latest}
@@ -23,18 +102,27 @@ services:
       args:
         BASE_IMAGE: ${BASE_IMAGE:-base}
         BASE_TAG: ${VERSION:-latest}
+        BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
     ports:
-      - "8501:8501"
+      - "127.0.0.1:8501:8501"  # loopback only; the UI exposes config/tokens
     depends_on:
       - redis
     environment:
-      - AVAILABLE_WORKERS=${AVAILABLE_WORKERS:-cdxgen,cbomkit,deepseek,cryptobomforge}
-      - AVAILABLE_LANGUAGES=python,java
+      - AVAILABLE_WORKERS=${AVAILABLE_WORKERS:-cdxgen,cbomkit,deepseek,cryptobomforge,cryptoscan,chatgpt,claude,pqcheck,qdarpan,securin-xbom,cipherradar,xgrep,cbomkit-jar}
+      - AVAILABLE_LANGUAGES=python,java,go
+      - EXPERIMENT_MEMORY_BUDGET_GB=${EXPERIMENT_MEMORY_BUDGET_GB:-14}  # UI batches run in waves like the runner
       - GITHUB_CACHE_TTL_SEC=86400
+      - COMPONENT_MATCH_WAIT_SEC=420
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     env_file: docker/env/coordinator.env
+    volumes:
+      - results-data:/data/results:ro  # stored experiments (read-only in the UI)
     restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 2g
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8501/_stcore/health"]
       interval: 2s
@@ -50,6 +138,7 @@ services:
       args:
         BASE_IMAGE: ${BASE_IMAGE:-base}
         BASE_TAG: ${VERSION:-latest}
+        BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
     depends_on:
       coordinator:
         condition: service_healthy
@@ -57,10 +146,17 @@ services:
         condition: service_healthy
     environment:
       - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-skeleton:${VERSION:-latest}
       - REDIS_PORT=6379
       - WORKER_TIMEOUT_SEC=6
     env_file: docker/env/worker-skeleton.env
     restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     profiles: [dev, all]
 
 
@@ -72,6 +168,7 @@ services:
       args:
         BASE_IMAGE: ${BASE_IMAGE:-base}
         BASE_TAG: ${VERSION:-latest}
+        BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
     depends_on:
       coordinator:
         condition: service_healthy
@@ -79,12 +176,19 @@ services:
         condition: service_healthy
     environment:
       - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-testing:${VERSION:-latest}
       - REDIS_PORT=6379
       - WORKER_TIMEOUT_SEC=6
       - TESTING_MIN_CBOM_KB=50
       - TESTING_MAX_CBOM_KB=1000
     env_file: docker/env/worker-testing.env
     restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     profiles: [dev, all]
 
   worker-cbomkit:
@@ -93,8 +197,9 @@ services:
       context: .
       dockerfile: ./docker/Dockerfile.worker-cbomkit
       args:
-        BASE_IMAGE: ${BASE_IMAGE}
-        BASE_TAG: ${VERSION}
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+        BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
     depends_on:
       coordinator:
         condition: service_healthy
@@ -102,12 +207,24 @@ services:
         condition: service_healthy
     environment:
       - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-cbomkit:${VERSION:-latest}
       - REDIS_PORT=6379
-      - WORKER_TIMEOUT_SEC=600
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
       - CBOMKIT_HEALTH_WAIT_SEC=20
-      - JAVA_OPTS=-Xms1g -Xmx6g -XX:+ExitOnOutOfMemoryError
+      # Leave 4 GiB of the container limit for native JVM memory and the worker/backend processes. The heap is the
+      # binding limit (a full heap ends the job as a failure, not an OOM kill), so -Xmx rises with the limit: 12g in
+      # 16g until 2026-10-30, when the trials' highest peak (12.8 GiB, scapy) sat at that heap.
+      - JAVA_OPTS=-Xms1g -Xmx16g -XX:+ExitOnOutOfMemoryError
     env_file: docker/env/worker-cbomkit.env
+    volumes:
+      - git-certs:/certs:ro  # trust the local git server's certificate (CBOMkit forces https)
     restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 20g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     profiles: [prod, all]
 
   worker-cdxgen:
@@ -118,6 +235,7 @@ services:
       args:
         BASE_IMAGE: ${BASE_IMAGE:-base}
         BASE_TAG:   ${VERSION:-latest}
+        BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
     depends_on:
       coordinator:
         condition: service_healthy
@@ -125,11 +243,21 @@ services:
         condition: service_healthy
     environment:
       - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-cdxgen:${VERSION:-latest}
       - REDIS_PORT=6379
-      - WORKER_TIMEOUT_SEC=600
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
       - CDXGEN_DEBUG_MODE=debug
     env_file: docker/env/worker-cdxgen.env
     restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          # 4g OOM-killed its Gradle runs on bisq/bisq2 (rc=-9, corpus-icpc); 8g was still OOM-killed on
+          # Chat2DB, bisq, bisq2 and kafka with the runs stored ok (2026-10-19); 16g on 8 of the 60 corpus-pilot-medium
+          # repos, 5 of them stored with 0 assets (2026-10-23)
+          memory: 24g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     profiles: [prod, all]
 
 
@@ -141,6 +269,7 @@ services:
       args:
         BASE_IMAGE: ${BASE_IMAGE:-base}
         BASE_TAG: ${VERSION:-latest}
+        BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
     depends_on:
       coordinator:
         condition: service_healthy
@@ -148,20 +277,38 @@ services:
         condition: service_healthy
     environment:
       - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-deepseek:${VERSION:-latest}
       - REDIS_PORT=6379
-      - WORKER_TIMEOUT_SEC=120
+      - WORKER_TIMEOUT_SEC=7200
+      # code-reading LLM budget (common/llm_cbom.py): files sent, chars per request, chunks per repo (a safety
+      # valve: 100 cut bisq2's 312 chunks; a capped run is marked in runs.csv), requests in flight
+      - LLM_MAX_FILES=1000
+      - LLM_MAX_CHUNK_CHARS=40000
+      - LLM_MAX_CHUNKS=1000
+      - LLM_CONCURRENCY=4
+      # deepseek-v4-pro thinks by default: the output limit covers the reasoning (DeepSeek's own thinking-mode default
+      # is 64K), answers take longer, and a temperature has no effect, so none is sent (the CBOM says `default`)
+      - LLM_MAX_OUTPUT_TOKENS=65536
+      - LLM_API_TIMEOUT_SEC=900
     env_file: docker/env/worker-deepseek.env
     restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     profiles: [prod, all]
 
-  worker-mssbomtool:
-    image: bf-cbom/worker-mssbomtool:${VERSION:-latest}
+  worker-chatgpt:
+    image: bf-cbom/worker-chatgpt:${VERSION:-latest}
     build:
       context: .
-      dockerfile: ./docker/Dockerfile.worker-mssbomtool
+      dockerfile: ./docker/Dockerfile.worker-chatgpt
       args:
         BASE_IMAGE: ${BASE_IMAGE:-base}
         BASE_TAG: ${VERSION:-latest}
+        BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
     depends_on:
       coordinator:
         condition: service_healthy
@@ -169,10 +316,421 @@ services:
         condition: service_healthy
     environment:
       - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-chatgpt:${VERSION:-latest}
       - REDIS_PORT=6379
-      - WORKER_TIMEOUT_SEC=120
-    env_file: docker/env/worker-mssbomtool.env
+      - WORKER_TIMEOUT_SEC=7200
+      # code-reading LLM budget (common/llm_cbom.py): files sent, chars per request, chunks per repo (a safety
+      # valve: 100 cut bisq2's 312 chunks; a capped run is marked in runs.csv), requests in flight
+      - LLM_MAX_FILES=1000
+      - LLM_MAX_CHUNK_CHARS=40000
+      - LLM_MAX_CHUNKS=1000
+      - LLM_CONCURRENCY=4
+      - LLM_MAX_OUTPUT_TOKENS=16000
+      - LLM_API_TIMEOUT_SEC=300
+      - OPENAI_MAX_TOKENS_PARAM=max_completion_tokens  # gpt-5 is a reasoning model (rejects max_tokens and temperature)
+    env_file: docker/env/worker-chatgpt.env
     restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    # no API key yet: opt in with `make up-prod EXTRA_PROFILES=llm` once docker/env/worker-chatgpt.env has the key
+    profiles: [llm, all]
+
+  worker-claude:
+    image: bf-cbom/worker-claude:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-claude
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+        BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-claude:${VERSION:-latest}
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=7200
+      # code-reading LLM budget (common/llm_cbom.py): files sent, chars per request, chunks per repo (a safety
+      # valve: 100 cut bisq2's 312 chunks; a capped run is marked in runs.csv), requests in flight
+      - LLM_MAX_FILES=1000
+      - LLM_MAX_CHUNK_CHARS=40000
+      - LLM_MAX_CHUNKS=1000
+      - LLM_CONCURRENCY=4
+      - LLM_MAX_OUTPUT_TOKENS=16000
+      - LLM_API_TIMEOUT_SEC=300
+    env_file: docker/env/worker-claude.env
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    # no API key yet: opt in with `make up-prod EXTRA_PROFILES=llm` once docker/env/worker-claude.env has the key
+    profiles: [llm, all]
+
+  worker-cryptoscan:
+    image: bf-cbom/worker-cryptoscan:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-cryptoscan
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+        BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-cryptoscan:${VERSION:-latest}
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
+    env_file: docker/env/worker-cryptoscan.env
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          # 2g until 2026-11-01 (peak at the limit, 14'051 hits, on ossf/malicious-packages, corpus-main)
+          memory: 4g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    profiles: [prod, all]
+
+  worker-pqcheck:
+    image: bf-cbom/worker-pqcheck:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-pqcheck
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+        BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-pqcheck:${VERSION:-latest}
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
+    env_file: docker/env/worker-pqcheck.env
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    profiles: [prod, all]
+
+  worker-qdarpan:
+    image: bf-cbom/worker-qdarpan:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-qdarpan
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+        BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-qdarpan:${VERSION:-latest}
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
+    env_file: docker/env/worker-qdarpan.env
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    profiles: [prod, all]
+
+  worker-securin-xbom:
+    image: bf-cbom/worker-securin-xbom:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-securin-xbom
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+        BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-securin-xbom:${VERSION:-latest}
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
+    env_file: docker/env/worker-securin-xbom.env
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    profiles: [prod, all]
+
+  worker-cipherradar:
+    image: bf-cbom/worker-cipherradar:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-cipherradar
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+        BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-cipherradar:${VERSION:-latest}
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
+    env_file: docker/env/worker-cipherradar.env
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          # 4g killed it (rc=-9, no CBOM) on pycryptodome, bunkerweb and pyca/cryptography (corpus-pilot-medium, 2026-10-23);
+          # 8g until 2026-10-30 (highest trial peak 7.3 GiB, bunkerweb; the peak grows with source size);
+          # 12g until 2026-11-01 (11.7 GiB and 1'794 limit hits on OctoGram, corpus-main, which timed out)
+          memory: 16g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    profiles: [prod, all]
+
+  worker-xgrep:
+    image: bf-cbom/worker-xgrep:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-xgrep
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+        BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-xgrep:${VERSION:-latest}
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
+    env_file: docker/env/worker-xgrep.env
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          # 4g until 2026-10-30 (highest trial peak 3.0 GiB, parse-server)
+          memory: 8g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    profiles: [prod, all]
+
+  worker-ciphersift:
+    image: bf-cbom/worker-ciphersift:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-ciphersift
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+        BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-ciphersift:${VERSION:-latest}
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
+    env_file: docker/env/worker-ciphersift.env
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    profiles: [parked, all]  # parked: built and started only with `make up-prod EXTRA_PROFILES=parked`
+
+  worker-scanoss:
+    # SCANOSS crypto-finder with its public open rules (no API key): Go, C, JavaScript; no Java/Python rules
+    image: bf-cbom/worker-scanoss:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-scanoss
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+        BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-scanoss:${VERSION:-latest}
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
+    env_file: docker/env/worker-scanoss.env
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    profiles: [prod, all]
+
+  worker-cbomkit-jar:
+    # same engine as worker-cbomkit, packaged as the standalone action jar (one voter in the agreement analysis, two tools otherwise)
+    image: bf-cbom/worker-cbomkit-jar:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-cbomkit-jar
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+        BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-cbomkit-jar:${VERSION:-latest}
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
+      - CBOMKIT_HEAP=6g
+    env_file: docker/env/worker-cbomkit-jar.env
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 8g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    profiles: [prod, all]
+
+  worker-qelens:   # failed the bar exam; run on bar-micro only
+    image: bf-cbom/worker-qelens:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-qelens
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+        BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-qelens:${VERSION:-latest}
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
+    env_file: docker/env/worker-qelens.env
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    profiles: [prod, all]
+
+  worker-cryptarium:   # failed the bar exam; run on bar-micro only
+    image: bf-cbom/worker-cryptarium:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-cryptarium
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+        BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-cryptarium:${VERSION:-latest}
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
+    env_file: docker/env/worker-cryptarium.env
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    profiles: [prod, all]
+
+  worker-qscan:   # failed the bar exam; run on bar-micro only
+    image: bf-cbom/worker-qscan:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.worker-qscan
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+        BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-qscan:${VERSION:-latest}
+      - REDIS_PORT=6379
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
+    env_file: docker/env/worker-qscan.env
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     profiles: [prod, all]
 
   worker-cryptobomforge:
@@ -184,6 +742,7 @@ services:
       args:
         BASE_IMAGE: ${BASE_IMAGE:-base}
         BASE_TAG: ${VERSION:-latest}
+        BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
     depends_on:
       coordinator:
         condition: service_healthy
@@ -191,12 +750,19 @@ services:
         condition: service_healthy
     environment:
       - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/worker-cryptobomforge:${VERSION:-latest}
       - REDIS_PORT=6379
-      - WORKER_TIMEOUT_SEC=600
-      - AVAILABLE_LANGUAGES=python,java
+      - WORKER_TIMEOUT_SEC=3600  # one limit for every tool in the corpus and mutation runs (2026-10-31)
+      - AVAILABLE_LANGUAGES=python,c  # crypto queries exist for Python and C/C++ only
       - CODEQL_RAM_MB=4096
     env_file: docker/env/worker-cryptobomforge.env
     restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          memory: 6g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     profiles: [prod, all]
 
   misc-treesimilarity:
@@ -205,6 +771,8 @@ services:
     build:
       context: .
       dockerfile: ./docker/Dockerfile.misc-treesimilarity
+      args:
+        BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
     depends_on:
       coordinator:
         condition: service_healthy
@@ -212,10 +780,17 @@ services:
         condition: service_healthy
     environment:
       - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/misc-treesimilarity:${VERSION:-latest}
       - REDIS_PORT=6379
       - CALC_TIMEOUT_SEC=300
     env_file: docker/env/misc-treesimilarity.env
-    restart: no
+    restart: on-failure:3  # the worker exits after WORKER_REDIS_GIVE_UP_SEC without Redis (common/worker.py)
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     profiles: [dev]
 
   misc-pyqun:
@@ -223,6 +798,10 @@ services:
     build:
       context: .
       dockerfile: ./docker/Dockerfile.misc-pyqun
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-base}
+        BASE_TAG: ${VERSION:-latest}
+        BF_CBOM_COMMIT: ${BF_CBOM_COMMIT:-unknown}
     depends_on:
       coordinator:
         condition: service_healthy
@@ -230,11 +809,21 @@ services:
         condition: service_healthy
     environment:
       - REDIS_HOST=redis
+      - BF_CBOM_IMAGE=bf-cbom/misc-pyqun:${VERSION:-latest}
       - REDIS_PORT=6379
       - CALC_TIMEOUT_SEC=300
     env_file: docker/env/misc-pyqun.env
-    restart: no
+    restart: on-failure:3  # the worker exits after WORKER_REDIS_GIVE_UP_SEC without Redis (common/worker.py)
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     profiles: [dev, prod, all]
 
 volumes:
   redis-data:
+  git-data:      # bare mirrors + mutant branches served by gitserver
+  git-certs:     # gitserver's self-signed TLS certificate, trusted by worker-cbomkit
+  results-data:  # experiment results (CBOMs + meta); export with `make experiment-export`

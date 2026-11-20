@@ -1,0 +1,24 @@
+# The bar exam: every tool once on the micro projects (experiments/corpus/micro, Java, Python and Go: 14 known crypto calls and
+# 8 decoys each, generated from the snippet catalog by mutation/micro.py; experiments/corpus/micro/ground_truth.yaml). A tool
+# passes in a language when it finds at least 7 of the 14 in their functions on that language's project (the bar);
+# below it in every language it is `bar failed`, else `bar passed`. The report's "Bar exam" section ends with the
+# verdicts as a spec writes them (`tools`, `tool_languages:`); a person copies them into the later specs by hand and no
+# code reads them. The directories are published to the git server
+# as deterministic fixture commits (`path:`), so every worker scans them like any repo.
+#   make experiment EXP=experiments/bar-micro.yaml ARGS="--overwrite-old" EXPERIMENT_MEMORY_BUDGET_GB=0
+#   make analysis ARGS="micro bar-micro"      # the bar, recall, precision, F1 per tool and language; bar passed/failed
+# After a change to one worker: ARGS="--rerun <tool>" (3 jobs).
+name: bar-micro
+description: "the bar exam: every tool once on the three micro projects with known ground truth"
+tools: [cbomkit, cdxgen, cryptobomforge, cryptoscan, pqcheck, qdarpan, securin-xbom, cipherradar, xgrep, cbomkit-jar, scanoss, qelens, cryptarium, qscan]
+repetitions: 1
+repos:
+  - full_name: bfcbom/micro-java
+    path: corpus/micro/java
+    language: Java
+  - full_name: bfcbom/micro-python
+    path: corpus/micro/python
+    language: Python
+  - full_name: bfcbom/micro-go
+    path: corpus/micro/go
+    language: Go

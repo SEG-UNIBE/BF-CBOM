@@ -23,6 +23,9 @@ from coordinator.redis_io import (
     pair_key,
     start_inspection,
 )
+from misc.cli.analysis_cmd import analysis_app
+from misc.cli.experiment_cmd import experiment_app
+from misc.cli.stack_cmd import stack_app
 
 app = typer.Typer(
     add_completion=False,
@@ -37,6 +40,9 @@ export_app = typer.Typer(
     context_settings={"help_option_names": ["-h", "--help"]},
 )
 app.add_typer(export_app, name="export")
+app.add_typer(experiment_app, name="experiment")
+app.add_typer(analysis_app, name="analysis")
+app.add_typer(stack_app, name="stack")
 
 
 EXPORT_DEST_OPTION = typer.Option(..., "--dest", "-d", help="Directory to write the ZIP")
@@ -110,7 +116,7 @@ def _resolve_insp_id(r: redis.Redis, insp_id: str) -> str:
     if r.exists(f"insp:{insp_id}"):
         return insp_id
 
-    inspections = r.smembers("inspecs") or []
+    inspections = r.smembers("inspects") or []
     matches = [bid for bid in inspections if bid.startswith(insp_id)]
 
     if not matches:
@@ -304,6 +310,7 @@ def run(
             "full_name": rr.full_name,
             "git_url": rr.git_url,
             **({"branch": rr.branch} if rr.branch else {}),
+            **({"commit": rr.commit} if rr.commit else {}),
         }
         for rr in repos_refs
     ]
@@ -611,6 +618,7 @@ def banner(
     typer.echo(typer.style(f"  {redis_host}:{redis_port}", fg=typer.colors.WHITE))
 
     typer.echo("")
+
     # Helper to emphasize the interesting part after the CLI path
     def _echo_uv(args: str) -> None:
         left = typer.style("uv run misc/cli/cli.py", fg=typer.colors.BRIGHT_BLACK)

@@ -1,0 +1,310 @@
+{
+ "bomFormat": "CycloneDX",
+ "specVersion": "1.7",
+ "metadata": {
+  "tools": {
+   "components": [
+    {
+     "bom-ref": "tool-qdarpan-0.1.0",
+     "name": "qdarpan",
+     "type": "application",
+     "version": "0.1.0"
+    }
+   ]
+  },
+  "properties": [
+   {
+    "name": "bf-cbom:fixture-origin",
+    "value": "e1-pilot-corpus 2026-10-16: FiloSottile__age@b74dce4cdbe3, apache__kafka@771b9576b00e, keycloak__keycloak@632f214aa2d6"
+   }
+  ]
+ },
+ "components": [
+  {
+   "bom-ref": "4f80707b98fd78b7",
+   "cryptoProperties": {
+    "algorithmProperties": {
+     "classicalSecurityLevel": 112,
+     "cryptoFunctions": [
+      "keygen"
+     ],
+     "parameterSetIdentifier": "2048",
+     "primitive": "pke"
+    },
+    "assetType": "algorithm",
+    "oid": "1.2.840.113549.1.1.1"
+   },
+   "description": "/tmp/qdarpan-d5lmy39k/repo/agessh/agessh_test.go:101",
+   "evidence": {
+    "occurrences": [
+     {
+      "line": 101,
+      "location": "agessh/agessh_test.go"
+     },
+     {
+      "line": 49,
+      "location": "agessh/agessh_test.go"
+     }
+    ]
+   },
+   "name": "RSA-2048",
+   "properties": [
+    {
+     "name": "qdarpan:classical-status",
+     "value": "ok"
+    },
+    {
+     "name": "qdarpan:collectors",
+     "value": "source_ast"
+    },
+    {
+     "name": "qdarpan:confidence",
+     "value": "0.9500"
+    },
+    {
+     "name": "qdarpan:corroborated",
+     "value": "false"
+    },
+    {
+     "name": "qdarpan:evidence-tiers",
+     "value": "direct_api_call"
+    },
+    {
+     "name": "qdarpan:family",
+     "value": "RSA"
+    },
+    {
+     "name": "qdarpan:location.0",
+     "value": "/tmp/qdarpan-d5lmy39k/repo/agessh/agessh_test.go:101"
+    },
+    {
+     "name": "qdarpan:location.1",
+     "value": "/tmp/qdarpan-d5lmy39k/repo/agessh/agessh_test.go:49"
+    },
+    {
+     "name": "qdarpan:matchers",
+     "value": "go.rsa.generatekey"
+    },
+    {
+     "name": "qdarpan:quantum-status",
+     "value": "broken"
+    },
+    {
+     "name": "qdarpan:surfaces",
+     "value": "source"
+    },
+    {
+     "name": "qdarpan:target",
+     "value": "/tmp/qdarpan-d5lmy39k/repo"
+    }
+   ],
+   "type": "cryptographic-asset"
+  },
+  {
+   "bom-ref": "b5c7f3d237fbd8d3",
+   "description": "/tmp/qdarpan-d5lmy39k/repo/agessh/agessh.go:19",
+   "evidence": {
+    "occurrences": [
+     {
+      "line": 19,
+      "location": "agessh/agessh.go"
+     },
+     {
+      "line": 7,
+      "location": "agessh/agessh_test.go"
+     }
+    ]
+   },
+   "name": "crypto/rsa",
+   "properties": [
+    {
+     "name": "qdarpan:classical-status",
+     "value": "ok"
+    },
+    {
+     "name": "qdarpan:collectors",
+     "value": "source_ast"
+    },
+    {
+     "name": "qdarpan:confidence",
+     "value": "0.9590"
+    },
+    {
+     "name": "qdarpan:corroborated",
+     "value": "false"
+    },
+    {
+     "name": "qdarpan:evidence-tiers",
+     "value": "linked_library_unpinned"
+    },
+    {
+     "name": "qdarpan:family",
+     "value": "RSA"
+    },
+    {
+     "name": "qdarpan:location.0",
+     "value": "/tmp/qdarpan-d5lmy39k/repo/agessh/agessh.go:19"
+    },
+    {
+     "name": "qdarpan:location.1",
+     "value": "/tmp/qdarpan-d5lmy39k/repo/agessh/agessh_test.go:7"
+    },
+    {
+     "name": "qdarpan:matchers",
+     "value": "include.crypto/rsa"
+    },
+    {
+     "name": "qdarpan:quantum-status",
+     "value": "broken"
+    },
+    {
+     "name": "qdarpan:surfaces",
+     "value": "source"
+    },
+    {
+     "name": "qdarpan:target",
+     "value": "/tmp/qdarpan-d5lmy39k/repo"
+    }
+   ],
+   "type": "library"
+  },
+  {
+   "bom-ref": "1d067b8924f49e8b",
+   "description": "/tmp/qdarpan-o57zzzf5/repo/clients/src/main/java/org/apache/kafka/clients/admin/KafkaAdminClient.java:257",
+   "evidence": {
+    "occurrences": [
+     {
+      "line": 257,
+      "location": "clients/src/main/java/org/apache/kafka/clients/admin/KafkaAdminClient.java"
+     },
+     {
+      "line": 23,
+      "location": "clients/src/main/java/org/apache/kafka/clients/admin/UserScramCredentialUpsertion.java"
+     }
+    ]
+   },
+   "name": "jca",
+   "properties": [
+    {
+     "name": "qdarpan:collectors",
+     "value": "source_ast"
+    },
+    {
+     "name": "qdarpan:confidence",
+     "value": "0.9900"
+    },
+    {
+     "name": "qdarpan:corroborated",
+     "value": "false"
+    },
+    {
+     "name": "qdarpan:evidence-tiers",
+     "value": "linked_library_unpinned"
+    },
+    {
+     "name": "qdarpan:location.0",
+     "value": "/tmp/qdarpan-o57zzzf5/repo/clients/src/main/java/org/apache/kafka/clients/admin/KafkaAdminClient.java:257"
+    },
+    {
+     "name": "qdarpan:location.1",
+     "value": "/tmp/qdarpan-o57zzzf5/repo/clients/src/main/java/org/apache/kafka/clients/admin/UserScramCredentialUpsertion.java:23"
+    },
+    {
+     "name": "qdarpan:matchers",
+     "value": "include.jca"
+    },
+    {
+     "name": "qdarpan:surfaces",
+     "value": "source"
+    },
+    {
+     "name": "qdarpan:target",
+     "value": "/tmp/qdarpan-o57zzzf5/repo"
+    }
+   ],
+   "type": "library"
+  },
+  {
+   "bom-ref": "ae67eab0cb8f9567",
+   "cryptoProperties": {
+    "algorithmProperties": {
+     "classicalSecurityLevel": 0,
+     "cryptoFunctions": [
+      "decrypt",
+      "encrypt"
+     ],
+     "mode": "cbc",
+     "padding": "pkcs7",
+     "primitive": "block-cipher"
+    },
+    "assetType": "algorithm"
+   },
+   "description": "/tmp/qdarpan-0jun2jq1/repo/crypto/default/src/main/java/org/keycloak/crypto/def/DefaultCryptoProvider.java:139",
+   "evidence": {
+    "occurrences": [
+     {
+      "line": 139,
+      "location": "crypto/default/src/main/java/org/keycloak/crypto/def/DefaultCryptoProvider.java"
+     },
+     {
+      "line": 191,
+      "location": "crypto/fips1402/src/main/java/org/keycloak/crypto/fips/FIPS1402Provider.java"
+     }
+    ]
+   },
+   "name": "AES-CBC",
+   "properties": [
+    {
+     "name": "qdarpan:classical-status",
+     "value": "ok"
+    },
+    {
+     "name": "qdarpan:collectors",
+     "value": "source_ast"
+    },
+    {
+     "name": "qdarpan:confidence",
+     "value": "0.9500"
+    },
+    {
+     "name": "qdarpan:corroborated",
+     "value": "false"
+    },
+    {
+     "name": "qdarpan:evidence-tiers",
+     "value": "direct_api_call"
+    },
+    {
+     "name": "qdarpan:family",
+     "value": "AES"
+    },
+    {
+     "name": "qdarpan:location.0",
+     "value": "/tmp/qdarpan-0jun2jq1/repo/crypto/default/src/main/java/org/keycloak/crypto/def/DefaultCryptoProvider.java:139"
+    },
+    {
+     "name": "qdarpan:location.1",
+     "value": "/tmp/qdarpan-0jun2jq1/repo/crypto/fips1402/src/main/java/org/keycloak/crypto/fips/FIPS1402Provider.java:191"
+    },
+    {
+     "name": "qdarpan:matchers",
+     "value": "jca.cipher.getinstance"
+    },
+    {
+     "name": "qdarpan:quantum-status",
+     "value": "weakened"
+    },
+    {
+     "name": "qdarpan:surfaces",
+     "value": "source"
+    },
+    {
+     "name": "qdarpan:target",
+     "value": "/tmp/qdarpan-0jun2jq1/repo"
+    }
+   ],
+   "type": "cryptographic-asset"
+  }
+ ],
+ "dependencies": []
+}

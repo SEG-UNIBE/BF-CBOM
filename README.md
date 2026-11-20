@@ -13,12 +13,13 @@
   <strong>
     👋 <a href="#introduction">Introduction</a> &nbsp;&nbsp;| &nbsp;&nbsp; 
     🚀 <a href="#setup">Setup</a> &nbsp;&nbsp;|&nbsp;&nbsp; 
+    📚 <a href="#documentation">Documentation</a> &nbsp;&nbsp;|&nbsp;&nbsp; 
     🛠️ <a href="#developer-notes">Developer Notes</a> 
   </strong>
 </div>
 
 </br>
-.
+
 <div align="center">
   <a href="https://github.com/SEG-UNIBE/BF-CBOM/releases"><img src="https://img.shields.io/github/v/release/SEG-UNIBE/BF-CBOM?include_prereleases" alt="Changelog" /></a>
   <a href="https://youtu.be/-YdBPHsyymU"><img src="https://img.shields.io/badge/Demo-Video-red.svg?logo=youtube&logoColor=white" alt="Demo Video" /></a>
@@ -42,37 +43,93 @@ It also offers **benchmarking capabilities** to orchestrate batch CBOM generatio
 ### Key Features
 
 - **Coordinator-first control plane:** a Streamlit UI backed by Redis schedules inspections, tracks job state, and surfaces results for reviewers.
-- **Containerised worker plugins:** every CBOM generator runs in its own Docker image but speaks the same Redis-driven instruction protocol.
-- **Scriptable CLI:** a Typer-based interface can launch inspections, export configs, or bundle CBOM artefacts for offline analysis.
+- **Containerized worker plugins:** every CBOM generator runs in its own Docker image but speaks the same Redis-driven instruction protocol.
+- **Scriptable CLI:** a Typer-based interface can launch inspections, export configs, or bundle CBOM artifacts for offline analysis.
 - **Reproducible runs:** checked-in `.env` templates, Dockerfiles, and `uv`-managed Python dependencies keep environments consistent across machines.
 
 **[▶️ Watch the Demo Video](https://youtu.be/-YdBPHsyymU)** - See BF-CBOM's features in action with a walkthrough of the UI, inspection process, and analysis capabilities.
 
 ### CBOM Generators Under Scrutiny
 
-BF-CBOM currently integrates four different CBOM generation approaches to enable side-by-side comparisons.
-Each generator brings a unique methodology for detecting and cataloging cryptographic assets:
+BF-CBOM integrates 13 CBOM generator tools for side-by-side comparisons (14 workers: CBOMkit in both of its official distributions).
+Each generator brings a unique methodology for detecting and cataloging cryptographic assets.
+Every tool runs at a pinned version, the latest stable release of 30 October 2026 ([`docs/tool-versions.md`](docs/tool-versions.md)).
+A bar exam on generated micro projects decides which tools take part in the experiments: Cryptarium, qelens and qScan stay below its bar and run on the micro projects only, and cdxgen passes it in Go only ([`experiments/README.md`](experiments/README.md)).
 
-- **[`CBOMKit`](https://github.com/PQCA/cbomkit)**:
-IBM Research's dedicated CBOM generator for Python and Java, now maintained by the Post-Quantum Cryptography Alliance.
-Uses SonarQube for static analysis and supports compliance policy checks.
+- **[`CBOMKit`](https://github.com/cbomkit/cbomkit)**:
+IBM Research's dedicated CBOM generator for Java, Python and Go, now maintained by the Post-Quantum Cryptography Alliance.
+Uses SonarQube's sonar-cryptography plugin for static analysis and supports compliance policy checks; shipped as a server with a REST API.
 
-- **[`cdxgen`](https://github.com/CycloneDX/cdxgen)**:
-CycloneDX's official generator, primarily for SBOMs but with CBOM extensions since April 2024.
-CBOM generation currently limited to Python and Java projects.
+- **[`CBOMkit-action`](https://github.com/cbomkit/cbomkit-action)** (worker `cbomkit-jar`):
+the same sonar-cryptography engine packaged as a GitHub Action (a jar), run without the server. Both distributions passed the bar exam with identical scores; the experiments after it run the server, which failed on one repository fewer.
+
+- **[`cdxgen`](https://github.com/cdxgen/cdxgen)**:
+OWASP's CycloneDX generator, primarily for SBOMs but with CBOM extensions since April 2024. Its crypto output is mostly crypto libraries and key/certificate files; algorithms come with file and line only for JavaScript/TypeScript and Go. It runs on the languages its README claims crypto support for (Java keystores and certificates, JavaScript/TypeScript, Go through golem), not on Python. For Java and Go repos the worker passes `-t java` / `-t go`, the README's own CBOM call, since without one cdxgen picks the language from the packages it finds and skips its code analysis when there are none.
 
 - **[`CryptobomForge`](https://github.com/Santandersecurityresearch/cryptobom-forge)**:
-Santander Security Research's CLI tool that processes CodeQL SARIF outputs rather than source code directly, making it language-agnostic.
+Santander Security Research's CLI tool that turns CodeQL SARIF output into a CBOM (IBM's pre-standard draft format). The worker runs CodeQL's experimental crypto queries, which exist for Python and C/C++ only.
 
-- **[`DeepSeek`](https://www.deepseek.com/)**:
-Experimental LLM-based approach using DeepSeek's language model for zero-shot cryptographic asset detection via prompt-based code analysis.
+- **[`CryptoScan`](https://github.com/csnp/cryptoscan)**:
+CyberSecurity NonProfit's pattern-based scanner (Apache-2.0) with a catalog of 90+ crypto patterns across 15+ languages; emits CycloneDX 1.6 CBOMs with code locations. Run with `--include-quantum-safe`, since it otherwise leaves out AES, SHA-2, HMAC and PBKDF2.
+
+- **[`pqcheck`](https://github.com/Rafael-Ryu/pqcheck)**:
+tree-sitter scanner for Python and Go (Apache-2.0) with a bundled go/types analyser; native CycloneDX 1.6 with file and line per asset.
+
+- **[`Q-DARPAN`](https://github.com/RohanExploit/q-darpan)**:
+tree-sitter scanner for Java, Go and C/C++ (Apache-2.0), CycloneDX 1.7. Its locations live in custom properties; the worker copies them into `evidence.occurrences`.
+
+- **[`securin-xbom`](https://github.com/securin-public/securin-xbom)**:
+semgrep-rule scanner for Java and Python (Apache-2.0), CycloneDX 1.6. Runs offline: the semgrep registry rule sets it would fetch online are frozen in the image at a pinned semgrep-rules commit, unfiltered.
+
+- **[`CipherRadar`](https://github.com/nk-sentinel/cipherradar)**:
+opengrep rules plus tree-sitter (`cradar` CLI, built from source), CycloneDX 1.7, many languages. Its Java pass crashes on some EC parameter code (`new ECGenParameterSpec(<identifier>)`), and the run then fails; `CRADAR_EXCLUDE_CRASHERS=1` leaves those files out through `.cradarignore` instead, recorded in the result notes.
+
+- **[`xgrep`](https://mondoo.com/docs/xgrep/code-scanning/cbom)** (Mondoo):
+tree-sitter and data-flow scanner for Java, Python, Go and JS/TS, CycloneDX 1.6. Free of charge but proprietary: the worker fetches the pinned npm package (verified by its sha512) at build time.
+
+- **[`SCANOSS crypto-finder`](https://github.com/scanoss/crypto-finder)** (GPL-2.0-only):
+opengrep rules plus call-graph reachability, CycloneDX 1.7 with file and line per asset. Its full rule set comes from the SCANOSS API and needs a key; without one the worker runs the documented offline mode with the public open rules ([`open-crypto-rules`](https://github.com/scanoss/open-crypto-rules), GPL-3.0), which cover Go, C, JavaScript and Rust but not Java or Python. The image holds the unmodified release binary, the opengrep release SCANOSS's own image ships and the rules at a pinned commit, all checksum- or commit-verified; the Dockerfile names their sources.
+
+- **[`qelens`](https://github.com/qelens/cbom)** (MPL-2.0): Rust/tree-sitter scanner for Python and JavaScript (crate `cbom`), CycloneDX 1.6 with file and line per asset.
+
+- **[`cryptarium`](https://github.com/sgoveia/cryptarium)** (Apache-2.0): Go/tree-sitter scanner with embedded YAML rule packs for Java, Python, Go, JS/TS and C/C++, CycloneDX 1.6; its CBOM carries no locations (its JSON format does).
+
+- **[`qScan`](https://github.com/quantakrypto/pqc-tools)** (quantakrypto, Apache-2.0): TypeScript pattern scanner for quantum-vulnerable cryptography in many languages (npm package), CycloneDX 1.6 with `file:line` locations; run offline, its optional LLM triage is never used.
+
+**Not integrated:**
+
+- **IBM Cryptoscope** ([Moffie et al., 2025](https://arxiv.org/abs/2503.19531)): a data-flow based CBOM generator for Java described in a paper; the implementation is not public.
+
+## Documentation
+
+This page gets you started. The details live next to what they describe:
+
+| Read | For |
+|---|---|
+| [`experiments/README.md`](experiments/README.md) | running batch experiments: the specs, their format, corpus sampling, mutants, every `make` command, memory and parallelism, the analysis commands and the tables they write |
+| [`experiments/corpus/README.md`](experiments/corpus/README.md) | the repository lists, the generated micro projects, their ground truth and the decoys |
+| [`analysis/README.md`](analysis/README.md) | how the analysis reads CBOMs: units (asset, record, item), normalization, the L0-L4 ladder, voter groups, packaging per tool |
+| [`analysis/report/README.md`](analysis/report/README.md) | plot recipes on the analysis tables |
+| [`analysis/data/CHANGELOG.md`](analysis/data/CHANGELOG.md) | the versions of the normalization vocabulary |
+| [`docs/pilot-2026-10-08/cbom_producers.csv`](docs/pilot-2026-10-08/cbom_producers.csv) | the record of the tool search (status 2026-10-06): 176 candidate CBOM producers with their tier, scope, first publication, popularity and evidence pages; how to read it and how the search was done: [`docs/pilot-2026-10-08/`](docs/pilot-2026-10-08/README.md) |
+| [`docs/tool-versions.md`](docs/tool-versions.md) | every tool's pinned version, its date and how it is pinned |
+| [`docs/findings.md`](docs/findings.md) | the reviews of the paper's runs: what was run, what failed, what the tools do as shipped |
 
 ## Setup
 
 **🚩 1. Docker**
 
 BF-CBOM is a multi-container environment (Redis, the coordinator UI, and one container per CBOM generation tool), so Docker must be installed locally.
-Install **Docker Desktop** using the official guide for [macOS](https://docs.docker.com/desktop/setup/install/mac-install/) or [Windows](https://docs.docker.com/desktop/setup/install/windows-install/).
+
+- **macOS / Windows:** install **Docker Desktop** using the official guide for [macOS](https://docs.docker.com/desktop/setup/install/mac-install/) or [Windows](https://docs.docker.com/desktop/setup/install/windows-install/).
+- **Linux (Ubuntu, Debian, …):** install **Docker Engine** with the Compose and Buildx plugins. Docker's convenience script does all three; afterwards add yourself to the `docker` group and log out and in again:
+
+  ```bash
+  curl -fsSL https://get.docker.com | sudo sh
+  sudo usermod -aG docker $USER
+  ```
+
+  Avoid the distribution package `docker.io`: it often lacks the Compose plugin (`docker compose`, without hyphen) that BF-CBOM needs. The [official apt repository](https://docs.docker.com/engine/install/ubuntu/) is the alternative to the script.
 
 After installation, open a new terminal and run the following command to confirm that Docker and Docker Compose are available.
 If everything is set up correctly, you will see two version strings.
@@ -80,6 +137,10 @@ If everything is set up correctly, you will see two version strings.
 ```bash
 docker --version && docker compose version
 ```
+
+> [!TIP]
+> **Apple Silicon (M-series) Macs:** the `cryptobomforge` worker only exists for `linux/amd64` (CodeQL ships no Linux arm64 binaries), so Docker emulates it.
+> Enable *Settings → General → Use Rosetta for x86_64/amd64 emulation on Apple Silicon* in Docker Desktop; it is much faster and more stable than the default emulation.
 
 **🚩 2. This Repo**
 
@@ -109,8 +170,24 @@ Prepare the environment files under `docker/env/`. Each service ships with a `*.
 
 At minimum set `GITHUB_TOKEN` inside `docker/env/coordinator.env`. In case you do not have one already, see [how to create a personal access token (classic)](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-personal-access-token-classic).
 
-From this point, you can continue with the setup using one of the two options described below.
-Either way, the build takes about 5–15 minutes for the first time (depending on hardware and internet speed) and requires roughly 20 GB of disk space for the images.
+**🚩 4. Start with Prebuilt Images (recommended)**
+
+Pull the published release images from GHCR and start the stack, without building anything locally:
+
+```bash
+make up-prod-pull
+```
+
+The stack starts in the background and a live board opens once it is up (`Ctrl+C` closes the board, `make down` stops the stack; see [the commands](#macos--linux)). Open [http://localhost:8501](http://localhost:8501) for the UI.
+The images need roughly 30 GB of disk space. Plan for at least 100 GB free if you build images yourself (see [Disk Space](#disk-space)).
+
+### Building the Images Yourself
+
+For work on the `dev` branch or a custom generator, use the [development quick start](#development-quick-start).
+It builds your local checkout; published release images do not contain your branch changes.
+
+If you want to build the images locally instead (e.g., to change a worker), continue with one of the two options described below.
+Either way, the build takes about 5–15 minutes for the first time (depending on hardware and internet speed).
 
 ### Option 1 – Disposable Builder Container
 
@@ -166,8 +243,8 @@ In this option, you will build and compose the docker compose environment direct
 **🚩 4. Build using Makefile**
 
 The project uses [GNU Make](https://www.gnu.org/software/make/) to simplify container orchestration.
-Most Linux distributions include `make` by default.
-On macOS, it comes with the *Xcode command line tools*, which you can install by running `xcode-select --install` in a terminal if not already present.
+- **Linux:** desktop distributions usually include it; minimal and server images (e.g. Ubuntu Server, cloud VMs) often do not: `sudo apt install -y make`.
+- **macOS:** it comes with the *Xcode command line tools*, which you can install by running `xcode-select --install` in a terminal if not already present.
 
 From the repository's root folder, start the full stack of services with:
 
@@ -177,16 +254,27 @@ make up-prod
 
 Note that it can take up to 20 minutes, depending on your hardware and internet speed.
 
-Docker Compose will launch and manage all containers. Stop the stack anytime with `Ctrl+C`.
+Use the Make targets for stack and runner commands: they export the image version and base-image name required by
+Compose. After pulling code changes, run `make up-prod` again to rebuild the runner and workers before experiments.
 
-**🚩 5. Local CLI (optional)**
-
-If `make up-prod` completed successfully and the containers are running, you can also interact with BF-CBOM through its command-line interface (CLI).
-From the repository's root folder, run:
+The stack starts in the background, and a live board opens once it is up: the experiments that run, every worker
+with its job, its memory, its queue and its last result, and whether Redis, the git server and the UI answer.
+`Ctrl+C` closes the board, but the stack keeps running, so the same terminal is free for `make experiment`.
+The same commands work on every platform and after `make up-prod-pull`:
 
 ```bash
-uv run misc/cli/cli.py
+make board                # reopen the live board (Ctrl+C closes it; the stack keeps running)
+make board ARGS=--once    # print one snapshot of it and exit (e.g. over ssh, or into a file)
+make experiment-attach    # join the terminal of a running `make experiment` (detach with Ctrl-P Ctrl-Q, not Ctrl-C)
+make logs                 # the containers' raw logs, followed
+make ps                   # the containers and their state
+make down                 # stop the stack
 ```
+
+The board shows the logo when the terminal is at least 130 columns wide and tall enough, otherwise one header line.
+Workers that are down appear in red: a container that exited, or one that has not sent a heartbeat for 30 s.
+
+For the command-line interface, see [Local CLI](#local-cli-optional) below.
 
 #### Windows
 
@@ -210,7 +298,7 @@ From the repository root (inside Git Bash), start the environment:
 make up-prod
 ```
 
-Stop anytime with `Ctrl+C`.
+`Ctrl+C` closes the live board; stop the stack with `make down` (all commands: [macOS / Linux](#macos--linux)).
 
 ### Local CLI (optional)
 
@@ -219,25 +307,77 @@ Because the CLI runs locally, a minimal Python setup is required before invoking
 
 **🎏 1. Python and `uv`**
 
-Install Python 3.12 and `uv`, the dependency manager used by BF-CBOM.
+Install `uv`, the dependency manager used by BF-CBOM. It downloads a matching Python 3.12 by itself when none is installed.
 
-- For Python, download at least the version 3.12 from the [official site](https://www.python.org/downloads/).
-- To install `uv`, follow the `curl` instructions on [uv's webpage](https://docs.astral.sh/uv/#installation).
+- **macOS:** `brew install uv`
+- **Linux:** Ubuntu and Debian do not package `uv`; use the official installer and open a new shell afterwards:
 
-> [!NOTE]
-> Using a package manager is often easiest: `brew install python@3.12 uv` on macOS, or `sudo apt-get install python3.12 uv` on Linux.
+  ```bash
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  ```
+
+- **Windows:** see the [installation options on uv's webpage](https://docs.astral.sh/uv/#installation).
 
 **🎏 2. Launch CLI**
 
-From the repository's root folder, run:
+From the repository's root folder, create the environment once and run the CLI:
 
 ```bash
+uv sync
 uv run misc/cli/cli.py
 ```
 
 The command prints the CLI's commands and options in the terminal.
+The host CLI reaches the running stack through Redis on `127.0.0.1:6379`.
+Batch experiments, corpus building and analysis are different: they need the Docker volumes and the internal git server, so always start them with `make experiment`, `make corpus` and `make analysis`, which run the same CLI inside the `runner` container.
+
+### Disk Space
+
+Every image rebuild leaves the previous version behind as an untagged image, and the build cache grows with each build. When Docker's disk fills up, Redis can no longer write its snapshot and rejects all writes with `MISCONF ... unable to persist to disk`. Check with `docker system df` and clean up after a series of rebuilds; this keeps tagged images and all volumes (results, git mirrors):
+
+```bash
+docker image prune -f
+docker builder prune -f --keep-storage 10GB
+```
 
 ## Developer Notes
+
+### Development Quick Start
+
+With Git, GNU Make and Docker running, start from a checkout of `dev`:
+
+```bash
+git clone --branch dev https://github.com/SEG-UNIBE/BF-CBOM.git
+cd BF-CBOM
+make ensure-env
+# Fill in docker/env/*.env for any credentials your tools require.
+make up-prod
+```
+
+Use `make up-prod` on the `dev` branch too: `prod` selects the generator services, not the Git branch.
+`make up-dev` starts only the development/example workers and cannot run the supplied experiments.
+The startup command builds the images, starts the services, then opens the live board. Check that the workers
+needed by your experiment are up; Ctrl+C closes the board while the services keep running.
+
+Start with the micro projects, then inspect and export the results:
+
+```bash
+make experiment EXP=experiments/bar-micro.yaml
+make experiment-status NAME=bar-micro
+make experiment-export NAME=bar-micro
+# Report and results: experiments/results/bar-micro.zip, including bar-micro/_ANALYSIS/_SUMMARY.md
+```
+
+The run waits for results; `make board` or `make experiment-status NAME=bar-micro` can also be used in a second
+terminal while it runs, and `make experiment-attach` joins the run's own terminal with its progress board (detach
+with Ctrl-P Ctrl-Q; Ctrl-C would interrupt the run). Repeating the run command resumes missing work. After changing worker code, rebuild
+with `make up-prod`, then use `ARGS="--rerun <tool>"` on the experiment command to replace that tool's results.
+For a new tool, create a separate spec under `experiments/` with a unique `name` and only that tool in `tools`
+(copy the micro spec's `repos`). `--rerun` selects results to redo; it does not restrict the spec to one tool.
+
+Experiment commands run in Docker; Python and `uv` on the host are optional. Specs under `experiments/` are
+mounted into the runner, while worker and analysis code require rebuilding. `make down` stops the stack and
+keeps its data volumes. See the [experiment guide](experiments/README.md) for every command, memory budgets and larger runs.
 
 BF-CBOM follows a deliberately modular design as illustrated in the figure below.
 At its core, the `Coordinator` orchestrates all inspection activities through a message-driven architecture.
@@ -248,15 +388,95 @@ This design creates decoupled interactions that make the framework flexible for 
 
 ### Adding Additional Workers
 
-1. Duplicate `workers/skeleton` to `workers/<mytool>` and implement `handle_instruction`.
-2. Create `docker/env/<mytool>.env` for credentials and configuration specific to the worker.
-3. Start from `docker/Dockerfile.worker-skeleton` (or craft a bespoke Dockerfile if required).
-4. Register the worker service in `docker-compose.yml`, pointing at the new `env_file`.
+1. Duplicate `workers/skeleton` to `workers/<mytool>` and implement `_produce`, keeping `build_handle_instruction` and `run_worker` for the shared job protocol and timeout handling. The skeleton returns an empty placeholder; a real worker must scan the requested snapshot (`clone_repo(..., commit=instr.repo_info.commit)`, as in `workers/pqcheck/main.py`).
+2. Add `docker/env/worker-<mytool>.env.template`, then run `make ensure-env` and put local credentials in the generated `.env` file.
+3. Copy `docker/Dockerfile.worker-skeleton` to `docker/Dockerfile.worker-<mytool>` and update the worker paths, environment name and entrypoint. Install the tool or its client as needed.
+4. Register `worker-<mytool>` in `docker-compose.yml`, using an existing generator service as a template: image/build arguments, Redis settings, `env_file`, memory limit and `profiles: [prod, all]`.
 5. Append the worker name to the `AVAILABLE_WORKERS` list in the `Makefile` so shared targets pick it up.
+6. Add an entry in `common/tools.yaml` with the tool's languages, engine and approach, vendor, URL, how it is shipped, its packaging and `memory_gb` matching its Compose limit. Add an adapter spec under `analysis/adapters/` for offline analysis; follow the [adapter policy](analysis/README.md#what-an-adapter-spec-may-contain) and vocabulary versioning rules.
+7. Add the tool to your experiment spec and rebuild with `make up-prod`. If its image is intended for release, also register its target and group membership in `docker-bake.hcl`.
 
-### Formatting and Linting
+Closed-source tools use the same worker protocol. Their binaries or API clients can remain in a
+private checkout, with credentials in the local `.env` file. A local integration does not require publishing its
+image or artifacts through the public release workflow.
 
-Ruff is configured in `pyproject.toml` for both formatting and linting:
+### Clean Rebuild
+
+To make sure every image is rebuilt from the current Dockerfiles, without reusing cached layers, run:
+
+```bash
+make clean-docker        # remove BF-CBOM's containers and images (other Docker projects are untouched)
+make up-prod NO_CACHE=1  # rebuild every layer from the Dockerfiles and start
+```
+
+`make clean-docker` keeps the volumes: `redis-data` with your stored inspections, `results-data` with the
+experiments and `git-data` with the git mirrors.
+Run `docker compose down -v` to delete them as well.
+Upstream base images are pinned by digest, so they resolve to the same content even when re-downloaded.
+Verify with `docker images 'bf-cbom/*'` (all freshly created) and `docker history <image>` (one layer per Dockerfile step).
+
+If a build fails with `No space left on device`, run `make clean-cache`: it frees Docker's build cache and dangling images without touching volumes or tagged images.
+
+### Publishing Release Images
+
+The images pulled by `make up-prod-pull` are built by `.github/workflows/images.yml` from `docker-bake.hcl`.
+Run `make release VERSION=<x.y.z>`, commit, then push a matching `v<x.y.z>` tag; the workflow refuses tags that do not match the `VERSION` file.
+Base images, uv and third-party sources are pinned (by digest or commit) inside the Dockerfiles; bump them deliberately.
+
+### Formatting, Linting and Tests
+
+Ruff is configured in `pyproject.toml` for both formatting and linting; unit tests live in `tests/` and need no Docker:
 
 - `uv run ruff format`
 - `uv run ruff check --fix`
+- `uv run pytest`
+
+`.github/workflows/ci.yml` runs all three on every push and pull request.
+
+### Worker Liveness
+
+Every worker refreshes a short-lived `worker:<name>:alive` key in Redis (see `common/worker.py`): its state, the job it runs and since when, the container's memory and limit, and its last result.
+The Setup page pre-selects only live workers, the Execution page warns before starting jobs for a worker that is down, and the Analysis page disables matching when the `pyqun` matcher is not running.
+The live board (`make board`, `misc/cli/stack_cmd.py`) shows the same keys for every worker, together with the queues (`jobs:<worker>`), the running experiments and the commit each container was built from, in red when it is not the checkout's.
+
+### Job States
+
+Every job of an inspection is in exactly one state, defined once in `common/utils.py` and used by the grid, the legend, the charts and the Start page counters:
+
+| State | Meaning |
+|---|---|
+| ⏸️ Held | created, but waits for a later memory-budget wave ([memory budget](experiments/README.md#running-an-experiment)) |
+| 💤 Queued | in the worker's Redis queue, no worker has taken it yet |
+| ⚙️ Running | a worker popped the job; the cell shows the elapsed time |
+| ✅ Completed | the worker returned a CBOM |
+| 💥 Failed / ⏰ Timeout | the worker errored (details in the job notes) or exceeded its time budget |
+| 🚫 Cancelled | cancelled before completion |
+| ⏭️ Unsupported | not run: the tool does not list the repository's language in `common/tools.yaml` |
+
+Workers mark a job running the moment they take it (`common/jobs.py`), using the routing hash the coordinator and the runner maintain. Unsupported pairs are decided when jobs are issued, from the repository's main language and the tool's declared `languages`; a repository without a known language is always run. The batch runner records such pairs as `run<i>.meta.json` with status `unsupported` and no CBOM (`--run-unsupported` disables this), so they never count as failures or empty results.
+
+### Snapshot pinning and provenance
+
+Every inspection resolves each repository's branch to a commit SHA when it starts (`git ls-remote`, no token needed) and stores it with the repo snapshot.
+Workers that clone check out exactly that commit (`common/utils.py:clone_repo`), so re-executing or retrying an inspection scans the same bytes.
+Each `JobResult` records `tool_version` (reported by the worker, e.g. `cdxgen 13.5.0`), `image_ref` (the image it ran in), `bfcbom_commit` (the checkout used to build it) and `run_index`, plus timing, peak memory, OOM kills and run notes.
+
+### Experiments
+
+Batch experiments run the generators over many repositories, reproducibly and resumably. They use two extra services
+of the stack and keep everything in Docker volumes:
+
+- `gitserver`: a read-only git server on the compose network. Every repository is mirrored there at its pinned commit
+  (volume `git-data`), and every tool clones from it, so all tools scan the same bytes; the mutation run serves its
+  mutants as branches. It also speaks TLS with a self-signed certificate, since CBOMkit insists on `https://`.
+- `runner`: an on-demand container running `bf-cbom experiment ...`; results land in the `results-data` volume and
+  reach the host only through an export.
+
+```bash
+make experiment EXP=experiments/bar-micro.yaml   # run a spec (resumable)
+make board                                          # watch it: experiments, workers, queues, memory
+make experiment-export NAME=bar-micro            # -> experiments/results/bar-micro.zip with bar-micro/_ANALYSIS/_SUMMARY.md
+```
+
+Everything else (the specs, the corpus, mutants, memory budgets and replicas, the analysis and its tables) is in the
+[experiment guide](experiments/README.md). `make clean-docker` keeps the volumes; `docker compose down -v` removes them.

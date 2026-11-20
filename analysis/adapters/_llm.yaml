@@ -1,0 +1,23 @@
+# Shared base of the LLM workers (common/llm_cbom.py assembles the CBOM from the model's answer; same prompt and
+# file selection for every provider).
+spec: _llm
+inherits: _cyclonedx
+version: 3
+declared: [{bomFormat: CycloneDX, specVersion: "1.7"}]
+sources:
+  - fields: standard
+  - property: {bf-cbom:digest: digest, bf-cbom:confidence: confidence, bf-cbom:primitive: primitive,
+               bf-cbom:mode: mode, bf-cbom:padding: padding, bf-cbom:algorithm-family: family,
+               bf-cbom:curve: curve}
+  - parse: name
+context: [property:bf-cbom:evidence]
+notes: >
+  One component per reported site (file and line verified against the clone where possible, see
+  bf-cbom:location-unverified). Names are whatever the model writes: JOSE (HS256, RS256, ES256, RSA-OAEP-256),
+  SSH (ssh-rsa), APIs (crypto/rand, SecureRandom, os.urandom), prose (SHA-256 with RSA, ECDSA with SHA-512).
+  Since ASSEMBLY_VERSION 2026-10-20.1 the worker writes CycloneDX 1.7: the model's values are mapped onto the 1.7
+  enums (GCM -> gcm, NoPadding -> raw, key-wrap, assetType key -> related-crypto-material with a material type); a
+  value without an enum equivalent is written as `other` and the model's original kept in
+  bf-cbom:primitive/mode/padding/asset-type. The registry-bound fields algorithmFamily (the prompt lists the
+  registry's families) and ellipticCurve (P-256 -> nist/P-256) hold only registry values; the model's other answers
+  (RSA, X25519) are kept in bf-cbom:algorithm-family / bf-cbom:curve. This spec reads all of these properties.

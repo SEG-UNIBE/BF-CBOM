@@ -44,7 +44,9 @@ pg_ctl -D "$PGDATA" -l "$PGDATA/server.log" \
   -o "-h 127.0.0.1 -p 5432 -k /tmp -c unix_socket_directories=/tmp" \
   -w start || { tail -n 100 "$PGDATA/server.log" >&2; exit 1; }
 
+SHUTTING_DOWN=0
 cleanup() {
+  SHUTTING_DOWN=1
   echo "[cbomkit] Shutting down..."
   if [ -n "${BACKEND_PID:-}" ] && kill -0 "$BACKEND_PID" 2>/dev/null; then kill "$BACKEND_PID" || true; fi
   if [ -n "${LOG_TAIL_PID:-}" ] && kill -0 "$LOG_TAIL_PID" 2>/dev/null; then kill "$LOG_TAIL_PID" || true; fi
@@ -72,6 +74,20 @@ psql -tc "SELECT 1 FROM pg_roles WHERE rolname='${POSTGRES_USER}'" | grep -q 1 |
   psql -c "CREATE USER ${POSTGRES_USER} WITH PASSWORD '${POSTGRES_PASSWORD}';"
 psql -tc "SELECT 1 FROM pg_database WHERE datname='${POSTGRES_DB}'" | grep -q 1 || \
   psql -c "CREATE DATABASE ${POSTGRES_DB} OWNER ${POSTGRES_USER};"
+
+# Trust the local git server (BF-CBOM batch experiments scan https://gitserver/<owner>/<repo>).
+GITSERVER_CERT="${GITSERVER_CERT:-/certs/gitserver.crt}"
+if [ -s "$GITSERVER_CERT" ]; then
+  TRUSTSTORE="$STATE_DIR/cacerts"
+  if cp /etc/ssl/certs/java/cacerts "$TRUSTSTORE" 2>/dev/null \
+     && keytool -importcert -noprompt -keystore "$TRUSTSTORE" -storepass changeit \
+          -alias gitserver -file "$GITSERVER_CERT" >/dev/null 2>&1; then
+    export JAVA_OPTS="${JAVA_OPTS:-} -Djavax.net.ssl.trustStore=$TRUSTSTORE -Djavax.net.ssl.trustStorePassword=changeit"
+    echo "[cbomkit] trusting git server certificate from $GITSERVER_CERT"
+  else
+    echo "[cbomkit] WARNING: could not import $GITSERVER_CERT into a truststore; https://gitserver scans will fail" >&2
+  fi
+fi
 
 echo "[cbomkit] Launching CBOMkit backend on port ${CBOMKIT_PORT}..."
 export QUARKUS_DATASOURCE_JDBC_URL="jdbc:postgresql://127.0.0.1:5432/${POSTGRES_DB}"
@@ -133,7 +149,7 @@ echo "[cbomkit] Starting Python worker..."
 export CBOMKIT_BASE_URL="http://127.0.0.1:${CBOMKIT_PORT}"
 
 # Launch Python worker in background and keep it running
-uv run --no-dev workers/cbomkit/main.py &
+uv run --frozen --no-dev workers/cbomkit/main.py &
 PY_PID=$!
 
 # Optionally stream backend logs to stdout for docker logs visibility
@@ -145,6 +161,7 @@ fi
 # Supervise backend and Python: restart backend on exit; if Python exits, stop backend and exit
 while true; do
   if ! kill -0 "$PY_PID" 2>/dev/null; then
+    [ "$SHUTTING_DOWN" -eq 1 ] && exit 0
     echo "[cbomkit] Python worker exited; shutting down"
     stop_backend
     exit 1
@@ -158,6 +175,7 @@ while true; do
   wait "$BACKEND_PID"
   EXIT_CODE=$?
   set -e
+  [ "$SHUTTING_DOWN" -eq 1 ] && exit 0
   echo "[cbomkit] Backend exited (code=$EXIT_CODE); checking for OOM and restarting..."
   if grep -qE "OutOfMemoryError|Out of memory" "$BACKEND_LOG"; then
     echo "[cbomkit] OOM detected; creating sentinel and restarting Postgres and backend."

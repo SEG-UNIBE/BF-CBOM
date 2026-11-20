@@ -1,0 +1,856 @@
+"""Flat, long-format CSV tables of one experiment, for pandas/R.
+
+Three layers, so that later steps (the normalizer, further n-way matchers) only add files:
+- runs:    one row per stored run (`run<i>.meta.json`), all repetitions;
+- records: one row per normalized record (`analysis/normalize/`) with a stable `record_id`
+           (`<tool>:<component>:<occurrence>`; `site_id` = `<tool>:<file>:<line>` for located ones);
+- matches: per matcher (`analysis/matchers/`) a groups table, a long membership table (group_id <-> record_id) and
+           an agreement table (one row per group and dimension).
+
+Join keys: records on (snapshot, variant, run, record_id), groups on (snapshot, variant, run, group_id);
+group ids restart per (snapshot, variant). Lists inside a cell are joined with ";".
+"""
+
+from __future__ import annotations
+
+import csv
+import json
+import random
+import re
+import statistics
+from collections import Counter, defaultdict
+from collections.abc import Iterable
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+
+from common.experiment import iter_results, repo_full_name, stored_status
+from common.tools_registry import load_tools, tool_packaging
+
+from .costs import cost_usd, load_prices
+from .groundtruth import TruthProject, TruthScore, bar_verdict
+from .levels import UNIT_LEVEL, identity
+from .matchers import MatchGroup, agreement
+from .normalize.record import RECORD_COLUMNS, NormalizedCbom, NormRecord
+from .normalize.report import assets_of
+
+LIST_SEP = ";"
+ASSET_COMPONENT_TYPES = ("cryptographic-asset", "crypto-asset")  # the latter: IBM draft 1.4-cbom-1.0
+
+RUNS_COLUMNS = [
+    "repo", "snapshot", "commit", "variant", "variant_commit", "language", "expect_crypto", "repo_files",
+    "repo_source_files", "repo_bytes", "repo_source_bytes", "tool", "run", "tailored",
+    "status", "duration_sec", "size_bytes", "error", "workaround", "tool_warning", "peak_memory_mb", "memory_limit_mb",
+    "limit_hits",
+    "oom_kills", "memory_failure", "cpu_seconds", "cpu_cores", "enqueued_at", "started_at", "finished_at", "queue_sec",
+    "received_at",
+    "tool_version", "image_ref", "bfcbom_commit", "bom_format", "spec_version",
+    "components", "crypto_assets", "algorithm_assets", "certificate_assets", "protocol_assets", "material_assets",
+    "other_assets", "located_file_assets", "located_line_assets",
+    "requests", "requests_failed", "chunks_total", "chunks_sent", "chunks_skipped", "input_tokens",
+    "cached_input_tokens", "cache_write_tokens", "output_tokens", "reasoning_tokens", "models_answered", "cost_usd",
+    "priced_model", "price_period", "price_table_version",
+]  # fmt: skip
+# JobResult.usage (common/llm_cbom.py:GenerationStats.usage) -> runs.csv columns
+USAGE_COLUMNS = (
+    "requests", "requests_failed", "chunks_total", "chunks_sent", "chunks_skipped", "input_tokens",
+    "cached_input_tokens", "cache_write_tokens", "output_tokens", "reasoning_tokens",
+)  # fmt: skip
+RECORDS_COLUMNS = ["repo", "snapshot", "commit", "variant", "language", "tool", "run", "location_kind"] + RECORD_COLUMNS
+GROUP_KEY_COLUMNS = ["matcher", "repo", "snapshot", "commit", "variant", "run", "group_id", "n_tools", "tools"]
+GROUP_COLUMNS = GROUP_KEY_COLUMNS + [
+    "language",
+    "level",
+    "scope",
+    "key",
+    "voters",
+    "voter_groups",
+    "member_voter_groups",
+    "n_records",
+    "n_sites",
+    "units",
+    "n_units",
+    "n_attached",
+    "located_voters",
+    "colocated_voters",
+    "file",
+    "line_min",
+    "line_max",
+    "parent",
+    "n_elements",
+    "similarity",
+]  # fmt: skip  (exact: sites/located/parent columns; raqun: n_elements, similarity)
+EXACT_GROUP_COLUMNS = GROUP_COLUMNS
+MEMBERS_COLUMNS = [
+    "matcher", "snapshot", "variant", "run", "group_id", "record_id", "tool", "unit", "implied", "matched", "attached",
+]  # fmt: skip
+MATCHLEVELS_COLUMNS = [
+    "matcher", "level", "run", "repos", "items", "records", "k1", "k2", "k3", "k4plus", "share_k2plus",
+    *[f"{d}_groups" for d in ("key_size", "mode", "padding", "curve", "digest", "location")],
+    *[f"{d}_agree" for d in ("key_size", "mode", "padding", "curve", "digest", "location")],
+    "seconds",  # the matcher's wall time at the level, summed over the repositories (the report fills it)
+]  # fmt: skip
+AGREEMENT_COLUMNS = [
+    "matcher", "repo", "snapshot", "variant", "run", "group_id", "scope", "key", "dimension", "reporting",
+    "agreeing", "majority", "values",
+]  # fmt: skip
+LOCATION_KINDS = ("line", "window", "import", "file", "none", "unread")  # what analysis/schema.py:location_kind returns
+UNIT_COLUMNS = [
+    "tool", "packaging", "cboms", "assets", "records", "items", "records_per_asset_median",
+    "records_per_asset_max", "multi_occurrence_share", "assets_per_item", "unlocated_share",
+    *[f"loc_{k}" for k in LOCATION_KINDS], "outside_code",
+]  # fmt: skip
+UNIT_REPO_COLUMNS = ["tool", "repo", "language", "assets", "records", "items"]
+MICRO_COLUMNS = [
+    "project", "language", "tool", "run", "tailored", "status", "verdict", "n_items",
+    "strict", "lenient", "repo", "recall_strict", "recall_lenient", "recall_repo",
+    "sites_in_file", "sites_correct", "precision", "f1", "bar_items", "passes_bar", "bar_verdict", "missed",
+    "repo_missed", "repo_extra", "decoys", "decoys_hit",
+]  # fmt: skip
+MICRO_ITEM_COLUMNS = [
+    "project", "language", "tool", "run", "item", "families", "insertion_style",
+    "callsite_strict", "callsite_lenient", "repo",
+]  # fmt: skip
+
+_ERROR_MAX = 300
+
+
+def _timeout_text(meta: dict) -> str | None:
+    if meta.get("status") != "timeout":
+        return None
+    d = meta.get("duration_sec")
+    return f"timed out after {d:.0f} s" if isinstance(d, int | float) else "timed out"
+
+
+WORKAROUND_PREFIX = "workaround: "
+TOOL_WARNING_PREFIX = "tool warning: "
+
+
+def _note_lines(notes: str | None, prefix: str) -> str | None:
+    found = [ln.strip()[len(prefix) :] for ln in (notes or "").splitlines() if ln.strip().startswith(prefix)]
+    return LIST_SEP.join(found) or None
+
+
+def workaround_line(notes: str | None) -> str | None:
+    """The recorded setup workarounds of a run (worker note lines starting with `workaround: `: CipherRadar's
+    `.cradarignore` of the files it crashes on), joined; None when there is none."""
+    return _note_lines(notes, WORKAROUND_PREFIX)
+
+
+def tool_warning_line(notes: str | None) -> str | None:
+    """What the tool said about limiting its own analysis (worker note lines starting with `tool warning: `, the
+    tool's words from its output: xgrep skipping its cross-file analysis on a large repository), joined; None when
+    it said nothing."""
+    return _note_lines(notes, TOOL_WARNING_PREFIX)
+
+
+def error_line(text: str | None) -> str | None:
+    """The most telling line of a run's error text, which usually starts with the echoed tool command: the
+    exception line of the last Python traceback (the first unindented line after it), else a timeout line, else the
+    first line that is not an echoed command (None if there is none)."""
+    lines = [ln.rstrip() for ln in (text or "").splitlines() if ln.strip()]
+    if not lines:
+        return None
+    starts = [i for i, ln in enumerate(lines) if ln.startswith("Traceback (most recent call last)")]
+    if starts:
+        for ln in lines[starts[-1] + 1 :]:
+            if not ln[0].isspace():
+                return ln[:_ERROR_MAX]
+    for ln in lines:
+        if "timeout" in ln.lower() and " cmd: " not in ln:
+            return ln.strip()[:_ERROR_MAX]
+    rest = [ln for ln in lines if " cmd: " not in ln]
+    return rest[0][:_ERROR_MAX] if rest else None
+
+
+def _cell(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, list | tuple | set | frozenset):
+        return LIST_SEP.join(str(v) for v in value)
+    return str(value)
+
+
+def write_csv(path: Path, rows: Iterable[dict], columns: list[str]) -> int:
+    """Write `rows` with exactly `columns` (header even when empty); atomic via a .tmp file. Returns the row count."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    n = 0
+    with tmp.open("w", encoding="utf-8", newline="") as fh:
+        w = csv.writer(fh, lineterminator="\n")
+        w.writerow(columns)
+        for row in rows:
+            w.writerow([_cell(row.get(c)) for c in columns])
+            n += 1
+    tmp.replace(path)
+    return n
+
+
+full_name = repo_full_name  # `<owner>__<repo>@<sha12>` -> `<owner>/<repo>`
+
+
+# ----- runs -----
+
+
+ASSET_TYPE_COLUMNS = {  # cryptoProperties.assetType as declared -> runs.csv column; anything else is `other`
+    "algorithm": "algorithm_assets",
+    "certificate": "certificate_assets",
+    "protocol": "protocol_assets",
+    "related-crypto-material": "material_assets",
+}
+
+
+def _located(component: dict) -> tuple[bool, bool]:
+    """(names a file, names a file and a line) as the tool wrote it: CycloneDX `evidence.occurrences[].location`
+    (+ `line`), or `cryptoProperties.detectionContext[].filePath` (+ `lineNumbers`) in IBM's draft. A file alone is
+    a weaker claim than a file and a line, so the two are counted apart (Content: `located` and traceability)."""
+    occurrences = [o for o in (component.get("evidence") or {}).get("occurrences") or [] if isinstance(o, dict)]
+    contexts = [
+        c for c in (component.get("cryptoProperties") or {}).get("detectionContext") or [] if isinstance(c, dict)
+    ]
+    file = any(o.get("location") for o in occurrences) or any(c.get("filePath") for c in contexts)
+    line = any(o.get("location") and o.get("line") is not None for o in occurrences) or any(
+        c.get("filePath") and c.get("lineNumbers") for c in contexts
+    )
+    return file, line
+
+
+def _cbom_counts(cbom: dict) -> dict:
+    """What the CBOM holds as written, before normalization: components, crypto assets by declared asset type, and
+    the crypto assets with a location (the raw Content columns of runs.csv)."""
+    comps = [c for c in cbom.get("components") or [] if isinstance(c, dict)]
+    crypto = [c for c in comps if c.get("type") in ASSET_COMPONENT_TYPES]
+    out = {
+        "bom_format": cbom.get("bomFormat"),
+        "spec_version": cbom.get("specVersion"),
+        "components": len(comps),
+        "crypto_assets": len(crypto),
+        "located_file_assets": sum(_located(c)[0] for c in crypto),
+        "located_line_assets": sum(_located(c)[1] for c in crypto),
+        **dict.fromkeys(ASSET_TYPE_COLUMNS.values(), 0),
+        "other_assets": 0,
+    }
+    for c in crypto:
+        kind = (c.get("cryptoProperties") or {}).get("assetType")
+        out[ASSET_TYPE_COLUMNS.get(kind, "other_assets")] += 1
+    return out
+
+
+def _usage_columns(usage: dict | None, started_at: str | None = None) -> dict:
+    """Token columns from JobResult.usage plus the cost from the price table (analysis/costs.py)."""
+    if not isinstance(usage, dict):
+        return {}
+    out = {col: usage.get(col) for col in USAGE_COLUMNS}
+    out["models_answered"] = LIST_SEP.join(sorted(usage.get("models") or {})) or None
+    cost = cost_usd(usage, started_at=started_at)
+    out.update(
+        cost_usd=cost["cost_usd"],
+        priced_model=cost["priced_model"],
+        price_period=cost["price_period"],
+        price_table_version=load_prices()["version"] if cost["cost_usd"] is not None else None,
+    )
+    return out
+
+
+def _seconds_between(start: str | None, end: str | None) -> float | None:
+    try:
+        t0 = datetime.fromisoformat(str(start).replace("Z", "+00:00"))
+        t1 = datetime.fromisoformat(str(end).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    return round((t1 - t0).total_seconds(), 1)
+
+
+_OUT_OF_MEMORY = re.compile(r"MemoryError|backend_oom|out of memory", re.IGNORECASE)
+
+
+def memory_failure(status: str, meta: dict) -> str | None:
+    """Whether a run that failed (error, timeout, oom) may have failed for memory, and why: `oom kill` (the kernel
+    killed a process of the container during the job), `out of memory` (its error says so: Java's OutOfMemoryError,
+    which ends a JVM at its heap before the container reaches its limit, CBOMkit's backend_oom, a runtime's "out of
+    memory", Python's MemoryError), `at limit` (its usage reached the container's limit during the job; the kernel
+    reclaims file cache first, so the limit may or may not be the cause). None for every other run."""
+    if status not in ("error", "timeout", "oom"):
+        return None
+    if (meta.get("oom_kills") or 0) > 0:
+        return "oom kill"
+    if _OUT_OF_MEMORY.search(meta.get("error") or ""):
+        return "out of memory"
+    if (meta.get("limit_hits") or 0) > 0:
+        return "at limit"
+    return None
+
+
+def run_rows(
+    exp_dir: Path,
+    languages: dict[str, str | None] | None = None,
+    tailored: dict[str, frozenset[str]] | None = None,
+    expects: dict[str, str | None] | None = None,
+    sizes: dict[str, dict[str, int]] | None = None,
+) -> list[dict]:
+    """One row per stored meta file; CBOM counts only where the CBOM exists and parses. `tailored`: {tool: repos it
+    was tuned on} for the `tailored` column; `expects`: {repo: expect_crypto} from the spec; `sizes`:
+    {snapshot: {files, source_files, checkout_bytes, source_bytes}} at the pinned commit, from the record or the
+    snapshot store (missing keys stay empty)."""
+    languages = languages or {}
+    tailored = tailored or {}
+    expects = expects or {}
+    sizes = sizes or {}
+    rows = []
+    for meta, cbom_path in iter_results(exp_dir):
+        snapshot = cbom_path.parents[2].name
+        repo = full_name(snapshot)
+        tool = meta.get("worker") or cbom_path.parent.name
+        status = stored_status(meta)
+        row = {
+            "repo": repo,
+            "snapshot": snapshot,
+            "commit": meta.get("base_commit") or (meta.get("repo_info") or {}).get("commit"),
+            "variant": meta.get("variant") or cbom_path.parents[1].name,
+            "variant_commit": meta.get("variant_commit"),
+            "language": meta.get("language") or languages.get(repo),
+            "expect_crypto": expects.get(repo),
+            "repo_files": (sizes.get(snapshot) or {}).get("files"),
+            "repo_source_files": (sizes.get(snapshot) or {}).get("source_files"),
+            "repo_bytes": (sizes.get(snapshot) or {}).get("checkout_bytes"),
+            "repo_source_bytes": (sizes.get(snapshot) or {}).get("source_bytes"),
+            "tool": tool,
+            "run": meta.get("run_index"),
+            "tailored": repo in tailored.get(tool, ()),
+            "status": status,
+            "duration_sec": meta.get("duration_sec"),
+            "size_bytes": meta.get("size_bytes"),
+            "error": error_line(meta.get("error")) or _timeout_text(meta),
+            "workaround": workaround_line(meta.get("notes")),
+            "tool_warning": tool_warning_line(meta.get("notes")),
+            "peak_memory_mb": meta.get("peak_memory_mb"),
+            "memory_limit_mb": meta.get("memory_limit_mb"),
+            "limit_hits": meta.get("limit_hits"),
+            "oom_kills": meta.get("oom_kills"),
+            "memory_failure": memory_failure(status, meta),
+            "cpu_seconds": meta.get("cpu_seconds"),
+            "cpu_cores": meta.get("cpu_cores"),
+            "enqueued_at": meta.get("enqueued_at"),
+            "started_at": meta.get("started_at"),
+            "finished_at": meta.get("finished_at"),
+            "queue_sec": _seconds_between(meta.get("enqueued_at"), meta.get("started_at")),
+            "received_at": meta.get("received_at"),
+            "tool_version": meta.get("tool_version"),
+            "image_ref": meta.get("image_ref"),
+            "bfcbom_commit": meta.get("bfcbom_commit"),
+            **_usage_columns(meta.get("usage"), meta.get("started_at")),
+        }
+        if cbom_path.exists():
+            try:
+                cbom = json.loads(cbom_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                cbom = None
+            if isinstance(cbom, dict):
+                row.update(_cbom_counts(cbom))
+        rows.append(row)
+    return rows
+
+
+# ----- run time (Content: what a scan costs) -----
+
+TOOLS_COLUMNS = ["tool", "name", "vendor", "url", "shipped", "approach", "version", "version_url", "languages", "cite"]
+
+
+def tool_rows(tools: Iterable[str], registry: dict[str, dict] | None = None) -> list[dict]:
+    """tools.csv: who publishes each tool that ran, its project page, how it is shipped, what it is built on and the
+    version the paper reports with the page that shows it, as `common/tools.yaml` records them (empty for a tool
+    outside the registry)."""
+    registry = registry if registry is not None else load_tools()
+
+    def cell(t: str, c: str) -> str:
+        v = (registry.get(t) or {}).get(c) or ""
+        return ";".join(str(x) for x in v) if isinstance(v, list) else str(v)
+
+    return [{"tool": t, **{c: cell(t, c) for c in TOOLS_COLUMNS[1:]}} for t in sorted(set(tools))]
+
+
+RUNTIME_COLUMNS = [
+    "tool", "language", "repos", "runs", "timeouts", "timeout_share", "median_sec", "median_ci_low", "median_ci_high",
+    "p90_sec", "max_sec", "spread_cv", "rerun_cv", "rerun_pairs", "hours", "sec_per_1k_source_files", "size_rho",
+    "peak_median_mb", "peak_ci_low", "peak_ci_high", "peak_p90_mb", "peak_max_mb", "peak_spread_cv", "cpu_sec_median",
+    "cpu_sec_ci_low", "cpu_sec_ci_high", "cpu_sec_p90", "cpu_sec_max", "cores_median", "cores_ci_low", "cores_ci_high",
+    "cores_p90", "cores_max", "limit_mb", "at_limit", "oom", "memory_failures",
+]  # fmt: skip
+RUNTIME_MIN_REPOS = 3  # a CI and a size correlation only over at least this many repositories (score.py's MIN_REPOS)
+RUNTIME_BOOTSTRAP = 1000
+
+
+def _quantile(values: list[float], q: float) -> float:
+    """The q-quantile with linear interpolation between the order statistics (values sorted)."""
+    pos = q * (len(values) - 1)
+    lo = int(pos)
+    hi = min(lo + 1, len(values) - 1)
+    return values[lo] + (values[hi] - values[lo]) * (pos - lo)
+
+
+def _cv(values: list[float]) -> float | None:
+    """Coefficient of variation (population sd / mean), None below two values or for a zero mean."""
+    if len(values) < 2 or not statistics.mean(values):
+        return None
+    return statistics.pstdev(values) / statistics.mean(values)
+
+
+def _median_ci(values: list[float], seed: int) -> tuple[float, float]:
+    """95 % percentile bootstrap interval of the median of `values` (RUNTIME_BOOTSTRAP resamples)."""
+    rng = random.Random(seed)
+    medians = sorted(statistics.median(rng.choice(values) for _ in values) for _ in range(RUNTIME_BOOTSTRAP))
+    return _quantile(medians, 0.025), _quantile(medians, 0.975)
+
+
+def runtime_rows(runs: list[dict], *, seed: int = 20261023) -> list[dict]:
+    """Per tool and language (and `all`), how long its scans take, from runs.csv. The unit is the repository: a
+    repository's time is the median of its ok runs (all variants and repetitions), so a mutated repository or a
+    repeated run counts once. `median_sec` is the median over the repositories with a bootstrap CI over them (95 %,
+    percentile, only with RUNTIME_MIN_REPOS); `p90_sec` over the repositories too, `max_sec` the slowest single ok run;
+    `spread_cv` the CV of the repositories' times (how much the repository decides); `rerun_cv` the median CV of the
+    ok runs of one snapshot and variant with several runs (run-to-run noise; empty without repetitions); `hours` the
+    wall time of every run that ran (ok, error, timeout, oom); `timeout_share` of those; `sec_per_1k_source_files`
+    the median over repositories of time per thousand source files of the repository's language; `size_rho`
+    Spearman between a repository's time and its source files; both only where `size_rho` exists (RUNTIME_MIN_REPOS
+    repositories whose sizes differ). Memory, over every run that ran: a repository's peak is the largest
+    `peak_memory_mb` of its runs (the container's working set, common/memory.py), `peak_median_mb` with its bootstrap
+    CI (`peak_ci_low` / `peak_ci_high`, as for time), `peak_p90_mb` and `peak_spread_cv` over the repositories,
+    `peak_max_mb` the largest of a single run. CPU, over the ok runs like time, a repository's value the median of
+    its runs: `cpu_sec_*` from `cpu_seconds` (the container's CPU time during the job, summed over its cores: the
+    work done) and `cores_*` from `cpu_cores` (that over the job's wall time: the mean number of cores busy), each
+    the median over the repositories with its CI, the p90 over them and the max of a single run (empty where the
+    workers did not record it yet). The limits, for checking that they did not shape the numbers:
+    `limit_mb` the container's limit; `at_limit` the runs whose usage reached it (`limit_hits` > 0; empty where the
+    workers did not record it yet), `oom` the runs with an OOM kill, `memory_failures` the failed runs that may have
+    failed for memory (`memory_failure`). Unsupported runs never ran and are left out."""
+    from .score import spearman
+
+    ran = [r for r in runs if r.get("status") not in (None, "", "unsupported")]
+    scopes: dict[tuple[str, str], list[dict]] = defaultdict(list)
+    for r in ran:
+        scopes[(r["tool"], "all")].append(r)
+        if r.get("language"):
+            scopes[(r["tool"], r["language"])].append(r)
+    out = []
+    for (tool, language), rs in sorted(scopes.items(), key=lambda kv: (kv[0][0], kv[0][1] != "all", kv[0][1])):
+        seconds = [(r, float(r["duration_sec"])) for r in rs if r.get("duration_sec") not in (None, "")]
+        ok = [(r, d) for r, d in seconds if r["status"] == "ok"]
+        per_repo: dict[str, list[float]] = defaultdict(list)
+        per_cell: dict[tuple[str, str], list[float]] = defaultdict(list)
+        source: dict[str, int] = {}
+        for r, d in ok:
+            per_repo[r["snapshot"]].append(d)
+            per_cell[(r["snapshot"], r.get("variant") or "")].append(d)
+            if r.get("repo_source_files") not in (None, ""):
+                source[r["snapshot"]] = int(r["repo_source_files"])
+        repo_sec = {s: statistics.median(v) for s, v in sorted(per_repo.items())}
+        values = sorted(repo_sec.values())
+        timeouts = sum(r["status"] == "timeout" for r in rs)
+        row = {
+            "tool": tool,
+            "language": language,
+            "repos": len(repo_sec),
+            "runs": len(rs),
+            "timeouts": timeouts,
+            "timeout_share": round(timeouts / len(rs), 3),
+            "hours": round(sum(d for _, d in seconds) / 3600, 2),
+        }
+        if values:
+            row |= {
+                "median_sec": round(statistics.median(values), 1),
+                "p90_sec": round(_quantile(values, 0.9), 1),
+                "max_sec": round(max(d for _, d in ok), 1),
+            }
+            if (cv := _cv(values)) is not None:
+                row["spread_cv"] = round(cv, 2)
+        if len(values) >= RUNTIME_MIN_REPOS:
+            lo, hi = _median_ci(values, seed)
+            row["median_ci_low"], row["median_ci_high"] = round(lo, 1), round(hi, 1)
+        reruns = [cv for v in per_cell.values() if (cv := _cv(v)) is not None]
+        if reruns:
+            row["rerun_cv"] = round(statistics.median(reruns), 2)
+            row["rerun_pairs"] = len(reruns)
+        sized = {s: float(n) for s, n in source.items()}
+        if len(sized) >= RUNTIME_MIN_REPOS and (rho := spearman(repo_sec, sized)) is not None:
+            row["size_rho"] = round(rho, 2)
+            # only where sizes vary: over projects of one size (the micro projects: one file) it is start-up cost
+            rates = [1000 * repo_sec[s] / n for s, n in sized.items() if n]
+            row["sec_per_1k_source_files"] = round(statistics.median(rates), 1) if rates else None
+        peaks: dict[str, float] = {}
+        for r in rs:
+            if r.get("peak_memory_mb") not in (None, ""):
+                peaks[r["snapshot"]] = max(float(r["peak_memory_mb"]), peaks.get(r["snapshot"], 0.0))
+        if peaks:
+            pv = sorted(peaks.values())
+            row |= {
+                "peak_median_mb": round(statistics.median(pv), 1),
+                "peak_p90_mb": round(_quantile(pv, 0.9), 1),
+                "peak_max_mb": round(pv[-1], 1),
+            }
+            if (cv := _cv(pv)) is not None:
+                row["peak_spread_cv"] = round(cv, 2)
+            if len(pv) >= RUNTIME_MIN_REPOS:
+                lo, hi = _median_ci(pv, seed)
+                row["peak_ci_low"], row["peak_ci_high"] = round(lo, 1), round(hi, 1)
+        for key, prefix, digits in (("cpu_seconds", "cpu_sec", 1), ("cpu_cores", "cores", 2)):
+            per: dict[str, list[float]] = defaultdict(list)
+            for r, _ in ok:
+                if r.get(key) not in (None, ""):
+                    per[r["snapshot"]].append(float(r[key]))
+            if not per:
+                continue
+            vals = sorted(statistics.median(v) for v in per.values())
+            row |= {
+                f"{prefix}_median": round(statistics.median(vals), digits),
+                f"{prefix}_p90": round(_quantile(vals, 0.9), digits),
+                f"{prefix}_max": round(max(x for v in per.values() for x in v), digits),
+            }
+            if len(vals) >= RUNTIME_MIN_REPOS:
+                lo, hi = _median_ci(vals, seed)
+                row[f"{prefix}_ci_low"], row[f"{prefix}_ci_high"] = round(lo, digits), round(hi, digits)
+        if limits := [float(r["memory_limit_mb"]) for r in rs if r.get("memory_limit_mb") not in (None, "")]:
+            row["limit_mb"] = round(max(limits), 1)
+        if hits := [int(float(r["limit_hits"])) for r in rs if r.get("limit_hits") not in (None, "")]:
+            row["at_limit"] = sum(h > 0 for h in hits)
+        row["oom"] = sum(int(float(r.get("oom_kills") or 0)) > 0 for r in rs)
+        row["memory_failures"] = sum(bool(r.get("memory_failure")) for r in rs)
+        out.append(row)
+    return out
+
+
+# ----- records (normalized) -----
+
+
+def record_rows(
+    records: list[NormRecord],
+    *,
+    snapshot: str,
+    variant: str,
+    run: int,
+    commit: str | None,
+    language: str | None,
+    location_kinds: dict[str, str] | None = None,
+) -> list[dict]:
+    """Normalized records (analysis/normalize/) of one CBOM; `location_kinds`: record id -> analysis/schema.py
+    location_kind."""
+    kinds = location_kinds or {}
+    base = {
+        "repo": full_name(snapshot),
+        "snapshot": snapshot,
+        "commit": commit,
+        "variant": variant,
+        "language": language,
+        "run": run,
+    }
+    return [{**base, "tool": r.tool, "location_kind": kinds.get(r.record_id), **r.csv_row()} for r in records]
+
+
+# ----- matches (generic over matchers) -----
+
+
+def group_rows(
+    matcher: str,
+    groups: list[MatchGroup],
+    *,
+    snapshot: str,
+    variant: str,
+    run: int,
+    commit: str | None,
+    language: str | None = None,
+    voter_of: dict[str, str] | None = None,
+) -> tuple[list[dict], list[dict], list[dict]]:
+    """Groups, membership and agreement rows of any matcher's groups for one (snapshot, variant)."""
+    base = {"matcher": matcher, "snapshot": snapshot, "variant": variant, "run": run}
+    g_rows, m_rows, a_rows = [], [], []
+    for g in groups:
+        voters = g.voters(voter_of)
+        # the voter groups whose own records are in the group (not attached by vocabulary knowledge): a group with
+        # none is no item (matchlevel_row skips it), however many generic records hang on it
+        members = {(voter_of or {}).get(r.tool, r.tool) for r in g.members if r.record_id not in g.attached}
+        g_rows.append(
+            {
+                **base,
+                "repo": full_name(snapshot),
+                "commit": commit,
+                "language": language,
+                "group_id": g.group_id,
+                "n_tools": g.k,
+                "tools": g.tools,
+                "scope": g.scope,
+                "key": g.key,
+                "voters": voters,
+                "voter_groups": len(voters),
+                "member_voter_groups": len(members),
+                **g.extra,
+            }
+        )
+        for r in g.members:
+            member = {"group_id": g.group_id, "record_id": r.record_id, "tool": r.tool, "unit": identity(r, UNIT_LEVEL)}
+            m_rows.append(
+                {
+                    **base,
+                    **member,
+                    "implied": r.record_id in g.implied,
+                    "matched": r.record_id in g.matched,
+                    "attached": r.record_id in g.attached,
+                }
+            )
+        a_rows += [
+            {**base, "repo": full_name(snapshot), "group_id": g.group_id, "scope": g.scope, "key": g.key, **row}
+            for row in agreement(g, voter_of=voter_of)
+        ]
+    return g_rows, m_rows, a_rows
+
+
+def raqun_inspection_rows(
+    groups_by_snapshot: dict[tuple[str, str], list[MatchGroup]], *, level: str, run: int, tools: list[str]
+) -> tuple[list[dict], list[str]]:
+    """One readable match per row, with the actual element attributes and reported names side by side by tool."""
+    from .matchers.raqun import attributes
+
+    columns = ["repo", "snapshot", "variant", "run", "level", "group_id", "similarity", "n_tools", "n_records", *tools]
+    rows = []
+    for (snapshot, variant), groups in sorted(groups_by_snapshot.items()):
+        for g in groups:
+            row = {
+                "repo": full_name(snapshot),
+                "snapshot": snapshot,
+                "variant": variant,
+                "run": run,
+                "level": level,
+                "group_id": g.group_id,
+                "similarity": g.extra.get("similarity"),
+                "n_tools": g.k,
+                "n_records": len(g.members),
+            }
+            by_tool: dict[str, list[NormRecord]] = defaultdict(list)
+            for rec in g.members:
+                by_tool[rec.tool].append(rec)
+            for tool, records in sorted(by_tool.items()):
+                names = json.dumps(sorted({r.name for r in records if r.name}), ensure_ascii=False)
+                attrs = "; ".join(sorted(attributes(records[0], level)))
+                row[tool] = f"{names} <{attrs}> [{len(records)} records]"
+            rows.append(row)
+    return rows, columns
+
+
+def matchlevel_row(
+    matcher: str, level: str, run: int, groups_by_snapshot: dict, voter_of: dict[str, str] | None = None
+) -> dict:
+    """One row of a matchlevels table (Agreement, one matcher at one level): over the repo groups of every snapshot, how
+    many items (algorithms, by their L4 identity: `extra.units` of the matchers' groups, else the group key) have
+    1 / 2 / 3 / 4+ voter groups in their largest group at that level,
+    and per dimension the share of the groups with at least two
+    voters reporting a value (admitted at the level) in which every reporting voter carries the majority value;
+    `location`: of the groups with two located voters, the share with two voters at one call site."""
+    best: dict[tuple, int] = {}  # (snapshot, item) -> voter groups of its largest cluster
+    records = 0
+    reporting: Counter = Counter()
+    agreeing: Counter = Counter()
+    for snapshot, groups in groups_by_snapshot.items():
+        for g in groups:
+            if g.scope != "repo":
+                continue
+            if not any(r.record_id not in g.attached for r in g.members):
+                continue  # generic records attached to it alone make no item
+            for unit in g.extra.get("units") or [g.key]:
+                best[(snapshot, unit)] = max(best.get((snapshot, unit), 0), len(g.voters(voter_of)))
+            records += len(g.members)
+            for row in agreement(g, voter_of=voter_of, level=level):
+                if row["reporting"] >= 2:
+                    reporting[row["dimension"]] += 1
+                    agreeing[row["dimension"]] += row["agreeing"] == row["reporting"]
+    k = Counter(min(v, 4) for v in best.values())
+    items = len(best)
+    out = {
+        "matcher": matcher,
+        "level": level,
+        "run": run,
+        "repos": len(groups_by_snapshot),
+        "items": items,
+        "records": records,
+        "k1": k[1],
+        "k2": k[2],
+        "k3": k[3],
+        "k4plus": k[4],
+        "share_k2plus": round((items - k[1]) / items, 3) if items else None,
+    }
+    for dim in ("key_size", "mode", "padding", "curve", "digest", "location"):
+        out[f"{dim}_groups"] = reporting[dim]
+        out[f"{dim}_agree"] = round(agreeing[dim] / reporting[dim], 3) if reporting[dim] else None
+    return out
+
+
+# ----- micro ground truth -----
+
+
+@dataclass
+class MicroEntry:
+    """One (micro project, tool) cell of an experiment: the run's status and, for a readable ok run, its score."""
+
+    project: TruthProject
+    tool: str
+    status: str  # status of the run (meta file); `missing` when the tool has no stored run on the project
+    score: TruthScore | None = None
+    tailored: bool = False  # the tool was tuned on this project (tools.yaml tailored_on)
+
+
+def unit_rows(
+    cboms: list[NormalizedCbom],
+    location_kinds: list[dict[str, str]] | None = None,
+) -> list[dict]:
+    """How each tool packages its findings (analysis/README.md "Units"), over the algorithm assets of `cboms` (one
+    run's CBOMs of the original variants): per tool its assets (CBOM components), their records (occurrences) and its
+    items (distinct L4 identities of its `mapped` records per CBOM, i.e. per repository, as the ladder counts them,
+    tailored repositories included), with the records per asset, the share of assets listed at more than one place,
+    the assets per item (above 1: one component per finding), the share of assets without a file, the
+    algorithm records per location kind (`loc_<kind>`; `location_kinds`: one {record id: kind} per CBOM) and the
+    records whose file is not a source file of the repository's language (`outside_code`: `NormRecord.in_scope`
+    False; fixtures, test vectors, configuration, documentation, other languages)."""
+    acc: dict[str, dict] = {}
+    for i, n in enumerate(cboms):
+        t = acc.setdefault(
+            n.tool, {"cboms": 0, "per_asset": [], "items": 0, "unlocated": 0, "kinds": Counter(), "outside": 0}
+        )
+        t["cboms"] += 1
+        assets, units = _packaging(n)
+        kinds = location_kinds[i] if location_kinds else {}
+        t["kinds"].update(kinds.get(r.record_id) or "unread" for rs in assets for r in rs)
+        t["outside"] += sum(r.in_scope is False for rs in assets for r in rs)
+        t["per_asset"] += [len(rs) for rs in assets]
+        t["unlocated"] += sum(not any(r.file for r in rs) for rs in assets)
+        t["items"] += len(units)
+    rows = []
+    for tool, t in sorted(acc.items()):
+        per, n_assets = t["per_asset"], len(t["per_asset"])
+        rows.append(
+            {
+                "tool": tool,
+                "packaging": tool_packaging(tool),
+                "cboms": t["cboms"],
+                "assets": n_assets,
+                "records": sum(per),
+                "items": t["items"],
+                "records_per_asset_median": statistics.median(per) if per else None,
+                "records_per_asset_max": max(per, default=None),
+                "multi_occurrence_share": round(sum(k > 1 for k in per) / n_assets, 3) if n_assets else None,
+                "assets_per_item": round(n_assets / t["items"], 2) if t["items"] else None,
+                "unlocated_share": round(t["unlocated"] / n_assets, 3) if n_assets else None,
+                **{f"loc_{k}": t["kinds"][k] for k in LOCATION_KINDS},
+                "outside_code": t["outside"],
+            }
+        )
+    return rows
+
+
+def unit_repo_rows(
+    cboms: list[NormalizedCbom],
+    repos: list[str],
+    languages: dict[str, str] | None = None,
+) -> list[dict]:
+    """unit_rows' assets, records and items per repository, one row per CBOM (`repos[i]` is the repository of
+    `cboms[i]`): the items are what the matchers work on, one repository at a time."""
+    rows = []
+    for n, repo in zip(cboms, repos, strict=True):
+        assets, units = _packaging(n)
+        rows.append(
+            {
+                "tool": n.tool,
+                "repo": repo,
+                "language": (languages or {}).get(repo),
+                "assets": len(assets),
+                "records": sum(len(rs) for rs in assets),
+                "items": len(units),
+            }
+        )
+    return sorted(rows, key=lambda r: (r["tool"], r["repo"]))
+
+
+def _packaging(n: NormalizedCbom) -> tuple[list[list[NormRecord]], set[str]]:
+    """A CBOM's algorithm assets, each as its records, and its items (the L4 identities of its mapped records)."""
+    assets = [rs for rs in assets_of(n) if rs[0].values.get("asset_type") == "algorithm"]
+    units = {identity(r, UNIT_LEVEL) for rs in assets for r in rs if r.resolution in (None, "mapped")}
+    return assets, units - {None}
+
+
+def micro_verdict(status: str, score: TruthScore | None) -> str:
+    """pass/fail (the bar: lenient call-site recall) for a scored run; otherwise why there is no grade:
+    unsupported (a language the tool does not support), missing (not run), error (failed, timed out, cancelled,
+    unreadable)."""
+    if score is not None:
+        return "pass" if score.passes_bar else "fail"
+    return status if status in ("unsupported", "missing") else "error"
+
+
+def micro_rows(entries: list[MicroEntry], *, run: int) -> list[dict]:
+    """One row per (micro project, tool); `bar_verdict` is the tool's verdict over all its projects (bar passed,
+    bar failed, not judged: groundtruth.bar_verdict)."""
+    by_tool: dict[str, list] = defaultdict(list)
+    for e in entries:
+        by_tool[e.tool].append(e.score)
+    rows = []
+    for e in entries:
+        s = e.score
+        row = {
+            "project": e.project.name,
+            "language": e.project.language,
+            "tool": e.tool,
+            "run": run,
+            "tailored": e.tailored,
+            "status": e.status,
+            "verdict": micro_verdict(e.status, s),
+            "n_items": len(e.project.assets),
+            "decoys": len(e.project.decoys),
+            "bar_verdict": bar_verdict(by_tool[e.tool]),
+        }
+        if s is not None:
+            recall_repo = s.recall_repo
+            row.update(
+                {
+                    "strict": len(s.hits_strict),
+                    "lenient": len(s.hits_lenient),
+                    "repo": None if s.hits_repo is None else len(s.hits_repo),
+                    "recall_strict": round(s.recall_strict, 3),
+                    "recall_lenient": round(s.recall_lenient, 3),
+                    "recall_repo": None if recall_repo is None else round(recall_repo, 3),
+                    "sites_in_file": s.sites_in_file,
+                    "sites_correct": s.sites_correct,
+                    "precision": None if s.precision is None else round(s.precision, 3),
+                    "f1": round(s.f1, 3),
+                    "bar_items": s.bar_items,
+                    "passes_bar": s.passes_bar,
+                    "missed": s.missed,
+                    "repo_missed": s.repo_missed,
+                    "repo_extra": s.repo_extra,
+                    "decoys_hit": s.decoys_hit,
+                }
+            )
+        rows.append(row)
+    return rows
+
+
+def micro_item_rows(entries: list[MicroEntry], *, run: int) -> list[dict]:
+    """Long format: one row per (project, tool, asset) of every scored run, which level found the asset."""
+    rows = []
+    for e in entries:
+        s = e.score
+        if s is None:
+            continue
+        for a in e.project.assets:
+            rows.append(
+                {
+                    "project": e.project.name,
+                    "language": e.project.language,
+                    "tool": e.tool,
+                    "run": run,
+                    "item": a.id,
+                    "families": sorted(a.families),
+                    "insertion_style": a.insertion_style,
+                    "callsite_strict": a.id in s.hits_strict,
+                    "callsite_lenient": a.id in s.hits_lenient,
+                    "repo": None if s.hits_repo is None else a.id in s.hits_repo,
+                }
+            )
+    return rows

@@ -1,25 +1,41 @@
+# syntax=docker/dockerfile:1.7
 # docker/Dockerfile.worker-cdxgen  (root-run)
 
-ARG CDXGEN_IMAGE=ghcr.io/cyclonedx/cdxgen
-ARG CDXGEN_TAG=v11.7.0
+ARG CDXGEN_IMAGE=ghcr.io/cdxgen/cdxgen
+# 13.5.0, the latest stable release as of 2026-10-30 (the project moved to the cdxgen org; npm's `latest` still
+# names 12.9.0). 12.8.x added the source-level crypto inventory for JS/TS (11.7.0 found nothing on any micro project).
+# JS/TS runs without -t: a single -t js switches that inventory off. Java and Go get their -t (workers/cdxgen/main.py).
+ARG CDXGEN_TAG=13.5.0@sha256:6b1f2ef9c976ab52400140f336a2df1633d8ff59c1cb0941d01fc131788fa60a
+FROM ghcr.io/astral-sh/uv:0.12.5@sha256:e85be844203885286c60ffad8a858d48afb6c5a5c237ca0e67f12e74b8f174b1 AS uv
 FROM ${CDXGEN_IMAGE}:${CDXGEN_TAG}
 
 # Stay root on purpose for this one worker
 USER root
 WORKDIR /app
+# The container runs with cap_drop=ALL, so root has no DAC_OVERRIDE: make the dirs cdxgen
+# writes to actually owned/writable by root (upstream ships /tmp/cdxgen-temp as uid 1000
+# and /root without the owner write bit).
+RUN chmod 0700 /root && mkdir -p /root/.m2 /tmp/cdxgen-temp \
+ && chown -R root:root /tmp/cdxgen-temp && chmod 1777 /tmp/cdxgen-temp
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONPATH=/app
 
 # Keep venv out of /app just to avoid lock/perm weirdness
 ENV UV_PROJECT_ENVIRONMENT=/root/.venvs/cdxgen \
-    UV_NO_LOCK=1
+    UV_LINK_MODE=copy
+
+COPY --from=uv /uv /uvx /usr/local/bin/
 
 # Deps first
 COPY pyproject.toml uv.lock ./
 COPY common/ ./common/
-RUN python3 -m pip install --no-cache-dir --upgrade pip uv \
- && uv sync --frozen --no-dev
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
 
 # Worker code last
 COPY workers/cdxgen/ ./workers/cdxgen/
 
-ENTRYPOINT ["uv", "run", "--no-dev", "workers/cdxgen/main.py"]
+ENTRYPOINT ["uv", "run", "--frozen", "--no-dev", "workers/cdxgen/main.py"]
+
+# BF-CBOM commit this image was built from (compose/bake pass it; last, so it never invalidates the layers above)
+ARG BF_CBOM_COMMIT=unknown
+ENV BF_CBOM_COMMIT=${BF_CBOM_COMMIT}

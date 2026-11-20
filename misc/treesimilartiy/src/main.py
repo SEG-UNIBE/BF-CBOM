@@ -1,15 +1,15 @@
 import logging
-import os
-import queue
-import time
 import multiprocessing
+import os
+import time
 from pathlib import Path
 
 import json_matching  # type: ignore  # pylint: disable=import-error,wrong-import-position
 import redis
 
-from common.config import REDIS_HOST, REDIS_PORT
+from common.config import BLPOP_TIMEOUT_SEC, REDIS_HOST, REDIS_PORT, REDIS_SOCKET_TIMEOUT_SEC
 from common.models import ComponentMatchJobInstruction, ComponentMatchJobResult
+from common.worker import publish_heartbeat
 
 NAME = Path(__file__).resolve().parents[1].name
 JOB_QUEUE = f"jobs:{NAME}"
@@ -33,22 +33,18 @@ def _match_worker(payloads: list[str], result_queue) -> None:
 
 def _serialize_match(match_group: list) -> list:
     return [
-        {
-            "file": component.doc_id,
-            "component": component.comp_id,
-            "cost": component.cost
-        } for component in match_group
+        {"file": component.doc_id, "component": component.comp_id, "cost": component.cost} for component in match_group
     ]
 
 
-def _match_components_legacy(documents: list[str]) ->  list[dict]:
+def _match_components_legacy(documents: list[str]) -> list[dict]:
     logger.info("Starting n-way component matching for %d documents...", len(documents))
     for i, doc in enumerate(documents):
         logger.info("Document %d first 300 chars: %s", i, doc[:300])
     logger.info("\tpreparing...")
     documents = json_matching.prepare_json_documents(documents)
     logger.info("\tpreparing DONE... (%d documents)", len(documents))
-    
+
     logger.info("\tmatching...")
     matches = json_matching.n_way_match_pivot(documents, cost_thresh=10000.0)
 
@@ -58,7 +54,7 @@ def _match_components_legacy(documents: list[str]) ->  list[dict]:
     return serialized
 
 
-def _match_components(documents: list[list[str]]) ->  list[dict]:
+def _match_components(documents: list[list[str]]) -> list[dict]:
     logger.info("Starting n-way component matching for %d documents...", len(documents))
     # The C++ function expects a list of documents, where each document is a list of component JSON strings.
     # It returns a list of chains, where each chain is a list of component IDs.
@@ -97,21 +93,11 @@ def _handle_instruction(raw_payload: str) -> None:
     logger.info(
         "📨 Received job instruction for job %s (repo: %s)", instruction.job_id, instruction.repo_info.full_name
     )
-    
-    
+
     # Transform the list of CbomJson objects into a list of documents (list[list[str]])
     # as expected by the C++ matching function.
-    documents = [
-        entry.components_as_json
-        for entry in instruction.CbomJsons
-        if entry.components_as_json
-    ]
-    documents_raw = [
-        entry.entire_json_raw
-        for entry in instruction.CbomJsons
-        if entry.entire_json_raw
-    ]
-    
+    documents = [entry.components_as_json for entry in instruction.CbomJsons if entry.components_as_json]
+
     tools = [entry.tool for entry in instruction.CbomJsons if entry.components_as_json]
     if len(documents) < 2:
         logger.warning("Need at least two documents with components to match. Aborting.")
@@ -156,9 +142,7 @@ def _handle_instruction(raw_payload: str) -> None:
         # match_results = _run_match_with_timeout(
         #     _match_components, documents, timeout_seconds=TIMEOUT_SEC
         # )
-         match_results = _run_match_with_timeout(
-            _match_components, documents, timeout_seconds=TIMEOUT_SEC
-        )
+        match_results = _run_match_with_timeout(_match_components, documents, timeout_seconds=TIMEOUT_SEC)
     except TimeoutError as err:
         status = "timeout"
         error_msg = str(err)
@@ -171,9 +155,7 @@ def _handle_instruction(raw_payload: str) -> None:
     if status == "ok":
         if match_results is None:
             status = "timeout"
-            error_msg = (
-                f"Component matching timed out after {TIMEOUT_SEC} seconds"
-            )
+            error_msg = f"Component matching timed out after {TIMEOUT_SEC} seconds"
             matches = []
         else:
             matches = match_results
@@ -207,19 +189,26 @@ def _handle_instruction(raw_payload: str) -> None:
 def main() -> None:
     global redis_client
 
-    redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
+    redis_client = redis.Redis(
+        host=REDIS_HOST, port=REDIS_PORT, decode_responses=True, socket_timeout=REDIS_SOCKET_TIMEOUT_SEC
+    )
     logger.info("%s listening for component match jobs... (queue: %s)", NAME, JOB_QUEUE)
 
     try:
         while True:
+            publish_heartbeat(redis_client, NAME, "idle")
             try:
-                _, raw_payload = redis_client.blpop(JOB_QUEUE)
+                item = redis_client.blpop(JOB_QUEUE, timeout=BLPOP_TIMEOUT_SEC)
             except redis.exceptions.RedisError as err:
                 logger.error("Redis error while waiting for jobs: %s", err)
                 time.sleep(1)
                 continue
+            if item is None:  # BLPOP timed out with no job; keep waiting
+                continue
+            _, raw_payload = item
             if not raw_payload:
                 continue
+            publish_heartbeat(redis_client, NAME, "busy")
             _handle_instruction(raw_payload)
     except KeyboardInterrupt:
         logger.info("Received shutdown signal, stopping listener")

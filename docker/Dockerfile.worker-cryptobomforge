@@ -1,5 +1,7 @@
-# syntax=docker/dockerfile:1.4
-FROM --platform=linux/amd64 python:3.12-slim
+# syntax=docker/dockerfile:1.7
+# amd64-only on purpose: CodeQL ships no Linux arm64 binaries.
+FROM ghcr.io/astral-sh/uv:0.12.5@sha256:e85be844203885286c60ffad8a858d48afb6c5a5c237ca0e67f12e74b8f174b1 AS uv
+FROM --platform=linux/amd64 python:3.12-slim-trixie@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1
 
 # Set working directory inside the container
 WORKDIR /app
@@ -28,32 +30,36 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Set JAVA_HOME and ensure it's in the PATH for CodeQL
-ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
 ENV PATH=$PATH:${JAVA_HOME}/bin
 
-# Install uv (Astral) as a static binary and move it to a system-wide path.
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
-    && mv /root/.local/bin/uv /usr/local/bin/uv
+# uv (Astral), pinned static binary
+COPY --from=uv /uv /uvx /usr/local/bin/
 
 # Copy dependency files first to leverage Docker's build cache.
 COPY pyproject.toml uv.lock README.md LICENSE ./
+COPY workers/cryptobomforge/requirements.txt ./workers/cryptobomforge/requirements.txt
 
 # Use uv for all Python package installations for consistency and speed.
 # Note: uv sync handles requirements from pyproject.toml.
 ARG CRYPTOBOM_FORGE_VERSION=1.1.0
-RUN uv sync --frozen --no-dev \
-    && uv pip install \
-        https://github.com/pre-quantum-research/cyclonedx-python-lib/archive/refs/heads/cbom.tar.gz \
+# Extra deps are pinned in workers/cryptobomforge/requirements.txt (cryptobom-forge itself
+# is installed --no-deps because it needs the forked cyclonedx-python-lib).
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev \
+    && uv pip install -r workers/cryptobomforge/requirements.txt \
     && uv pip install --no-deps \
-        "https://github.com/Santandersecurityresearch/cryptobom-forge/releases/download/${CRYPTOBOM_FORGE_VERSION}/cryptobom_forge-${CRYPTOBOM_FORGE_VERSION}-py3-none-any.whl" \
-    && uv pip install click jsonschema PyYAML requests dataclasses_json normalize_json tqdm redis
+        "https://github.com/Santandersecurityresearch/cryptobom-forge/releases/download/${CRYPTOBOM_FORGE_VERSION}/cryptobom_forge-${CRYPTOBOM_FORGE_VERSION}-py3-none-any.whl"
 
 # Install CodeQL CLI in a separate, cached layer.
-ARG CODEQL_VERSION=2.23.0
+ARG CODEQL_VERSION=2.27.3
+# sha256 of codeql-linux64.zip of that release
+ARG CODEQL_SHA256=845075a2fa2fdf72629adc6cbde6264691b698d1f294bd27f10c6b579cd750a4
 RUN mkdir -p /opt/codeql \
     && curl -#Lf --retry 5 --retry-all-errors --retry-delay 5 --continue-at - \
          -o /tmp/codeql.zip \
          "https://github.com/github/codeql-cli-binaries/releases/download/v${CODEQL_VERSION}/codeql-linux64.zip" \
+    && echo "${CODEQL_SHA256}  /tmp/codeql.zip" | sha256sum -c - \
     && unzip /tmp/codeql.zip -d /opt/codeql \
     && rm /tmp/codeql.zip \
     && ln -s /opt/codeql/codeql/codeql /usr/local/bin/codeql \
@@ -62,14 +68,31 @@ RUN mkdir -p /opt/codeql \
 
 
 # Download CodeQL query packs and resolve languages.
-RUN /usr/local/bin/codeql pack download codeql/python-queries codeql/java-queries \
+# Pack versions must match the CLI: these are the ones shipped with CODEQL_VERSION
+# (see github/codeql tag codeql-cli/v<CODEQL_VERSION>, <lang>/ql/src/qlpack.yml).
+ARG CODEQL_PYTHON_QUERIES=1.8.13
+ARG CODEQL_JAVA_QUERIES=1.11.13
+ARG CODEQL_CPP_QUERIES=1.9.2
+# The worker runs experimental/cryptography/inventory/new_models (Python, C/C++); fail the build if absent.
+RUN /usr/local/bin/codeql pack download \
+        codeql/python-queries@${CODEQL_PYTHON_QUERIES} \
+        codeql/java-queries@${CODEQL_JAVA_QUERIES} \
+        codeql/cpp-queries@${CODEQL_CPP_QUERIES} \
     && codeql resolve packs \
-    && codeql resolve languages
+    && codeql resolve languages \
+    && codeql resolve queries codeql/python-queries:experimental/cryptography/inventory/new_models | grep -q AllCryptoAlgorithms \
+    && codeql resolve queries codeql/cpp-queries:experimental/cryptography/inventory/new_models | grep -q AllCryptoAlgorithms
 
 # Copy the application code. This should be the final step to benefit from caching.
 COPY common/ ./common/
 COPY workers/cryptobomforge/ ./workers/cryptobomforge/
 
 # Define the entrypoint for the application.
+# Reported in every JobResult.tool_version
+ENV TOOL_VERSION="cryptobom-forge ${CRYPTOBOM_FORGE_VERSION}; codeql ${CODEQL_VERSION}; codeql-java-queries ${CODEQL_JAVA_QUERIES}; codeql-python-queries ${CODEQL_PYTHON_QUERIES}; codeql-cpp-queries ${CODEQL_CPP_QUERIES}; crypto queries experimental/cryptography/inventory/new_models"
+
 ENTRYPOINT ["tini", "--", "python", "-m", "workers.cryptobomforge.main"]
 
+# BF-CBOM commit this image was built from (compose/bake pass it; last, so it never invalidates the layers above)
+ARG BF_CBOM_COMMIT=unknown
+ENV BF_CBOM_COMMIT=${BF_CBOM_COMMIT}

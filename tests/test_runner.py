@@ -1,0 +1,318 @@
+"""The batch runner end to end on a fake Redis (misc/cli/experiment_cmd.py): a fake worker thread drains the job
+queues like common/worker.py would, the runner enqueues, collects, stores, resumes, retries and exports."""
+
+import json
+import shutil
+import subprocess
+import threading
+import time
+import zipfile
+
+import fakeredis
+import pytest
+import yaml
+from typer.testing import CliRunner
+
+from common import experiment as ex
+from common.models import JobInstruction, JobResult
+from common.worker import heartbeat_key, live_replicas, publish_heartbeat, replica_key
+from misc.cli import experiment_cmd
+
+TOOLS = ["t1", "t2"]
+
+
+class FakeWorkers(threading.Thread):
+    """BLPOPs `jobs:<tool>` for every tool, answers with an ok CBOM (t2 fails on the second repo), publishes
+    heartbeats, pushes JobResults to `results:<tool>` as a worker does."""
+
+    def __init__(self, r):
+        super().__init__(daemon=True)
+        self.r, self.stop, self.seen = r, threading.Event(), []
+
+    def run(self):
+        while not self.stop.is_set():
+            for tool in TOOLS:
+                publish_heartbeat(self.r, tool, "idle")
+            item = self.r.blpop([f"jobs:{t}" for t in TOOLS], timeout=1)
+            if item is None:
+                continue
+            queue, raw = item
+            tool = queue.split(":", 1)[1]
+            instr = JobInstruction.from_json(raw)
+            self.seen.append((tool, instr.repo_info.full_name))
+            failing = tool == "t2" and instr.repo_info.full_name.endswith("/second")
+            result = JobResult(
+                job_id=instr.job_id,
+                status="error" if failing else "ok",
+                repo_info=instr.repo_info,
+                json="{}"
+                if failing
+                else json.dumps({"bomFormat": "CycloneDX", "specVersion": "1.6", "components": []}),
+                duration_sec=0.01,
+                size_bytes=2,
+                worker=tool,
+                tool_version=f"{tool} 1.0",
+                run_index=instr.run_index,
+                error="boom" if failing else None,
+            )
+            self.r.rpush(f"results:{tool}", result.to_json())
+
+
+def _git(*args, cwd):
+    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
+
+
+@pytest.fixture
+def world(tmp_path, monkeypatch):
+    """Two local upstream repos, a results dir, a mirror dir, a fake Redis and the runner pointed at all of them."""
+    repos = {}
+    for name in ("first", "second"):
+        src = tmp_path / "upstream" / name
+        src.mkdir(parents=True)
+        (src / "a.py").write_text("import hashlib\n")
+        _git("init", "-q", "-b", "main", cwd=src)
+        _git("-c", "user.name=t", "-c", "user.email=t@t", "add", ".", cwd=src)
+        _git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "init", cwd=src)
+        repos[name] = src
+    spec = tmp_path / "e.yaml"
+    spec.write_text(
+        yaml.safe_dump(
+            {
+                "name": "e-fake",
+                "tools": TOOLS,
+                "repetitions": 1,
+                "repos": [{"full_name": f"o/{n}", "git_url": str(p), "language": "Python"} for n, p in repos.items()],
+            }
+        )
+    )
+    results, mirrors = tmp_path / "results", tmp_path / "mirrors"
+    r = fakeredis.FakeRedis(decode_responses=True)
+    monkeypatch.setattr(experiment_cmd, "_redis", lambda host, port: r)
+    monkeypatch.setattr(experiment_cmd, "experiment_dir", lambda name: results / name)
+    monkeypatch.setattr(ex, "RESULTS_DIR", results)
+    monkeypatch.setattr(experiment_cmd, "RESULTS_DIR", results)
+    real_resolve = experiment_cmd.resolve_snapshots
+    monkeypatch.setattr(
+        experiment_cmd,
+        "resolve_snapshots",
+        lambda spec, exp_dir, **kw: real_resolve(spec, exp_dir, mirror_dir=mirrors, server_url="http://gs", **kw),
+    )
+    monkeypatch.setenv("BF_CBOM_COMMIT", "abc123def456")
+    monkeypatch.setenv("EXPERIMENT_IMAGE_IDS", "bf-cbom/worker-t1:1.0.3=sha256:" + "1" * 64)
+    workers = FakeWorkers(r)
+    workers.start()
+    yield {"spec": spec, "results": results, "redis": r, "workers": workers}
+    workers.stop.set()
+    workers.join(timeout=3)
+
+
+def _run(args):
+    return CliRunner().invoke(experiment_cmd.experiment_app, args, catch_exceptions=False)
+
+
+def test_run_stores_results_resumes_retries_and_exports(world, tmp_path):
+    spec, results = world["spec"], world["results"]
+    t0 = time.monotonic()
+    result = _run(["run", str(spec), "--idle-timeout", "20", "--memory-budget-gb", "1"])
+    assert result.exit_code == 0, result.output
+    exp = results / "e-fake"
+    metas = sorted(p.relative_to(exp).as_posix() for p in exp.glob("*/*/*/run1.meta.json"))
+    assert len(metas) == 4 and all(r.commit for r in ex.pinned_repos(exp).values()) and not (exp / "lock.json").exists()
+    statuses = {(p.parents[2].name.split("@")[0], p.parent.name): json.loads(p.read_text())["status"]
+                for p in exp.glob("*/*/*/run1.meta.json")}  # fmt: skip
+    assert statuses[("o__second", "t2")] == "error" and sum(s == "ok" for s in statuses.values()) == 3
+    status = world["redis"].hgetall(experiment_cmd._status_key("e-fake"))  # what the stack board reads
+    assert (status["stored_jobs"], status["failed_jobs"], status["expected_jobs"]) == ("4", "1", "4")
+    tools = world["redis"].hgetall(experiment_cmd._tools_key("e-fake"))  # the board's forecast per tool
+    assert json.loads(status["tool_jobs"]) == {"t1": 2, "t2": 2} and (tools["t1:n"], tools["t2:n"]) == ("2", "2")
+    assert float(tools["t1:sec"]) >= 0
+    meta = json.loads(next(exp.glob("o__first@*/original/t1/run1.meta.json")).read_text())
+    assert meta["enqueued_at"] and meta["tool_version"] == "t1 1.0" and meta["variant"] == "original"
+    (session,) = ex.load_run_log(exp)
+    assert session["status"] == "completed" and session["results_stored"] == 4 and session["command"] == "run"
+    assert session["runner_commit"] == "abc123def456" and session["images"] == {"t1": "sha256:" + "1" * 64}
+    assert session["memory_budget_gb"] == 1.0 and len(session["waves"]) == 2  # two unknown tools at 1 GiB each
+    assert "e-fake: completed, 4 of 4 runs stored" in result.output and "ok 3   error 1" in result.output
+    assert "o/second  boom" in result.output and "ARGS=--retry-failed   redo the 1 run(s) not ok" in result.output
+    assert time.monotonic() - t0 < 60
+
+    # resume: everything on disk, nothing enqueued
+    again = _run(["run", str(spec), "--idle-timeout", "5"])
+    assert again.exit_code == 0 and "4 run(s) already on disk" in again.output and len(world["workers"].seen) == 4
+    assert len(ex.load_run_log(exp)) == 1  # no session without work
+
+    # retry-failed redoes only the failed run
+    retry = _run(["run", str(spec), "--idle-timeout", "20", "--retry-failed"])
+    assert retry.exit_code == 0 and "1 to enqueue" in retry.output and len(world["workers"].seen) == 5
+    assert len(ex.load_run_log(exp)) == 2
+
+    # export zips the layout without touching the volume
+    dest = tmp_path / "out"
+    exported = _run(["export", "e-fake", "--dest", str(dest), "--no-report"])
+    assert exported.exit_code == 0, exported.output
+    names = zipfile.ZipFile(dest / "e-fake.zip").namelist()
+    assert "e-fake/_experiment.yaml" in names and "e-fake/_run-log.json" in names
+    assert sum(n.endswith("run1.json") for n in names) == 4
+
+    # --all exports every complete experiment and skips one with runs missing
+    part = results / "e-part"
+    shutil.copytree(exp, part)
+    next(part.glob("o__first@*/original/t1/run1.meta.json")).unlink()
+    every = _run(["export", "--all", "--dest", str(dest), "--no-report"])
+    assert every.exit_code == 0, every.output
+    assert "skipped e-part: 1 run(s) missing" in every.output
+    assert sorted(p.name for p in dest.iterdir()) == ["e-fake.zip"]
+    assert _run(["export", "--dest", str(dest)]).exit_code != 0  # neither a name nor --all
+
+
+def test_run_refuses_workers_or_a_git_server_built_from_another_commit(world, monkeypatch):
+    spec, results = world["spec"], world["results"]
+    monkeypatch.setenv("EXPERIMENT_IMAGE_IDS", "bf-cbom/gitserver:1.0.3=sha256:" + "2" * 64)
+    # what make reads from the running containers: t1 runs an older build, t2 and the git server the runner's
+    monkeypatch.setenv("EXPERIMENT_BUILDS", "gitserver=abc123def456,worker-t1=4c87e3273be6,worker-t2=abc123def456,"
+                       "worker-other=4c87e3273be6")  # fmt: skip
+    refused = CliRunner().invoke(experiment_cmd.experiment_app, ["run", str(spec), "--idle-timeout", "5"])
+    assert refused.exit_code == 2 and "worker-t1 4c87e3273be6" in refused.output and "make up-prod" in refused.output
+    assert "worker-other" not in refused.output  # not in the spec
+    assert not (results / "e-fake").exists() and not world["workers"].seen  # nothing pinned, nothing enqueued
+    monkeypatch.setenv("EXPERIMENT_BUILDS", "gitserver=abc123def456,worker-t1=abc123def456,worker-t2=abc123def456")
+    ran = _run(["run", str(spec), "--idle-timeout", "20"])
+    assert ran.exit_code == 0, ran.output
+    (session,) = ex.load_run_log(results / "e-fake")
+    assert session["builds"]["worker-t1"] == ["abc123def456"] and session["gitserver_image"] == "sha256:" + "2" * 64
+    assert experiment_cmd.foreign_builds(["t1"], {"worker-t1": ["x"]}, None) == {}  # no runner commit: no check
+
+
+def test_overwrite_old_leaves_nothing_of_the_former_run(world):
+    spec, results, r = world["spec"], world["results"], world["redis"]
+    assert _run(["run", str(spec), "--idle-timeout", "20"]).exit_code == 0
+    exp = results / "e-fake"
+    pins = {n: r.commit for n, r in ex.pinned_repos(exp).items()}
+    first = next(exp.glob("o__first@*")) / "original"
+    stale_tool = first / "t9"  # a tool the spec no longer names: iter_results (the analysis) would still read it
+    stale_tool.mkdir()
+    (stale_tool / "run1.meta.json").write_text('{"status": "ok", "worker": "t9"}')
+    norm = first / "t1" / "run1.norm.json"
+    norm.write_text("{}")
+    (exp / ex.ANALYSIS_DIR).mkdir(exist_ok=True)
+    (exp / ex.ANALYSIS_DIR / "_SUMMARY.md").write_text("old")
+    (exp / "lock.json").write_text("{}")  # a file of an older layout
+    # a job an earlier run left pending whose result never comes: without the flag the run would wait for it
+    snap = experiment_cmd.resolve_snapshots(ex.load_spec(spec), exp)[0]
+    stale_job = ex.PlannedJob(job_id="stale-job", snapshot=snap, tool="t1", run_index=1)
+    r.hset(experiment_cmd._pending_key("e-fake"), "stale-job", experiment_cmd._descriptor(stale_job))
+
+    out = _run(["run", str(spec), "--idle-timeout", "20", "--overwrite-old"])
+    assert out.exit_code == 0, out.output
+    assert "removed the experiment folder (5 stored run(s)) and cancelled 1 pending job(s)" in out.output
+    expected = "0 run(s) already on disk, 0 unsupported (not run), 0 still pending from an earlier run, 4 to enqueue"
+    assert expected in out.output
+    assert len(world["workers"].seen) == 8  # every run of the spec again
+    assert len(list(exp.glob("*/*/*/run1.meta.json"))) == 4 and not stale_tool.exists() and not norm.exists()
+    assert not (exp / ex.ANALYSIS_DIR / "_SUMMARY.md").exists() and not (exp / "lock.json").exists()
+    assert {n: r.commit for n, r in ex.pinned_repos(exp).items()} == pins  # the same snapshots, from the spec
+    assert not r.hexists(experiment_cmd._pending_key("e-fake"), "stale-job")
+    (session,) = ex.load_run_log(exp)  # the former sessions went with their runs
+    assert session["runs_overwritten"] == 5 and session["results_stored"] == 4
+
+
+def test_delete_removes_the_folder_and_what_redis_holds_for_the_experiment(world):
+    spec, results, r = world["spec"], world["results"], world["redis"]
+    assert _run(["run", str(spec), "--idle-timeout", "20"]).exit_code == 0
+    snap = experiment_cmd.resolve_snapshots(ex.load_spec(spec), results / "e-fake")[0]
+    stale_job = ex.PlannedJob(job_id="stale-job", snapshot=snap, tool="t1", run_index=1)
+    r.hset(experiment_cmd._pending_key("e-fake"), "stale-job", experiment_cmd._descriptor(stale_job))
+    out = _run(["delete", "e-fake", "--yes"])
+    assert out.exit_code == 0 and "cancelled 1 pending job(s)" in out.output, out.output
+    assert not (results / "e-fake").exists()
+    assert not r.exists(experiment_cmd._status_key("e-fake"), experiment_cmd._pending_key("e-fake"))
+
+
+def test_mutation_block_runs_originals_and_mutants_and_regenerates_them_identically(world, tmp_path):
+    src = tmp_path / "upstream" / "mutable"
+    (src / "pkg").mkdir(parents=True)
+    (src / "pkg" / "core.py").write_text(
+        "import json\n\n\ndef load(text):\n    return json.loads(text)\n\n\ndef main():\n    return load('{}')\n"
+    )
+    _git("init", "-q", "-b", "main", cwd=src)
+    _git("-c", "user.name=t", "-c", "user.email=t@t", "add", ".", cwd=src)
+    _git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "init", cwd=src)
+    spec = tmp_path / "e4.yaml"
+    spec.write_text(
+        yaml.safe_dump(
+            {
+                "name": "mutation-fake",
+                "tools": TOOLS,
+                "repos": [{"full_name": "o/mutable", "git_url": str(src), "language": "Python"}],
+                "mutation": {"per_repo": 2, "styles": ["direct", "indirect"], "snippets": ["sha-256", "md5"]},
+            }
+        )
+    )
+    out = _run(["run", str(spec), "--idle-timeout", "20"])
+    assert out.exit_code == 0, out.output
+    exp = world["results"] / "mutation-fake"
+    manifest = ex.load_mutants(exp)
+    mutants = manifest["repos"]["o/mutable"]["mutants"]
+    assert [m["style"] for m in mutants] == ["direct", "indirect", "direct", "direct"]  # 2 calls, then 2 decoys
+    assert [m["decoy"] for m in mutants] == [False, False, True, True] and len(world["workers"].seen) == 10
+    snapshot = next(exp.glob("o__mutable@*"))
+    assert sorted(p.name for p in snapshot.iterdir()) == sorted(["original", *(m["id"] for m in mutants)])
+    meta = json.loads((snapshot / mutants[0]["id"] / "t1" / "run1.meta.json").read_text())
+    assert meta["variant"] == mutants[0]["id"] and meta["variant_commit"] == mutants[0]["commit"]
+    assert ex.expected_jobs(ex.load_spec(spec), exp) == 10 and "mutation" in yaml.safe_load(
+        ex.spec_path(exp).read_text()
+    )
+
+    again = _run(["run", str(spec), "--idle-timeout", "20", "--overwrite-old"])
+    assert again.exit_code == 0, again.output
+    assert ex.load_mutants(exp)["repos"] == manifest["repos"]  # regenerated from scratch: deterministic
+    assert len(world["workers"].seen) == 20
+
+
+def test_live_replicas_count_each_workers_containers_from_their_heartbeats():
+    r = fakeredis.FakeRedis(decode_responses=True)
+    for host in ("a1", "b2", "c3"):
+        r.set(replica_key("cbomkit", host), "{}")
+    r.set(heartbeat_key("cbomkit"), "{}")
+    r.set(heartbeat_key("xgrep"), "{}")  # an image from before the replica keys: one container
+    assert live_replicas(r, ["cbomkit", "xgrep", "qdarpan"]) == {"cbomkit": 3, "xgrep": 1, "qdarpan": 0}
+
+
+def test_list_shows_experiments_and_folders_in_an_older_layout(tmp_path, monkeypatch):
+    results = tmp_path / "results"
+    (results / "e-new").mkdir(parents=True)
+    (results / "e-new" / ex.SPEC_FILE).write_text("name: e-new\n")
+    (results / "e-old").mkdir()
+    (results / "e-old" / "experiment.yaml").write_text("name: e-old\n")
+    (results / "corpus").mkdir()
+    monkeypatch.setattr(experiment_cmd, "RESULTS_DIR", results)
+    out = _run(["list"]).output
+    lines = out.splitlines()
+    assert lines[0].split()[0] == "experiment" and lines[1].split()[0] == "e-new"
+    assert "make experiment-delete NAME=e-old" in out and "corpus" not in out
+
+
+def test_board_names_the_running_job_its_time_what_waits_and_what_failed(monkeypatch):
+    from rich.progress import Progress
+
+    from misc.cli import progress
+
+    monkeypatch.setattr(progress, "_live", Progress())  # a display that is never drawn
+    snap = {"source_url": "u", "branch": "main", "commit": "c", "variant_commit": "c", "scan_url": "s"}
+
+    def job(jid, tool, repo, variant="original"):
+        snapshot = ex.Snapshot(full_name=repo, variant=variant, scan_branch="b", **snap)
+        return ex.PlannedJob(job_id=jid, snapshot=snapshot, tool=tool, run_index=1)
+
+    jobs = [job("1", "t1", "o/big"), job("2", "t1", "o/small", "ins-x"), job("3", "t1", "o/third")]
+    jobs.append(job("4", "t2", "o/big"))
+    board = experiment_cmd._Board(jobs, waves=[["t1"], ["t2"]])
+    board.wave(1)
+    board.stored(jobs[2], "error", 1)
+    r = fakeredis.FakeRedis(decode_responses=True)
+    long_ago = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 3725))
+    r.hset("exp:e:running", mapping={"1": long_ago})
+    board.poll(r, "e", {j.job_id: j for j in jobs[:2]})
+    item = {t.description.strip(): t.fields["item"] for t in progress._live.tasks}
+    assert item["t1"].startswith("o/big · run1 · 1:02:0") and item["t1"].endswith(" · 1 queued · 1 error")
+    assert item["t2"] == "wave 2" and item["results"] == "wave 1/2 · 1 error"

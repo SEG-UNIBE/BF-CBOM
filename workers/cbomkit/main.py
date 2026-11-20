@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+import subprocess
 import threading
 import time
 import uuid
@@ -16,6 +17,8 @@ from common.worker import build_handle_instruction, run_worker
 # Worker name and timeout settings
 NAME = os.path.basename(os.path.dirname(__file__))
 TIMEOUT_SEC = int(os.getenv("WORKER_TIMEOUT_SEC", "300"))
+# How long a job waits for a backend the previous job restarted (the entrypoint allows it 120 s to answer)
+RESTART_WAIT_SEC = float(os.getenv("CBOMKIT_RESTART_WAIT_SEC", "180"))
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -82,6 +85,23 @@ def _http_delete(url: str, timeout: int = 15):
         return None, None, str(e)
 
 
+def parse_progress(message: str) -> tuple[str, str]:
+    """(type, text) of a CBOMkit websocket progress message, e.g. {"type": "ERROR", "message": "Git clone failed: ..."}.
+
+    Types seen from cbomkit 2.1.10: LABEL (incl. the final "Finished"), GITURL, BRANCH, REVISION_HASH, PURL, ERROR.
+    Anything that is not such a JSON object yields ("", "").
+    """
+    try:
+        obj = json.loads(message)
+    except Exception:
+        return "", ""
+    if not isinstance(obj, dict):
+        return "", ""
+    typ = obj.get("type")
+    txt = obj.get("message")
+    return (str(typ).upper() if typ else ""), (str(txt) if txt is not None else "")
+
+
 def _repo_host_path(git_url: str) -> str:
     # Normalize to github.com/org/repo
     url = git_url.strip()
@@ -136,6 +156,9 @@ class CbomKitClient:
         self._lock = threading.Lock()
         self._finished_evt = threading.Event()
         self._last_purl: str | None = None
+        # Set when the backend reports an ERROR progress message (e.g. "Git clone failed: Revision not found: master"
+        # after its silent main -> master retry); the scan will never reach "Finished", so the job fails at once.
+        self._scan_error: str | None = None
 
     def _make_ws_url(self, client_id: str) -> str:
         u = self.ws_url_tmpl
@@ -199,11 +222,11 @@ class CbomKitClient:
             self._ws_connected = True
 
         def on_message(ws, message):
-            try:
-                obj = json.loads(message)
-            except Exception:
-                obj = None
-            txt = (obj or {}).get("message") if isinstance(obj, dict) else None
+            typ, txt = parse_progress(message)
+            if typ == "ERROR":
+                logger.error("cbomkit backend reported: %s", txt)
+                self._scan_error = txt or "unknown error"
+                return
             if txt:
                 # Try to capture the stored PURL with commit, optionally with ?branch=...
                 try:
@@ -324,6 +347,13 @@ class CbomKitClient:
             time.sleep(0.25)
         return False
 
+    def wait_restarted(self, max_wait: float) -> None:
+        """Wait until the backend answers and the entrypoint has cleared its OOM sentinel, as after a restart."""
+        deadline = time.monotonic() + max_wait
+        self._wait_backend_ready(max_wait=max_wait)
+        while self._backend_oom_flagged() and time.monotonic() < deadline:
+            time.sleep(0.5)
+
     def get_cbom(self, repo_id: str):
         url = f"{self.base}/api/v1/cbom/{repo_id}"
         return _http_get_json(url, timeout=30)
@@ -345,6 +375,9 @@ class CbomKitClient:
             obj = json.loads(text or "{}")
         except Exception:
             return text
+        # /v1/cbom/last/1 wraps the single result in a list: [{"bom": {...}, "projectIdentifier": ...}]
+        if isinstance(obj, list) and len(obj) == 1 and isinstance(obj[0], dict):
+            obj = obj[0]
         target = obj.get("bom") if isinstance(obj, dict) and isinstance(obj.get("bom"), dict) else obj
         try:
             comps = target.get("components") if isinstance(target, dict) else None
@@ -441,7 +474,8 @@ class CbomKitClient:
 
     def _build_purl_candidates(self, namespace: str, name: str, branch: str, sha7: str | None) -> list[str]:
         base = f"pkg:github/{namespace}/{name}"
-        qs = f"?branch={branch}" if branch and branch.lower() != "main" else ""
+        # CBOMkit stores the branch URL-encoded inside the identifier (bfcbom/x -> bfcbom%2Fx)
+        qs = f"?branch={parse.quote(branch, safe='')}" if branch and branch.lower() != "main" else ""
         cands: list[str] = []
         if sha7:
             # Prefer short 7-char commit, with and without branch qualifier
@@ -475,6 +509,7 @@ class CbomKitClient:
                     continue
                 self._finished_evt.clear()
                 self._last_purl = None
+                self._scan_error = None
                 try:
                     with self._lock:
                         payload = {
@@ -491,6 +526,8 @@ class CbomKitClient:
                 while time.monotonic() < deadline:
                     if self._finished_evt.is_set():
                         return True, True, None
+                    if self._scan_error:
+                        return True, False, f"scan_error:{self._scan_error}"
                     if self._backend_oom_flagged():
                         return True, False, "backend_oom"
                     if self._ws_error:
@@ -540,12 +577,14 @@ class CbomKitClient:
             if st not in (200, 204, 404):
                 logger.warning("CBOM delete returned %s for id=%s: %s", st, rid, (body or "")[:120])
 
-    def generate_cbom(self, git_url, branch="main") -> tuple[str | None, float, str | None]:
+    def generate_cbom(
+        self, git_url, branch="main", commit: str | None = None, budget: float | None = None
+    ) -> tuple[str | None, float, str | None]:
         start = time.monotonic()
         # 1) Snapshot last/1 before scan (sequential change detection)
         before = self._get_last_raw()
         # 2) Trigger via WebSocket and wait until Finished (within budget)
-        budget = max(5.0, float(str(max(10, TIMEOUT_SEC - 5))))
+        budget = max(5.0, budget if budget is not None else float(max(10, TIMEOUT_SEC - 5)))
         ws_started, ws_finished, trig_err = self.trigger_scan_ws(git_url, branch, budget)
 
         if not ws_started:
@@ -561,6 +600,8 @@ class CbomKitClient:
                 return None, time.monotonic() - start, "backend_unavailable"
             if trig_err == "backend_oom":
                 return None, time.monotonic() - start, "backend_oom"
+            if trig_err and trig_err.startswith("scan_error:"):
+                return None, time.monotonic() - start, trig_err
             return None, time.monotonic() - start, "ws_not_finished"
 
         # 3) After finishing, allow a short grace for persistence
@@ -570,7 +611,9 @@ class CbomKitClient:
         ns, name = self._purl_namespace_name(git_url)
         host, owner, repo = self._owner_repo_from_giturl(git_url)
         if ns and name and owner and repo:
-            sha = self._github_head_sha(owner, repo, branch)
+            sha = commit[:7] if commit else None
+            if sha is None and host == "github.com":
+                sha = self._github_head_sha(owner, repo, branch)
             for pid in self._build_purl_candidates(ns, name, branch, sha):
                 rid = parse.quote(pid, safe="")
                 logger.info("Trying CBOM fetch for reconstructed id: %s", pid)
@@ -618,12 +661,25 @@ class CbomKitClient:
         return None, time.monotonic() - start, "cbom_not_available"
 
 
+def stop_backend() -> None:
+    """Kill the CBOMkit backend; the entrypoint restarts it with a fresh Postgres. A job's timeout kills only the
+    worker's process group, so a scan that ran out of time would otherwise go on in the backend beside the next
+    job's scan, taking its heap and CPUs (decided 2026-10-31, after corpus-main's largest repos timed out)."""
+    subprocess.run(["pkill", "-KILL", "-f", "quarkus-run.jar"], check=False, capture_output=True)
+
+
 def _produce(instr: JobInstruction, trace: Trace) -> str | tuple[str, float]:
+    t0 = time.monotonic()
     logger.info("[%s] Running on repo %s", NAME, instr.repo_info.full_name)
     client = CbomKitClient()
+    # A backend the previous job restarted comes up first; this wait is not the scan's time and leaves the scan
+    # its budget short of the job's limit, so a timeout still ends here and not in the job's hard kill.
+    client.wait_restarted(max_wait=RESTART_WAIT_SEC)
     payload, duration, err = client.generate_cbom(
         git_url=instr.repo_info.git_url,
         branch=instr.repo_info.branch,
+        commit=instr.repo_info.commit,
+        budget=TIMEOUT_SEC - 5 - (time.monotonic() - t0),
     )
     if payload is not None:
         return payload, duration
@@ -631,9 +687,19 @@ def _produce(instr: JobInstruction, trace: Trace) -> str | tuple[str, float]:
         trace.add(
             f"cbomkit WebSocket did not signal 'Finished' within budget: "
             f"repo={instr.repo_info.full_name} branch={instr.repo_info.branch} "
-            f"worker_timeout_sec={TIMEOUT_SEC}"
+            f"worker_timeout_sec={TIMEOUT_SEC}; backend restarted, so the scan does not run on into the next job"
         )
+        stop_backend()
         raise TimeoutError(err)
+    if err and str(err).startswith("scan_error:"):
+        # Deterministic backend failure (clone/checkout/scan error); no point in waiting for the timeout
+        message = str(err)[len("scan_error:") :].strip()
+        trace.add(
+            f"cbomkit backend error for repo={instr.repo_info.full_name} branch={instr.repo_info.branch}: {message}"
+        )
+        # the backend's first line names the cause (`Parse error at line 1 column 8`); runs.csv shows this line
+        first = message.splitlines()[0].rstrip(":").strip() if message else ""
+        raise RuntimeError(f"cbomkit_scan_error: {first}" if first else "cbomkit_scan_error")
     if err == "backend_oom":
         trace.add("cbomkit backend encountered OutOfMemoryError")
         # Give the supervisor time to restart backend before we release the job,
@@ -651,6 +717,7 @@ def _produce(instr: JobInstruction, trace: Trace) -> str | tuple[str, float]:
 
 
 handle_instruction = build_handle_instruction(NAME, _produce)
+
 
 def main():
     # Delegate the queue/timeout loop to the shared runner

@@ -1,0 +1,53 @@
+# syntax=docker/dockerfile:1.7
+# docker/Dockerfile.worker-securin-xbom
+# securin-xbom (Apache-2.0): semgrep-rule scanner, CycloneDX 1.6 output. Installed from the pinned
+# source commit into its own venv together with a pinned semgrep, plus the registry rule sets xbom fetches
+# online, frozen from a pinned semgrep-rules commit. No cdxgen on purpose (see worker).
+ARG BASE_IMAGE=base
+ARG BASE_TAG=latest
+FROM ${BASE_IMAGE}:${BASE_TAG}
+
+ARG XBOM_REPO=https://github.com/securin-public/securin-xbom
+ARG XBOM_COMMIT=a270c5ffd393d904efc1d5ad51f406dabe197117
+ARG SEMGREP_VERSION=1.183.0
+# The semgrep.dev registry rule sets xbom fetches online, frozen from this semgrep-rules commit
+# (the whole rule sets, registry ids; see workers/securin-xbom/freeze_rules.py).
+ARG SEMGREP_RULES_REPO=https://github.com/semgrep/semgrep-rules
+ARG SEMGREP_RULES_COMMIT=16b9e6d45f10649f6a531ec4838ed9924372c3bc
+
+USER root
+RUN set -eu; \
+    git clone --quiet "${XBOM_REPO}" /opt/xbom-src \
+ && git -C /opt/xbom-src checkout --quiet "${XBOM_COMMIT}" \
+ && uv venv --quiet /opt/xbom \
+ && uv pip install --quiet --python /opt/xbom/bin/python /opt/xbom-src "semgrep==${SEMGREP_VERSION}" \
+ && rm -rf /opt/xbom-src \
+ && /opt/xbom/bin/python -c "import xbom, importlib.metadata as m; print('xbom', m.version('xbom'), 'semgrep', m.version('semgrep'))"
+COPY workers/securin-xbom/freeze_rules.py /opt/xbom-freeze_rules.py
+RUN set -eu; \
+    git init --quiet /opt/semgrep-rules \
+ && git -C /opt/semgrep-rules fetch --quiet --depth 1 "${SEMGREP_RULES_REPO}" "${SEMGREP_RULES_COMMIT}" \
+ && git -C /opt/semgrep-rules checkout --quiet FETCH_HEAD \
+ && /opt/xbom/bin/python /opt/xbom-freeze_rules.py /opt/semgrep-rules /opt/xbom-registry/rules \
+ && rm -rf /opt/semgrep-rules /opt/xbom-freeze_rules.py \
+ && chmod -R a+rX /opt/xbom-registry
+ENV TOOL_VERSION="xbom 0.1.0 (${XBOM_COMMIT}) semgrep ${SEMGREP_VERSION} registry-rules semgrep-rules@${SEMGREP_RULES_COMMIT}" \
+    SEMGREP_RULES_COMMIT=${SEMGREP_RULES_COMMIT} \
+    SEMGREP_SEND_METRICS=off SEMGREP_ENABLE_VERSION_CHECK=0
+
+USER appuser
+WORKDIR /app
+ENV PYTHONPATH=/app
+
+COPY --chown=appuser:appuser pyproject.toml uv.lock ./
+COPY --chown=appuser:appuser common/ ./common/
+RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=1000,gid=1000 \
+    uv sync --frozen --no-dev
+
+COPY --chown=appuser:appuser workers/securin-xbom/ ./workers/securin-xbom/
+
+ENTRYPOINT ["tini", "-g", "--", "uv", "run", "--frozen", "--no-dev", "workers/securin-xbom/main.py"]
+
+# BF-CBOM commit this image was built from (compose/bake pass it; last, so it never invalidates the layers above)
+ARG BF_CBOM_COMMIT=unknown
+ENV BF_CBOM_COMMIT=${BF_CBOM_COMMIT}

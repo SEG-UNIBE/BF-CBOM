@@ -1,0 +1,40 @@
+# Reader spec for CycloneDX 1.6/1.7 CBOMs (crypto fields exist in CycloneDX only since 1.6). Every tool spec
+# inherits it (directly or via a shared base) and states only where the tool differs. Values read from `fields`
+# are checked against the official schema of the version the CBOM declares (analysis/normalize/conformance.py),
+# so reading 1.7 fields from a 1.6 CBOM works but is reported as a `field` issue.
+spec: _cyclonedx
+version: 1
+findings:
+  component_types: [cryptographic-asset]
+  libraries: none          # none | tagged (library_tags) | all
+  library_tags: []
+fields:                    # standard JSON path (relative to the component) -> dimension
+  cryptoProperties.assetType: asset_type
+  cryptoProperties.oid: oid
+  cryptoProperties.algorithmProperties.algorithmFamily: family          # 1.7 (registry family)
+  cryptoProperties.algorithmProperties.primitive: primitive
+  cryptoProperties.algorithmProperties.mode: mode
+  cryptoProperties.algorithmProperties.padding: padding
+  cryptoProperties.algorithmProperties.ellipticCurve: curve             # 1.7 (`<category>/<name>`)
+  cryptoProperties.algorithmProperties.curve: curve                     # 1.6, deprecated in 1.7
+  cryptoProperties.algorithmProperties.parameterSetIdentifier: param    # key length or digest length, per family
+  cryptoProperties.algorithmProperties.cryptoFunctions: functions
+  cryptoProperties.relatedCryptoMaterialProperties.type: material
+  cryptoProperties.relatedCryptoMaterialProperties.size: size           # key size for keys, else a parameter
+  cryptoProperties.relatedCryptoMaterialProperties.algorithmRef: ref
+  cryptoProperties.certificateProperties.signatureAlgorithmRef: ref
+  cryptoProperties.protocolProperties.type: protocol
+  cryptoProperties.protocolProperties.version: protocol_version
+  purl: purl
+sources:                   # highest precedence first
+  - fields: standard
+  - parse: name
+  - refs
+  - dependencies
+  - api: occurrence:additionalContext
+locations: [evidence_occurrences]
+context: [occurrence:additionalContext, occurrence:symbol]
+notes: >
+  Generic CycloneDX reading: standard crypto fields first, then the component name (composite names such as
+  AES-256-GCM carry most of the information for many tools), then refs and dependencies between components, then
+  the API named in an occurrence's additionalContext.

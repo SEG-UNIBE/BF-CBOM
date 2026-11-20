@@ -1,3 +1,14 @@
 docker/env/*.env
 docker/env/*.env.template
 misc/treesimilartiy/build
+tests/
+notes.md
+CLAUDE.md
+.github/
+.vscode/
+.git/
+**/__pycache__/
+.venv/
+.pytest_cache/
+.ruff_cache/
+experiments/results/

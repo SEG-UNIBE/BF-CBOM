@@ -236,6 +236,8 @@ ruff.toml
 .pyproject-black.toml
 
 .idea/
-exports/
 notes.md
-experiments/
+CLAUDE.md
+
+experiments/results/*
+!experiments/results/.gitkeep

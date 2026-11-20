@@ -1,0 +1,47 @@
+# syntax=docker/dockerfile:1.7
+# docker/Dockerfile.worker-xgrep
+# Mondoo xgrep (free of charge, LicenseRef-Mondoo-Proprietary). The binary is taken from the public
+# npm package at build time and verified against the registry's sha512.
+# Pinned to the latest stable release as of 2026-10-30 (docs/tool-versions.md).
+ARG BASE_IMAGE=base
+ARG BASE_TAG=latest
+FROM ${BASE_IMAGE}:${BASE_TAG}
+
+ARG XGREP_VERSION=0.101.0
+# sha512 (hex) of @mondoohq/xgrep_linux_<arch>-<version>.tgz, from the npm registry's dist.integrity
+ARG XGREP_SHA512_AMD64=51143ad50bf3063d7441eafccd4950858adcd0aadf98b876a2731a3b4817b25615df695a163cf4a58f63bf56ca6a1ecb783789de84187a89e5ef0d62ee4f90ea
+ARG XGREP_SHA512_ARM64=dcc5c167a98a77ff28156729f6758d9cf098a4c34d428594846efdd3b8c828f517f20edcc6342b6f333eec3b9d2104a97a971f4ad9a83ac33aba0fc83254ff6f
+ARG TARGETARCH
+
+USER root
+RUN set -eu; \
+    case "${TARGETARCH}" in \
+      amd64) sum="${XGREP_SHA512_AMD64}";; \
+      arm64) sum="${XGREP_SHA512_ARM64}";; \
+      *) echo "unsupported arch ${TARGETARCH}" >&2; exit 1;; \
+    esac; \
+    url="https://registry.npmjs.org/@mondoohq/xgrep_linux_${TARGETARCH}/-/xgrep_linux_${TARGETARCH}-${XGREP_VERSION}.tgz"; \
+    curl -fsSL --retry 5 --retry-delay 5 -o /tmp/xgrep.tgz "$url"; \
+    echo "${sum}  /tmp/xgrep.tgz" | sha512sum -c -; \
+    mkdir -p /tmp/xg && tar -xzf /tmp/xgrep.tgz -C /tmp/xg; \
+    install -m 0755 "$(find /tmp/xg -type f -name xgrep | head -1)" /usr/local/bin/xgrep; \
+    rm -rf /tmp/xg /tmp/xgrep.tgz; \
+    HOME=/tmp XGREP_UPDATE_CHECK=0 DO_NOT_TRACK=1 xgrep version
+ENV TOOL_VERSION="xgrep ${XGREP_VERSION}" XGREP_UPDATE_CHECK=0 DO_NOT_TRACK=1
+
+USER appuser
+WORKDIR /app
+ENV PYTHONPATH=/app
+
+COPY --chown=appuser:appuser pyproject.toml uv.lock ./
+COPY --chown=appuser:appuser common/ ./common/
+RUN --mount=type=cache,target=/home/appuser/.cache/uv,uid=1000,gid=1000 \
+    uv sync --frozen --no-dev
+
+COPY --chown=appuser:appuser workers/xgrep/ ./workers/xgrep/
+
+ENTRYPOINT ["tini", "-g", "--", "uv", "run", "--frozen", "--no-dev", "workers/xgrep/main.py"]
+
+# BF-CBOM commit this image was built from (compose/bake pass it; last, so it never invalidates the layers above)
+ARG BF_CBOM_COMMIT=unknown
+ENV BF_CBOM_COMMIT=${BF_CBOM_COMMIT}
