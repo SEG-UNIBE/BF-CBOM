@@ -23,7 +23,7 @@ authors:
     email: timo.kehrer@unibe.ch
     affiliation: University of Bern
     orcid: "https://orcid.org/0000-0002-2582-5557"
-version: 1.0.3
+version: 2.0.0-rc.1
 url: "https://github.com/SEG-UNIBE/BF-CBOM"
 doi: 10.5281/zenodo.17140610
 abstract: >-
