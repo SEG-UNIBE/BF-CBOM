@@ -363,6 +363,13 @@ Three cases the example leaves out:
   with SHA-2 in its family field it carries SHA-2 at L4: it sits in both clusters, which stay two). The summary
   reports how many confirmations rest on such attachments (`confirmed_strict`) and how many clusters span several
   identities (`multi_unit_clusters`).
+- Confirmation through an attachment is the *lenient* reading, and it is generous in two ways. A record counts as a
+  generic report as soon as one of its levels carries a generic key: a component named in a tool's own way with
+  `SHA-2` in the standard's family field is SHA-2 at L2 and SHA-256 from L3 on, and it stays attached to the SHA-384
+  and SHA-512 clusters of other tools. And `CSPRNG`, a secure random generator without a named scheme, stands for
+  every family of its group, the non-cryptographic `PRNG` included, so reports of secure and of insecure random
+  generators confirm each other. The *strict* reading counts neither (`confirmed_strict`), and it is the lower bound
+  of every lenient share.
 - Parameters (key size, mode, padding, curve, digest) get the same ladder from L2 on, over (algorithm, value)
   pairs: a value counts at L2 only from a standard field, at L3 also when parsed from the name, at L4 from any
   source. Digest starts at L3 because CycloneDX has no field for the digest of a composite.

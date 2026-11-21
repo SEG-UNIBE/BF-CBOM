@@ -74,6 +74,7 @@ from .summary_blocks import (
     read_csv,
 )
 from .summary_rqs import (
+    INDEPENDENT,
     _agreement,
     _conformance,
     _content,
@@ -83,6 +84,7 @@ from .summary_rqs import (
     _raqun,
     _reported,
     _stability,
+    llm_ran,
 )
 
 # ----- the overview and the preamble -----
@@ -95,7 +97,7 @@ FILES = {
     "tools.csv": "one row per tool that ran: vendor, project page, how it is shipped, what it is built on, the "
     "version the paper reports and the page that shows it (common/tools.yaml)",
     "runs.csv": "one row per stored run, all repetitions (status, duration, tool version, raw CBOM counts by asset "
-    "type, LLM tokens and costs)",
+    "type)",
     "runtime.csv": "per tool and language (and all): repositories, median seconds with a bootstrap CI over "
     "repositories, p90, max, spread across repositories and between reruns, timeouts, hours, seconds per 1k "
     "source files and Spearman against size, peak memory and CPU cores with the same statistics, and the memory "
@@ -105,11 +107,11 @@ FILES = {
     "micro-items-run{i}.csv": "one row per (micro project, tool, expected item): found at call site (strict, "
     "lenient), repo",
     "items-run{i}.csv": "one row per (repo, tool, item) with whether its family is the CycloneDX registry's and the "
-    "voter groups matching it at each level L0-L4, without locations",
+    "tools matching it at each level L0-L4, without locations",
     "registry-run{i}.csv": "the delta to the CycloneDX registry: one row per family added to it (gap kind, "
     "primitive, items resting on it, repos, tools, reason), per unit no vocabulary names, and per table of the "
     "identifier layer with its size",
-    "levels-run{i}.csv": "share of each tool's items another voter group confirms, per level L0-L4",
+    "levels-run{i}.csv": "share of each tool's items another tool confirms, per level L0-L4",
     "units-run{i}.csv": "per tool: algorithm assets, records, items and how they relate (records per asset, assets "
     "per item), the kinds of place and the records outside code files of the repository's language",
     "units-repo-run{i}.csv": "per (tool, repo): algorithm assets, records, items",
@@ -127,9 +129,9 @@ FILES = {
     "and `member_voter_groups` = 0 for only attached records, no item)",
     "members-exact-run{i}.csv": "exact matcher: one row per (group, record), `matched` = joined through a lower "
     "level, `implied` with --closure",
-    "matchlevels-run{i}.csv": "the exact matcher per level: items by number of voter groups, the agreement per "
-    "dimension inside the groups and the matcher's seconds",
-    "agreement-exact-run{i}.csv": "exact matcher: one row per (group, dimension): voters reporting, agreeing, majority",
+    "matchlevels-run{i}.csv": "the exact matcher per level: items by number of tools, the agreement per dimension "
+    "inside the groups and the matcher's seconds",
+    "agreement-exact-run{i}.csv": "exact matcher: one row per (group, dimension): tools reporting, agreeing, majority",
     "groups-raqun-run{i}.csv": "RaQuN: one row per group, with its attribute-set similarity",
     **{
         f"raqun-{lv}-run{{i}}.csv": f"RaQuN at {lv}, to read: one row per group, per tool the names it reported, the "
@@ -143,9 +145,10 @@ FILES = {
     "pair Jaccard, each matcher's seconds",
     "score-run{i}.csv": "per tool, dimension and level: items, confirmation (CI), exclusivity, coverage, rank, "
     "Dawid-Skene",
-    "loo-run{i}.csv": "the order without each voter group and its Kendall tau against the full order",
-    "grouping-run{i}.csv": "the order with every tool its own voter group and with the LLM workers merged, and its "
-    "Kendall tau against the declared voter groups",
+    "loo-run{i}.csv": "the order without each tool and its Kendall tau against the full order",
+    "grouping-run{i}.csv": "the order under the declared grouping of the tools and under each other one that groups "
+    "this experiment's tools differently (every tool on its own, the tools of one pattern engine family as one), with "
+    "its Kendall tau against the declared one",
     "stability.csv": "per (tool, snapshot) with repeated runs: Jaccard across runs, record-count CV, flux (the share "
     "of items not in every run), consensus set",
     "mutants.csv": "one row per mutant (mutants.json): the injected call or decoy, its file, lines, host and patch",
@@ -157,6 +160,16 @@ FILES = {
     "medians) and the noise floor from --baseline",
     "bridge-run{i}.csv": f"the bridge to {AGREEMENT.id}: per language, each tool's confirmation rate at L4 against "
     "its F1, Spearman over the cells and Kendall tau between the rankings",
+}
+
+
+# The files that hold something of the LLM workers, as the summary of an experiment where one ran describes them.
+FILES_LLM = {
+    "runs.csv": "one row per stored run, all repetitions (status, duration, tool version, raw CBOM counts by asset "
+    "type, LLM tokens and costs)",
+    "grouping-run{i}.csv": "the order under the declared grouping of the tools and under each other one that groups "
+    "this experiment's tools differently (every tool on its own, the LLM workers as one, the tools of one pattern "
+    "engine family as one), with its Kendall tau against the declared one",
 }
 
 
@@ -197,10 +210,10 @@ def _reading() -> list[str]:
              "- `L2`: the standard vocabulary (`DESede` = `3DES`).",
              "- `L3`: composite names split (`AES-256-GCM` is `AES`).",
              "- `L4`: also each tool's own spellings and labels."),
-            ("Voter group", "tools that share their detection logic count as one voter, so that the same logic never "
-             f"confirms itself ({_link('Voter groups')})."),
-            ("Confirmed", "a tool's item is confirmed when a tool of another voter group reports it too."),
-            ("k", "the number of voter groups that report an item.", "`k=1`: one group only, unconfirmed."),
+            (INDEPENDENT, "tools that share their detection logic count as one tool, since they cannot confirm "
+             f"each other ({_link(INDEPENDENT)})."),
+            ("Confirmed", "a tool's item is confirmed when another tool reports it too."),
+            ("k", "the number of tools that report an item.", "`k=1`: one tool only, unconfirmed."),
         ],
         code=False,
     )  # fmt: skip
@@ -1176,8 +1189,11 @@ def _decoys(rows: list[dict], langs: list[str], tools: list[str]) -> list[str]:
 # ----- entry points -----
 
 
-def _files(info: dict, run: int) -> list[str]:
+def _files(info: dict, run: int, *, llm: bool = False) -> list[str]:
+    """The files of the report with their row counts, by the question they answer, then its settings. `llm`: an LLM
+    worker ran, so the files and the settings that concern such workers say so."""
     counts = info.get("rows") or {}
+    about = {**FILES, **FILES_LLM} if llm else FILES
     lines = ["## Files", ""]
     lines += _text("The files in this folder behind the tables above, with their row counts, by the question they "
                    "answer.")  # fmt: skip
@@ -1192,12 +1208,12 @@ def _files(info: dict, run: int) -> list[str]:
         if not names:
             continue
         lines += [f"#### {title}", ""]
-        lines += [f"- `{p.format(i=run)}` ({_n(counts[p.format(i=run)])} rows): {FILES.get(p, '')}."
+        lines += [f"- `{p.format(i=run)}` ({_n(counts[p.format(i=run)])} rows): {about.get(p, '')}."
                   for p in patterns if p.format(i=run) in counts]  # fmt: skip
         lines.append("")
         listed |= set(names)
     rest = [
-        (p.format(i=run), m) for p, m in FILES.items() if p.format(i=run) in counts and p.format(i=run) not in listed
+        (p.format(i=run), m) for p, m in about.items() if p.format(i=run) in counts and p.format(i=run) not in listed
     ]
     lines += ["#### Other", ""] + [f"- `{n}` ({_n(counts[n])} rows): {m}." for n, m in rest]
     lines += _bullets(
@@ -1207,7 +1223,8 @@ def _files(info: dict, run: int) -> list[str]:
             ("<snapshot>/<variant>/<tool>/run<i>.norm.json", "the normalized CBOM next to each stored one."),
         ]
     )  # fmt: skip
-    settings = info.get("settings") or {}
+    # `merge_llm` is a setting about the LLM workers: listed where one ran, or where it was set
+    settings = {k: v for k, v in (info.get("settings") or {}).items() if k != "merge_llm" or v or llm}
     adapters = info.get("adapters") or {}
     lines += _background(
         "Settings and adapter specs",
@@ -1227,17 +1244,19 @@ def render(analysis_dir: Path, *, run: int = 1) -> str:
     def rows(name: str) -> list[dict]:
         return read_csv(analysis_dir / name.format(i=run))
 
+    runs = rows("runs.csv")
+    llm = llm_ran(runs)  # an experiment without an LLM worker reads nothing of them
     lines = ["## Preamble", "", "The terms the tables use, the questions they answer, and every stored run.", ""]
     lines += _reading() + _questions()
-    lines += _runs(rows("runs.csv"))
-    lines += _memory_limits(rows("runs.csv"), rows("runtime.csv"))
+    lines += _runs(runs)
+    lines += _memory_limits(runs, rows("runtime.csv"))
     lines += _tools(rows("tools.csv"))
-    lines += _versions(rows("runs.csv"), rows("tools.csv"))
+    lines += _versions(runs, rows("tools.csv"))
     lines += _repositories(spec or {})
-    lines += _negatives(rows("runs.csv"), run)
+    lines += _negatives(runs, run)
     lines += _micro(rows("micro-run{i}.csv"), rows("micro-items-run{i}.csv"))
     lines += _content(
-        _reported(rows("runs.csv"), run),
+        _reported(runs, run),
         rows("units-run{i}.csv"),
         rows("coverage-run{i}.csv"),
         rows("units-repo-run{i}.csv"),
@@ -1250,7 +1269,7 @@ def render(analysis_dir: Path, *, run: int = 1) -> str:
     )  # fmt: skip
     lines += _normalization(rows("items-run{i}.csv"), rows("registry-run{i}.csv"), rows("vocab.csv"))
     # pairs a tool was tuned on are left out of Agreement (unless --include-tailored): said only where there are any
-    tailored = any(_true(r.get("tailored")) for r in rows("runs.csv"))
+    tailored = any(_true(r.get("tailored")) for r in runs)
     lines += _agreement(
         info,
         rows("levels-run{i}.csv"),
@@ -1260,16 +1279,18 @@ def render(analysis_dir: Path, *, run: int = 1) -> str:
         rows("loo-run{i}.csv"),
         rows("grouping-run{i}.csv"),
         tailored=tailored and not (info.get("settings") or {}).get("include_tailored"),
+        ran={r["tool"] for r in runs if r.get("status") != "unsupported"},
+        llm=llm,
     )
     lines += _mutation(rows("mutants.csv"), rows("mutation.csv"), rows("mutation-rates.csv"),
                        rows("mutation-scores.csv"), rows("bridge-run{i}.csv"))  # fmt: skip
     lines += _stability(rows("stability.csv"), (spec or {}).get("repetitions"))
-    lines += _llm(rows("runs.csv"), rows("score-run{i}.csv"))
+    lines += _llm(runs, rows("score-run{i}.csv"))
     lines += _raqun(
         rows("matchlevels-run{i}.csv"), rows("matchlevels-raqun-run{i}.csv"), rows("matchers-raqun-run{i}.csv")
     )
-    lines += _files(info, run)
-    overview = _experiment(rows("runs.csv"), load_run_log(analysis_dir.parent), spec=spec or {}, info=info, run=run)
+    lines += _files(info, run, llm=llm)
+    overview = _experiment(runs, load_run_log(analysis_dir.parent), spec=spec or {}, info=info, run=run)
     lines = _header(spec or {}, info, run) + overview + _toc(lines) + lines
     return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).rstrip() + "\n"
 

@@ -207,6 +207,32 @@ def test_grouping_rows_rank_again_with_every_tool_its_own_voter():
     assert rows["declared"]["kendall_tau"] == 1.0 and rows["per-tool"]["ranking"][:2] == ["a", "a2"]
 
 
+def test_a_grouping_is_another_one_only_where_it_groups_the_tools_that_ran_differently():
+    """grouping-run<i>.csv holds the declared grouping and each sensitivity grouping that differs from it for the
+    experiment's tools (`same_grouping`), whatever the groups are called: the paper's ten tools are each their own
+    group, so only the shared pattern engine family changes who confirms whom."""
+    from common.tools_registry import voter_groups
+
+    declared = voter_groups()
+    others = {
+        "per-tool": {t: t for t in declared},
+        "llm-merged": voter_groups(merge_llm=True),
+        "engine-merged": voter_groups(engine_family=True),
+    }
+
+    def kept(tools: list[str]) -> list[str]:
+        return [name for name, voters in others.items() if not sc.same_grouping(voters, declared, tools)]
+
+    eligible = ["cbomkit", "cdxgen", "cipherradar", "cryptobomforge", "cryptoscan", "pqcheck", "qdarpan", "scanoss",
+                "securin-xbom", "xgrep"]  # fmt: skip
+    assert kept(eligible) == ["engine-merged"]
+    assert kept([*eligible, "cbomkit-jar"]) == ["per-tool", "engine-merged"]  # CBOMkit twice, as in the bar exam
+    assert kept(["cbomkit", "cipherradar"]) == []  # one tool of the engine family: its group under another name
+    assert kept(["cbomkit", "deepseek", "claude"]) == ["llm-merged"] and kept(["cbomkit", "claude"]) == []
+    assert sc.same_grouping({"a": "x", "b": "x"}, {"a": "y", "b": "y", "c": "y"}, ["a", "b", "outside"])
+    assert not sc.same_grouping({"a": "x", "b": "x"}, {"a": "a"}, ["a", "b"])
+
+
 def test_flux_counts_the_items_not_in_every_run_and_the_baseline_summarizes_it_per_tool():
     """Detection's noise floor: `flux` per (tool, snapshot) is the share of items that come and go between repeated runs
     of unchanged code; `baseline_flux` gives each tool's mean flux and the share of its snapshots whose runs differ."""

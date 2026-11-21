@@ -34,6 +34,7 @@ from __future__ import annotations
 import random
 import statistics
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 
 from .levels import UNIT_LEVEL, identity, parameter_at
@@ -353,6 +354,21 @@ def leave_one_out(obs: Observations, dim: str, *, min_repos: int = MIN_REPOS, mi
             }
         )
     return rows
+
+
+def same_grouping(a: dict[str, str], b: dict[str, str], tools: Iterable[str]) -> bool:
+    """Whether two voter maps (tool -> voter group, a tool outside a map its own group) put `tools` into the same
+    groups, whatever the groups are called. Two such maps let the same tools confirm each other, so they give the
+    same ranking: a sensitivity grouping is worth its rows only where it differs from the declared one."""
+    tools = list(tools)
+
+    def groups(voter_of: dict[str, str]) -> set[frozenset[str]]:
+        out: dict[str, set[str]] = defaultdict(set)
+        for tool in tools:
+            out[voter_of.get(tool, tool)].add(tool)
+        return {frozenset(ts) for ts in out.values()}
+
+    return groups(a) == groups(b)
 
 
 def grouping_rows(

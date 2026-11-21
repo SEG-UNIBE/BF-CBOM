@@ -106,7 +106,7 @@ The name says the kind of spec, then what it runs on.
 
 | Spec | Tools | Repos | Purpose |
 |---|---|---|---|
-| `bar-micro.yaml` | all 14 workers, once | the 3 micro projects (`experiments/corpus/micro`: Java, Python, Go) | the voter bar: the micro check against the generated ground truth (`make analysis ARGS="micro bar-micro"`), whose verdicts are written into the later specs by hand (`tools`, `tool_languages`; at least 7 of 14 in their functions in one paper language); 42 jobs |
+| `bar-micro.yaml` | all 14 workers, once | the 3 micro projects (`experiments/corpus/micro`: Java, Python, Go) | the bar exam: the micro check against the generated ground truth (`make analysis ARGS="micro bar-micro"`), whose verdicts are written into the later specs by hand (`tools`, `tool_languages`; at least 7 of 14 in their functions in one paper language); 42 jobs |
 | `stability-pilot.yaml` | the 10 eligible tools (cdxgen in Go only), 3 repetitions | 3 micro projects + the 10 fastest pilot repos | run-to-run variance (`stability.csv`) and consensus sets for the scores; 390 jobs at most |
 | `corpus-pilot-small.yaml` | the 10 eligible tools (cdxgen in Go only) | the 12 pilot projects in Java, Python and Go (`experiments/corpus/pilot-2026-10-08.yaml`) | first real workload: location-aware agreement on the pilot's pinned projects; large repos (Kafka, Keycloak) push CBOMkit towards its timeout |
 | `corpus-pilot-medium.yaml` | the 10 eligible tools (cdxgen in Go only), once | 60 manually selected projects, 20 each in Java, Python and Go (`experiments/corpus/pilot-2026-10-22.yaml`) | second pilot, pinned to default-branch HEADs on 2026-10-22; 900 tool/repository pairs |
@@ -590,8 +590,8 @@ Run one as `make analysis ARGS="<command> <exp>"`, for example `make analysis AR
 **The summary, `_SUMMARY.md`**
 
 - Markdown tables for a first look: runs per tool, the micro inclusion matrix and recall at two levels, who finds
-  each micro asset, fill rates and spec issues, the L0-L4 ladder, how many voter groups report each algorithm per
-  repository, LLM token counts, the list of files.
+  each micro asset, fill rates and spec issues, the L0-L4 ladder, how many tools report each algorithm per
+  repository, the list of files. LLM token counts and costs appear only where an LLM worker ran.
 - Its Preamble ends with the repositories the record names, each linked to GitHub at its pinned commit, folded into
   one column per language, or flat with the size when the corpus builder recorded one.
 - It is rendered from the CSV files and the record, so it never shows anything they don't hold.
@@ -708,8 +708,9 @@ Their columns: [Table reference](#table-reference).
 
 `levels <exp>` computes the normalization ladder (L0-L4, see
 [the ladder](../analysis/README.md#normalization-from-a-cbom-to-records)): per repository the items each tool
-reports (`analysis/README.md` "Units"), and the share that a tool of another voter group (`voter_group` in
-`common/tools.yaml`) also reports. It prints a tools x levels table and writes two files.
+reports (`analysis/README.md` "Units"), and the share that another tool also reports. Tools that share their
+detection logic count as one (`voter_group` in `common/tools.yaml`). It prints a tools x levels table and writes two
+files.
 
 | File | Content |
 |---|---|
@@ -719,7 +720,7 @@ reports (`analysis/README.md` "Units"), and the share that a tool of another vot
 | Option | Effect |
 |---|---|
 | `--run <i>` | another repetition |
-| `--merge-llm` | every LLM worker one voter |
+| `--merge-llm` | the LLM workers count as one tool |
 | `--include-tailored` | keeps the pairs a tool was tuned on |
 | `--closure` | adds the algorithms a record implies |
 
@@ -729,27 +730,33 @@ reports (`analysis/README.md` "Units"), and the share that a tool of another vot
 the exact matcher's groups, per tool, dimension (algorithm, key size, mode, padding, curve, digest, location) and
 level.
 
-**Voter groups** follow shared detection logic: the two CBOMkit packagings count once, and using the same pattern
-engine alone does not merge tools. `--merge-llm` merges the LLM workers.
+**Independent tools.** Tools that share their detection logic count as one, since they cannot confirm each other
+(`voter_group` in `common/tools.yaml`): the two CBOMkit packagings count once, and using the same pattern engine
+alone does not merge tools. `--merge-llm` merges the LLM workers.
 
 **What an item is.** An L4 identity, a (identity, value) pair or a (identity, file:line) pair, read off the
 matcher's groups so that a group is never counted twice.
 
 | Measure | Meaning |
 |---|---|
-| confirmation rate | the share of the tool's items another voter group reports too: the same algorithm per repository, the same parameter value, a shared call site |
+| confirmation rate | the share of the tool's items another tool reports too: the same algorithm per repository, the same parameter value, a shared call site |
 | `rate` | the point estimate: the mean of the per-repository rates, with a bootstrap CI of that mean over repositories (`--samples`, default 200) |
 | `rate_pooled` | the share over all items |
-| exclusivity | the share no other voter group reports at all |
+| exclusivity | the share no other tool reports at all |
 | rank | only for tools with items in at least 3 repositories and 10 items in total; others show their rate without a rank or CI |
-| Dawid-Skene | on the algorithm dimension, a weighted support: an EM without labels estimates every voter group's sensitivity and specificity, and a tool's support is the mean posterior of its items |
+| Dawid-Skene | on the algorithm dimension, a weighted support: an EM without labels estimates every tool's sensitivity and specificity, and a tool's support is the mean posterior of its items |
 
-- **Leave one out.** `loo-run<i>.csv` recomputes the ranking without each voter group, with Kendall's tau against
-  the full ranking.
+- **Leave one out.** `loo-run<i>.csv` recomputes the ranking without each tool, with Kendall's tau against the full
+  ranking.
+- **Merged tools.** `grouping-run<i>.csv` ranks the tools under the declared grouping and again under each other
+  one that groups the tools that ran differently: every tool on its own (`per-tool`), the LLM workers as one
+  (`llm-merged`), the tools of one pattern engine family as one (`engine-merged`). A grouping that changes nothing
+  for the experiment is not written.
 - **Tailored pairs.** Pairs a tool was tuned on are excluded (`--include-tailored` keeps them).
 - **Stability.** `stability.csv` covers every (tool, repository) with repeated runs: Jaccard of the algorithm sets
   between runs, the record-count CV and the consensus set (algorithms in more than half of the runs). With
-  repetitions the scores use that consensus set (`--no-consensus` scores run i alone).
+  repetitions the scores use that consensus set (`--no-consensus` scores run i alone). An experiment without
+  repeated runs has no such file.
 - **LLM costs** come from the stored token usage and the dated price table `analysis/data/llm_prices.yaml`
   (`cost_usd`, `priced_model`, `price_period`, `price_table_version` in `runs.csv`). The summary adds cost per
   repository, per item and per confirmed item.
@@ -817,7 +824,7 @@ runs the **exact matcher** (`analysis/matchers/exact.py`, matcher (b)) at every 
 call-site groups (`scope: repo` / `site`) into the same `groups-exact-run<i>.csv`.
 
 **Agreement per dimension.** Per group and dimension (key size, mode, padding, curve, digest, location) the
-agreement table says how many voters report a value admitted at the level and how many carry the majority value.
+agreement table says how many tools report a value admitted at the level and how many carry the majority value.
 
 **Levels.** The full group, member and agreement tables are written at the scoring level (`--level`, default L4),
 the per-level summary `matchlevels-run<i>.csv` for all five levels (L0-L4).
@@ -915,7 +922,7 @@ The commands write to the experiment's folder on the volume. `run1` is repetitio
 <exp>/_ANALYSIS/
 ├── _SUMMARY.md                  # report: Markdown tables of everything below, for reading
 ├── latex/                       # report: the paper's tables (tab_*.tex) and key numbers (val_<experiment>.tex)
-├── tables-run1.json             # tables: settings used, row counts, the analysis code's commit, versions, the voter map (group, engine per tool)
+├── tables-run1.json             # tables: settings used, row counts, the analysis code's commit, versions, per tool the group it counts in and its engine
 │
 ├── runs.csv                     # tables: one row per stored run (all repetitions)
 ├── runtime.csv                  # tables: per tool and language, how long its scans take (Content)
@@ -936,15 +943,15 @@ The commands write to the experiment's folder on the volume. `run1` is repetitio
 ├── traceability-run1.csv        # schema (Content): per (snapshot, tool): located, existing, in range, strong
 │
 ├── levels-run1.csv              # levels: confirmed share per tool at normalization levels L0-L4
-├── items-run1.csv               # levels: which items each tool reports per repository, with the voter groups matching at each level
+├── items-run1.csv               # levels: which items each tool reports per repository, with the tools matching at each level
 ├── groups-exact-run1.csv        # tables: exact matcher, one row per group (repo scope per algorithm, site scope per call site)
 ├── members-exact-run1.csv       # tables: one row per (group, record)
-├── agreement-exact-run1.csv     # tables: one row per (group, dimension): voters reporting / agreeing, majority value
-├── matchlevels-run1.csv         # tables: the exact matcher per level: items by voter groups, agreement per dimension
+├── agreement-exact-run1.csv     # tables: one row per (group, dimension): tools reporting / agreeing, majority value
+├── matchlevels-run1.csv         # tables: the exact matcher per level: items by number of tools, agreement per dimension
 ├── score-run1.csv               # score (Agreement): per tool, dimension, level: items, confirmation [CI], exclusivity, rank, Dawid-Skene
-├── loo-run1.csv                 # score (Agreement): ranking without each voter group, Kendall tau vs the full ranking
-├── grouping-run1.csv            # score: the ranking under other voter groupings, Kendall tau
-├── stability.csv                # score: per (tool, snapshot) with repeated runs: Jaccard across runs, records CV, consensus
+├── loo-run1.csv                 # score (Agreement): ranking without each tool, Kendall tau vs the full ranking
+├── grouping-run1.csv            # score: the ranking under the declared grouping of the tools and each that differs, Kendall tau
+├── stability.csv                # score, only with repeated runs: per (tool, snapshot) Jaccard across runs, records CV, consensus
 │
 ├── micro-run1.csv               # tables: one row per (micro project, tool); only with micro projects
 ├── micro-items-run1.csv         # tables: one row per (micro project, tool, expected item)
@@ -991,9 +998,9 @@ file.
 | `groups-raqun-run<i>.csv`, `members-raqun-run<i>.csv`, `agreement-raqun-run<i>.csv` | matches, only with `--raqun` | RaQuN's groups |
 | `matchers-raqun-run<i>.csv` | matches, only with `--raqun` | (repository, level): exact vs RaQuN |
 | `score-run<i>.csv` | scores | (dimension, tool) at the matcher's level |
-| `loo-run<i>.csv` | scores | (dimension, left-out voter group) |
-| `grouping-run<i>.csv` | scores | (dimension, voter grouping) |
-| `stability.csv` | scores | (tool, snapshot, variant) with >= 2 runs |
+| `loo-run<i>.csv` | scores | (dimension, left-out tool) |
+| `grouping-run<i>.csv` | scores | (dimension, grouping of the tools) |
+| `stability.csv` | scores, only with repeated runs | (tool, snapshot, variant) with >= 2 runs |
 | `micro-run<i>.csv` | ground truth | micro project and tool of the spec, also unsupported and failed runs |
 | `micro-items-run<i>.csv` | ground truth | (micro project, tool, expected item) of every scored run |
 | `mutants.csv` | Detection | mutant (`mutants.json`) |
@@ -1186,6 +1193,8 @@ The delta to the CycloneDX registry (Normalization). Three kinds of rows:
 `levels-run<i>.csv`:
 
 - dimension, level, tool, voter_group, items, confirmed, share.
+- **voter_group:** the tool it counts as. Tools that share their detection logic count as one (`voter_group` in
+  `common/tools.yaml`), and every other tool is its own. Every column named after it counts tools that way.
 - **confirmed_strict:** confirmed without the attached generic reports.
 - **multi_unit_clusters:** clusters whose members span several L4 identities.
 - Tool `all` pools every tool.
@@ -1194,13 +1203,13 @@ The delta to the CycloneDX registry (Normalization). Three kinds of rows:
 `items-run<i>.csv`:
 
 - **`unit`:** the item's L4 identity.
-- the tool's voter group, and the repo's language.
+- the tool's `voter_group`, and the repo's language.
 - **`tailored`:** the tool was tuned on the repo.
 - **`implied`:** the row is only implied (with `--closure`).
 - **`registry`:** its family is a CycloneDX registry entry rather than an addition of `algorithms.yaml`
   (Normalization).
 - the number of records and distinct spellings behind it.
-- **`k_L0` .. `k_L4`:** per level, the voter groups in the item's largest cluster.
+- **`k_L0` .. `k_L4`:** per level, the number of tools in the item's largest cluster.
 
 </details>
 
@@ -1212,10 +1221,10 @@ records at one call site.
 
 - matcher, repo, snapshot, commit, variant, run, language, level, scope.
 - **group_id:** `E00001`, clusters sorted by key; sites `E00001.001`.
-- **n_tools, tools:** the tools. k counts voter groups: `voter_groups`.
+- **n_tools, tools:** the tools. k counts those that share their detection logic once: `voter_groups`.
 - **key:** the level's key: a raw name at L0, an identity at L4.
 - voters, voter_groups.
-- **member_voter_groups:** voter groups with a record of their own in the group, attached records aside. 0 = the
+- **member_voter_groups:** those of them with a record of their own in the group, attached records aside. 0 = the
   group is no item, the rule of `matchlevels-run<i>.csv` and the summary's "Per language".
 - n_records, n_sites, n_attached.
 - **units, n_units:** L4 identities of the members.
@@ -1240,8 +1249,8 @@ records at one call site.
 
 - matcher, repo, snapshot, variant, run, group_id, scope, key.
 - **dimension:** key_size, mode, padding, curve, digest; location for repo groups.
-- **reporting:** voters with a value.
-- **agreeing:** voters carrying the majority value.
+- **reporting:** tools with a value.
+- **agreeing:** tools carrying the majority value.
 - majority, values.
 
 </details>
@@ -1251,11 +1260,12 @@ records at one call site.
 
 - matcher, level, run, repos, records.
 - **items:** algorithms by L4 identity.
-- **k1, k2, k3, k4plus:** items by the voter groups of their largest group at the level.
+- **k1, k2, k3, k4plus:** items by the number of tools in their largest group at the level.
 - share_k2plus.
-- **`<dim>_groups` and `<dim>_agree`** for key_size, mode, padding, curve, digest: groups with 2+ voters reporting a
+- **`<dim>_groups` and `<dim>_agree`** for key_size, mode, padding, curve, digest: groups with 2+ tools reporting a
   value admitted at the level, and the share where all agree.
-- **location_groups, location_agree:** groups with 2+ located voters, and the share with 2+ at one call site.
+- **location_groups, location_agree:** groups with 2+ tools that give a location, and the share with 2+ at one call
+  site.
 
 </details>
 
@@ -1280,22 +1290,27 @@ records at one call site.
 - **ci_low, ci_high:** bootstrap of the mean over repositories; only with enough support.
 - exclusive, exclusivity.
 - **majority_items, majority_covered, coverage:** of the repository's majority items (those at least half of the
-  voter groups that ran there report), the share the tool reports, mean over repositories: a recall proxy.
+  tools that ran there report), the share the tool reports, mean over repositories: a recall proxy.
 - **rank:** only with items in ≥ 3 repos and ≥ 10 items.
 - **ds_support, ds_sensitivity, ds_specificity:** algorithm dimension only.
 
 `loo-run<i>.csv`: dimension, level, left_out, kendall_tau, ranking.
 
-`grouping-run<i>.csv`: the sensitivity checks of the voter groups (`analysis/README.md` "Voter groups").
+`grouping-run<i>.csv`: how far the ranking depends on which tools count as one (the evidence for the declared
+grouping is in `analysis/README.md`).
 
 - dimension, level, voter_groups, ranked, ranking.
-- **grouping:** `declared`, `per-tool`, `llm-merged`, `engine-merged`.
+- **grouping:** `declared`, then each of `per-tool` (every tool on its own), `llm-merged` (the LLM workers as one)
+  and `engine-merged` (the tools of one pattern engine family as one) that groups the tools that ran differently
+  from `declared`. A grouping that changes nothing for the experiment is not written.
 - **kendall_tau:** against `declared`.
 
 </details>
 
 <details>
 <summary><code>stability.csv</code></summary>
+
+Written only when a tool ran more than once on a snapshot, so an experiment without repeated runs has no such file.
 
 - repo, snapshot, variant, tool, level, runs, records_mean, records_cv, items_mean, jaccard_mean, jaccard_min,
   consensus, unstable.
@@ -1419,13 +1434,13 @@ members = pd.read_csv("_ANALYSIS/members-exact-run1.csv")
 groups = pd.read_csv("_ANALYSIS/groups-exact-run1.csv")
 keys = ["snapshot", "variant", "run"]
 df = records.merge(members, on=keys + ["record_id", "tool"]).merge(groups, on=keys + ["group_id"], suffixes=("", "_group"))
-groups.query("scope == 'repo'")["voter_groups"].value_counts()   # voter groups per item
+groups.query("scope == 'repo'")["voter_groups"].value_counts()   # tools per item
 groups["tools"].str.split(";")          # list cells
 
 micro = pd.read_csv("_ANALYSIS/micro-run1.csv")
 micro.pivot(index="tool", columns="language", values="lenient")      # the inclusion matrix
 items = pd.read_csv("_ANALYSIS/items-run1.csv")
-items.drop_duplicates(["snapshot", "variant", "unit"])["k_L4"].value_counts()   # voter groups per item at L4
+items.drop_duplicates(["snapshot", "variant", "unit"])["k_L4"].value_counts()   # tools per item at L4
 ```
 
 ### Export

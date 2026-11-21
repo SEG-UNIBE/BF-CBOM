@@ -132,7 +132,7 @@ def bar(micro: list[dict]) -> list[Value]:
 def findings(levels: list[dict], items: list[dict], schema: list[dict]) -> list[Value]:
     """Content to Agreement in a handful of numbers: the algorithm items in all and per tool (levels-run<i>.csv, the
     top level), those resting on a vocabulary addition (items-run<i>.csv), the documents that validate
-    (schema-run<i>.csv), and the two ends of the ladder: the share of items another voter group also reports before
+    (schema-run<i>.csv), and the two ends of the ladder: the share of items another tool also reports before
     normalization (raw names) and after it."""
     out: list[Value] = []
     algorithm = [r for r in levels if r.get("dimension") == "algorithm"]
@@ -162,7 +162,7 @@ def findings(levels: list[dict], items: list[dict], schema: list[dict]) -> list[
         row = whole.get(level)
         if row and _int(row["items"]):
             share = _share(_int(row["confirmed"]), _int(row["items"]))
-            out.append(v(what, share, f"share of items another voter group also reports, {note} ({level})"))
+            out.append(v(what, share, f"share of items another tool also reports, {note} ({level})"))
     return out
 
 

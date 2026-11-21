@@ -699,8 +699,8 @@ def _baseline(name: str | None) -> dict[str, dict[str, float]] | None:
     if not name:
         return None
     path = analysis_dir(_experiment(name)) / "stability.csv"
-    if not path.exists():
-        _err(f"--baseline {name}: no {path.name} in its _ANALYSIS (run `report` on it first, with repeated runs)")
+    if not path.exists():  # not reported yet, or reported without repeated runs, which writes no such file
+        _err(f"--baseline {name}: no {path.name} in its _ANALYSIS (`report` writes it only with repeated runs)")
     rows = baseline_flux(read_csv(path))
     if not rows:
         _err(f"--baseline {name}: its stability.csv has no rows (the experiment needs repetitions > 1)")
@@ -759,11 +759,16 @@ def _mutation_step(
 
 
 def _stability_step(all_runs: list[Normalized], write: Writer, *, level: str) -> dict[tuple[str, str, str], set[str]]:
-    """stability.csv over every repetition (analysis/stability.py); returns the consensus sets of repeated runs."""
+    """stability.csv over every repetition (analysis/stability.py); returns the consensus sets of repeated runs.
+    Without a (tool, snapshot, variant) that has two or more runs there is nothing to compare: no step, no file, no
+    consensus sets."""
     runs: dict[tuple[str, str, str], dict[int, list]] = defaultdict(dict)
     for meta, cbom_path, n in all_runs:
         snapshot, variant = cbom_path.parents[2].name, cbom_path.parents[1].name
         runs[(snapshot, variant, n.tool)][int(meta.get("run_index") or 1)] = n.records
+    if not any(len(by_run) > 1 for by_run in runs.values()):
+        typer.echo("no repeated runs in this experiment: stability table skipped")
+        return {}
     with progress.step("run-to-run stability"):
         rows, consensus = stability_rows(runs, level=level, repo_of=tbl.full_name)
     write("stability.csv", rows, STABILITY_COLUMNS)
@@ -785,8 +790,10 @@ def _score_step(
 ) -> sc.Observations:
     """score-run<i>.csv, loo-run<i>.csv and grouping-run<i>.csv (analysis/score.py) from the exact matcher's groups;
     returns the observations under the declared voter groups (the bridge of the mutation step reads them).
-    grouping-run<i>.csv ranks the tools again with every tool its own voter group, with the LLM workers merged and
-    with the tools of one pattern engine family merged (the sensitivity checks of the declared voter groups)."""
+    grouping-run<i>.csv ranks the tools under the declared voter groups and again with every tool its own voter
+    group, with the LLM workers merged and with the tools of one pattern engine family merged (the sensitivity
+    checks of the declared voter groups), each only when it groups the tools that ran differently from the declared
+    groups: a grouping that changes nothing for this experiment would repeat the declared rows."""
     voter_of = _voter_of(merge_llm)
     tools_ran: dict[str, set[str]] = defaultdict(set)
     repo_of: dict[str, str] = {}
@@ -814,11 +821,16 @@ def _score_step(
         rows, loo = sc.score_rows(obs, samples=samples)
     write(f"score-run{run}.csv", rows, sc.SCORE_COLUMNS)
     write(f"loo-run{run}.csv", loo, sc.LOO_COLUMNS)
-    with progress.step("Agreement: other voter groupings"):
-        groupings = {"declared": obs, "per-tool": observe({t: t for t in voter_of})}
+    with progress.step("Agreement: sensitivity to merged tools"):
+        others = {"per-tool": {t: t for t in voter_of}}
         if not merge_llm:
-            groupings["llm-merged"] = observe(_voter_of(True))
-        groupings["engine-merged"] = observe(voter_groups(merge_llm=merge_llm, engine_family=True))
+            others["llm-merged"] = _voter_of(True)
+        others["engine-merged"] = voter_groups(merge_llm=merge_llm, engine_family=True)
+        ran = set().union(*tools_ran.values())
+        groupings = {"declared": obs}
+        groupings |= {
+            name: observe(voters) for name, voters in others.items() if not sc.same_grouping(voters, voter_of, ran)
+        }
         grouping = sc.grouping_rows(groupings)
     write(f"grouping-run{run}.csv", grouping, sc.GROUPING_COLUMNS)
     return obs
@@ -838,7 +850,7 @@ def score_cmd(
     jobs: int = JOBS_OPT,
 ):
     """Agreement: the per-tool rates without ground truth (confirmation rate, exclusivity, Dawid-Skene support,
-    leave-one-voter-out, bootstrap CIs) on the exact matcher's groups; stability.csv over repeated runs."""
+    leave-one-tool-out, bootstrap CIs) on the exact matcher's groups; stability.csv over repeated runs."""
     exp_dir = _experiment(name)
     counts: dict[str, int] = {}
     write = _writer(analysis_dir(exp_dir), counts)
@@ -941,7 +953,7 @@ def levels(
     jobs: int = JOBS_OPT,
 ):
     """How much agreement normalization creates: share of each tool's items (per repository) that another
-    voter group also reports, at levels L0 (raw names) to L4 (full adapter specs). See analysis/levels.py.
+    tool also reports, at levels L0 (raw names) to L4 (full adapter specs). See analysis/levels.py.
     Also writes items-run<i>.csv: which items each tool reports per repository and level."""
     exp_dir = _experiment(name)
     counts: dict[str, int] = {}
@@ -956,7 +968,7 @@ def levels(
     )
     for level in lv.LEVELS:
         typer.echo(f"  {level}: {lv.LEVEL_NAMES[level]}")
-    typer.echo("share of a tool's items (per repository) that another voter group also reports:")
+    typer.echo("share of a tool's items (per repository) that another tool also reports:")
     for line in lv.table_lines(rows):
         typer.echo("  " + line)
 
@@ -1115,10 +1127,10 @@ def report(
     baseline: str | None = BASELINE_OPT,
 ):
     """Everything in one pass: normalized CBOMs, every CSV table (runs, records, schema/meaningful/sources and
-    traceability, the exact matcher's groups/members/agreement, scores and leave-one-out, stability, micro at two
-    levels, items per tool and level, ladder, the registry delta, coverage, conformance; with mutants the Detection
-    tables mutants.csv, mutation.csv, mutation-rates.csv, mutation-scores.csv and bridge-run<i>.csv, the agreement
-    tables on the originals only) and _ANALYSIS/_SUMMARY.md with Markdown tables."""
+    traceability, the exact matcher's groups/members/agreement, scores and leave-one-out, stability with repeated
+    runs, micro at two levels, items per tool and level, ladder, the registry delta, coverage, conformance; with
+    mutants the Detection tables mutants.csv, mutation.csv, mutation-rates.csv, mutation-scores.csv and
+    bridge-run<i>.csv, the agreement tables on the originals only) and _ANALYSIS/_SUMMARY.md with Markdown tables."""
     exp_dir = _experiment(name)
     path = run_report(
         exp_dir,

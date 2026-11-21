@@ -745,6 +745,8 @@ def _conformance(schema: list[dict], meaningful: list[dict], conf: list[dict], s
                     top,
                 ]
             )
+        # a CBOM our worker assembled is among them, as the LLM workers' are: only then the table has that value
+        assembled = any(r.get("cbom_by") == "bf-cbom" for r in schema)
         lines += ["### Conformance", ""]
         lines += _text(
             "Every CBOM validated as a whole document against the official CycloneDX JSON schema of the version it "
@@ -756,7 +758,7 @@ def _conformance(schema: list[dict], meaningful: list[dict], conf: list[dict], s
             [
                 ("CBOM by", "`tool`: the tool writes the document.",
                  "`BF-CBOM`: our worker assembles it (the LLM workers), so validity there measures BF-CBOM, not the "
-                 "tool."),
+                 "tool." if assembled else ""),
                 ("CBOMs", "its stored CBOMs."),
                 ("declares", "the format and versions they declare."),
                 ("checked", "the CBOMs validated."),
@@ -1117,22 +1119,24 @@ def _spellings(vocab: list[dict]) -> list[str]:
 
 
 def _agreement(info: dict, levels: list[dict], matchlevels: list[dict], groups: list[dict], scores: list[dict],
-               loo: list[dict], grouping: list[dict], *, tailored: bool = False) -> list[str]:  # fmt: skip
-    """Agreement: the voter groups, part (a) the agreement per level (the ladder per tool, the items by voter groups),
-    part (b) the agreement at the top level and the per-tool rates. The exact matcher throughout. `tailored`: the
-    experiment has (tool, repository) pairs a tool was tuned on, which are left out, so the tables say so."""
+               loo: list[dict], grouping: list[dict], *, tailored: bool = False, ran: set[str] | None = None,
+               llm: bool = False) -> list[str]:  # fmt: skip
+    """Agreement: which tools count as one, part (a) the agreement per level (the ladder per tool, the items by
+    number of tools), part (b) the agreement at the top level and the per-tool rates. The exact matcher throughout.
+    `tailored`: the experiment has (tool, repository) pairs a tool was tuned on, which are left out, so the tables
+    say so. `ran`: the tools that ran, `llm`: an LLM worker is among them (`llm_ran`)."""
     ladder, items = _ladder(levels, tailored), _level_items(matchlevels, tailored)
     if items and not ladder:
         ladder = [f"### {LADDER}", ""]
     top = _at_top(matchlevels, groups)
-    rates = _scores(scores, loo, grouping, tailored)
-    body = _voters(info) + ladder + items + top + rates
+    rates = _scores(scores, loo, grouping, tailored, llm=llm)
+    body = _voters(info, ran, llm=llm, sensitivity=f"#### {SENSITIVITY}" in rates) + ladder + items + top + rates
     if not body:
         return []
     intro = [
         AGREEMENT.question,
         "The exact matcher puts the records of different tools that describe the same algorithm in one repository "
-        "into one group, and how many voter groups end up together says how much the tools agree.",
+        "into one group, and how many tools end up together says how much they agree.",
     ]
     if ladder:
         intro.append(f"{AGREEMENT.part('a')}, as normalization proceeds: the same items at every level, in "
@@ -1143,40 +1147,52 @@ def _agreement(info: dict, levels: list[dict], matchlevels: list[dict], groups: 
     return [AGREEMENT.heading(), "", *_text(*intro)] + body
 
 
-def _voters(info: dict) -> list[str]:
-    """The voter groups the agreement numbers rest on (tables-run<i>.json `voters`, after --merge-llm)."""
+INDEPENDENT = "Independent tools"  # the heading of the rule on who confirms whom
+SENSITIVITY = "Sensitivity to merged tools"  # the heading of the check of that rule, after the per-tool rates
+COUNTS_AS = "counts as"  # the column that names a tool's group (`voter_group` in the CSVs), and its note
+COUNTS_AS_COLUMN = (
+    COUNTS_AS,
+    f"the tool it counts as, which is itself unless it shares its detection logic with others ({_link(INDEPENDENT)}).",
+)
+
+
+def _voters(info: dict, ran: set[str] | None = None, *, llm: bool = False, sensitivity: bool = False) -> list[str]:
+    """Who confirms whom: the rule, and as a table the tools that count as one, when two or more of a group ran
+    (tables-run<i>.json `voters`, each tool of the spec with its group after --merge-llm; `ran`: the tools that ran,
+    default all of them). `llm`: an LLM worker ran, `sensitivity`: the summary holds the check of the rule."""
     voters = info.get("voters") or {}
     if not voters:
         return []
     groups: dict[str, list[str]] = defaultdict(list)
     for tool, v in voters.items():
-        groups[v.get("voter_group") or tool].append(tool)
+        if ran is None or tool in ran:
+            groups[v.get("voter_group") or tool].append(tool)
     shared = {g: ts for g, ts in sorted(groups.items()) if len(ts) > 1}
-    single = sorted(ts[0] for ts in groups.values() if len(ts) == 1)
-    lines = ["### Voter groups", ""]
+    lines = [f"### {INDEPENDENT}", ""]
     lines += _text(
-        "Who confirms whom in every table below: a tool's finding counts as confirmed only when a tool of *another* "
-        "voter group reports it too.",
-        "Tools that share their detection logic (the same engine packaged twice, or the same rules) form one group, so "
-        "that the same logic never confirms itself, and every other tool is a voter group of its own.",
+        "Who confirms whom in every table below: a tool's finding counts as confirmed only when another tool reports "
+        "it too.",
+        "Tools that share their detection logic count as one tool, since they cannot confirm each other "
+        "(`voter_group` in `common/tools.yaml`).",
+        "One row per group of such tools in this experiment, and every other tool counts on its own."
+        if shared
+        else "No two tools of this experiment share their detection logic, so every tool counts on its own.",
     )
     if shared:
         table = [
             [g, ", ".join(sorted(ts)), ", ".join(sorted({voters[t].get("engine") or "?" for t in ts}))]
             for g, ts in shared.items()
         ]
-        lines += md_table(["voter group", "tools", "engine"], table, "lll") + [""]
-    if single:
-        lines += _text(f"One voter group each: {', '.join(f'`{t}`' for t in single)}.")
-    if (info.get("settings") or {}).get("merge_llm"):
-        lines += _check(CAVEAT, "`--merge-llm`: the LLM workers count as one voter (`merge_group: llm`), the "
+        lines += md_table([COUNTS_AS, "tools", "engine"], table, "lll") + [""]
+    if llm and (info.get("settings") or {}).get("merge_llm"):
+        lines += _check(CAVEAT, "`--merge-llm`: the LLM workers count as one tool (`merge_group: llm`), the "
                                 "sensitivity check.")  # fmt: skip
-    lines += _background("How the groups are decided", _text(
+    lines += _background("Which tools count as one", _text(
         "Tools that share only a pattern engine but run independently written rules count apart: their rule sets were "
         "checked and share no rule.",
-        "The groups are BF-CBOM's decision, set in `common/tools.yaml` (`voter_group`) with the evidence in "
-        "`analysis/README.md` (Voter groups).",
-        "The scores also rank the tools under other groupings.",
+        "The decision is BF-CBOM's, recorded per tool in `common/tools.yaml`, with the evidence in "
+        "`analysis/README.md`.",
+        f"{_link(SENSITIVITY)} ranks the tools again under other groupings." if sensitivity else "",
     ))  # fmt: skip
     return lines
 
@@ -1185,8 +1201,8 @@ LADDER = "Agreement per level (the ladder)"  # the heading of the question's par
 
 
 def _ladder(all_rows: list[dict], tailored: bool = False) -> list[str]:
-    """Agreement, part (a): per tool the share of its items another voter group also reports at each level, and the
-    same for the parameters (levels-run<i>.csv)."""
+    """Agreement, part (a): per tool the share of its items another tool also reports at each level, and the same
+    for the parameters (levels-run<i>.csv)."""
     rows = [r for r in all_rows if r.get("dimension", "algorithm") == "algorithm"]
     if not rows:
         return []
@@ -1204,29 +1220,29 @@ def _ladder(all_rows: list[dict], tailored: bool = False) -> list[str]:
     lines = [f"### {LADDER}", ""]
     lines += _text(
         "How much of the tools' agreement is created by normalization?",
-        "One row per tool: of its `items` (algorithms per repository, location ignored), the share another voter group "
-        f"also reports when names count as the same at that level (see {_link('How to read this summary')}).",
+        "One row per tool: of its `items` (algorithms per repository, location ignored), the share another tool also "
+        f"reports when names count as the same at that level (see {_link('How to read this summary')}).",
         "The L0 to L4 gap is the agreement normalization creates.",
     )
-    lines += md_table(["tool", "voter group", *levels, "items"], table, "ll" + "r" * (len(levels) + 1)) + [""]
+    lines += md_table(["tool", COUNTS_AS, *levels, "items"], table, "ll" + "r" * (len(levels) + 1)) + [""]
     if tailored:
         lines += _check(CAVEAT, "Pairs a tool was tuned on are left out.")
     alls = {r["level"]: r for r in rows if r["tool"] == "all"}
     lines += _columns(
         [
-            ("voter group", "the tool's voter group."),
-            (f"{levels[0]} … {levels[-1]}", "the share of its items another voter group also reports at that level.",
+            COUNTS_AS_COLUMN,
+            (f"{levels[0]} … {levels[-1]}", "the share of its items another tool also reports at that level.",
              "The items are the same at every level, so the shares are comparable: they only grow from left to right, "
              "and each step's gain is what one normalization step adds.",
              "The tool specs behind L4 hold the tools' own spellings and labels, never our judgments."),
-            ("items", "the tool's items, and for `all` the voters' items pooled."),
+            ("items", "the tool's items, and for `all` the tools' items pooled."),
         ]
     )  # fmt: skip
     eg = next((row for row in table if row[0] != "all" and row[2] and row[2] != row[1 + len(levels)]), None)
     if eg:
         lines += _example(
             f"`{eg[0]}` reports {_n(eg[-1])} items.",
-            f"Another voter group reports a share of {eg[2]} of them under the identical name ({levels[0]}) and "
+            f"Another tool reports a share of {eg[2]} of them under the identical name ({levels[0]}) and "
             f"{eg[1 + len(levels)]} once every normalization step counts ({levels[-1]}).",
         )
     if alls and any(r.get("multi_unit_clusters") not in (None, "") for r in alls.values()):
@@ -1237,7 +1253,7 @@ def _ladder(all_rows: list[dict], tailored: bool = False) -> list[str]:
         multi = ", ".join(f"{lv} {_n(_int(r.get('multi_unit_clusters')))}" for lv, r in alls.items())
         lines += _background("How much rests on vocabulary knowledge", _text(
             "A generic report (`EC`, `SHA-2`) confirms the specific algorithms it may mean.",
-            f"Confirmed without such generic reports, all voters: {strict}.",
+            f"Confirmed without such generic reports, all tools: {strict}.",
             f"Groups whose records name several algorithms (what a level declares the same), per level: {multi}.",
             "Records whose name is no algorithm (`undefined`, `api`, `non-crypto`, `ambiguous`) are no items.",
         ))  # fmt: skip
@@ -1252,14 +1268,14 @@ def _ladder(all_rows: list[dict], tailored: bool = False) -> list[str]:
             ptable.append([d, *cells, by_dim.get((d, plevels[-1]), {}).get("items", "")])
         lines += ["#### Parameters", ""]
         lines += _text(
-            "The same ladder for the parameters, pooled over the voters, one row per parameter.",
+            "The same ladder for the parameters, pooled over the tools, one row per parameter.",
             "A pair is an item with one value of it, such as AES with key size 256.",
         )
         lines += md_table(["parameter", *plevels, f"pairs {plevels[-1]}"], ptable) + [""]
         lines += _columns(
             [
-                (f"{plevels[0]} … {plevels[-1]}", "the share of the voters' pairs for which another voter group "
-                 "reports the same value for that item.",
+                (f"{plevels[0]} … {plevels[-1]}", "the share of the tools' pairs for which another tool reports "
+                 "the same value for that item.",
                  "A value counts at L2 when it sits in a standard field, from L3 also when parsed from the name, at L4 "
                  "from any source (per-tool rows in `levels-run<i>.csv`).",
                  "`n/a`: the standard has no field for that value (CycloneDX carries no digest of a composite such as "
@@ -1271,12 +1287,12 @@ def _ladder(all_rows: list[dict], tailored: bool = False) -> list[str]:
 
 
 MATCH_DIMS = ("key_size", "mode", "padding", "curve", "digest", "location")
-LEVEL_ITEMS = "Items by voter groups"
+LEVEL_ITEMS = "Items by number of tools"
 
 
 def _level_table(levels: list[dict], *, matcher: bool = False) -> tuple[list[str], list[list]]:
-    """matchlevels rows as a table: per level the items by the number of voter groups and the agreement per
-    dimension. With `matcher` a first column names each row's matcher (RaQuN's cross-check)."""
+    """matchlevels rows as a table: per level the items by the number of tools and the agreement per dimension.
+    With `matcher` a first column names each row's matcher (RaQuN's cross-check)."""
     header = ["level", "items", "k=1", "k=2", "k=3", "k≥4", "key size", "mode", "padding", "curve", "digest",
               "location"]  # fmt: skip
     table = []
@@ -1297,27 +1313,27 @@ def _level_columns(*, raqun: bool = False) -> list[str]:
     """The columns of a per-level table (`_level_table`), with RaQuN's notes when it is one of the matchers."""
     return _columns(
         [
-            ("items", "the algorithms per repository that some voter reports, the same items "
+            ("items", "the algorithms per repository that some tool reports, the same items "
              + ("for both matchers and " if raqun else "") + "at every level."),
-            ("k=1 … k≥4", "the items by the number of voter groups in their largest group, as a count and a "
-             "share of `items`.", "`k=1`: one voter group only, unconfirmed.", "`k≥4`: four or more agree."),
-            ("key size … digest", "among the groups where at least two voter groups give that parameter, the "
-             "share where all of them give the same value, with the number of such groups in brackets.",
+            ("k=1 … k≥4", "the items by the number of tools in their largest group, as a count and a share of "
+             "`items`.", "`k=1`: one tool only, unconfirmed.", "`k≥4`: four or more agree."),
+            ("key size … digest", "among the groups where at least two tools give that parameter, the share where "
+             "all of them give the same value, with the number of such groups in brackets.",
              "Parameters count from L2 on."),
-            ("location", "among the groups where at least two voter groups give a location, the share where two "
-             "of them point at the same call site (the same file, lines within ±2).",
+            ("location", "among the groups where at least two tools give a location, the share where two of them "
+             "point at the same call site (the same file, lines within ±2).",
              "Empty for `raqun`, which has no call sites." if raqun else ""),
         ]
     )  # fmt: skip
 
 
 def _level_items(levels: list[dict], tailored: bool = False) -> list[str]:
-    """Agreement, part (a): the items by the number of voter groups that agree and the agreement per dimension, per
-    level (matchlevels-run<i>.csv)."""
+    """Agreement, part (a): the items by the number of tools that agree and the agreement per dimension, per level
+    (matchlevels-run<i>.csv)."""
     if not levels:
         return []
     lines = [f"#### {LEVEL_ITEMS}", ""]
-    lines += _text("The same items at every level, by the number of voter groups that agree, and the agreement per "
+    lines += _text("The same items at every level, by the number of tools that agree, and the agreement per "
                    "dimension, one row per level.")  # fmt: skip
     header, table = _level_table(levels)
     lines += md_table(header, table, "l" + "r" * (len(header) - 1)) + [""]
@@ -1329,27 +1345,27 @@ def _level_items(levels: list[dict], tailored: bool = False) -> list[str]:
         agree = next(((d, c) for d, c in zip(MATCH_DIMS, eg[6:], strict=True) if c and d != "location"), None)
         sentences = [
             f"`{eg[2]}` under `k=1` at {eg[0]}: {eg[2].split(' ')[0]} of the {_n(eg[1])} items are reported by a "
-            "single voter group.",
-            f"`{eg[5]}` under `k≥4` says four or more voter groups agree on {eg[5].split(' ')[0]}.",
+            "single tool.",
+            f"`{eg[5]}` under `k≥4` says four or more tools agree on {eg[5].split(' ')[0]}.",
         ]
         if agree:
             share, n_groups = agree[1].split(" (")
             sentences.append(
                 f"`{agree[1]}` under `{agree[0].replace('_', ' ')}`: in {n_groups.rstrip(')')} groups at least two "
-                f"voter groups give a {agree[0].replace('_', ' ')}, and in {share} of them all give the same."
+                f"tools give a {agree[0].replace('_', ' ')}, and in {share} of them all give the same."
             )
         lines += _example(*sentences)
     return lines
 
 
 def _confirmed(levels: list[dict]) -> tuple[float, int] | None:
-    """The share of the top level's items that at least two voter groups agree on, and those items."""
+    """The share of the top level's items that at least two tools agree on, and those items."""
     top = next((r for r in levels if r["level"] == LEVEL_ORDER[-1] and _int(r["items"])), None)
     return (round(1 - _int(top["k1"]) / _int(top["items"]), 2), _int(top["items"])) if top else None
 
 
 def _at_top(levels: list[dict], groups: list[dict]) -> list[str]:
-    """Agreement, part (b): the headline, the share of items at least two voter groups agree on at the top level
+    """Agreement, part (b): the headline, the share of items at least two tools agree on at the top level
     (matchlevels-run<i>.csv), and the distribution per language at the scoring level (groups-exact-run<i>.csv)."""
     headline, overlap = _confirmed(levels), _overlap(groups)
     if not headline and not overlap:
@@ -1359,8 +1375,8 @@ def _at_top(levels: list[dict], groups: list[dict]) -> list[str]:
     sentences = ["The agreement once normalization is complete, the level the per-tool rates are built on."]
     if headline:
         sentences += [
-            f"**Headline at {top}**: of the {_n(headline[1])} items, another voter group reports the same algorithm "
-            f"for a share of {_pct(headline[0])}.",
+            f"**Headline at {top}**: of the {_n(headline[1])} items, another tool reports the same algorithm for a "
+            f"share of {_pct(headline[0])}.",
             f"The agreement per dimension is the {top} row of {_link(LEVEL_ITEMS)}.",
         ]
     return lines + _text(*sentences) + overlap
@@ -1377,7 +1393,7 @@ def _overlap(groups: list[dict]) -> list[str]:
         return buckets[min(k, 4) - 1]
 
     def line(label: str, rows: list[dict]) -> list:
-        best: dict[tuple, int] = {}  # (snapshot, variant, unit) -> voter groups of its largest group
+        best: dict[tuple, int] = {}  # (snapshot, variant, unit) -> the tools of its largest group, as they count
         # a group without a member record of its own is no item, however many generic records hang on it (the rule
         # of tables.matchlevel_row, so `all` equals the per-level table)
         rows = [g for g in rows if _int(g.get("member_voter_groups", g.get("voter_groups")))]
@@ -1405,30 +1421,38 @@ def _overlap(groups: list[dict]) -> list[str]:
             ("k=1 … k≥4", "as in that table."),
             ("sites", "the call sites inside those groups: records in the same file with lines within ±2 form one "
              "site."),
-            ("co-located", "groups where at least two voter groups point at the same call site."),
+            ("co-located", "groups where at least two tools point at the same call site."),
         ]
     )  # fmt: skip
     return lines
 
 
 def _scores(rows: list[dict], loo: list[dict], grouping: list[dict] | None = None,
-            tailored: bool = False) -> list[str]:  # fmt: skip
+            tailored: bool = False, *, llm: bool = False) -> list[str]:  # fmt: skip
     """Agreement, part (b): the per-tool rates per dimension (analysis/score.py); the orders are sensitivity
-    rows."""
+    rows. `llm`: an LLM worker ran (`_groupings`)."""
     if not rows:
         return []
     level = rows[0].get("level") or "?"
+    dims = list(dict.fromkeys(r["dimension"] for r in rows))
+    # the checks of the order, after the tables: each is there only with its data
+    checks = {
+        "leave one tool out": _leave_one_out(loo, dims),
+        "the sensitivity to merged tools": _groupings(grouping or [], llm=llm),
+    }
+    named = [name for name, block in checks.items() if block]
     lines = ["### Per-tool rates", ""]
     lines += _text(
         "Without a reference CBOM, a tool is scored by how much of what it reports other, independent tools report "
         f"too (the exact matcher's groups at {level}).",
         "One table per dimension (`algorithm`, then the parameters and `location`), one row per tool, in the order of "
         "its rate.",
-        "The checks after the tables (leave one voter out, other voter groupings) ask whether the order itself is "
-        "stable.",
+        f"The check{'s' if len(named) > 1 else ''} after the tables ({', '.join(named)}) "
+        f"ask{'' if len(named) > 1 else 's'} whether the order itself is stable."
+        if named
+        else "",
     )
     example: tuple = ()  # one worked reading, from the first table with an interval
-    dims = list(dict.fromkeys(r["dimension"] for r in rows))
     for dim in dims:
         rs = sorted(
             (r for r in rows if r["dimension"] == dim),
@@ -1454,13 +1478,13 @@ def _scores(rows: list[dict], loo: list[dict], grouping: list[dict] | None = Non
             if not example and ci and _pct(r["ci_low"]) != _pct(r["ci_high"]):  # an interval with a width
                 example = (
                     f"`{row[5]}` for `{r['tool']}` ({dim}): in the average repository a share of {_pct(r['rate'])} of "
-                    "its items are reported by another voter group too.",
+                    "its items are reported by another tool too.",
                     f"Resampling the repositories puts that average between {_pct(r['ci_low'])} and "
                     f"{_pct(r['ci_high'])}.",
                     f"Over all its {_n(r['items'])} items at once the share is {_pct(r['rate_pooled'])}, and no other "
-                    f"voter group reports {_pct(r['exclusivity'])} of them at all.",
+                    f"tool reports {_pct(r['exclusivity'])} of them at all.",
                 )
-        header = ["rank", "tool", "voter group", "repos", "items", "rate [95 % CI]", "pooled", "exclusivity",
+        header = ["rank", "tool", COUNTS_AS, "repos", "items", "rate [95 % CI]", "pooled", "exclusivity",
                   "coverage"]  # fmt: skip
         if dim == "algorithm":
             header += ["DS support", "DS sens. / spec."]
@@ -1469,30 +1493,31 @@ def _scores(rows: list[dict], loo: list[dict], grouping: list[dict] | None = Non
                             "high rate, so `coverage` stands next to it.",
                             f"The ranking by F1 is {DETECTION.id}'s.")  # fmt: skip
     if tailored:
-        lines += _check(CAVEAT, "Pairs a tool was tuned on are left out, and tools of one voter group never confirm "
+        lines += _check(CAVEAT, "Pairs a tool was tuned on are left out, and tools that count as one never confirm "
                                 "each other.")  # fmt: skip
     else:
-        lines += _check(CAVEAT, "Tools of one voter group never confirm each other.")
+        lines += _check(CAVEAT, "Tools that count as one never confirm each other.")
     lines += _columns(
         [
             ("rank", "the position in that order, only for tools with items in at least 3 repositories and at least "
              "10 items in total.", "`–`: too little, and then no interval either."),
+            COUNTS_AS_COLUMN,
             ("repos", "where the tool reports."),
             ("items", "what it reports.",
              "For `algorithm` an item is an algorithm in a repository, for a parameter (algorithm, value) such as "
              "(AES, key size 256), for `location` (algorithm, call site)."),
-            ("rate [95 % CI]", "the share of the tool's items that another voter group reports too, for a parameter "
-             "the same value, for `location` the same call site.",
+            ("rate [95 % CI]", "the share of the tool's items that another tool reports too, for a parameter the "
+             "same value, for `location` the same call site.",
              "It is computed per repository and then averaged over the repositories, so one large repository does "
              "not decide it.",
              "The brackets are a 95 % bootstrap confidence interval: the repositories resampled 200 times, the range "
              "that holds the middle 95 % of the averages.", "A wide range means few repositories or very different "
              "ones."),
             ("pooled", "the same share over all the tool's items at once, so large repositories weigh more."),
-            ("exclusivity", "the share of its items no other voter group reports at all (pooled).",
+            ("exclusivity", "the share of its items no other tool reports at all (pooled).",
              f"Agreement cannot tell whether these are findings the others miss or false positives, {DETECTION.id} "
              "can."),
-            ("coverage", "of the repository's majority items (those at least half of the voter groups that ran there "
+            ("coverage", "of the repository's majority items (those at least half of the tools that ran there "
              "report), the share the tool reports, averaged over the repositories.",
              "A recall proxy next to `rate`'s precision proxy.",
              "Empty for `location`, where call sites are compared by window, not by equality."),
@@ -1506,43 +1531,50 @@ def _scores(rows: list[dict], loo: list[dict], grouping: list[dict] | None = Non
         lines += _example(*example)
     lines += _background("Dawid-Skene", _text(
         "Dawid-Skene is a second model of the same agreement.",
-        "From the pattern of who reports what, it estimates for each voter how often it reports an item that is there "
+        "From the pattern of who reports what, it estimates for each tool how often it reports an item that is there "
         "and stays silent on one that is not, and for each item how likely it is real.",
     ))  # fmt: skip
-    if loo:
-        by_dim: dict[str, list[dict]] = defaultdict(list)
-        for r in loo:
-            by_dim[r["dimension"]].append(r)
-        table = []
-        for dim in dims:
-            taus = [
-                (_float(r["kendall_tau"]), r["left_out"])
-                for r in by_dim.get(dim, [])
-                if _float(r["kendall_tau"]) is not None
-            ]
-            if taus:
-                lo = min(taus)
-                table.append([dim, f"{lo[0]:.2f} (without {lo[1]})", f"{statistics.mean(t for t, _ in taus):.2f}"])
-        if table:
-            lines += ["#### Leave one voter out", ""]
-            lines += _text(
-                "Does the ranking depend on one voter?",
-                "Each voter group is left out in turn and the tools ranked again, one row per dimension.",
-            )
-            lines += md_table(["dimension", "lowest tau", "mean tau"], table, "lll") + [""]
-            lines += _columns(
-                [
-                    ("lowest tau", "Kendall's tau between that ranking and the full one, with the voter group whose "
-                     "removal changes the order most.", "1 is the same order, 0 unrelated, -1 reversed."),
-                    ("mean tau", "the mean over all removals."),
-                ]
-            )  # fmt: skip
-    return lines + _groupings(grouping or [])
+    return lines + [line for block in checks.values() for line in block]
 
 
-def _groupings(rows: list[dict]) -> list[str]:
-    """The ranking under other voter groupings (grouping-run<i>.csv): the sensitivity check of the voter groups."""
-    others = [r for r in rows if r["grouping"] != "declared"]
+def _leave_one_out(loo: list[dict], dims: list[str]) -> list[str]:
+    """The ranking without each tool in turn (loo-run<i>.csv), one row per dimension of `dims`."""
+    by_dim: dict[str, list[dict]] = defaultdict(list)
+    for r in loo:
+        by_dim[r["dimension"]].append(r)
+    table = []
+    for dim in dims:
+        taus = [
+            (_float(r["kendall_tau"]), r["left_out"])
+            for r in by_dim.get(dim, [])
+            if _float(r["kendall_tau"]) is not None
+        ]
+        if taus:
+            lo = min(taus)
+            table.append([dim, f"{lo[0]:.2f} (without {lo[1]})", f"{statistics.mean(t for t, _ in taus):.2f}"])
+    if not table:
+        return []
+    lines = ["#### Leave one tool out", ""]
+    lines += _text(
+        "Does the ranking depend on one tool?",
+        "Each tool is left out in turn and the others ranked again, one row per dimension.",
+    )
+    lines += md_table(["dimension", "lowest tau", "mean tau"], table, "lll") + [""]
+    lines += _columns(
+        [
+            ("lowest tau", "Kendall's tau between that ranking and the full one, with the tool whose removal changes "
+             "the order most.", "1 is the same order, 0 unrelated, -1 reversed."),
+            ("mean tau", "the mean over all removals."),
+        ]
+    )  # fmt: skip
+    return lines
+
+
+def _groupings(rows: list[dict], *, llm: bool = False) -> list[str]:
+    """The ranking under other groupings of the tools (grouping-run<i>.csv): the sensitivity check of which tools
+    count as one. Left out when the table holds the declared grouping alone, and the grouping that merges the LLM
+    workers shows only where one ran (`llm`)."""
+    others = [r for r in rows if r["grouping"] != "declared" and (llm or r["grouping"] != "llm-merged")]
     if not others:
         return []
     names = list(dict.fromkeys(r["grouping"] for r in others))
@@ -1553,31 +1585,29 @@ def _groupings(rows: list[dict]) -> list[str]:
         for g in names:
             r = by.get((dim, g))
             tau = _float(r.get("kendall_tau")) if r else None
-            cells.append(f"{tau:.2f} ({r['voter_groups']} voters)" if tau is not None else "")
+            cells.append(f"{tau:.2f} ({r['voter_groups']} tools)" if tau is not None else "")
         table.append(cells)
     algo = by.get(("algorithm", "per-tool"))
-    lines = ["#### Other voter groupings", ""]
+    lines = [f"#### {SENSITIVITY}", ""]
     lines += _text(
-        "Does the ranking depend on how tools are grouped into voters?",
+        "Does the ranking depend on which tools count as one?",
         "One row per dimension, one column per alternative grouping (`grouping-run<i>.csv`).",
         "The matcher's groups stay the same, so a change is the grouping's effect alone.",
     )
     lines += md_table(["dimension", *names], table, "l" + "l" * len(names)) + [""]
     if algo and algo.get("ranking"):
-        lines += _text(f"Algorithm ranking with every tool its own voter: {algo['ranking'].replace(';', ', ')}.")
+        lines += _text(f"Algorithm ranking with every tool on its own: {algo['ranking'].replace(';', ', ')}.")
     labels = {
-        "per-tool": "every tool its own voter, so tools sharing their detection logic then confirm each other.",
-        "llm-merged": "the LLM workers as one voter.",
-        "engine-merged": "the tools of one pattern engine family as one voter (semgrep and its fork opengrep), "
+        "per-tool": "every tool on its own, so tools sharing their detection logic then confirm each other.",
+        "llm-merged": "the LLM workers as one tool.",
+        "engine-merged": "the tools of one pattern engine family as one tool (semgrep and its fork opengrep), "
                          "whatever their rules.",
     }  # fmt: skip
-    series = f"{names[0]} … {names[-1]}" if len(names) > 1 else names[0]
-    lines += _columns(
-        [(series, "Kendall's tau between the ranking under the declared voter groups and under that grouping (1 is "
-                  "the same order), with the number of voter groups it has."),
-         *((g, labels[g]) for g in names if g in labels)]
-    )  # fmt: skip
-    return lines
+    cell = ("Kendall's tau between the ranking under the declared grouping and under that one (1 is the same order), "
+            "with the number of tools that grouping counts.")  # fmt: skip
+    if len(names) == 1:  # one column: what the grouping is, then what its cells hold
+        return lines + _columns([(names[0], labels.get(names[0], ""), "A cell is " + cell)])
+    return lines + _columns([(f"{names[0]} … {names[-1]}", cell), *((g, labels[g]) for g in names if g in labels)])
 
 
 # ----- Detection -----
@@ -1847,8 +1877,8 @@ def _bridge(bridge: list[dict]) -> list[str]:
     lines += _text(
         "Per language, each tool's confirmation rate on this experiment's original repositories is set against its F1 "
         "on the injected items (`bridge-run<i>.csv`, one cell per tool and language).",
-        f"The confirmation rate is {AGREEMENT.id}'s: the share of its algorithm items at L4 that another voter "
-        "group confirms.",
+        f"The confirmation rate is {AGREEMENT.id}'s: the share of its algorithm items at L4 that another tool "
+        "confirms.",
     )
 
     def coef(v) -> str:
@@ -1940,13 +1970,19 @@ def _stability(rows: list[dict], repetitions: int | None = None) -> list[str]:
     return lines
 
 
+def llm_ran(runs: list[dict]) -> bool:
+    """Whether an LLM worker ran in the experiment: a stored run recorded LLM requests (runs.csv `requests`). The
+    summary of an experiment without one says nothing of LLM workers, their tokens and costs or `--merge-llm`."""
+    return any(r.get("requests") for r in runs)
+
+
 def _llm(rows: list[dict], scores: list[dict] | None = None) -> list[str]:
+    if not llm_ran(rows):
+        return []
     usage: dict[str, list[dict]] = defaultdict(list)
     for r in rows:
         if r.get("requests"):
             usage[r["tool"]].append(r)
-    if not usage:
-        return []
     found = {r["tool"]: r for r in scores or [] if r.get("dimension") == "algorithm"}
     table, cost_table = [], []
     versions = set()
@@ -2031,7 +2067,7 @@ def _llm(rows: list[dict], scores: list[dict] | None = None) -> list[str]:
                 ("median per repo", "the median of one run."),
                 ("per item", "the total divided by the algorithms the tool reports (from the scores' algorithm "
                  "table)."),
-                ("per confirmed item", "the total divided by those another voter group reports too."),
+                ("per confirmed item", "the total divided by those another tool reports too."),
                 ("priced as", "the price entry used."),
             ]
         )  # fmt: skip
@@ -2051,8 +2087,8 @@ def _raqun(levels: list[dict], raqun_levels: list[dict], matchers: list[dict]) -
     lines = [f"## {RAQUN}", ""]
     lines += _text(*RAQUN_NOTE, f"The exact matcher's rows are those of {_link(LEVEL_ITEMS)}.")
     lines += ["### Both matchers per level", ""]
-    lines += _text("Items by the number of voter groups that agree, and the agreement per dimension, one row per "
-                   "matcher and level.")  # fmt: skip
+    lines += _text("Items by the number of tools that agree, and the agreement per dimension, one row per matcher "
+                   "and level.")  # fmt: skip
     header, table = _level_table(both, matcher=True)
     lines += md_table(header, table, "ll" + "r" * (len(header) - 2)) + [""]
     lines += _text(*_crosscheck(levels, raqun_levels))
@@ -2075,9 +2111,9 @@ def _crosscheck(levels: list[dict], raqun_levels: list[dict]) -> list[str]:
     if not ex or not rq:
         return []
     sentences = [
-        f"Cross-check at {LEVEL_ORDER[-1]}: another voter group reports the same algorithm for a share of "
-        f"{_pct(ex[0])} of the items (the exact matcher), and RaQuN confirms {_pct(rq[0])} when a group must be the "
-        "same finding with the same details."
+        f"Cross-check at {LEVEL_ORDER[-1]}: another tool reports the same algorithm for a share of {_pct(ex[0])} of "
+        f"the items (the exact matcher), and RaQuN confirms {_pct(rq[0])} when a group must be the same finding with "
+        "the same details."
     ]
     if ex[0] > rq[0]:
         sentences.append(f"The {_pct(ex[0] - rq[0])} in between is agreement that breaks on the details.")

@@ -301,6 +301,10 @@ def test_publish_fixture_is_deterministic_and_resolvable(tmp_path: Path):
     (other / "pkg").mkdir()
     (other / "pkg" / "a.py").write_text("import hashlib\n")
     assert ex.publish_fixture(ex.RepoSpec(full_name="bfcbom/micro-x", path=str(other)), mirror_dir=mirror) == sha1
+    # Python's bytecode cache, written when a fixture is imported once, is no part of it
+    (other / "pkg" / "__pycache__").mkdir()
+    (other / "pkg" / "__pycache__" / "a.cpython-312.pyc").write_bytes(b"\x00cache")
+    assert ex.publish_fixture(ex.RepoSpec(full_name="bfcbom/micro-x", path=str(other)), mirror_dir=mirror) == sha1
     # changed content -> new SHA, published into the existing mirror
     (src / "pkg" / "a.py").write_text("import hmac\n")
     sha2 = ex.publish_fixture(spec, mirror_dir=mirror)

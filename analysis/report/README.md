@@ -11,10 +11,11 @@ import pandas as pd
 A = "experiments/results/corpus-icpc/_ANALYSIS"   # or any copied export
 ```
 
-**Tools per item, UpSet plot (Agreement).** Which voter groups report which items per repository.
+**Tools per item, UpSet plot (Agreement).** Which tools report which items per repository.
 ```python
 groups = pd.read_csv(f"{A}/groups-exact-run1.csv").query("scope == 'repo'")
-# one row per (repo group, voter group); `voters` is a ';'-joined list in groups-exact
+# one row per (repo group, tool); `voters` is a ';'-joined list in groups-exact, where tools that share their
+# detection logic count as one
 sets = groups.dropna(subset=["voters"]).assign(voter=lambda d: d["voters"].str.split(";")).explode("voter")
 # Group ids restart in each snapshot: keep the complete key.
 keys = ["snapshot", "variant", "run", "group_id"]
@@ -41,8 +42,8 @@ ladder = ladder[["L0", "L1", "L2", "L3", "L4"]]       # one line per tool, level
 params = lv.query("dimension != 'algorithm' and tool == 'all'").pivot(index="dimension", columns="level", values="share")
 ```
 
-**Items by voter groups per level (Agreement).** Items by the number of voter groups in their largest group, and
-the agreement per dimension inside the groups, level by level.
+**Items by number of tools per level (Agreement).** Items by the number of tools in their largest group, and the
+agreement per dimension inside the groups, level by level.
 ```python
 ml = pd.read_csv(f"{A}/matchlevels-run1.csv")     # the exact matcher, one row per level
 k = ml.set_index("level")[["k1", "k2", "k3", "k4plus"]].div(ml["items"].values, axis=0)  # stacked bars
@@ -56,7 +57,7 @@ ranked = sc.dropna(subset=["rank", "ci_low", "ci_high"]).sort_values("rate")
 # dot = rate (mean per-repository confirmation), whiskers = ci_low .. ci_high
 err = [ranked["rate"] - ranked["ci_low"], ranked["ci_high"] - ranked["rate"]]
 ```
-Stability of the ranking: `loo-run1.csv` (`kendall_tau` per left-out voter group); stability across levels: rerun
+Stability of the ranking: `loo-run1.csv` (`kendall_tau` per left-out tool); stability across levels: rerun
 `make analysis ARGS="report <exp> --level L2"` and compare `rank`. Save the previous tables first:
 each report replaces `_ANALYSIS/`.
 

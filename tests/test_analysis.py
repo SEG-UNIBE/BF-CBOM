@@ -222,14 +222,15 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
         assert (out / f).exists(), f
     for f in ("schema-run1.csv", "meaningful-run1.csv", "traceability-run1.csv", "score-run1.csv", "loo-run1.csv"):
         assert (out / f).exists(), f
-    assert (out / "stability.csv").exists() and _read_csv(out / "stability.csv") == []  # one run each: no rows
+    # one run each: nothing to compare, so no stability table, and the report says so
+    assert not (out / "stability.csv").exists() and "no repeated runs in this experiment" in result.output
     scores = {(r["dimension"], r["tool"]): r for r in _read_csv(out / "score-run1.csv")}
     assert int(scores[("algorithm", "cbomkit")]["items"]) >= 11 and scores[("algorithm", "cipherradar")]["items"]
     assert float(scores[("algorithm", "cbomkit")]["rate_pooled"]) >= 0.8  # CBOMkit and CipherRadar agree on micro-java
     assert scores[("algorithm", "cbomkit")]["ds_support"] and scores[("location", "cbomkit")]["items"]
     grouping = {(r["dimension"], r["grouping"]): r for r in _read_csv(out / "grouping-run1.csv")}
     assert grouping[("algorithm", "declared")]["kendall_tau"] in ("", "1.0")  # one ranked tool or the same order
-    assert {g for _, g in grouping} == {"declared", "per-tool", "llm-merged", "engine-merged"}
+    assert {g for _, g in grouping} == {"declared"}  # no other grouping puts cbomkit and cipherradar differently
     assert list(_read_csv(out / "coverage-run1.csv")[0]) == COVERAGE_COLUMNS
     assert (out / "conformance-run1.csv").read_text(encoding="utf-8").startswith(",".join(CONFORMANCE_COLUMNS))
     units = {u["tool"]: u for u in _read_csv(out / "units-run1.csv")}
@@ -281,8 +282,8 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
                 "### Repositories", "## Bar exam", "## RQ1 Content", "### What the tools report, as written",
                 "### Units per tool", "### Traceability", "### Conformance", "### Spec issues", "### Meaningful",
                 "### Where the information lives", "## RQ2 Normalization", "### The registry and what it lacks",
-                "### Spellings per identity", "## RQ3 Agreement", "### Voter groups",
-                "### Agreement per level (the ladder)", "#### Items by voter groups", "### Agreement at L4",
+                "### Spellings per identity", "## RQ3 Agreement", "### Independent tools",
+                "### Agreement per level (the ladder)", "#### Items by number of tools", "### Agreement at L4",
                 "### Per-tool rates")  # fmt: skip
     for section in (*sections, "## Files"):
         assert section in summary, section
@@ -315,7 +316,50 @@ def test_report_command_writes_every_table_and_the_summary(tmp_path, monkeypatch
     assert all(r["registry"] in ("true", "false") for r in algos)
     assert "| cbomkit | 11 / 11 · 11 |" in summary
     assert "tuned on" not in summary  # no tool of this experiment was tuned on its repository
-    assert f"{CAVEAT} Tools of one voter group never confirm each other." in summary
+    assert f"{CAVEAT} Tools that count as one never confirm each other." in summary
+    # the report says tools, and names the rule once: no two of these share their detection logic
+    assert "No two tools of this experiment share their detection logic, so every tool counts on its own." in summary
+    assert "voter" not in summary.replace("`voter_group` in `common/tools.yaml`", "", 1).replace("member_voter_", "")
+    assert "#### Sensitivity to merged tools" not in summary  # only the declared grouping: nothing to compare
+    # nor a word about what did not take part: LLM workers, repeated runs
+    assert "LLM" not in summary and "merge_llm" not in summary and "stability.csv" not in info["rows"]
+
+
+def test_report_writes_the_stability_table_only_with_repeated_runs(tmp_path, monkeypatch, old_truth):
+    """Stability compares a tool's runs on one snapshot. With a second repetition the report writes stability.csv and
+    the summary's section; with one run each (the test above) it writes neither, and such an experiment is no
+    `--baseline`."""
+    import shutil
+
+    from typer.testing import CliRunner
+
+    from misc.cli import analysis_cmd
+
+    exp = _fake_experiment(tmp_path)
+    out = exp / "_ANALYSIS"
+    monkeypatch.setattr(analysis_cmd, "experiment_dir", lambda name: tmp_path / name)
+
+    def report(*args: str):
+        return CliRunner().invoke(analysis_cmd.analysis_app, ["report", "exp-tables", *args])
+
+    assert report().exit_code == 0 and not (out / "stability.csv").exists()
+    result = report("--baseline", "exp-tables")  # fails before anything runs: the report above stands
+    assert result.exit_code == 1 and "--baseline exp-tables: no stability.csv in its _ANALYSIS" in result.output
+    assert "## Run-to-run stability" not in (out / "_SUMMARY.md").read_text(encoding="utf-8")
+
+    record = exp / "_experiment.yaml"
+    record.write_text(record.read_text(encoding="utf-8") + "repetitions: 2\n", encoding="utf-8")
+    for tool in ("cbomkit", "cipherradar"):
+        runs = exp / SNAPSHOT / "original" / tool
+        meta = json.loads((runs / "run1.meta.json").read_text(encoding="utf-8")) | {"run_index": 2}
+        (runs / "run2.meta.json").write_text(json.dumps(meta), encoding="utf-8")
+        shutil.copy(runs / "run1.json", runs / "run2.json")
+    result = report()
+    assert result.exit_code == 0 and "stability table skipped" not in result.output, result.output
+    stable = {(r["tool"], r["runs"], r["jaccard_min"]) for r in _read_csv(out / "stability.csv")}
+    assert stable == {("cbomkit", "2", "1.0"), ("cipherradar", "2", "1.0")}  # the same CBOM twice
+    summary = (out / "_SUMMARY.md").read_text(encoding="utf-8")
+    assert "## Run-to-run stability" in summary and "- `stability.csv` (2 rows): " in summary
 
 
 def test_summary_says_that_tuned_on_pairs_are_left_out_only_when_there_are_any(tmp_path, monkeypatch, old_truth):
@@ -919,6 +963,62 @@ def test_memory_failure_names_why_a_failed_run_may_have_failed_for_memory():
     assert memory_failure("timeout", {"limit_hits": 2}) == "at limit"
     assert memory_failure("error", {"error": "parse error", "limit_hits": 0}) is None
     assert memory_failure("ok", {"oom_kills": 0, "limit_hits": 7}) is None  # an ok run did not fail
+
+
+def test_independent_tools_section_shows_a_table_only_when_two_tools_that_count_as_one_ran():
+    """Tools that share their detection logic count as one. The section states that rule, and it lists such tools
+    only when two of them ran in the experiment: in every other experiment each tool counts on its own."""
+    from analysis.summary_blocks import style_issues
+    from analysis.summary_rqs import _voters
+
+    sonar = {"voter_group": "cbomkit", "engine": "sonar-cryptography"}
+    info = {"voters": {"cbomkit": sonar, "cbomkit-jar": sonar, "xgrep": {"voter_group": "xgrep", "engine": "xgrep"}}}
+    rule = "Tools that share their detection logic count as one tool, since they cannot confirm each other"
+    both = "\n".join(_voters(info, {"cbomkit", "cbomkit-jar", "xgrep"}))
+    assert both.startswith("### Independent tools\n") and rule in both
+    assert "| counts as | tools | engine |\n" in both
+    assert "| cbomkit | cbomkit, cbomkit-jar | sonar-cryptography |" in both
+    one = "\n".join(_voters(info, {"cbomkit", "xgrep"}))  # cbomkit-jar is in the spec, but it did not run
+    assert rule in one and "|" not in one
+    assert "No two tools of this experiment share their detection logic, so every tool counts on its own." in one
+    assert style_issues(both) == style_issues(one) == []
+    assert _voters({}, {"cbomkit"}) == []  # tables written without the voter map: no section
+
+
+def test_summary_names_the_llm_workers_only_where_one_ran():
+    """An experiment without an LLM worker reads nothing of them: not in a column's note, not as a grouping, not in
+    the list of files and settings. With one, each of those passages is there."""
+    from analysis import summary as sm
+    from analysis.summary_rqs import _conformance, _groupings, llm_ran
+
+    assert not llm_ran([{"tool": "cbomkit", "requests": ""}, {"tool": "xgrep"}])
+    assert llm_ran([{"tool": "cbomkit", "requests": ""}, {"tool": "claude", "requests": "12"}])
+
+    def text(lines: list[str]) -> str:
+        return "\n".join(lines)
+
+    def grouping(name: str, groups: int) -> dict:
+        return {"dimension": "algorithm", "level": "L4", "grouping": name, "voter_groups": str(groups),
+                "ranked": "3", "kendall_tau": "1.0", "ranking": "a;b;c"}  # fmt: skip
+
+    rows = [grouping("declared", 4), grouping("llm-merged", 3), grouping("engine-merged", 3)]
+    assert "| dimension | engine-merged |" in text(_groupings(rows)) and "llm" not in text(_groupings(rows)).lower()
+    with_llm = text(_groupings(rows, llm=True))
+    assert "| dimension | llm-merged | engine-merged |" in with_llm and "the LLM workers as one tool." in with_llm
+    assert _groupings(rows[:2]) == [] == _groupings(rows[:1], llm=True)  # the declared grouping alone: no section
+
+    def cbom(tool: str, by: str) -> dict:
+        return {"tool": tool, "cbom_by": by, "schema": "1.7", "valid": "true", "bom_format": "CycloneDX",
+                "spec_version": "1.7", "error_kinds": ""}  # fmt: skip
+
+    assert "LLM" not in text(_conformance([cbom("cbomkit", "tool")], [], [], []))
+    assert "(the LLM workers)" in text(_conformance([cbom("cbomkit", "tool"), cbom("claude", "bf-cbom")], [], [], []))
+
+    info = {"rows": {"runs.csv": 3, "grouping-run1.csv": 7}, "settings": {"level": "L4", "merge_llm": False}}
+    plain, llm = text(sm._files(info, 1)), text(sm._files(info, 1, llm=True))
+    assert "llm" not in plain.lower() and "`level=L4`" in plain
+    assert "LLM tokens and costs" in llm and "the LLM workers as one" in llm and "`merge_llm=False`" in llm
+    assert "`merge_llm=True`" in text(sm._files({"settings": {"merge_llm": True}}, 1))  # a setting that was set
 
 
 def test_stability_section_names_the_pairs_that_lost_a_repetition():

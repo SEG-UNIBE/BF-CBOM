@@ -481,12 +481,16 @@ FIXTURE_AUTHOR = ("BF-CBOM fixtures", "fixtures@bf-cbom.invalid")
 FIXTURE_DATE = "2026-10-08T00:00:00Z"
 
 
+FIXTURE_IGNORE = (".git", "__pycache__", "*.pyc")  # never part of a published fixture
+
+
 def publish_fixture(spec: RepoSpec, *, mirror_dir: Path = GIT_MIRROR_DIR, bare: Path | None = None) -> str:
     """Commit a plain directory (`RepoSpec.path`, e.g. experiments/corpus/micro/java) into the base mirror (or into
     `bare`: the analysis's snapshot cache on a laptop, analysis/snapshots.py).
 
     The commit is deterministic (fixed author, date and message), so the SHA depends only on the
-    files' contents and modes: the same fixture gets the same snapshot id on every machine.
+    files' contents and modes: the same fixture gets the same snapshot id on every machine. Python's bytecode cache
+    is left out (`FIXTURE_IGNORE`): importing a Python fixture once writes it, and it would change the commit.
     Returns the commit; `ensure_mirror` then finds it in the mirror like any upstream commit.
     """
     if not spec.path:
@@ -504,7 +508,7 @@ def publish_fixture(spec: RepoSpec, *, mirror_dir: Path = GIT_MIRROR_DIR, bare: 
     }
     with tempfile.TemporaryDirectory(prefix="fixture-") as tmp:
         work = Path(tmp) / "work"
-        shutil.copytree(src, work, ignore=shutil.ignore_patterns(".git"))
+        shutil.copytree(src, work, ignore=shutil.ignore_patterns(*FIXTURE_IGNORE))
         old_env = {k: os.environ.get(k) for k in env}
         os.environ.update(env)
         try:
